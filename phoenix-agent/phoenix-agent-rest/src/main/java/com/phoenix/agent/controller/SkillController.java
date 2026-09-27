@@ -103,6 +103,12 @@ public class SkillController {
         return skillAdminService.refs(id);
     }
 
+    /** 已授权组 id（发布/授权界面回显） */
+    @GetMapping("/{id}/groups")
+    public ReturnVo<List<String>> authorizedGroupIds(@PathVariable Long id) {
+        return skillAdminService.authorizedGroupIds(id);
+    }
+
     /** 删除（仅草稿） */
     @DeleteMapping("/{id}")
     public ReturnVo<Boolean> delete(@PathVariable Long id) {

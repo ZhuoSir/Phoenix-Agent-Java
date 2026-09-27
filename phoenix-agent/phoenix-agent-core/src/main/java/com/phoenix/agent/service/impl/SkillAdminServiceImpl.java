@@ -385,6 +385,16 @@ public class SkillAdminServiceImpl implements SkillAdminService {
     }
 
     @Override
+    public ReturnVo<List<String>> authorizedGroupIds(Long id) {
+        List<String> groupIds = groupSkillInfoMapper
+            .selectListByQuery(QueryWrapper.create().where("skill_id = ?", id))
+            .stream()
+            .map(GroupSkillInfo::getGroupId)
+            .toList();
+        return ReturnVo.ok(groupIds);
+    }
+
+    @Override
     @Transactional(rollbackFor = Exception.class)
     public ReturnVo<Boolean> delete(Long id) {
         HarnessSkill skill = harnessSkillMapper.selectOneById(id);

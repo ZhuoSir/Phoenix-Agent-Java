@@ -71,6 +71,11 @@ public interface SkillAdminService {
     ReturnVo<SkillRefVO> refs(Long id);
 
     /**
+     * 已授权组 id 列表（发布/授权界面回显，R-07）。
+     */
+    ReturnVo<List<String>> authorizedGroupIds(Long id);
+
+    /**
      * 删除技能（仅草稿）：物理删技能+资源，并级联清理绑定与授权（R-08）。
      */
     ReturnVo<Boolean> delete(Long id);
