@@ -57,6 +57,17 @@ public class FrontSkillAccessServiceImpl implements FrontSkillAccessService {
 
     @Override
     public ReturnVo<String> resolveVisibleAgentSn(String accountId, Long agentId) {
+        ReturnVo<Boolean> visible = validateVisible(accountId, agentId);
+        if (visible.getData() == null) {
+            return ReturnVo.fail(visible.getMsg(), SkillErrorCodeEnm.SKILL_ACCESS_DENIED.getCode());
+        }
+        Object sn = Db.selectObject("select sn from tbl_data_agent where id = ?", agentId);
+        // sn 可为空（库配置驱动的对话智能体以 agentId 寻址），空 sn 属正常而非"不存在"
+        return ReturnVo.ok("操作成功!", sn == null ? null : (String) sn);
+    }
+
+    @Override
+    public ReturnVo<Boolean> validateVisible(String accountId, Long agentId) {
         if (agentId == null) {
             return ReturnVo.fail(SkillErrorCodeEnm.SKILL_AGENT_NOT_FOUND.getMsg(),
                 SkillErrorCodeEnm.SKILL_AGENT_NOT_FOUND.getCode());
@@ -72,13 +83,7 @@ public class FrontSkillAccessServiceImpl implements FrontSkillAccessService {
             return ReturnVo.fail("该智能体未授权给当前账号所在组",
                 SkillErrorCodeEnm.SKILL_ACCESS_DENIED.getCode());
         }
-        Object sn = Db.selectObject("select sn from tbl_data_agent where id = ?", agentId);
-        if (sn == null || ((String) sn).isBlank()) {
-            return ReturnVo.fail(SkillErrorCodeEnm.SKILL_AGENT_NOT_FOUND.getMsg(),
-                SkillErrorCodeEnm.SKILL_AGENT_NOT_FOUND.getCode());
-        }
-        // 注意：ReturnVo.ok(String) 命中 msg 重载，故用两参形式显式传 data
-        return ReturnVo.ok("操作成功!", (String) sn);
+        return ReturnVo.ok(true);
     }
 
     @Override
