@@ -195,7 +195,7 @@ const showHumanFeedback = ref(false);
 const showHarnessConfirm = ref(false);
 const pendingConfirmButtons = ref<ConfirmButton[]>([]);
 const pendingConfirmSessionId = ref('');
-const pendingConfirmAgentSn = ref('');
+const pendingConfirmAgentId = ref<number>(0);
 const lastRequest = ref<GraphRequest | null>(null);
 const resultSetDisplayConfig = reactive<ResultSetDisplayConfig>({
   showSqlResults: false,
@@ -393,10 +393,17 @@ async function sendGraphRequest(request: GraphRequest, rejectedPlan: boolean) {
 
     let closeStreamFn: (() => void) | null = null;
 
+    // R-13：按 type 分流；harness 以 agentId 寻址（不再有 sn || id 兜底）
     switch (agent.value.type) {
-      case 'agent':
+      case 'agent': {
+        if (!agent.value.sn) {
+          isStreaming.value = false;
+          ElMessage.error('该智能体缺少运行时标识（sn），暂时无法对话');
+          return;
+        }
         closeStreamFn = startAgentStream();
         break;
+      }
       case 'harness':
         closeStreamFn = startHarnessStream();
         break;
@@ -409,7 +416,7 @@ async function sendGraphRequest(request: GraphRequest, rejectedPlan: boolean) {
       const chatRequest: ChatApiRequest = {
         sessionId,
         content: request.query,
-        agentSn: String(agent.value.sn || agent.value.id),
+        agentSn: String(agent.value.sn),
         type: 'agent',
       };
 
@@ -526,7 +533,7 @@ async function sendGraphRequest(request: GraphRequest, rejectedPlan: boolean) {
       const harnessRequest: HarnessChatRequest = {
         sessionId,
         message: request.query,
-        harnessSn: String(agent.value.sn || agent.value.id),
+        agentId: Number(agent.value.id),
       };
 
       return streamHarnessChat(
@@ -694,7 +701,7 @@ async function sendGraphRequest(request: GraphRequest, rejectedPlan: boolean) {
         showHarnessConfirm.value = true;
         pendingConfirmButtons.value = response.buttons;
         pendingConfirmSessionId.value = response.threadId;
-        pendingConfirmAgentSn.value = response.agentId;
+        pendingConfirmAgentId.value = Number(response.agentId);
       }
 
       if (currentSession.value?.id === sessionId) {
@@ -970,7 +977,7 @@ async function handleHarnessButtonClick(btn: ConfirmButton) {
     await confirmHarnessChat(
       {
         sessionId: pendingConfirmSessionId.value,
-        agentSn: pendingConfirmAgentSn.value,
+        agentId: pendingConfirmAgentId.value,
         allowed,
       },
       async (response) => {
