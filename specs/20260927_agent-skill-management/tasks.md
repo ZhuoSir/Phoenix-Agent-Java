@@ -6,7 +6,7 @@
 
 ## 1. 基础（数据与模型）
 
-- [ ] T-01 编写并本地执行技能域 DDL 升级/回滚脚本
+- [x] T-01 编写并本地执行技能域 DDL 升级/回滚脚本
   关联: R-03, R-04, R-07
   依赖: 无
   验证方式: 在本地 phoenix-pg 执行升级脚本后 `\d tbl_harness_skills` 含 status 列、两张新表建成；用同名重复插入触发 uk 报错；执行回滚脚本后结构还原（psql 输出留档 specs/{dir}/artifacts.md 草案）
