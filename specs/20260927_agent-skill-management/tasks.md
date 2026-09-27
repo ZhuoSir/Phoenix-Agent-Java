@@ -70,7 +70,7 @@
   验证方式: curl /api/admin/harness/chat 带 enabledSkillIds 发**不含触发词**的消息→回复按技能指令；不带 ids 发「报诗」→行为同 T-09（回归）；勾 4 个/勾未绑定→拒绝码
   验收标准: R-05 三场景全过；不传字段时接口向后兼容
 
-- [ ] T-11 实现 SkillAccessService 三重交集判定与前台端点：getMySkills?agentId=、/platform/harness/chat（platform 身份→agent 组可见性→skill 三重校验→自主模式追加"本轮可用技能仅…"约束提示）
+- [x] T-11 实现 SkillAccessService 三重交集判定与前台端点：getMySkills?agentId=、/platform/harness/chat（platform 身份→agent 组可见性→skill 三重校验→自主模式追加"本轮可用技能仅…"约束提示）
   关联: R-07, R-09
   依赖: T-10
   验证方式: curl：前台 token 查 getMySkills（授权/未授权两组账号对照）；越权构造 enabledSkillIds 含未授权技能→权限错误；正常路径显式执行成功

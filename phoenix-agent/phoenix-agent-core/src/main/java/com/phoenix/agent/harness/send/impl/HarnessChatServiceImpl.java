@@ -150,6 +150,10 @@ public class HarnessChatServiceImpl implements HarnessChatService {
     }
 
     private UserMessage buildUserMessage(HarnessRequest request) {
-        return new UserMessage(request.getMessage());
+        if (request.getSkillScopeHint() == null || request.getSkillScopeHint().isBlank()) {
+            return new UserMessage(request.getMessage());
+        }
+        // 前台通道技能范围约束（R-09 风险①缓解）；与用户原文拼接在末尾，避免干扰指令解析
+        return new UserMessage(request.getMessage() + "\n\n[平台约束] " + request.getSkillScopeHint());
     }
 }
