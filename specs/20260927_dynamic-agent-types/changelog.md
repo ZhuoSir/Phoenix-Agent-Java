@@ -1,5 +1,12 @@
 # Changelog: dynamic-agent-types
 
+## 追加变更（2026-09-27 · 核对任务验收口径时发现并修复 T-11 入参校验缺口）
+逐条比对 tasks.md 的「验证方式/验收标准」时，实测发现 **T-11「agentId 与 harnessSn 皆缺 → 参数错误码」不达标**：
+原先直接落到 `harnessStaticLoader.loadAgent(null)` → 抛 IllegalArgumentException → **HTTP 500 服务器内部错误**，不是明确错误码。
+- 修复：`HarnessChatServiceImpl.resolveAgent/confirmStream(ConfirmRequest)` 增加显式入参校验，两者皆缺抛 `InvalidInputException`（全局 advice → 400 + 明确 message）
+- 复测三分支：仅 agentId（25）→ 200 正常流式；仅 harnessSn（RulesHarnessAgent）→ 200 正常流式；**两者皆缺 → `HTTP 400 {"message":"agentId 与 harnessSn 至少需要一个"}`**
+- 顺带补齐 T-12 的**拒绝分支**实测：前台账号对话未授权智能体（agent25 未授权给其组）→ `{"content":"该智能体未授权给当前账号所在组","end":true}`
+
 ## 追加验证（2026-09-27 · 补齐两处遗留证据）
 **① T-09 深度分析：并发限流 + 超时文案 实测（原为「未触发路径」）**
 - 为可测性把三个阈值改为可配置（默认值不变）：`phoenix.agent.tool.deep-analysis-timeout-seconds`(180)、`deep-analysis-max-chars`(6000)、`deep-analysis-max-concurrent`(2)；`DeepAnalysisTool` 增加全参构造，Contributor 读配置注入。理由：这些阈值与运行环境强相关（LLM 延迟、库表规模），做成编译期常量不合理。

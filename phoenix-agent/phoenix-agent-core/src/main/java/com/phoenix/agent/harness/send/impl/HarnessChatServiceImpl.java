@@ -6,6 +6,7 @@ import com.alibaba.cloud.ai.graph.StateGraph;
 import com.alibaba.cloud.ai.graph.streaming.StreamingOutput;
 import com.phoenix.agent.harness.agent.HarnessStaticLoader;
 import com.phoenix.agent.harness.factory.HarnessAgentRegistry;
+import com.phoenix.data.exception.InvalidInputException;
 import com.phoenix.agent.harness.request.ConfirmRequest;
 import com.phoenix.agent.harness.request.HarnessRequest;
 import com.phoenix.agent.harness.send.HarnessChatService;
@@ -85,6 +86,10 @@ public class HarnessChatServiceImpl implements HarnessChatService {
         if (request.getAgentId() != null) {
             return harnessAgentRegistry.get(request.getAgentId());
         }
+        if (!org.springframework.util.StringUtils.hasText(request.getHarnessSn())) {
+            // 显式入参校验：两者皆缺时给明确错误（原先落到 loadAgent(null) → 500）
+            throw new InvalidInputException("agentId 与 harnessSn 至少需要一个");
+        }
         return harnessStaticLoader.loadAgent(request.getHarnessSn());
     }
 
@@ -141,6 +146,9 @@ public class HarnessChatServiceImpl implements HarnessChatService {
     public Flux<NodeOutput> confirmStream(ConfirmRequest request) {
         if (request.getAgentId() != null) {
             return confirmStream(harnessAgentRegistry.get(request.getAgentId()), request);
+        }
+        if (!org.springframework.util.StringUtils.hasText(request.getAgentSn())) {
+            throw new InvalidInputException("agentId 与 agentSn 至少需要一个");
         }
         return confirmStream(harnessStaticLoader.loadAgent(request.getAgentSn()), request);
     }
