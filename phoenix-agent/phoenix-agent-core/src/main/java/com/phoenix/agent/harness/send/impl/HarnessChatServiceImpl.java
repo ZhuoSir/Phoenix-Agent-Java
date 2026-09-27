@@ -9,6 +9,8 @@ import com.phoenix.agent.harness.request.ConfirmRequest;
 import com.phoenix.agent.harness.request.HarnessRequest;
 import com.phoenix.agent.harness.send.HarnessChatService;
 import com.phoenix.agent.harness.service.HitlCacheService;
+import com.phoenix.agent.harness.skill.ExplicitSkillMiddleware;
+import com.phoenix.agent.harness.skill.SkillExplicitInjectionService;
 import io.agentscope.core.agent.RuntimeContext;
 import io.agentscope.core.event.AgentEvent;
 import io.agentscope.core.event.AgentEventType;
@@ -36,18 +38,51 @@ import java.util.Map;
 public class HarnessChatServiceImpl implements HarnessChatService {
     private final HarnessStaticLoader harnessStaticLoader;
     private final HitlCacheService hitlCacheService;
+    private final SkillExplicitInjectionService skillExplicitInjectionService;
+
     @Override
     public Mono<Msg> call(String sn, HarnessRequest request) {
         HarnessAgent harnessAgent = getHarnessAgent(sn);
-        return harnessAgent.call(buildUserMessage(request), buildRuntimeContext(request));
+        SkillExplicitInjectionService.InjectionResult injection = skillExplicitInjectionService
+            .prepare(sn, request.getEnabledSkillIds());
+        if (!injection.ok()) {
+            return Mono.error(new IllegalArgumentException(injection.errorMsg()));
+        }
+        return harnessAgent.call(buildUserMessage(request), buildRuntimeContext(request, injection.block()));
     }
 
     @Override
     public Flux<NodeOutput> stream(String sn, HarnessRequest request) {
         HarnessAgent harnessAgent = getHarnessAgent(sn);
         String sessionId = request.getSessionId();
-        return harnessAgent.streamEvents(buildUserMessage(request), buildRuntimeContext(request))
-                .map(event -> toNodeOutput(event, sessionId));
+        // R-05：请求入口做三重校验；拒绝时以内容增量事件返回原因并结束流
+        SkillExplicitInjectionService.InjectionResult injection = skillExplicitInjectionService
+            .prepare(sn, request.getEnabledSkillIds());
+        if (!injection.ok()) {
+            return Flux.just(errorOutput(injection.errorMsg()), endOutput());
+        }
+        // 技能全文经 RuntimeContext 交给 ExplicitSkillMiddleware 注入系统提示（plan v1.1.0 决策4）
+        Flux<NodeOutput> body = harnessAgent
+            .streamEvents(buildUserMessage(request), buildRuntimeContext(request, injection.block()))
+            .map(event -> toNodeOutput(event, sessionId));
+        if (injection.skillNames().isEmpty()) {
+            return body;
+        }
+        // 让前端可见本轮实际加载了哪些技能（R-05）
+        Map<String, Object> leadData = new HashMap<>();
+        leadData.put("loaded_skills", String.join(",", injection.skillNames()));
+        return Flux.concat(Flux.just(NodeOutput.of("harness_agent", "harness", new OverAllState(leadData), null)), body);
+    }
+
+    /** 拒绝原因用内容增量事件承载，前端 content 直接可见 */
+    private NodeOutput errorOutput(String msg) {
+        Map<String, Object> data = new HashMap<>();
+        data.put("error_message", msg);
+        return new StreamingOutput<>(msg, "harness_agent", "harness", new OverAllState(data));
+    }
+
+    private NodeOutput endOutput() {
+        return NodeOutput.of(StateGraph.END, "harness", new OverAllState(new HashMap<>()), null);
     }
 
     @Override
@@ -104,8 +139,14 @@ public class HarnessChatServiceImpl implements HarnessChatService {
         return NodeOutput.of("harness_agent", "harness", new OverAllState(data), null);
     }
 
-    private RuntimeContext buildRuntimeContext(HarnessRequest request) {
-        return RuntimeContext.builder().sessionId(request.getSessionId()).userId(request.getUserId()).build();
+    private RuntimeContext buildRuntimeContext(HarnessRequest request, String activeSkillBlock) {
+        RuntimeContext.Builder builder = RuntimeContext.builder()
+            .sessionId(request.getSessionId())
+            .userId(request.getUserId());
+        if (activeSkillBlock != null && !activeSkillBlock.isBlank()) {
+            builder.put(ExplicitSkillMiddleware.CTX_ACTIVE_SKILL_BLOCK, activeSkillBlock);
+        }
+        return builder.build();
     }
 
     private UserMessage buildUserMessage(HarnessRequest request) {

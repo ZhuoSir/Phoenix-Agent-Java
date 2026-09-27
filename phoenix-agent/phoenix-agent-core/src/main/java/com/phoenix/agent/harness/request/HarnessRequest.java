@@ -7,6 +7,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.io.Serializable;
+import java.util.List;
 
 @Data
 @Builder
@@ -21,4 +22,6 @@ public class HarnessRequest implements Serializable {
     private String message;
     @NotBlank
     private String harnessSn;
+    /** 显式执行技能 id 列表（R-05：不传=维持模型自主匹配） */
+    private List<Long> enabledSkillIds;
 }

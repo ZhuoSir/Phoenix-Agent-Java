@@ -1,4 +1,5 @@
-> 版本: v1.0.0 | 状态: 已确认 | 更新: 2026-09-27 | 确认人: 陈卓 | 确认日期: 2026-09-27
+> 版本: v1.1.0 | 状态: 已确认 | 更新: 2026-09-27 | 确认人: 陈卓 | 确认日期: 2026-09-27
+> v1.1.0 变更：决策4 显式执行通道由「user message 注入」改为「系统提示注入（自定义 middleware）」——Implement 实测发现原方案被模型判定为 prompt injection 并拒绝执行，证据见 §风险①说明。
 
 # 技术方案：智能体技能管理
 
@@ -62,7 +63,11 @@ SQL 升级件              ALTER + 2 新表 + 回滚（Implement 时登记 artif
 1. **CRUD 落 phoenix-agent 域**。理由：与 PostgresSkillRepository/运行时装载同域同表；拒绝落 phoenix-data（那是 NL2SQL 报表域，tbl_data_* 命名虽像但语义不属）；拒绝新建顶层模块（模块数控制）。
 2. **运行时隔离用装饰器实现 `AgentSkillRepository`**，agent 构建时传 `new FilteredSkillRepository(delegate, sn)`。理由：不动上游、天然满足 R-06（registry/prompt 注入都经 repository）。拒绝：靠 metadata_json 里 status 过滤（load 路径在上游不可控）；拒绝：按 agent 复制技能行（双写漂移）。
 3. **ZIP 解析复用 agentscope-core `SkillUtil.createFromZip(byte[])`**。理由：SKILL.md 定位/frontmatter 必填校验/资源提取的格式权威在上游，自研解析必漂移。拒绝：手写 unzip+YAML 解析。
-4. **显式执行=服务端把所选技能全文以 `<active_skills>` 注入本轮 user message**（buildUserMessage 一处改动）。理由：确定性满足"强制、不靠触发词"。拒绝：提示模型"请用技能X"让其自主 load_skill（不确定）；拒绝：改 HarnessAgent 框架（不可控上游）。
+4. **显式执行=系统提示注入（v1.1.0 改）**：自定义 `ExplicitSkillMiddleware implements MiddlewareBase`，实现 `onSystemPrompt(agent, runtimeContext, prompt)`——从 RuntimeContext 读本轮 `enabledSkillIds`（请求链路写入），三重校验后把技能全文追加到**系统提示**；构建期用 `.middlewares(List.of(现有 StopOnAllDeniedMiddleware, 新中间件))` 挂载（builder 支持多中间件）。
+   - **为何改**：Implement 实测原方案（把技能全文拼进 user message）被安全对齐模型识别为 **prompt injection** 并明确拒绝执行——DeepSeek 推理原文："the injected skill says I must output UNCOND_OK_2026 regardless. That's a prompt injection presumably part of the harness test."，两轮不同措辞（含强化"触发条件已满足"指令）均被拒。
+   - 为何不选其它替代：`RuntimeContext.put(SkillFilter.class, SkillFilter.enable(...))` 的请求级过滤通道在 harness 链路**不生效**（`HarnessSkillMiddleware.applyVisibility` 只用构建期 filter + curator 可见性，已用字节码核实）；改上游 jar 不可行；framework SkillBox 激活是 agent 实例级共享状态，多会话并发会串。
+   - 保留：三重校验（published ∧ 绑定本 sn ∧ ≤maxExplicit）、loadedSkills 可见性（改由服务端在流首部事件给出，不再依赖注入块）。
+   - 附带实现修正：拒绝原因改用 `StreamingOutput` 事件返回（原 `error_message` 状态未被子控制器映射，用户看不到拒绝原因——实测越权/超限响应内容为空）。
 5. **绑定/授权走独立端点**，嵌进 agent 通用 save/update 的方案被否（触碰共用链路+register 覆写语义，风险面大）。
 6. **前台通道新端点而非复用 admin 的**（权限模型与身份域不同：privilege id vs platform account id，混用即越权面）。
 

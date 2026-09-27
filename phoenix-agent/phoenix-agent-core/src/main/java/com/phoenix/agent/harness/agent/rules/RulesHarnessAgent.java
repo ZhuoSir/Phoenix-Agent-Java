@@ -55,7 +55,8 @@ public class RulesHarnessAgent extends AbstractHarnessAgent {
                 .memory(this.getDefaultModelConfig())
                 .workspace(Paths.get(".agentscope/workspace"))
                 .enablePendingToolRecovery(true)
-                .middleware(new StopOnAllDeniedMiddleware())
+                .middlewares(java.util.List.of(new StopOnAllDeniedMiddleware(),
+                        new com.phoenix.agent.harness.skill.ExplicitSkillMiddleware()))
                 .compaction(CompactionConfig.builder().triggerMessages(50)      // 50 条触发摘要压缩
                         .truncateArgs(CompactionConfig.TruncateArgsConfig.builder()
                                 .maxArgLength(2000)

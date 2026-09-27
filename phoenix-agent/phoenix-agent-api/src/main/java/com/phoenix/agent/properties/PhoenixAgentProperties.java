@@ -11,12 +11,23 @@ public class PhoenixAgentProperties {
     private String modelPath;
     private String skillPath;
     private Embedding embedding;
+    private Skill skill = new Skill();
+
     @Data
     public static class Embedding {
         private String baseUrl;
         private String apiKey;
         private String model;
         private Integer dimensions = 512;
+    }
+
+    /**
+     * 技能相关配置（R-05 显式执行上限，防单轮注入 token 爆炸）
+     */
+    @Data
+    public static class Skill {
+        /** 单轮显式勾选技能数量上限 */
+        private Integer maxExplicit = 3;
     }
 }
 

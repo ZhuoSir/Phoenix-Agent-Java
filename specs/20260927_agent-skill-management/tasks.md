@@ -64,7 +64,7 @@
   验证方式: 端到端：未绑定状态与制度专家聊「报诗」→不触发；绑定 py-fib-demo 后同话术→触发（对话留证）；绑 A 后与 HumanInTheLoop 聊→感知不到 A
   验收标准: R-06 两场景全过；装饰器不缓存（绑定变更下一轮生效）
 
-- [ ] T-10 实现显式技能注入：HarnessRequest 增 enabledSkillIds（后端二次校验 ≤3、published、绑定），buildUserMessage 前拼 `<active_skills>` 全文块，SSE 事件透出 loadedSkills[]
+- [x] T-10 实现显式技能注入：HarnessRequest 增 enabledSkillIds（后端二次校验 ≤3、published、绑定），buildUserMessage 前拼 `<active_skills>` 全文块，SSE 事件透出 loadedSkills[]
   关联: R-05
   依赖: T-09
   验证方式: curl /api/admin/harness/chat 带 enabledSkillIds 发**不含触发词**的消息→回复按技能指令；不带 ids 发「报诗」→行为同 T-09（回归）；勾 4 个/勾未绑定→拒绝码

@@ -89,7 +89,10 @@ public class HarnessController {
     @PostMapping(value = "/chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<Map<String, Object>> harnessChat(@RequestBody HarnessRequest  harnessRequest) {
         String userId = StpUtil.getLoginIdAsString();
-        HarnessRequest request = HarnessRequest.builder().userId(userId).sessionId(harnessRequest.getSessionId()).message(harnessRequest.getMessage()).build();
+        HarnessRequest request = HarnessRequest.builder().userId(userId).sessionId(harnessRequest.getSessionId())
+                .message(harnessRequest.getMessage())
+                .enabledSkillIds(harnessRequest.getEnabledSkillIds())
+                .build();
         return harnessChatService.stream(harnessRequest.getHarnessSn(), request)
                 .map(output -> {
                     Map<String, Object> eventMap = new LinkedHashMap<>();
@@ -101,6 +104,11 @@ public class HarnessController {
                     if (output.isEND()) {
                         eventMap.put("end", true);
                     }
+                    // 显式技能注入拒绝原因（R-05）/ 本轮实际加载的技能（R-05 可见性）
+                    output.state().value("error_message", String.class)
+                        .ifPresent(msg -> eventMap.putIfAbsent("content", msg));
+                    output.state().value("loaded_skills", String.class)
+                        .ifPresent(skills -> eventMap.put("loadedSkills", skills));
                     output.state().value("agent_event", AgentEvent.class).ifPresent(event -> {
                         if (event instanceof RequireUserConfirmEvent confirmEvent) {
                             eventMap.put("needConfirm", true);

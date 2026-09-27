@@ -1,5 +1,14 @@
 # Changelog: agent-skill-management
 
+## v1.1.0（2026-09-27）确认人: 陈卓
+- 重确认通过：plan.md v1.1.0 已确认（显式执行改 middleware→系统提示注入），T-10 按新通道返工
+- **修改 决策4**：显式执行通道 user message 注入 → **系统提示注入（ExplicitSkillMiddleware）**
+  - 原因：Implement 实测（T-10）被模型判定为 prompt injection 而拒绝执行（DeepSeek 推理原文可查 /tmp/t10c.txt 语境）
+  - 已核实不可行替代：RuntimeContext+SkillFilter 通道在 harness 链路不生效（字节码核实 applyVisibility 只读构建期 filter）
+  - 附带修正：拒绝原因改 StreamingOutput 事件返回（原 error_message 未被控制器映射，实测拒绝响应为空）
+- 影响任务：T-10 需按新通道返工（当前未勾选）；T-11 复用同一校验服务，接口契约不变
+- 需求（R-05/R-09 语义）不变，requirements.md 无需重确认
+
 ## v0.1.0 plan 草稿期（2026-09-27）
 - 陈卓对三个决策点表态并写入 plan.md 风险节：① 自主模式缝隙=接受为已知限制（显式路径严格校验）② saveBySn 验证任务照做 ③ 单轮≤3 技能可配置通过
 - 补充说明 saveBySn 含义并当场实测其源码：**insert-only**，风险②消解（无覆写问题，取消附带修复任务）
