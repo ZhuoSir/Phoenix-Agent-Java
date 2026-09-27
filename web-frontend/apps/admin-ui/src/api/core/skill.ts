@@ -76,6 +76,8 @@ export async function uploadSkillApi(file: File, overwrite = false) {
     msg: string;
     success: boolean;
   }>('/api/skill/upload', formData, {
+    // 必须显式声明 multipart，否则请求头默认 json → 后端 415
+    headers: { 'Content-Type': 'multipart/form-data' },
     responseReturn: 'body',
   });
 }
