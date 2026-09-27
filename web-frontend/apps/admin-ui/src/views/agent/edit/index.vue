@@ -26,6 +26,8 @@ import {
 } from '#/api';
 
 import AgentDataSourceConfig from './components/AgentDataSourceConfig.vue';
+import AgentProfileAiFields from '#/components/agent-profile/AgentProfileAiFields.vue';
+
 import AgentRuntimeConfig from '../list/components/AgentRuntimeConfig.vue';
 import AgentSkillConfig from './components/AgentSkillConfig.vue';
 
@@ -217,29 +219,11 @@ onMounted(loadAgent);
 
         <ElRow :gutter="20">
           <ElCol :span="24">
-            <div class="mb-5">
-              <label class="mb-2 block text-sm font-medium text-gray-700">描述</label>
-              <ElInput
-                v-model="agent.description"
-                :rows="3"
-                type="textarea"
-                placeholder="请输入智能体描述"
-              />
-            </div>
-          </ElCol>
-        </ElRow>
-
-        <ElRow :gutter="20">
-          <ElCol :span="24">
-            <div class="mb-5">
-              <label class="mb-2 block text-sm font-medium text-gray-700">智能体Prompt</label>
-              <ElInput
-                v-model="agent.prompt"
-                :rows="4"
-                type="textarea"
-                placeholder="请输入智能体Prompt"
-              />
-            </div>
+            <AgentProfileAiFields
+              v-model:description="agent.description"
+              v-model:prompt="agent.prompt"
+              :name="agent.name"
+            />
           </ElCol>
         </ElRow>
 

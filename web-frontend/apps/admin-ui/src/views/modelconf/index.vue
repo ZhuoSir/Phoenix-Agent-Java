@@ -32,6 +32,8 @@ import {
 
 import {
   activateModelConfigApi,
+  deactivateModelConfigApi,
+  setDefaultModelConfigApi,
   addModelConfigApi,
   deleteModelConfigApi,
   getModelConfigListApi,
@@ -266,8 +268,35 @@ function getActions(config: ModelConfig) {
         title:
           config.modelType === 'EMBEDDING'
             ? '您正在更换嵌入模型，此操作风险较高！由于不同模型的向量空间不一致，切换后可能导致所有历史向量数据（含数据源、智能体知识、业务知识）将全部失效且无法检索。确定要执行吗？'
-            : `确定要启用【${config.provider} - ${config.modelName}】吗？`,
+            : `确定要启用【${config.provider} - ${config.modelName}】吗？（启用=可被智能体选择的模型，同类型可同时启用多个）`,
         confirm: () => handleActivate(config.id, config.modelType),
+        okText: '确定',
+        cancelText: '取消',
+      },
+    },
+    {
+      text: '停用',
+      icon: 'lucide:minus-circle',
+      ifShow: () => !!config.isActive,
+      loading: deactivatingId.value === config.id,
+      popConfirm: {
+        title: `确定要停用【${config.provider} - ${config.modelName}】吗？`,
+        confirm: () => handleDeactivate(config.id),
+        okText: '确定',
+        cancelText: '取消',
+      },
+    },
+    {
+      text: '设为默认',
+      icon: 'lucide:star',
+      ifShow: () => !config.isDefault,
+      loading: settingDefaultId.value === config.id,
+      popConfirm: {
+        title:
+          config.modelType === 'EMBEDDING'
+            ? `您正在更换默认嵌入模型。历史向量由旧模型生成，与新模型向量空间不可比，需重新初始化数据源 schema 才与新模型一致（系统不会自动重算）。确定切换吗？`
+            : `确定把【${config.provider} - ${config.modelName}】设为该类型的默认模型吗？（同类型旧默认会被取消，该条会自动置为启用）`,
+        confirm: () => handleSetDefault(config.id),
         okText: '确定',
         cancelText: '取消',
       },
@@ -300,6 +329,45 @@ async function handleDelete(config: ModelConfig) {
     }
   } catch {
     ElMessage.error('删除失败');
+  }
+}
+
+const deactivatingId = ref<number | null>(null);
+const settingDefaultId = ref<number | null>(null);
+
+async function handleDeactivate(id?: number) {
+  if (!id) return;
+  try {
+    deactivatingId.value = id;
+    const res = await deactivateModelConfigApi(id);
+    if (res && res.success === false) {
+      ElMessage.error(res.message || '停用失败');
+      return;
+    }
+    ElMessage.success('模型已停用');
+    await loadConfigs();
+  } catch (error: any) {
+    ElMessage.error(error?.message || '停用失败');
+  } finally {
+    deactivatingId.value = null;
+  }
+}
+
+async function handleSetDefault(id?: number) {
+  if (!id) return;
+  try {
+    settingDefaultId.value = id;
+    const res = await setDefaultModelConfigApi(id);
+    if (res && res.success === false) {
+      ElMessage.error(res.message || '设置默认模型失败');
+      return;
+    }
+    ElMessage.success('已设为默认模型（对新请求立即生效，无需重启）');
+    await loadConfigs();
+  } catch (error: any) {
+    ElMessage.error(error?.message || '设置默认模型失败');
+  } finally {
+    settingDefaultId.value = null;
   }
 }
 
@@ -415,11 +483,20 @@ onMounted(loadConfigs);
                 >
                   {{ scope.row.isActive ? '已启用' : '未启用' }}
                 </ElTag>
+                <ElTag
+                  v-if="scope.row.isDefault"
+                  type="warning"
+                  size="small"
+                  effect="dark"
+                  class="ml-1"
+                >
+                  默认
+                </ElTag>
               </template>
             </template>
           </ElTableColumn>
         </template>
-        <ElTableColumn label="操作" width="240">
+        <ElTableColumn label="操作" width="330">
           <template #default="{ row }">
             <VbenTableAction :actions="getActions(rowAs(row))" />
           </template>
