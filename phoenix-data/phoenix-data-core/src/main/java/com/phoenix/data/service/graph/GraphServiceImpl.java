@@ -200,7 +200,16 @@ public class GraphServiceImpl implements GraphService {
      * @return
      */
     private String builerLoginVo() {
-        LoginVO loginVO = StpUtil.getSession().getModel(ACCOUNT_LOGIN, LoginVO.class);
+        LoginVO loginVO;
+        try {
+            loginVO = StpUtil.getSession().getModel(ACCOUNT_LOGIN, LoginVO.class);
+        }
+        catch (Exception e) {
+            // 非 HTTP 调用方（对话智能体的深度分析工具、MCP 工具回调等）没有 Sa-Token 上下文，
+            // 此前会直接抛 SaTokenContextException 打断整条图链路；此处降级为空（与 loginVO == null 同义）。
+            log.debug("无 Sa-Token 上下文，跳过登录人信息注入: {}", e.getMessage());
+            return "";
+        }
         String loginVo = "";
         if (loginVO != null) {
             loginVo = """

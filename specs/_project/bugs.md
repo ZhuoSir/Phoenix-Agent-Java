@@ -74,10 +74,33 @@
 - **修复**：改为**整词匹配**（`\b(...)\b`）并先剔除字符串字面量/引用标识符；真实拦截不放宽
 - **验证（jshell 直调，JDK23）**：`select create_time, update_time from t` → SAFE；`select delete_flag, last_update from t` → SAFE；`WITH ... select` → SAFE；`DROP TABLE x` → BLOCKED；`select * from t; delete from t` → BLOCKED[DELETE]；`UPDATE t SET a=1` → BLOCKED；`select ... where b='drop table x'` → SAFE（字面量不误杀）
 
-### B-13 embedding 模型配置不可用 → NL2SQL 图链路（深度分析）不可用
-- **现象**：`tbl_data_model_config` 的 EMBEDDING 项（id=6，`text-embedding-v4`，`https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1`）调用返回 `404 {"code":"InvalidParameter","message":"Model not exist."}`
-- **影响**：`initializeSchemaForAgentWithDatasource`（写 table/column 向量文档）失败 → 向量库为空 → NL2SQL 状态图的 SchemaRecall 无文档 → **T-09 深度分析工具在当前环境无法完成端到端**（工具已把该失败转成可读文案「深度分析暂不可用：…（可稍后重试）」，模型可降级改用取数工具）
-- **修复方向**：更换为可用的 embedding 配置（正确的模型名/网关或官方 DashScope key）后重跑；属环境配置，非代码缺陷
+### B-13 embedding 模型 404（✅ 已解决，2026-09-27）
+- **现象**：模型配置「测试」一直 404。**两个独立原因**：
+  1. **base_url 多带了一段 `/v1`**：应用用 Spring AI `OpenAiApi`，它会在 base_url 后自动拼默认路径 `/v1/embeddings`；配置写成 `https://dashscope.aliyuncs.com/compatible-mode/v1` → 实际请求 `…/compatible-mode/v1/v1/embeddings` → 404。对照：CHAT 配置用的是 `https://api.deepseek.com`（不带 `/v1`）所以正常。
+  2. **模型名不被 OpenAI 兼容模式支持**：`qwen3-vl-embedding` → `404 {"error":{"message":"Unsupported model `qwen3-vl-embedding` for OpenAI compatibility mode.","code":"model_not_supported"}}`
+- **实测矩阵**（同一 key，直连 + 经应用测试接口双向验证）：
+
+  | base_url | model | 结果 |
+  |---|---|---|
+  | `…/compatible-mode/v1` | `qwen3-vl-embedding` | 404（双重错误） |
+  | `…/compatible-mode/v1` | `text-embedding-v4` | 404（仅 base_url 问题） |
+  | `…/compatible-mode` | `qwen3-vl-embedding` | 404（仅模型名问题） |
+  | `…/compatible-mode` | `text-embedding-v4` | ✅ 成功 |
+
+- **处理**：已把 id=6 改为 `base_url=https://dashscope.aliyuncs.com/compatible-mode` + `model_name=text-embedding-v4`（`text-embedding-v3` 同样可用；`text-embedding-v2` 固定返回 1536 维不可用——向量表是 `vector(512)`，而代码固定请求 `dimensions(512)`，v4/v3 都支持）。原值：`…/compatible-mode/v1` + `qwen3-vl-embedding`。
+- **验证**：应用「测试」→ `连接测试成功！模型可用。`；真实写入链路 → `Schema初始化成功`，`tbl_vector_store_simple_data` 出现 agentId=25 的 28 条 512 维向量。
+
+### B-16 三张 Spring AI 向量表缺主键 → ON CONFLICT 插入必失败（✅ 已修，2026-09-27）
+- **现象**：embedding 修好后 `POST /api/agent/{id}/datasources/init` 仍失败：`BatchUpdateException: INSERT INTO public.tbl_vector_store_simple_data …` → `PSQLException: there is no unique or exclusion constraint matching the ON CONFLICT specification`
+- **根因**：`sql/all_schema.sql` 建的 `tbl_vector_store_simple_data` / `tbl_vector_store_rag` / `tbl_vector_store_user_memory` **只有 HNSW 向量索引、没有主键/唯一约束**，而 Spring AI `PgVectorStore` 的 upsert 依赖 `ON CONFLICT (id)`。（对照：AgentScope 自建的 `tbl_harness_vector_store_knowledge` 有主键，正常。）
+- **影响**：所有 schema/知识文档写入向量库的路径**全部不可用**（不只是深度分析）→ 也解释了为何 `/api/agent/{id}/datasources/init` 从来没成功过
+- **修复**：三表补 `PRIMARY KEY (id)`（幂等 DO 块，已执行并复核 3 条 pkey）；**基线 `sql/all_schema.sql` 仍缺这三处约束，建议后续一并修**（属 B-01 同族：基线 DDL 不完整）
+
+### B-17 图链路在非 HTTP 调用方取 Sa-Token 登录态直接抛异常（✅ 已修，2026-09-27）
+- **现象**：B-13/B-16 修好后，深度分析报 `SaTokenContext 上下文尚未初始化`（图内 `handleNewProcess` → `builerLoginVo()` → `StpUtil.getSession()`）
+- **根因**：`GraphServiceImpl.builerLoginVo()` 无条件取当前登录态；对话智能体的深度分析工具运行在 AgentScope 工具线程（`boundedElastic`），Sa-Token 上下文不随行 → 抛异常打断整条图链路。MCP 工具回调等非 HTTP 调用方同理
+- **修复**：`builerLoginVo()` 捕获无上下文异常并降级为空串（与原 `loginVO == null` 分支同义），不再打断图执行
+- **验证**：重跑深度分析 → `深度分析完成: agentId=25, datasourceId=11, elapsedMs=93485, chars=6024`，产出按 type 分组统计 + 时间分布归因的完整报告（图链路真实执行，非取数工具降级）
 
 ### B-14 删除智能体残留孤儿数据（运行配置/技能绑定/组授权）
 - **现象**：`DELETE /api/agent/{id}` 只删 `tbl_data_agent` 行；实测删除智能体 29 后，`tbl_data_agent_runtime_config`（1 行）、`tbl_data_agent_skill_info`（1 行）、`tbl_platform_group_agent_info`（1 行）**全部残留**，成为孤儿数据
@@ -101,7 +124,7 @@
 ## 修复状态跟踪
 | ID | 级别 | 状态 |
 |---|---|---|
-| B-01 | P1 | 未修（容器内已临时补序列） |
+| B-01 | P1 | 未修（容器内已临时补序列；另有向量表缺主键，见 B-16） |
 | B-02 | P1 | 未修 |
 | B-03 | P2 | 未修 |
 | B-04 | P2 | 不修（设计问题→技术债/spec） |
@@ -113,6 +136,8 @@
 | B-10 | P2 | 部分解决（dynamic-agent-types：新建强制 type=harness、列表去类型标签；存量 5 个自注册类保留） |
 | B-11 | P2 | 未修（前台 HITL 确认端点缺失，前端 404） |
 | B-12 | P2 | ✅ 已修（dynamic-agent-types T-08：整词匹配 + 剔除字面量，jshell 8 例验证） |
-| B-13 | P2 | 未修（环境：embedding 模型 404，深度分析链路受阻） |
+| B-13 | P2 | ✅ 已解决（base_url 去掉多余 /v1 + 模型名改 text-embedding-v4，实测通过） |
 | B-14 | P2 | 未修（删除智能体残留运行配置/技能绑定/组授权孤儿行） |
 | B-15 | P2 | ✅ 已修（列表关键字搜索 PG `CONCAT` 参数类型报错 → 改字符串拼接） |
+| B-16 | P2 | ✅ 已修（三张向量表补主键；基线 all_schema.sql 仍缺，待修） |
+| B-17 | P2 | ✅ 已修（非 HTTP 调用方无 Sa-Token 上下文时降级，不再打断图链路） |

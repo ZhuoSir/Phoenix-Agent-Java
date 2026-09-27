@@ -1,5 +1,22 @@
 # Changelog: dynamic-agent-types
 
+## 追加变更（2026-09-27 · 合并后 · 用户报「向量模型测试一直 404」排查）
+用户报「配置的向量模型测试一直 404」，排查出**三个独立问题**并全部修复，最终把此前被卡的 T-09 深度分析**端到端跑通**：
+
+1. **B-13 embedding 配置两处错误**（用户配置，已代修正）
+   - Spring AI `OpenAiApi` 会自动在 base_url 后拼 `/v1/embeddings`，原 `base_url=…/compatible-mode/v1` → 实际请求 `…/v1/v1/embeddings` → 404（对照 CHAT 配置 `https://api.deepseek.com` 不带 `/v1` 所以正常）
+   - 模型名 `qwen3-vl-embedding` 不被 OpenAI 兼容模式支持 → `404 model_not_supported`
+   - 已改为 `base_url=https://dashscope.aliyuncs.com/compatible-mode` + `model_name=text-embedding-v4`（v3 亦可；v2 固定 1536 维与 `vector(512)` 不匹配不可用）。实测：应用「测试」→ 连接测试成功；真实写入 → `Schema初始化成功`，agent25 写入 28 条 512 维向量
+2. **B-16 三张 Spring AI 向量表缺主键**（既有 DDL 缺漏，已补）
+   - `tbl_vector_store_simple_data/rag/user_memory` 只有 HNSW 索引、无主键，而 `PgVectorStore` upsert 依赖 `ON CONFLICT (id)` → `there is no unique or exclusion constraint matching the ON CONFLICT specification`
+   - 影响面比 embedding 更大：**所有**向量写入路径（schema 初始化、知识文档）从来都写不进去
+   - 已补 `PRIMARY KEY (id)`（幂等执行 + 复核）；基线 `sql/all_schema.sql` 仍缺，待后续修（B-01 同族）
+3. **B-17 图链路在非 HTTP 调用方取 Sa-Token 登录态抛异常**（已修）
+   - `GraphServiceImpl.builerLoginVo()` 无条件 `StpUtil.getSession()`；深度分析工具运行在 AgentScope 工具线程，无 Sa-Token 上下文 → `SaTokenContext 上下文尚未初始化` 打断整图
+   - 已改为捕获该异常并降级为空串（与原 `loginVO == null` 分支同义），MCP 工具回调等非 HTTP 调用方同样受益
+
+**T-09 由此从「成功路径未验证」转为已验证**：`深度分析完成: agentId=25, datasourceId=11, elapsedMs=93485, chars=6024`，工具线程 `tool-deep-25-<uuid>` 独立 threadId，产出按 type 分组 + 时间分布归因的完整分析报告（真实图链路，非取数工具降级）。
+
 ## 追加变更（2026-09-27 · 合并后 · 列表去存量智能体）
 - 用户反馈：「全部智能体里还显示那么多之前的」，要求列表只显示当前已创建的智能体。**用户选定方案：只从列表去掉（可逆），不删数据、不改自注册代码**。
 - 背景事实：`AbstractHarnessAgent.register()` 启动时 `agentService.saveBySn()` 写库，而 `saveBySn` 是「不存在就插入」→ 19/20/21/23/24 这 5 个 Java 自注册智能体**删了也会在下次重启时长回来**，只删 DB 行解决不了。
