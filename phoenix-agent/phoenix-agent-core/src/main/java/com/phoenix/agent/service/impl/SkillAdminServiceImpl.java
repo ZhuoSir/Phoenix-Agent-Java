@@ -4,16 +4,20 @@ import com.mybatisflex.core.paginate.Page;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.core.row.Db;
 import com.phoenix.agent.constant.SkillConstant;
+import com.phoenix.agent.dto.SkillBindingDTO;
 import com.phoenix.agent.dto.SkillPublishDTO;
 import com.phoenix.agent.enums.SkillErrorCodeEnm;
 import com.phoenix.agent.enums.SkillStatusEnm;
+import com.phoenix.agent.mapper.AgentSkillInfoMapper;
 import com.phoenix.agent.mapper.GroupSkillInfoMapper;
 import com.phoenix.agent.mapper.HarnessSkillMapper;
 import com.phoenix.agent.mapper.HarnessSkillResourceMapper;
+import com.phoenix.agent.model.AgentSkillInfo;
 import com.phoenix.agent.model.GroupSkillInfo;
 import com.phoenix.agent.model.HarnessSkill;
 import com.phoenix.agent.model.HarnessSkillResource;
 import com.phoenix.agent.service.SkillAdminService;
+import com.phoenix.agent.vo.AgentSkillOptionVO;
 import com.phoenix.agent.vo.SkillDetailVO;
 import com.phoenix.agent.vo.SkillListVO;
 import com.phoenix.agent.vo.SkillResourceVO;
@@ -30,9 +34,12 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 
 /**
  * 技能管理后台服务实现。
@@ -50,6 +57,8 @@ public class SkillAdminServiceImpl implements SkillAdminService {
     private final HarnessSkillResourceMapper harnessSkillResourceMapper;
 
     private final GroupSkillInfoMapper groupSkillInfoMapper;
+
+    private final AgentSkillInfoMapper agentSkillInfoMapper;
 
     @Override
     public ReturnVo<Page<SkillListVO>> page(String keyword, String status, int pageNum, int pageSize) {
@@ -272,6 +281,96 @@ public class SkillAdminServiceImpl implements SkillAdminService {
             groupSkillInfoMapper.insertBatch(rows);
         }
         return null;
+    }
+
+    @Override
+    public ReturnVo<List<AgentSkillOptionVO>> options(Long agentId) {
+        List<Long> boundIds = boundIds(agentId);
+        List<AgentSkillOptionVO> result = new ArrayList<>();
+        Set<Long> seen = new HashSet<>();
+        // 已发布池
+        List<HarnessSkill> published = harnessSkillMapper.selectListByQuery(
+            QueryWrapper.create().where("status = ?", SkillStatusEnm.PUBLISHED.getCode()));
+        for (HarnessSkill s : published) {
+            result.add(toOptionVo(s, boundIds.contains(s.getId())));
+            seen.add(s.getId());
+        }
+        // 已绑定但当前已下线：仍返回供编辑页灰显（R-04 场景2）
+        List<Long> offlineBound = boundIds.stream().filter(id -> !seen.contains(id)).toList();
+        if (!offlineBound.isEmpty()) {
+            harnessSkillMapper.selectListByQuery(QueryWrapper.create().in("id", offlineBound))
+                .forEach(s -> result.add(toOptionVo(s, true)));
+        }
+        return ReturnVo.ok(result);
+    }
+
+    @Override
+    public ReturnVo<List<Long>> boundSkillIds(Long agentId) {
+        return ReturnVo.ok(boundIds(agentId));
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public ReturnVo<Boolean> bindAgent(Long agentId, SkillBindingDTO dto) {
+        if (agentId == null) {
+            return ReturnVo.fail(SkillErrorCodeEnm.SKILL_AGENT_NOT_FOUND.getMsg(),
+                SkillErrorCodeEnm.SKILL_AGENT_NOT_FOUND.getCode());
+        }
+        Object agentCnt = Db.selectObject("select count(*) from tbl_data_agent where id = ?", agentId);
+        if (agentCnt == null || ((Number) agentCnt).longValue() == 0) {
+            return ReturnVo.fail(SkillErrorCodeEnm.SKILL_AGENT_NOT_FOUND.getMsg(),
+                SkillErrorCodeEnm.SKILL_AGENT_NOT_FOUND.getCode());
+        }
+        List<Long> targetIds = dto == null || dto.getSkillIds() == null ? List.of()
+            : dto.getSkillIds().stream().filter(Objects::nonNull).distinct().toList();
+        if (!targetIds.isEmpty()) {
+            // 仅允许绑定已发布技能（R-04）
+            long publishedCnt = harnessSkillMapper.selectCountByQuery(QueryWrapper.create()
+                .where("status = ?", SkillStatusEnm.PUBLISHED.getCode())
+                .in("id", targetIds));
+            if (publishedCnt != targetIds.size()) {
+                return ReturnVo.fail(SkillErrorCodeEnm.SKILL_NOT_PUBLISHED.getMsg(),
+                    SkillErrorCodeEnm.SKILL_NOT_PUBLISHED.getCode());
+            }
+        }
+        // 覆盖式：物理删后重建（绑定关系无审计留存要求）
+        agentSkillInfoMapper.deleteByQuery(QueryWrapper.create().where("agent_id = ?", agentId));
+        if (!targetIds.isEmpty()) {
+            Date now = new Date();
+            List<AgentSkillInfo> rows = targetIds.stream().map(sid -> {
+                AgentSkillInfo info = new AgentSkillInfo();
+                info.setAgentId(agentId);
+                info.setSkillId(sid);
+                info.setCreateTime(now);
+                info.setUpdateTime(now);
+                return info;
+            }).toList();
+            agentSkillInfoMapper.insertBatch(rows);
+        }
+        log.info("智能体技能绑定更新, agentId={}, skillIds={}", agentId, targetIds);
+        return ReturnVo.ok(true);
+    }
+
+    /** 该智能体已绑定技能 id（未删除） */
+    private List<Long> boundIds(Long agentId) {
+        if (agentId == null) {
+            return List.of();
+        }
+        return agentSkillInfoMapper
+            .selectListByQuery(QueryWrapper.create().where("agent_id = ?", agentId))
+            .stream()
+            .map(AgentSkillInfo::getSkillId)
+            .toList();
+    }
+
+    private AgentSkillOptionVO toOptionVo(HarnessSkill s, boolean bound) {
+        AgentSkillOptionVO vo = new AgentSkillOptionVO();
+        vo.setSkillId(s.getId());
+        vo.setName(s.getName());
+        vo.setDescription(s.getDescription());
+        vo.setStatus(s.getStatus());
+        vo.setBound(bound);
+        return vo;
     }
 
     private SkillListVO toListVo(HarnessSkill s) {
