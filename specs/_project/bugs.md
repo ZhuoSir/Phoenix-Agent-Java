@@ -53,6 +53,16 @@
 - AGENTS.md 宣称「零 resource 文件」，本模块实际有 application.yml + application-test.yml（profile=test 默认激活）
 - **修复方向**：改文档或改配置二选一，另议
 
+### B-09 前台与 harness 智能体无对话通道（已被 agent-skill-management 修复）
+- **现象**：前台对话页 auth 存在 harness 分支，但指向 `/api/front/harness/chat` —— 后端**无此端点**，B-09 即前台侧通道缺失
+- **状态**：✅ 已由 `specs/20260927_agent-skill-management` 的 T-11/T-14 修复：后端新增 `/platform/harness/chat`（前台身份+组可见性+技能三重校验），前端 transport 改指该端点
+- **注**：requirements.md R-09 引用的 B-09 即本条（原 bugs.md 漏登记，2026-09-27 补记）
+
+### B-10 后台新建智能体 type 为空，且无类型选择入口
+- **现象**：管理端「新建智能体」抽屉的提交 payload 不含 `type` 字段（`agent-create-drawer.vue handleSave`），`tbl_data_agent.type` 无 DB 默认值 → 新智能体 type=NULL；列表类型列显示空白，语义不明（用户实测：新建后类型概念不清）
+- **连带影响**：harness 类型**无法通过后台创建**——它由 Java `@Component extends AbstractHarnessAgent` 启动时注册，运行时经 `HarnessStaticLoader` 按 sn 取内存实例（缺失即 `NoSuchElementException`）。因此**不要把库里某行 type 直接改成 harness**，会得到无法运行的坏数据
+- **修复方向**：① 新建时明确默认 type（如 sql）并在 UI 展示类型；② 若要支持"后台可创建 harness 智能体"，需把 harness 构建参数（sysPrompt/工具/模型）数据驱动化 + 动态注册 → 属新功能，另立 spec
+
 ---
 
 ## 工作区遗留状态（非缺陷，处置需确认）
@@ -71,3 +81,5 @@
 | B-06 | P3 | 不修（缺功能→待立项） |
 | B-07 | P3 | 未修 |
 | B-08 | P3 | 未修 |
+| B-09 | P2 | ✅ 已修（agent-skill-management T-11/T-14） |
+| B-10 | P2 | 未修（新建智能体 type 缺失；harness 无法后台创建） |
