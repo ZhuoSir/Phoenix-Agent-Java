@@ -10,7 +10,7 @@
 2. **B-16 三张 Spring AI 向量表缺主键**（既有 DDL 缺漏，已补）
    - `tbl_vector_store_simple_data/rag/user_memory` 只有 HNSW 索引、无主键，而 `PgVectorStore` upsert 依赖 `ON CONFLICT (id)` → `there is no unique or exclusion constraint matching the ON CONFLICT specification`
    - 影响面比 embedding 更大：**所有**向量写入路径（schema 初始化、知识文档）从来都写不进去
-   - 已补 `PRIMARY KEY (id)`（幂等执行 + 复核）；基线 `sql/all_schema.sql` 仍缺，待后续修（B-01 同族）
+   - 已补 `PRIMARY KEY (id)`（幂等执行 + 复核）；**基线 `sql/all_schema.sql` 同步补齐**（按文件既有风格在末尾 ALTER 块追加），空库重放：报错数 64 与基线一致（全为 B-01 既有问题，无向量表相关），三张向量表主键建成
 3. **B-17 图链路在非 HTTP 调用方取 Sa-Token 登录态抛异常**（已修）
    - `GraphServiceImpl.builerLoginVo()` 无条件 `StpUtil.getSession()`；深度分析工具运行在 AgentScope 工具线程，无 Sa-Token 上下文 → `SaTokenContext 上下文尚未初始化` 打断整图
    - 已改为捕获该异常并降级为空串（与原 `loginVO == null` 分支同义），MCP 工具回调等非 HTTP 调用方同样受益

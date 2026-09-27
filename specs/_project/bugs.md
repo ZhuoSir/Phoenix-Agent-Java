@@ -94,7 +94,7 @@
 - **现象**：embedding 修好后 `POST /api/agent/{id}/datasources/init` 仍失败：`BatchUpdateException: INSERT INTO public.tbl_vector_store_simple_data …` → `PSQLException: there is no unique or exclusion constraint matching the ON CONFLICT specification`
 - **根因**：`sql/all_schema.sql` 建的 `tbl_vector_store_simple_data` / `tbl_vector_store_rag` / `tbl_vector_store_user_memory` **只有 HNSW 向量索引、没有主键/唯一约束**，而 Spring AI `PgVectorStore` 的 upsert 依赖 `ON CONFLICT (id)`。（对照：AgentScope 自建的 `tbl_harness_vector_store_knowledge` 有主键，正常。）
 - **影响**：所有 schema/知识文档写入向量库的路径**全部不可用**（不只是深度分析）→ 也解释了为何 `/api/agent/{id}/datasources/init` 从来没成功过
-- **修复**：三表补 `PRIMARY KEY (id)`（幂等 DO 块，已执行并复核 3 条 pkey）；**基线 `sql/all_schema.sql` 仍缺这三处约束，建议后续一并修**（属 B-01 同族：基线 DDL 不完整）
+- **修复**：① 运行库三表补 `PRIMARY KEY (id)`（幂等 DO 块，已执行并复核 3 条 pkey）；② **基线 `sql/all_schema.sql` 一并补齐**（按该文件既有的「末尾 ALTER 块加主键」风格追加 3 条语句）——空库重放验证：报错数与基线一致（64 处，均为 B-01 既有问题，无一与向量表相关），且三张向量表主键建成
 
 ### B-17 图链路在非 HTTP 调用方取 Sa-Token 登录态直接抛异常（✅ 已修，2026-09-27）
 - **现象**：B-13/B-16 修好后，深度分析报 `SaTokenContext 上下文尚未初始化`（图内 `handleNewProcess` → `builerLoginVo()` → `StpUtil.getSession()`）

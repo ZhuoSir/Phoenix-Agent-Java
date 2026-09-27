@@ -3972,6 +3972,9 @@ CREATE TABLE "public"."tbl_vector_store_combined" (
                                                       "updated_at" timestamp(6)
 )
 ;
+
+
+
 ALTER TABLE "public"."tbl_vector_store_combined" OWNER TO "phoenix";
 
 -- ----------------------------
@@ -41331,3 +41334,18 @@ ALTER TABLE "public"."tbl_tmp_products" ADD CONSTRAINT "tbl_data_products_pkey" 
 -- Primary Key structure for table tbl_tmp_users
 -- ----------------------------
 ALTER TABLE "public"."tbl_tmp_users" ADD CONSTRAINT "tbl_data_users_pkey" PRIMARY KEY ("id");
+
+-- ----------------------------
+-- Primary Key structure for table tbl_vector_store_rag
+-- ----------------------------
+ALTER TABLE "public"."tbl_vector_store_rag" ADD CONSTRAINT "tbl_vector_store_rag_pkey" PRIMARY KEY ("id");
+
+-- ----------------------------
+-- Primary Key structure for table tbl_vector_store_simple_data
+-- ----------------------------
+ALTER TABLE "public"."tbl_vector_store_simple_data" ADD CONSTRAINT "tbl_vector_store_simple_data_pkey" PRIMARY KEY ("id");
+
+-- ----------------------------
+-- Primary Key structure for table tbl_vector_store_user_memory
+-- ----------------------------
+ALTER TABLE "public"."tbl_vector_store_user_memory" ADD CONSTRAINT "tbl_vector_store_user_memory_pkey" PRIMARY KEY ("id");
