@@ -48,6 +48,11 @@ public class ModelConfigDTO {
 	 */
 	private Boolean isActive = true;
 
+	/**
+	 * 该类型默认模型标记（每类型至多一条）；由「设为默认」动作维护，新增时恒为 false
+	 */
+	private Boolean isDefault = false;
+
 	// 模型代理配置，默认关闭（使用直连）
 	private Boolean proxyEnabled = false;
 

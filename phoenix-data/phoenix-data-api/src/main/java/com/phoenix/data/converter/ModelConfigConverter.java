@@ -27,6 +27,7 @@ public class ModelConfigConverter {
 			.temperature(entity.getTemperature())
 			.maxTokens(entity.getMaxTokens())
 			.isActive(entity.getIsActive())
+			.isDefault(entity.getIsDefault())
 			.apiKey(entity.getApiKey())
 			.modelType(entity.getModelType().getCode())
 			.completionsPath(entity.getCompletionsPath())
@@ -64,6 +65,8 @@ public class ModelConfigConverter {
 		entity.setProxyPassword(dto.getProxyPassword());
 		// 默认值处理
 		entity.setIsActive(false);
+		// 默认标记只能由「设为默认」动作维护，新增一律非默认（避免绕过唯一性）
+		entity.setIsDefault(false);
 		entity.setIsDeleted(0);
 		entity.setCreatedTime(LocalDateTime.now());
 		entity.setUpdatedTime(LocalDateTime.now());

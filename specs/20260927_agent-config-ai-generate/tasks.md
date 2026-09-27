@@ -13,7 +13,7 @@
   验证方式: ① 存量库执行升级件 → `\d tbl_data_model_config` 见列与索引、`select model_type,count(*) from tbl_data_model_config where is_default and is_deleted=0 group by 1` 每类型 ≤1；② 构造"同类型多条启用"（模拟 B-20 后果）再在临时库重放 → 收敛为最新一条且索引建成；③ 重复执行零报错；④ 执行回滚件 → 列与索引消失、`is_active` 值逐条不变；⑤ 回滚后再执行升级件成功
   验收标准: 升级/回滚幂等可重放；唯一默认由 `uk_dmc_type_default` 保证；回填规则与顺序兼容（先收敛后建索引）在脚本文末注释写明
 
-- [ ] T-02 `ModelConfig`/`ModelConfigDTO` 增 `isDefault`；Mapper 增默认相关查询并移除互斥调用（修 B-20）
+- [x] T-02 `ModelConfig`/`ModelConfigDTO` 增 `isDefault`；Mapper 增默认相关查询并移除互斥调用（修 B-20）
   关联: R-10, R-11, R-14, R-19
   依赖: T-01
   验证方式: `mvn install -pl phoenix-data/phoenix-data-core -am` 通过；psql 断言 `selectDefaultByType`/`selectEnabledByType` 返回符合预期；`grep -rn "deactivateOthers" phoenix-data` 仅剩定义无调用（调用点删除）

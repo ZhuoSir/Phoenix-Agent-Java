@@ -31,8 +31,8 @@ public class ModelConfigDataServiceImpl extends ServiceImpl<ModelConfigMapper, M
 
 	@Override
 	public void switchActiveStatus(Integer id, ModelType type) {
-		getMapper().deactivateOthers(type.getCode(), id);
-
+		// 启用改为「可多选集合」，不再取消同类型其他配置的启用态
+		// （原 deactivateOthers 的 SQL 与注释相反、会把同类型其他条一并置为 true —— bugs.md B-20，随本改造删除）
 		ModelConfig entity = getById(id);
 		if (entity != null) {
 			entity.setIsActive(true);
