@@ -8,6 +8,7 @@ import com.phoenix.agent.vo.AgentProfileGenerateVO;
 import com.phoenix.tools.vo.ReturnVo;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -31,8 +32,12 @@ import java.util.concurrent.TimeoutException;
 @RequiredArgsConstructor
 public class AgentProfileController {
 
-    /** 生成调用响应式超时上限（模型出 md 提示词比纯文本慢，A-06） */
-    private static final Duration GENERATE_TIMEOUT = Duration.ofSeconds(60);
+    /**
+     * 生成调用超时（秒）。两项一次出要求模型输出 JSON（含整段 md 提示词），
+     * 实测 60s 会把已成功的中途调用切断（用户侧只看到"失败"），故默认 90s 且可配置。
+     */
+    @Value("${phoenix.agent.profile-generate-timeout-seconds:90}")
+    private long generateTimeoutSeconds = 90;
 
     private final AgentProfileGenerationService agentProfileGenerationService;
 
@@ -52,9 +57,9 @@ public class AgentProfileController {
     public Mono<ReturnVo<AgentProfileGenerateVO>> generate(@RequestBody AgentProfileGenerateDTO dto) {
         return Mono.fromCallable(() -> agentProfileGenerationService.generate(dto))
             .subscribeOn(Schedulers.boundedElastic())
-            .timeout(GENERATE_TIMEOUT)
+            .timeout(Duration.ofSeconds(generateTimeoutSeconds))
             .onErrorResume(TimeoutException.class, e -> {
-                log.error("AI 生成超时（>{}s）", GENERATE_TIMEOUT.toSeconds());
+                log.error("AI 生成超时（>{}s）", generateTimeoutSeconds);
                 return Mono.just(ReturnVo.fail(ProfileGenerationErrorCodeEnm.MODEL_CALL_FAILED.getMsg(),
                     ProfileGenerationErrorCodeEnm.MODEL_CALL_FAILED.getCode()));
             })

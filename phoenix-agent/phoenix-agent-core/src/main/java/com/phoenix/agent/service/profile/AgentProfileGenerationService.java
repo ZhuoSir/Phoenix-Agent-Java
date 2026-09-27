@@ -59,8 +59,8 @@ public class AgentProfileGenerationService {
             return fail(ProfileGenerationErrorCodeEnm.NO_DEFAULT_CHAT_MODEL);
         }
 
-        String metaPrompt = AgentProfilePromptTemplates.metaPrompt(name, withDescription, req.getDescription(),
-            req.getPrompt());
+        String metaPrompt = AgentProfilePromptTemplates.metaPrompt(name, withDescription, withPrompt,
+            req.getDescription(), req.getPrompt());
         String raw;
         try {
             raw = aiModelRegistry.getChatClient().prompt().user(metaPrompt).call().content();
@@ -95,7 +95,21 @@ public class AgentProfileGenerationService {
             vo.setPrompt(prompt);
         }
         else {
-            vo.setDescription(oneLine(stripFence(raw)));
+            // 单项描述：容忍模型仍然回 JSON 的情况（取 description 字段，不把整段塞进输入框）
+            String desc = stripFence(raw);
+            String obj = extractJsonObject(desc);
+            if (obj != null) {
+                try {
+                    String fromJson = objectMapper.readTree(obj).path("description").asString("");
+                    if (!fromJson.isBlank()) {
+                        desc = fromJson;
+                    }
+                }
+                catch (RuntimeException ignore) {
+                    // 不是合法 JSON 就按原文处理
+                }
+            }
+            vo.setDescription(oneLine(desc));
         }
         log.info("AI 生成完成: name={}, targets={}, configId={}, modelName={}, 描述字数={}, 提示词字数={}", name, targets,
             defaultChat.getId(), defaultChat.getModelName(),

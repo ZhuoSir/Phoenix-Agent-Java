@@ -45,16 +45,12 @@ const promptValue = computed({
   set: (v: string) => emit('update:prompt', v),
 });
 
-const loadingDesc = ref(false);
-const loadingPrompt = ref(false);
 const loadingBoth = ref(false);
 /** 撤销快照：只记本次生成前的内容，保存后不清 */
 const undoSnapshot = ref<null | { description: string; prompt: string }>(null);
 const lastError = ref('');
 
-const generating = computed(
-  () => loadingDesc.value || loadingPrompt.value || loadingBoth.value,
-);
+const generating = computed(() => loadingBoth.value);
 
 async function runGenerate(targets: ProfileField[]) {
   const name = (props.name ?? '').trim();
@@ -80,9 +76,7 @@ async function runGenerate(targets: ProfileField[]) {
 
   const wantDesc = targets.includes('DESCRIPTION');
   const wantPrompt = targets.includes('PROMPT');
-  if (targets.length === 2) loadingBoth.value = true;
-  else if (wantDesc) loadingDesc.value = true;
-  else loadingPrompt.value = true;
+  loadingBoth.value = true;
   lastError.value = '';
 
   try {
@@ -111,8 +105,6 @@ async function runGenerate(targets: ProfileField[]) {
     ElMessage.error(lastError.value);
   } finally {
     loadingBoth.value = false;
-    loadingDesc.value = false;
-    loadingPrompt.value = false;
   }
 }
 
@@ -136,12 +128,7 @@ function undo() {
         :disabled="disabled"
         placeholder="请输入智能体描述（纯文本，一句话）"
       />
-      <div class="mt-2 flex items-center gap-2">
-        <ElButton size="small" :loading="loadingDesc" :disabled="disabled || generating" @click="runGenerate(['DESCRIPTION'])">
-          AI 生成描述
-        </ElButton>
-        <span class="text-xs text-gray-400">纯文本，不超过 120 字</span>
-      </div>
+      <div class="mt-1 text-xs text-gray-400">纯文本，不超过 120 字</div>
     </div>
 
     <div class="mb-5">
@@ -154,11 +141,8 @@ function undo() {
         placeholder="用 Markdown 书写系统提示词：## 角色 / ## 描述 / ## 能力 / ## 安全范围"
       />
       <div class="mt-2 flex flex-wrap items-center gap-2">
-        <ElButton size="small" :loading="loadingPrompt" :disabled="disabled || generating" @click="runGenerate(['PROMPT'])">
-          AI 生成提示词
-        </ElButton>
         <ElButton size="small" type="primary" :loading="loadingBoth" :disabled="disabled || generating" @click="runGenerate(['DESCRIPTION','PROMPT'])">
-          AI 同时生成两项
+          AI 生成描述与提示词
         </ElButton>
         <ElButton v-if="undoSnapshot" size="small" :disabled="disabled" @click="undo">
           撤销生成

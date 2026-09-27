@@ -60,8 +60,8 @@ public final class AgentProfilePromptTemplates {
      * @param currentDescription 已填描述（可空，作为上下文）
      * @param currentPrompt      已填提示词（可空，作为上下文/润色依据）
      */
-    public static String metaPrompt(String name, boolean withDescription, String currentDescription,
-            String currentPrompt) {
+    public static String metaPrompt(String name, boolean withDescription, boolean withPrompt,
+            String currentDescription, String currentPrompt) {
         StringBuilder sb = new StringBuilder();
         sb.append("你是智能体配置助手。请根据智能体名称，产出可直接使用的配置内容。\n\n");
         sb.append("【智能体名称】").append(name).append('\n');
@@ -72,26 +72,39 @@ public final class AgentProfilePromptTemplates {
             sb.append("【已填写的提示词（可参考或改进）】\n").append(currentPrompt.trim()).append('\n');
         }
         sb.append('\n');
+        int item = 1;
         if (withDescription) {
-            sb.append("1) 描述：中文纯文本，不超过 ").append(DESCRIPTION_MAX_CHARS)
-                .append(" 字，一句话说明这个智能体做什么、给谁用；不要 Markdown 标记、不要引号包裹、不要复述名称。\n");
+            sb.append(item++).append(") 描述：中文纯文本，不超过 ").append(DESCRIPTION_MAX_CHARS)
+                .append(" 字，一句话说明这个智能体做什么、给谁用；")
+                .append("不要 Markdown 标记、不要引号包裹、不要复述名称。\n");
         }
-        sb.append(withDescription ? "2) " : "")
+        sb.append(item > 1 ? "2) " : "")
             .append("提示词：必须是 **Markdown 语法文本**，中文，长度 ")
             .append(PROMPT_MIN_CHARS).append('~').append(PROMPT_MAX_CHARS).append(" 字，")
             .append("并必须包含以下四个二级标题段落（顺序可调，每段都要有实际内容，禁止留空段或 TODO/占位符）：")
             .append(sectionList()).append("。");
         sb.append(" 可在其后追加与名称语义相关的段落（如 ## 输出要求、## 工具使用）。");
         sb.append(" 段落内用无序列表或有序列表表达要点；不要输出代码块包裹整篇内容，不要解释你在做什么。\n\n");
-        if (withDescription) {
-            sb.append("【输出格式】只输出一个 JSON 对象，不要任何额外文字与 Markdown 代码块标记：\n")
-                .append("{\"description\":\"...\",\"prompt\":\"...\"}\n")
-                .append("其中 prompt 字段内的换行用 \\n 表示，Markdown 标题写作 ## 段落名。\n");
-        }
-        else {
-            sb.append("【输出格式】只输出提示词正文本身（Markdown），不要 JSON、不要代码块包裹、不要任何解释。\n");
-        }
+        sb.append(outputContract(withDescription, withPrompt));
         return sb.toString();
+    }
+
+    /**
+     * 输出协议按目标项决定：两项才要 JSON；单项时只要那一项的正文。
+     *
+     * <p>曾经的实测缺陷：只生成「描述」时仍要求模型输出 {"description":...,"prompt":...}，
+     * 于是整段 JSON 被原样塞进描述字段（用户在界面上看到的就是 JSON）。
+     */
+    public static String outputContract(boolean withDescription, boolean withPrompt) {
+        if (withDescription && withPrompt) {
+            return "【输出格式】只输出一个 JSON 对象，不要任何额外文字与 Markdown 代码块标记：\n"
+                + "{\"description\":\"...\",\"prompt\":\"...\"}\n"
+                + "其中 prompt 字段内的换行用 \\n 表示，Markdown 标题写作 ## 段落名。\n";
+        }
+        if (withPrompt) {
+            return "【输出格式】只输出提示词正文本身（Markdown），不要 JSON、不要代码块包裹、不要任何解释。\n";
+        }
+        return "【输出格式】只输出描述这一句话的纯文本本身，不要 JSON、不要引号、不要 Markdown 标记、不要换行。\n";
     }
 
     private static boolean hasText(String s) {

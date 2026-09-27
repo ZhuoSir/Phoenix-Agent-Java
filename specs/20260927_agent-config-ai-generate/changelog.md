@@ -1,6 +1,28 @@
 # Changelog: agent-config-ai-generate
 
 
+## Implement 修正（2026-09-27 · 用户实测反馈「生成描述返回 JSON」）
+**缺陷**：`targets=["DESCRIPTION"]` 时 meta-prompt 仍按"两项"要求模型输出 `{"description":...,"prompt":...}`，
+而服务把整段原样塞进描述字段 → 界面描述框里出现一段 JSON。
+- **根因**：输出协议只按 `withDescription` 分支决定，未考虑"只要描述"的情形（`AgentProfilePromptTemplates`）
+- **修复1**：新增 `outputContract(withDescription, withPrompt)` 三态协议——两项才要 JSON；
+  只要提示词→只要 md 正文；只要描述→只要一句话纯文本
+- **修复2（防御）**：单项描述时若模型仍回 JSON，取其中 `description` 字段，不把整段塞进输入框
+- **修复3**：两项一次出的实测耗时 ~45s（曾达 65s+），原 60s 响应式超时会在成功前切断 →
+  超时放宽为 **90s 且可配置** `phoenix.agent.profile-generate-timeout-seconds`
+
+**UI 简化（用户要求）**：去掉「AI 生成描述」「AI 生成提示词」两个单项按钮，
+只保留一个 **「AI 生成描述与提示词」**（一次同时出两项）；撤销/覆盖确认/失败提示不变。
+接口侧 `targets` 仍支持单项（R-03 的单项能力保留，只是不再给入口）。
+> 若要把 T-11 的验证方式文案同步改成"单按钮"，属改已确认文档 → 需你说一句才做（会触发重确认）。
+
+**实测（现网，默认 CHAT=7 qwen3.8-flash）**：
+- `targets=[DESCRIPTION]` → 描述=「面向法务、采购和管理人员，自动审阅合同条款…」49 字，**无 JSON**，prompt=None
+- `targets=[PROMPT]` → 提示词 681 字四段齐备，description=null
+- `targets=[DESCRIPTION,PROMPT]` → 45.7s 返回：描述 55 字纯文本（含JSON=False）+ 提示词 544 字且 `## 角色/描述/能力/安全范围` 四段齐备
+- 后端 BUILD=0；`vue-tsc` 189（无新增）；组件经 dev server 转译 200 无错误
+
+
 ## Implement 记录（2026-09-27 · 进度与证据）
 **已勾选（8/13）**：T-01 升级件（存量库+空库+回滚全链路实测）、T-02（含删除 B-20 的互斥方法）、T-03 默认优先/回落+WARN、
 T-04 启用不互斥/停用默认保护/设默认（并发唯一性实测）、T-06 运行时取默认+纪元刷新（不重启切换验证）、
