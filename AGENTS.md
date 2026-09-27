@@ -74,3 +74,22 @@ Multi-module Maven project (Java 21). An NL2SQL state-graph engine built on Spri
 - Declared but **not wired** in POM: maven-checkstyle-plugin, spotless-maven-plugin, jacoco-maven-plugin.
 - Sa-Token integration for auth (`sa-token-reactor-spring-boot4-starter`).
 - OpenTelemetry → Langfuse tracing configured.
+
+---
+
+## spec 开发流程（bryanchen-spec 接入说明 · 2026-09-27 init 追加）
+
+四阶段：Specify(requirements.md) → Plan(plan.md) → Tasks(tasks.md) → Implement。
+产物落盘 `specs/{YYYYMMDD}_{功能名}/`（requirements/plan/tasks/changelog 四件套）。
+
+**铁律（任何规范不得豁免）：**
+1. 三重确认门：requirements/plan/tasks 版本头全部 `状态: 已确认` 且确认人非空，才允许写生产代码；确认人须由用户给出，agent 不代确认。
+2. 确认前只允许写 `specs/` 下文档；禁止改源码、升依赖、改构建/CI 配置。
+3. 已确认文档被修改 → 状态回退 `待重确认`、版本 bump、重走确认。
+4. 不得声称「测试通过/完成」除非贴出真实命令输出。
+5. Implement 中发现需求/设计缺陷 → 停编码 → 回改文档 → 重新确认。
+
+**项目事实以 `specs/_project/profile.md` 为准**（本文件部分条目已过期，见 profile §已知技术债）。
+各领域规范源由项目根 `.specrc.yml` 路由（code-backend/api/database/git/版本→global；code-frontend→none）。
+里程碑与发版：走 skill 的 releases/vX.Y.Z 流程（git 现状有 phoenix-1.1.x-release 痕迹 → 建议 B 档）。
+完整流程细则见 skill：`bryanchen-spec`（触发词「新需求 / spec流程 / 继续 <功能名>」）。

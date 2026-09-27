@@ -5,6 +5,7 @@ import com.alibaba.cloud.ai.graph.streaming.StreamingOutput;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.phoenix.agent.harness.request.ConfirmRequest;
 import com.phoenix.agent.harness.request.HarnessRequest;
+import com.phoenix.agent.controller.support.HarnessEventMapper;
 import com.phoenix.agent.harness.send.HarnessChatService;
 import com.phoenix.privilege.entity.PrivilegeUser;
 import io.agentscope.core.event.AgentEvent;
@@ -89,46 +90,12 @@ public class HarnessController {
     @PostMapping(value = "/chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<Map<String, Object>> harnessChat(@RequestBody HarnessRequest  harnessRequest) {
         String userId = StpUtil.getLoginIdAsString();
-        HarnessRequest request = HarnessRequest.builder().userId(userId).sessionId(harnessRequest.getSessionId()).message(harnessRequest.getMessage()).build();
+        HarnessRequest request = HarnessRequest.builder().userId(userId).sessionId(harnessRequest.getSessionId())
+                .message(harnessRequest.getMessage())
+                .enabledSkillIds(harnessRequest.getEnabledSkillIds())
+                .build();
         return harnessChatService.stream(harnessRequest.getHarnessSn(), request)
-                .map(output -> {
-                    Map<String, Object> eventMap = new LinkedHashMap<>();
-                    eventMap.put("content", "");
-                    eventMap.put("end", false);
-                    if (output instanceof StreamingOutput<?> streamingOutput && streamingOutput.chunk() != null) {
-                        eventMap.put("content", streamingOutput.chunk());
-                    }
-                    if (output.isEND()) {
-                        eventMap.put("end", true);
-                    }
-                    output.state().value("agent_event", AgentEvent.class).ifPresent(event -> {
-                        if (event instanceof RequireUserConfirmEvent confirmEvent) {
-                            eventMap.put("needConfirm", true);
-                            eventMap.put("toolCalls", confirmEvent.getToolCalls());
-                            List<Map<String, Object>> buttons = new ArrayList<>();
-                            Map<String, Object> confirmBtn = new LinkedHashMap<>();
-                            confirmBtn.put("text", "确认");
-                            confirmBtn.put("action", "confirm");
-                            confirmBtn.put("type", "primary");
-                            buttons.add(confirmBtn);
-                            Map<String, Object> cancelBtn = new LinkedHashMap<>();
-                            cancelBtn.put("text", "取消");
-                            cancelBtn.put("action", "cancel");
-                            cancelBtn.put("type", "danger");
-                            buttons.add(cancelBtn);
-                            eventMap.put("buttons", buttons);
-                        } else if (event instanceof TextBlockDeltaEvent textEvent) {
-                            eventMap.put("content", textEvent.getDelta());
-                        } else if (event instanceof ThinkingBlockDeltaEvent thinkingEvent) {
-                            // eventMap.put("content", thinkingEvent.getDelta());
-                        } else if (event instanceof ThinkingBlockStartEvent || event instanceof ThinkingBlockEndEvent) {
-                            // 思考开始/结束事件，无需处理，静默忽略
-                        } else if (!(event instanceof CustomEvent)) {
-                            log.warn("Unhandled agent_event type: {}", event.getClass().getSimpleName());
-                        }
-                    });
-                    return eventMap;
-                });
+                .map(HarnessEventMapper::toEventMap);
     }
 
 

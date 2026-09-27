@@ -2,9 +2,12 @@
 import { computed, nextTick, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useAgentStore, useChatStore } from '@phoenix/chat-shared';
-import { ElMessage, ElIcon, ElTooltip } from 'element-plus';
+import { ElMessage, ElIcon, ElOption, ElSelect, ElTooltip } from 'element-plus';
 import { ArrowDown, ArrowUp } from '@element-plus/icons-vue';
 
+import { getMySkillsApi } from '#/api/front/agent';
+
+import { setExplicitSkillIds } from '../api-transport';
 import PresetQuestions from './PresetQuestions.vue';
 
 const chat = useChatStore();
@@ -15,6 +18,21 @@ const { activeAgent } = storeToRefs(agentStore);
 const inputValue = ref('');
 const textareaRef = ref<HTMLTextAreaElement | null>(null);
 const presetCollapsed = ref(true);
+
+/** 前台技能区（R-09）：仅 harness 智能体展示当前账号可见可用的技能 */
+const mySkills = ref<Array<{ id: number; name: string }>>([]);
+const selectedSkillIds = ref<number[]>([]);
+
+watch(
+  () => activeAgent.value?.id,
+  async (id) => {
+    selectedSkillIds.value = [];
+    mySkills.value = [];
+    if (!id || activeAgent.value?.type !== 'harness') return;
+    mySkills.value = await getMySkillsApi(id);
+  },
+  { immediate: true },
+);
 
 const hasPendingConfirm = computed(() => {
   const sessionId = activeSessionId.value;
@@ -75,7 +93,10 @@ async function handleSubmit() {
   if (hasPendingConfirm.value) return;
   inputValue.value = '';
   resize();
+  // 显式技能仅对下一条消息生效（不持久）
+  setExplicitSkillIds(selectedSkillIds.value);
   await chat.send(value);
+  selectedSkillIds.value = [];
 }
 
 function handleKeydown(event: KeyboardEvent) {
@@ -89,6 +110,31 @@ function handleKeydown(event: KeyboardEvent) {
 
 <template>
   <div class="composer">
+    <div
+      v-if="activeAgent?.type === 'harness' && mySkills.length > 0"
+      class="mb-2 flex items-center gap-2 px-1"
+    >
+      <span class="text-xs text-gray-500">显式技能</span>
+      <ElSelect
+        v-model="selectedSkillIds"
+        class="min-w-[220px]"
+        clearable
+        collapse-tags
+        collapse-tags-tooltip
+        filterable
+        multiple
+        placeholder="不选则由模型自主匹配"
+        size="small"
+      >
+        <ElOption
+          v-for="skill in mySkills"
+          :key="skill.id"
+          :label="skill.name"
+          :value="skill.id"
+        />
+      </ElSelect>
+      <span class="text-xs text-gray-400">勾选后本轮强制执行所选技能</span>
+    </div>
 
     <div class="composer__preset">
       <el-tooltip v-if="!presetCollapsed" content="隐藏预设问题">

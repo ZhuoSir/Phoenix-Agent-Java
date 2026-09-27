@@ -26,6 +26,7 @@ import {
 } from '#/api';
 
 import AgentDataSourceConfig from './components/AgentDataSourceConfig.vue';
+import AgentSkillConfig from './components/AgentSkillConfig.vue';
 
 const route = useRoute();
 const router = useRouter();
@@ -290,6 +291,13 @@ onMounted(loadAgent);
 
       <div class="rounded-lg bg-white p-6 shadow-sm">
         <AgentDataSourceConfig :agent-id="Number(route.params.id)" />
+      </div>
+
+      <div v-if="Number(route.params.id)" class="rounded-lg bg-white p-6 shadow-sm">
+        <AgentSkillConfig
+          :agent-id="Number(route.params.id)"
+          :agent-type="agent.type"
+        />
       </div>
     </div>
   </Page>

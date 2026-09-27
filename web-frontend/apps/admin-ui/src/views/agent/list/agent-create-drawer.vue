@@ -51,6 +51,7 @@ import {
 
 import AccessApi from '#/components/agent/AccessApi.vue';
 import AgentDataSourceConfig from '../edit/components/AgentDataSourceConfig.vue';
+import AgentSkillConfig from '../edit/components/AgentSkillConfig.vue';
 import AgentKnowledgeConfig from './components/AgentKnowledgeConfig.vue';
 import BusinessKnowledgeConfig from './components/BusinessKnowledgeConfig.vue';
 import SemanticsConfig from './components/SemanticsConfig.vue';
@@ -685,6 +686,12 @@ const [Drawer, drawerApi] = useVbenDrawer({
               <span>数据源配置</span>
             </ElMenuItem>
           </ElMenuItemGroup>
+          <ElMenuItemGroup title="技能配置">
+            <ElMenuItem index="skill">
+              <ElIcon><IconifyIcon icon="lucide:sparkles" /></ElIcon>
+              <span>技能配置</span>
+            </ElMenuItem>
+          </ElMenuItemGroup>
           <ElMenuItemGroup title="PROMPT配置">
             <ElMenuItem index="prompt">
               <ElIcon><IconifyIcon icon="lucide:message-square" /></ElIcon>
@@ -896,6 +903,12 @@ const [Drawer, drawerApi] = useVbenDrawer({
           v-else-if="activeMenu === 'datasource'"
           :agent-id="editId!"
         />
+
+        <!-- 技能配置（技能仅对 Harness 类智能体运行时生效） -->
+        <div v-else-if="activeMenu === 'skill'">
+          <AgentSkillConfig v-if="editId" :agent-id="editId" />
+          <div v-else class="text-sm text-gray-500">请先保存智能体，再配置技能。</div>
+        </div>
 
         <!-- PROMPT配置 -->
         <div v-else-if="activeMenu === 'prompt'">

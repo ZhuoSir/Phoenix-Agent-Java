@@ -231,6 +231,10 @@ export interface FrontHarnessChatRequest {
   sessionId: string;
   message: string;
   harnessSn: string;
+  /** 前台按智能体 id 寻址（后端据此做组可见性校验） */
+  agentId?: number | string;
+  /** 显式执行的技能 id（R-09：不传=模型自主匹配） */
+  enabledSkillIds?: number[];
 }
 
 export interface FrontHarnessConfirmRequest {
@@ -246,7 +250,7 @@ export function streamFrontHarnessChat(
   onError?: (error: Error) => Promise<void>,
   onComplete?: () => Promise<void>,
 ): () => void {
-  const url = `${API_BASE_URL}/api/front/harness/chat`;
+  const url = `${API_BASE_URL}/platform/harness/chat`;
   const controller = new AbortController();
 
   const doFetch = async () => {
