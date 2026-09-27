@@ -93,6 +93,31 @@ public class AgentServiceImpl extends ServiceImpl<AgentMapper, Agent> implements
 	}
 
 	/**
+	 * 管理端智能体列表：只返回平台内创建的智能体（sn 为空），过滤 Java 自注册类。
+	 */
+	@Override
+	@Transactional(readOnly = true)
+	public List<Agent> listCreatedInPlatform(String status, String keyword) {
+		List<Agent> result;
+		if (keyword != null && !keyword.isBlank()) {
+			result = search(keyword);
+		}
+		else if (status != null && !status.isBlank()) {
+			result = findByStatus(status);
+		}
+		else {
+			result = findAll();
+		}
+		return result.stream()
+			.filter(agent -> agent != null && !hasText(agent.getSn()))
+			.toList();
+	}
+
+	private boolean hasText(String value) {
+		return value != null && !value.isBlank();
+	}
+
+	/**
 	 * 保存 Agent，新增时设置创建/更新时间，更新时仅更新时间
 	 */
 	@Override

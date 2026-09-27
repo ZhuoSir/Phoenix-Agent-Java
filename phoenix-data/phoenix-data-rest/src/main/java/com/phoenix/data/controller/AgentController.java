@@ -33,15 +33,8 @@ public class AgentController {
     @GetMapping("/list")
     public ReturnVo<List<Agent>> list(@RequestParam(value = "status", required = false) String status,
                                       @RequestParam(value = "keyword", required = false) String keyword) {
-        List<Agent> result;
-        if (StringUtils.isNotBlank(keyword)) {
-            result = agentService.search(keyword);
-        } else if (StringUtils.isNotBlank(status)) {
-            result = agentService.findByStatus(status);
-        } else {
-            result = agentService.findAll();
-        }
-        return ReturnVo.ok(result);
+        // 只列平台内创建的智能体（sn 为空）：Java 自注册的存量智能体不再出现在列表（可逆取舍）
+        return ReturnVo.ok(agentService.listCreatedInPlatform(status, keyword));
     }
 
     /**

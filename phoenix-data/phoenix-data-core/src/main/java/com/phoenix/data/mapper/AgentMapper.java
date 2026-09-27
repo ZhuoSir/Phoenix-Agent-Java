@@ -66,9 +66,9 @@ public interface AgentMapper extends BaseMapper<Agent> {
 	 */
 	@Select("""
 			SELECT * FROM tbl_data_agent
-			WHERE (name LIKE CONCAT('%', #{keyword}, '%')
-				   OR description LIKE CONCAT('%', #{keyword}, '%')
-				   OR tags LIKE CONCAT('%', #{keyword}, '%'))
+			WHERE (name LIKE '%' || CAST(#{keyword} AS text) || '%'
+				   OR description LIKE '%' || CAST(#{keyword} AS text) || '%'
+				   OR tags LIKE '%' || CAST(#{keyword} AS text) || '%')
 			ORDER BY order_num ASC, create_time DESC
 			""")
 	List<Agent> searchByKeyword(@Param("keyword") String keyword);

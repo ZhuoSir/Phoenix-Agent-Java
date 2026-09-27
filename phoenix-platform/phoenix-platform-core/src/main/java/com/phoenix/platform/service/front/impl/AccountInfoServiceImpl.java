@@ -81,7 +81,12 @@ public class AccountInfoServiceImpl extends ServiceImpl<AccountInfoMapper, Accou
                 List<GroupAgentInfo> gas = groupAgentInfoService.getByGroupIds(gids);
                 if (CollUtil.isNotEmpty(gas)) {
                     List<Long> agentIds = CollStreamUtil.toList(gas, GroupAgentInfo::getAgentId);
-                    datas = agentService.findByIds(agentIds, AgentStatusEnm.PUBLISHED.getCode());
+                    // 与后台列表一致：只展示平台内创建的智能体（sn 为空），
+                    // Java 自注册类（有 sn）保留在库中但不再进任何列表
+                    datas = agentService.findByIds(agentIds, AgentStatusEnm.PUBLISHED.getCode())
+                        .stream()
+                        .filter(agent -> agent != null && StrUtil.isBlank(agent.getSn()))
+                        .toList();
                 }
             }
         }

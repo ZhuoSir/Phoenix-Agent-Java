@@ -1,5 +1,15 @@
 # Changelog: dynamic-agent-types
 
+## 追加变更（2026-09-27 · 合并后 · 列表去存量智能体）
+- 用户反馈：「全部智能体里还显示那么多之前的」，要求列表只显示当前已创建的智能体。**用户选定方案：只从列表去掉（可逆），不删数据、不改自注册代码**。
+- 背景事实：`AbstractHarnessAgent.register()` 启动时 `agentService.saveBySn()` 写库，而 `saveBySn` 是「不存在就插入」→ 19/20/21/23/24 这 5 个 Java 自注册智能体**删了也会在下次重启时长回来**，只删 DB 行解决不了。
+- 实现：**只在列表查询侧过滤 `sn` 为空的记录**（平台内创建的智能体 sn 为空；Java 自注册类 sn 非空）
+  - 后台：`GET /api/agent/list` 改走新方法 `AgentService.listCreatedInPlatform(status, keyword)`（`findAll/findByStatus/search` 语义不变，避免影响 `AgentStartupInitialization` 等既有调用方）
+  - 前台：`AccountInfoServiceImpl.getMyAgents()` 同步过滤，口径与后台一致
+  - 存量智能体仍保留在库中、仍可被 agentId 直达调用（构建预演/对话实测正常），Java 代码保留作参考 → 完全可逆（回退这两处过滤即恢复展示）
+- 实测：后台列表 3 个（30 智能体02 / 25 智能体01 / 22 销售智能体），draft=[30,25]、published=[]、offline=[22]；关键字「制度」「巡逻」→ 空；存量 agent24 构建预演 `source=legacy` + 对话正常
+- 附带修复 **B-15**：`AgentMapper.searchByKeyword` 在 PostgreSQL 下 `CONCAT('%', #{keyword}, '%')` 报 `could not determine data type of parameter $1`（列表搜索框一用就 500）→ 改 `'%' || CAST(#{keyword} AS text) || '%'`，四个关键词实测正常
+
 ## Implement 记录（2026-09-27 · T-16 端到端总回归）
 **场景① 新建对话智能体全能力**（新建 id=29，不传 type → 落 `harness`；配 知识库 topK=8/阈值0.6 + 取数 + 深度分析 + 数据源11 + 计划模式；绑技能 weather；发布；授权通用组）
 - 构建摘要：`agentId=29, runtimeKey=agent-29, planMode=true, memory=true, policy=local, tools=[todo, database_query, deep_analysis, knowledge_retrieval], skillPool=1`（四工具按配置装配、技能池按 agentId 解析）

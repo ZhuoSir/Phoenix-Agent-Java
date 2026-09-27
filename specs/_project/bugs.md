@@ -84,6 +84,12 @@
 - **影响**：运行配置残留会在日后新建同 id 智能体时误命中（id 自增不会复用，但孤儿行长期占用/污染统计）；组授权残留会随历史累计
 - **修复方向**：删除智能体时级联清理三张关联表（或在各表的查询侧统一加 `exists` 校验）；本期（dynamic-agent-types）不修，已登记；本次回归的孤儿行已手工清理
 
+### B-15 智能体列表关键字搜索在 PG 下 500（本期已修）
+- **现象**：`GET /api/agent/list?keyword=xxx` → `500 {"message":"服务器内部错误"}`，日志 `PSQLException: ERROR: could not determine data type of parameter $1`，SQL 为 `name LIKE CONCAT('%', ?, '%')`
+- **根因**：PostgreSQL 无法从 `CONCAT` 推断未定类型的参数
+- **修复**：`AgentMapper.searchByKeyword` 改为 `'%' || CAST(#{keyword} AS text) || '%'`
+- **验证**：keyword=制度/巡逻（存量）→ `[]`；智能体/销售 → 命中平台内创建的智能体，均 HTTP 200 正常返回
+
 ---
 
 ## 工作区遗留状态（非缺陷，处置需确认）
@@ -109,3 +115,4 @@
 | B-12 | P2 | ✅ 已修（dynamic-agent-types T-08：整词匹配 + 剔除字面量，jshell 8 例验证） |
 | B-13 | P2 | 未修（环境：embedding 模型 404，深度分析链路受阻） |
 | B-14 | P2 | 未修（删除智能体残留运行配置/技能绑定/组授权孤儿行） |
+| B-15 | P2 | ✅ 已修（列表关键字搜索 PG `CONCAT` 参数类型报错 → 改字符串拼接） |

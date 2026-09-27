@@ -52,6 +52,18 @@ public interface AgentService extends IService<Agent> {
 	Agent resetApiKey(Long id);
 
 	/**
+	 * 管理端智能体列表：**只返回平台内创建的智能体**（`sn` 为空）。
+	 *
+	 * <p>Java 自注册类（BpmReactAgent/ZhiduReactAgent/ParolCompiledGraph/HumanInTheLoop/RulesHarnessAgent）
+	 * 每次启动都会 `saveBySn` 写库，它们的 `sn` 非空；这些存量智能体不再出现在列表里，
+	 * 但保留在库中且运行能力不变（可被 agentId 直接调用），属可逆的产品取舍。
+	 *
+	 * @param status 可选状态过滤（draft/published/offline）
+	 * @param keyword 可选关键字
+	 */
+	List<Agent> listCreatedInPlatform(String status, String keyword);
+
+	/**
 	 * 删除 Agent
 	 */
 	void deleteById(Long id);
