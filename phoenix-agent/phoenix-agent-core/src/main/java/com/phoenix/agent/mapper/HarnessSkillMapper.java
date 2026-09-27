@@ -26,6 +26,19 @@ public interface HarnessSkillMapper extends BaseMapper<HarnessSkill> {
     List<String> selectAllowedSkillNamesByAgentSn(@Param("sn") String sn);
 
     /**
+     * 运行时技能池（R-03/R-10，库配置路径）：按 **agentId** 取「已绑定该智能体 ∧ 已发布」的技能名。
+     * 与 sn 版本查的是同一批绑定行，只是解析方式不同——新建的库配置智能体没有 sn，必须走本方法。
+     */
+    @Select("""
+            select s.name
+              from tbl_harness_skills s
+              join tbl_data_agent_skill_info b on b.skill_id = s.id and b.del_flag = 0
+             where b.agent_id = #{agentId}
+               and s.status = 'published'
+            """)
+    List<String> selectAllowedSkillNamesByAgentId(@Param("agentId") Long agentId);
+
+    /**
      * 技能绑定版本（T-06 配置指纹组成项）：绑定条数 + 最近绑定变更时间。
      * 绑定变更即视为「运行实例已过期」，与 agent/运行配置的 update_time 一起决定是否重建。
      */

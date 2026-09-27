@@ -56,4 +56,7 @@ public class AgentRuntimePreviewVO implements Serializable {
 
     /** 该智能体运行时可见技能数（= 已发布 ∧ 已绑定本智能体） */
     private Integer skillPoolSize;
+
+    /** 该智能体运行时可见技能名清单（按 agentId 解析，T-10） */
+    private List<String> skillNames;
 }

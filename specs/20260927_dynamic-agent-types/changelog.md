@@ -1,5 +1,12 @@
 # Changelog: dynamic-agent-types
 
+## Implement 记录（2026-09-27 · T-10）
+- 完成 T-10：`HarnessSkillMapper.selectAllowedSkillNamesByAgentId`（新）+ `AgentScopedSkillRepository` 双构造器（agentId 路径 / sn 路径并存）。
+  - 库配置路径（Factory 构建的对话智能体）走 **agentId**；存量 Java 自注册路径（AbstractHarnessAgent）保持 **sn**，行为不变。
+  - 构建预演新增 `skillNames`（按 agentId 解析的技能名清单），成为技能池隔离的可观测入口。
+- 实测：agent25（sn=NULL）技能池由 T-05 时的 0 → `[weather]`（agentId 路径生效）；agent24 为 `[poem, weather]`，DB 反查 `poem` 仅绑 24 → 按智能体隔离成立；存量 sn 路径执行同款 SQL（sn=RulesHarnessAgent）返回 `[poem, weather]`，兼容路径未回归。
+- 测试数据（有意保留至 T-16 回归）：新上传技能 `poem`（id=12，已发布、未授权任何用户组→前台不可见）并绑定 agent24；T-16 结束后清理。
+
 ## Implement 记录（2026-09-27 · T-07）
 - 完成 T-07：新增 `KnowledgeRetrievalTool`（按智能体实例化）+ `KnowledgeRetrievalToolContributor`，检索范围 = 本实例 agentId，topK/阈值来自运行配置。
 - **新增增量升级件 `04_knowledge_tool_params.sql`（+回滚件）**：`knowledge_top_k`(默认10) / `knowledge_similarity_threshold`(默认0.65)。原因：plan T-07 验收要求「topK/阈值来自配置」，已确认的 `03` 无此两列；不改 `03`（保持已确认件不动），以增量件补齐，默认值 = 原写死值故存量行为不变。已幂等执行 2 次验证。

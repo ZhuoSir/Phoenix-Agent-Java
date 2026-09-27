@@ -53,7 +53,8 @@ public class HarnessAgentPreviewService {
         vo.setDbDeepAnalysisEnabled(isOn(config.getDbDeepAnalysisEnabled()));
         vo.setDatasourceId(config.getDatasourceId());
         vo.setFilesystemPolicy(config.getFilesystemPolicy());
-        vo.setSkillPoolSize(harnessAgentFactory.skillPoolSize(harnessAgentFactory.runtimeKey(agent)));
+        vo.setSkillNames(harnessAgentFactory.skillPoolNames(agent));
+        vo.setSkillPoolSize(vo.getSkillNames().size());
         try {
             HarnessAgentRegistry.RuntimeHandle handle = harnessAgentRegistry.acquire(agentId);
             vo.setBuildOk(true);

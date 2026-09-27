@@ -172,22 +172,31 @@ public class HarnessAgentFactory {
     public String describe(Agent agent, AgentRuntimeConfig config, List<String> toolNames) {
         return "agentId=%d, runtimeKey=%s, modelConfigId=%s, planMode=%s, memory=%s, policy=%s, tools=%s, skillPool=%d"
             .formatted(agent.getId(), runtimeKey(agent), config.getModelConfigId(), isOn(config.getPlanMode()),
-                isOn(config.getMemoryEnabled()), config.getFilesystemPolicy(), toolNames,
-                skillPoolSize(runtimeKey(agent)));
+                isOn(config.getMemoryEnabled()), config.getFilesystemPolicy(), toolNames, skillPoolSize(agent));
     }
 
-    /** 运行时技能池大小 = 已发布 ∧ 已绑定本智能体（查库失败降级为 0，不阻断构建） */
-    public int skillPoolSize(String sn) {
-        if (!StringUtils.hasText(sn)) {
-            return 0;
+    /**
+     * 运行时技能池大小 = 已发布 ∧ 已绑定本智能体（查库失败降级为 0，不阻断构建）。
+     * 有 agentId 走 agentId 路径（T-10）；仅存量仅有 sn 的场景回落 sn 路径。
+     */
+    public int skillPoolSize(Agent agent) {
+        return skillPoolNames(agent).size();
+    }
+
+    /** 运行时技能池清单（已发布 ∧ 已绑定本智能体），供管理端回显与排障 */
+    public List<String> skillPoolNames(Agent agent) {
+        if (agent == null) {
+            return List.of();
         }
         try {
-            List<String> names = harnessSkillMapper.selectAllowedSkillNamesByAgentSn(sn);
-            return names == null ? 0 : names.size();
+            List<String> names = agent.getId() != null
+                ? harnessSkillMapper.selectAllowedSkillNamesByAgentId(agent.getId())
+                : harnessSkillMapper.selectAllowedSkillNamesByAgentSn(agent.getSn());
+            return names == null ? List.of() : List.copyOf(names);
         }
         catch (RuntimeException e) {
-            log.warn("技能池统计失败: sn={}, err={}", sn, e.toString());
-            return 0;
+            log.warn("技能池统计失败: agentId={}, sn={}, err={}", agent.getId(), agent.getSn(), e.toString());
+            return List.of();
         }
     }
 
@@ -199,8 +208,12 @@ public class HarnessAgentFactory {
     public record BuildResult(HarnessAgent agent, String summary, List<String> toolNames) {
     }
 
+    /**
+     * 库配置路径的技能仓库：按 **agentId** 隔离（T-10）；存量 Java 自注册类仍走 sn 路径
+     * （见 AbstractHarnessAgent.skillRepositoryForCurrentAgent）。
+     */
     private AgentScopedSkillRepository skillRepository(Agent agent) {
-        return new AgentScopedSkillRepository(postgresSkillRepository, runtimeKey(agent), harnessSkillMapper);
+        return new AgentScopedSkillRepository(postgresSkillRepository, agent.getId(), harnessSkillMapper);
     }
 
     /**
