@@ -12,7 +12,7 @@
   验证方式: 在本地 phoenix-pg 执行升级→`\d tbl_data_agent_runtime_config` 结构齐备、`select count(*) from tbl_data_agent where type is null` 为 0、`type` 列默认值生效（插入不带 type 的行后取值 = harness）；执行回滚后对象消失；空库重放两顺序零报错（psql 输出留档）
   验收标准: 升级/回滚脚本幂等可重放；NULL 回填不可逆性在脚本注释与 artifacts.md 中注明
 
-- [ ] T-02 新增运行配置实体/Mapper、开关枚举与 DTO/VO
+- [x] T-02 新增运行配置实体/Mapper、开关枚举与 DTO/VO
   关联: R-03, R-09
   依赖: T-01
   验证方式: `mvn install -pl phoenix-agent/phoenix-agent-core -am` 编译通过；字段与 DDL COMMENT 逐一对齐（人工比对清单）
