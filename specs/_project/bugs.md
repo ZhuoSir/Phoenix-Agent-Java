@@ -119,6 +119,11 @@
 - **可能修复**：① 知识检索工具在 metadata 含 `agentKnowledgeId` 且类型为 QA/FAQ 时，回查 `tbl_data_agent_knowledge.content` 一并返回；② 或嵌入端把 answer 一起写入文档文本。需产品确认口径
 - **对照验证**：改用 `type=DOCUMENT`（上传 .md）后向量内容为文件正文，检索作答正常（见 dynamic-agent-types changelog 追加变更）
 
+### B-19 harness 对话入参缺失时返回 500（✅ 已修，2026-09-27）
+- **现象**：`POST /api/admin/harness/chat` 既不传 `agentId` 也不传 `harnessSn` → `HTTP 500 {"message":"服务器内部错误"}`（落到 `loadAgent(null)` 抛 IllegalArgumentException）
+- **修复**：`HarnessChatServiceImpl` 显式校验，两者皆缺抛 `InvalidInputException` → 400 + 「agentId 与 harnessSn 至少需要一个」；`confirmStream` 同理
+- **验证**：三分支复测（仅 agentId / 仅 harnessSn / 皆缺）分别为 200 / 200 / 400
+
 ---
 
 ## 工作区遗留状态（非缺陷，处置需确认）
@@ -148,3 +153,4 @@
 | B-16 | P2 | ✅ 已修（运行库三表补主键 + 基线 all_schema.sql 同步补齐，空库重放验证报错数不变） |
 | B-17 | P2 | ✅ 已修（非 HTTP 调用方无 Sa-Token 上下文时降级，不再打断图链路） |
 | B-18 | P2 | 未修（QA/FAQ 知识只向量化问题，答案检索不到；DOCUMENT 类型正常） |
+| B-19 | P3 | ✅ 已修（harness 对话入参缺失 500 → 400 + 明确提示） |
