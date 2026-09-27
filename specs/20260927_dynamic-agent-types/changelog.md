@@ -1,5 +1,24 @@
 # Changelog: dynamic-agent-types
 
+## Implement 记录（2026-09-27 · T-08 / T-09）
+- **T-08**（取数工具，`queryDatabase`）：`DatabaseQueryTool` + Contributor（`dbQueryEnabled==1` 装配）+ 共享支撑 `DatabaseToolSupport`。
+  - **实现细化（plan 决策4 语义不变）**：plan 设想「复用 SchemaService 向量召回 schema」，但实测其检索过滤器含 `agentId`，而文档写入用的是**做 schema 初始化的那个 agent**＋`query` 参数是死参数 → 对话智能体（尤其 sn=NULL 的新建智能体）召不回任何表。故 schema 改为**JDBC 实时内省**（`Accessor.showTables/showColumns` + `TableMetadataService.batchEnrichTableMetadata`，表 30/列 40 截断、表名排序保证可复现），SQL 生成与执行仍完全复用 data 域（`Nl2SqlService.generateSql` + `Accessor.executeSqlAndReturnObject` + `SqlSecurityValidator`），未自写 SQL 生成。
+  - **发现并修复 B-12**：`SqlSecurityValidator` 用子串匹配关键字，`create_time`/`update_time` 等普通列名会被误判为危险语句，只读查询遭大面积误杀 → 改整词匹配 + 先剔除字符串字面量/引用标识符（jshell 8 例验证：3 类常见只读 SQL 放行、4 类真实写操作/堆叠语句拦截、字面量不误杀）。
+  - 实测（真实对话链路，agent25 配数据源 11）：模型自主调用 `queryDatabase` → 日志 `数据库取数完成: agentId=25, datasourceId=11, rows=1, elapsedMs=3007` → 回答「7」，与 `select count(*) from tbl_data_agent` 一致。
+- **T-09**（深度分析工具，`deepAnalyze`）：`DeepAnalysisTool` + Contributor；内部复用 NL2SQL 状态图（`GraphService.graphStreamProcess`），独立 threadId（`tool-deep-{agentId}-{uuid}`）、同线程阻塞收集（先订阅再投喂，`complete`/`error` 判终态）、180s 超时、每智能体并发上限 2（**实现取舍**：原计划「单会话并发」，因工具侧刻意不依赖 RuntimeContext 拿不到 sessionId，改为每智能体信号量，类注释已写明）；前置「确保就绪」= 缺 `tbl_data_agent_datasource` 绑定则补绑 + 缺 schema 文档则用全部表初始化。
+  - 实测：模型自主调用 `deepAnalyze` 两次（工具装配证据：`tools=[todo, database_query, deep_analysis, knowledge_retrieval]`），失败路径均返回**可读文案**（「深度分析暂不可用：…（可稍后重试）」）且模型能降级改用取数工具完成回答——错误不抛栈、不污染主会话。
+  - **未能端到端验证（如实登记）**：本环境 EMBEDDING 模型配置不可用（`404 Model not exist.`，见 bugs.md **B-13**）→ schema 向量文档无法生成 → 状态图 SchemaRecall 无输入 → 深度分析在**本环境**无法跑出结论。代码链路只验证到「就绪检查失败→可读错误」，成功路径（图产出报告、threadId 隔离、超时/限流文案）待 embedding 配置修复后重跑。
+
+## Implement 记录（2026-09-27 · T-11~T-15）
+- **T-11**（后台寻址）：`/api/admin/harness/chat` 与 `/confirm` 支持 `agentId`（agentId 优先，`harnessSn` 保留兼容）。`HarnessChatService` 增 `call/stream/confirmStream(HarnessRequest|ConfirmRequest)` 重载：agentId → `HarnessAgentRegistry`（存量自注册智能体在注册表内自动回退其 Java 实例），未传 agentId → 原 `HarnessStaticLoader` 路径。显式技能校验同步支持 `prepareByAgentId`（技能池按 agentId 解析）。
+- **T-12**（前台寻址）：`/platform/harness/chat` 内部改走注册表（请求带 agentId），**保留**组可见性校验 + 显式技能三重交集校验 + 技能范围约束提示；`harnessSn` 仅作兼容字段，不做 `sn || id` 猜测。
+- **T-13**（前端寻址）：运行页 harness 分支改为 `agentId`；删除全部 `sn || id` 兜底（`run/index.vue` 两处、`api-transport.ts`）；存量 `agent` 类型分支在缺 sn 时**显式报错**而不是拿 id 冒充 sn；确认请求改传 `agentId`。
+- **T-14**（去类型标签）：后台列表移除类型徽标与 `getTypeText` 映射（四类型名称不再出现在 UI）；新建抽屉本就无类型选择（服务端强制 `harness`）；存量展示与功能不变。
+- **T-15**（运行配置面板）：编辑抽屉新增「对话智能体」菜单分组 + `AgentRuntimeConfig.vue` 面板（模型选择/计划模式/记忆/知识库工具含 topK·阈值/数据库取数与深度分析两级 + 数据源/文件系统策略），含「构建预演」按钮直连 `runtime-config/preview` 回显生效工具与技能池；`edit/index.vue` 同步挂载；新增 `api/core/agentRuntime.ts`。技能配置面板复用（仅文案由「Harness 类智能体」改为「对话智能体」）。
+- 前端校验：`npx vue-tsc --noEmit --skipLibCheck` 通过（`src/` 错误数维持基线 194，本次改动文件 0 错误）。
+- 发现并登记 **B-11**：前台 HITL 确认调用的 `POST /api/front/harness/confirm` 后端**不存在**（spec-1 遗留），本期不修。
+- 待办：T-11/T-12 的真实对话链路（SSE）与 T-13~T-15 的界面走查，并入 T-16 端到端回归。
+
 ## Implement 记录（2026-09-27 · T-10）
 - 完成 T-10：`HarnessSkillMapper.selectAllowedSkillNamesByAgentId`（新）+ `AgentScopedSkillRepository` 双构造器（agentId 路径 / sn 路径并存）。
   - 库配置路径（Factory 构建的对话智能体）走 **agentId**；存量 Java 自注册路径（AbstractHarnessAgent）保持 **sn**，行为不变。
