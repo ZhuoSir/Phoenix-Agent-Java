@@ -1,0 +1,12 @@
+# .specrc.yml —— bryanchen-spec 规范源路由表（团队共享，进 git）
+# 源取值: global | file:<相对路径> | skill:<skill名> | none
+# 生成: 2026-09-27 spec init（用户逐行确认）
+domains:
+  code-backend:   global        # 全局规范为 Java 语境，适配本项目；如需 BotCloud 规范另改
+  code-frontend:  none          # 前端以仓库自带 vsh/eslint/oxlint/stylelint/cspell 工具链为权威
+  api-design:     global
+  database:       global        # PostgreSQL 通用底线适用
+  git-workflow:   global
+  versioning:     global
+project_files:
+  - AGENTS.md                   # 永远生效、优先级最高；其过期条目与现实的冲突以 specs/_project/profile.md 记录为准并在 commit 说明
