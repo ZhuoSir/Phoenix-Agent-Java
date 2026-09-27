@@ -1,6 +1,13 @@
 # Changelog: agent-config-ai-generate
 
 ## v1.0.0（2026-09-27）确认人: 陈卓
+- 三重确认第③关通过：tasks.md v1.0.0 已确认（T-01~T-13）；用户明示未反对「T-13 顺带修 B-01 以达成全序空库重放零报错」，按方案执行
+- **进入 Phase 4 Implement**（分支 feature/agent-config-ai-generate）
+- 三重确认第②关通过：plan.md v1.0.0 已确认（用户仅回「确认」，即接受 plan 中两项主动请示：① 默认缺失时「对话回落任一启用 + WARN，仅 AI 生成严格拒绝」的宽严分界；② 换 EMBEDDING 默认做二次确认 + 审计日志）
+- 进入 Phase 3：tasks.md 草稿（T-01~T-13，五要素齐备，21 条 R 全覆盖自检通过，总数 ≤20）
+- **本 spec 附带消解 B-20**（`deactivateOthers` SQL 写反）：T-02 删除其调用点、T-04 启用改多值 + 默认唯一由部分唯一索引保证
+
+
 - 三重确认第①关通过：requirements.md（R-01~R-21 + AC-01~13 + Non-goals + 假设 A-01~A-10）
 - **Q4 决议 = B**：自研轻量 md 编辑器（textarea + 复用项目已有 `markdown-it` 实时预览 + 少量工具栏按钮），**不引入新依赖**；requirements 正文未改（与 A 分支未选、与「不回则按 B」一致），故不触发重确认
 - 进入 Phase 2 Plan
