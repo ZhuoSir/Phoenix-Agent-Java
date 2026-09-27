@@ -49,19 +49,19 @@
 
 ## 4. AI 生成能力（后端）
 
-- [ ] T-07 生成错误码枚举 + md 骨架与 meta-prompt 常量类 + `GET /api/agent/generate-profile/skeleton`
+- [x] T-07 生成错误码枚举 + md 骨架与 meta-prompt 常量类 + `GET /api/agent/generate-profile/skeleton`
   关联: R-06, R-08, R-18
   依赖: T-03
   验证方式: curl skeleton 端点 → 返回含 `## 角色`、`## 描述`、`## 能力`、`## 安全范围` 四段的 md 文本；登录态缺失返回未授权；单测式比对：skeleton 段落集合与 meta-prompt 内声明的必含段落集合来自同一常量（grep 证明无第二处硬编码）
   验收标准: 错误码集中在枚举（42010~42015）不散落字符串；段落集合单一来源；骨架无 TODO/空段落
 
-- [ ] T-08 生成服务：取 CHAT 默认 → 一次调用出描述+提示词（JSON 协议）→ 解析/超时/失败错误码
+- [x] T-08 生成服务：取 CHAT 默认 → 一次调用出描述+提示词（JSON 协议）→ 解析/超时/失败错误码
   关联: R-01, R-03, R-04, R-06, R-18
   依赖: T-07
   验证方式: 真实调用服务（经 T-09 端点）：① 名称「合同审查助手」→ 返回两项非空，提示词含四段且为 md；② `targets=["PROMPT"]` 单项 → 只返回提示词；③ 人为把 api_key 改错 → 返回 42012 且响应无堆栈、无半成品；④ 无 CHAT 默认 → 42011 引导文案；⑤ 模型返回带 ```json 围栏/夹带说明文字 → 仍能解析或明确 42013（原文只进日志）
   验收标准: 中文、描述 ≤120 字纯文本、提示词 md 300~600 字四段齐全；失败一律可展示错误码；日志含 traceId/配置ID 不含 api_key；超时 ≤60s 返回
 
-- [ ] T-09 `POST /api/agent/generate-profile` 端点与入参校验（不自动保存）
+- [x] T-09 `POST /api/agent/generate-profile` 端点与入参校验（不自动保存）
   关联: R-01, R-02, R-03, R-04
   依赖: T-08
   验证方式: curl：① 正常入参 → `ReturnVo` 成功且**保存前** `select prompt,description from tbl_data_agent where id=?` 未变化（证明不自动保存）；② `name` 空 → 42010；③ `name` 超长/`targets` 空或含非法枚举 → 参数错误；④ 未登录 → 未授权；⑤ 生成后手工 PUT 保存 → 落库为返回的 md 原文（含 `##` 标题字符未被转义）
