@@ -6,6 +6,7 @@ import io.agentscope.core.tool.Toolkit;
 import io.agentscope.core.tool.builtin.TodoTools;
 import io.agentscope.harness.agent.HarnessAgent;
 import io.agentscope.harness.agent.IsolationScope;
+import io.agentscope.harness.agent.filesystem.spec.LocalFilesystemSpec;
 import io.agentscope.harness.agent.filesystem.spec.RemoteFilesystemSpec;
 import io.agentscope.harness.agent.memory.compaction.CompactionConfig;
 import io.agentscope.harness.agent.memory.compaction.ToolResultEvictionConfig;
@@ -47,11 +48,10 @@ public class RulesHarnessAgent extends AbstractHarnessAgent {
                 .model(this.createChatModel())
                 .toolkit(toolkit)
                 .enablePlanMode(true)
-                .disableShellTool()
                 .distributedStore(redisDistributedStore)
                 .stateStore(postgresAgentStateStore)
                 .skillRepository(postgresSkillRepository)
-                .filesystem(new RemoteFilesystemSpec(redisStore).isolationScope(IsolationScope.USER))
+                .filesystem(new LocalFilesystemSpec().isolationScope(IsolationScope.USER))
                 .memory(this.getDefaultModelConfig())
                 .workspace(Paths.get(".agentscope/workspace"))
                 .enablePendingToolRecovery(true)
