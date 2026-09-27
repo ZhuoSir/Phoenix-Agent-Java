@@ -77,4 +77,12 @@ public interface ModelConfigDataService extends IService<ModelConfig> {
 	 */
 	List<ModelConfigDTO> listEnabledConfigsByType(ModelType modelType);
 
+	/**
+	 * 严格取指定类型的默认模型：不做"回落启用项"。
+	 *
+	 * <p>运行时取模型可容忍回落（不让既有对话被打断），但「AI 生成」这类管理动作必须
+	 * 在没设默认时明确拒绝（R-18），故分开两个语义。
+	 */
+	ModelConfigDTO findDefaultConfigByType(ModelType modelType);
+
 }

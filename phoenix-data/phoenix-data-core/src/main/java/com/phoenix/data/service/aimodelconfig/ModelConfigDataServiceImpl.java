@@ -187,6 +187,12 @@ public class ModelConfigDataServiceImpl extends ServiceImpl<ModelConfigMapper, M
 
 	@Override
 	@Transactional(readOnly = true)
+	public ModelConfigDTO findDefaultConfigByType(ModelType modelType) {
+		return toDTO(getMapper().selectDefaultByType(modelType.getCode()));
+	}
+
+	@Override
+	@Transactional(readOnly = true)
 	public List<ModelConfigDTO> listEnabledConfigsByType(ModelType modelType) {
 		List<ModelConfig> enabled = getMapper().selectEnabledByType(modelType.getCode());
 		if (enabled == null) {
