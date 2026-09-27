@@ -20,7 +20,7 @@
 
 ## 2. 后台管理功能（服务层）
 
-- [ ] T-03 实现 SkillAdminService.list/detail：分页、关键字过滤（name/description）、详情含正文与资源清单
+- [x] T-03 实现 SkillAdminService.list/detail：分页、关键字过滤（name/description）、详情含正文与资源清单
   关联: R-01
   依赖: T-02
   验证方式: T-09 完成后 curl 列表/详情断言（含搜索「poem」仅剩 1 条、未登录 401）
