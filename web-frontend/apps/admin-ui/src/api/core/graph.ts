@@ -29,7 +29,10 @@ export interface GraphNodeResponse {
 
 export interface HarnessConfirmRequest {
   sessionId: string;
-  agentSn: string;
+  /** 智能体ID（R-08 统一寻址） */
+  agentId: number;
+  /** 存量自注册智能体的 sn（兼容字段，agentId 优先） */
+  agentSn?: string;
   allowed: boolean;
   suggestedRules?: any[];
 }
@@ -47,7 +50,12 @@ export enum TextType {
 export interface HarnessChatRequest {
   sessionId: string;
   message: string;
-  harnessSn: string;
+  /** 智能体ID（R-08 统一寻址；后端据此走运行时注册表） */
+  agentId: number;
+  /** 存量自注册智能体的 sn（兼容字段，agentId 优先） */
+  harnessSn?: string;
+  /** 显式执行的技能 id（由前台/运行页技能区传入） */
+  enabledSkillIds?: number[];
 }
 
 const API_BASE_URL = '/api';
@@ -315,7 +323,7 @@ export function streamHarnessChat(
               return;
             }
             const nodeResponse: GraphNodeResponse = {
-              agentId: request.harnessSn,
+              agentId: String(request.agentId),
               threadId: request.sessionId,
               nodeName: 'Harness',
               textType: TextType.MARK_DOWN,
@@ -406,7 +414,7 @@ export async function confirmHarnessChat(
           return;
         }
         const nodeResponse: GraphNodeResponse = {
-          agentId: request.agentSn,
+          agentId: String(request.agentId ?? request.agentSn ?? ''),
           threadId: request.sessionId,
           nodeName: 'Harness',
           textType: TextType.MARK_DOWN,

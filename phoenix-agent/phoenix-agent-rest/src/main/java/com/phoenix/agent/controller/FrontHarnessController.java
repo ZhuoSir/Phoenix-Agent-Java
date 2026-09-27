@@ -49,14 +49,17 @@ public class FrontHarnessController {
     public Flux<Map<String, Object>> chat(@RequestBody HarnessRequest body) {
         String accountId = StpUtil.getLoginIdAsString();
         Long agentId = body.getAgentId();
-        // 1) 智能体对本账号可见（组-智能体授权）
-        ReturnVo<String> agentSn = frontSkillAccessService.resolveVisibleAgentSn(accountId, agentId);
-        if (agentSn.getData() == null) {
+        // 1) 智能体对本账号可见（组-智能体授权）——只判可见性，不要求 sn：
+        //    库配置驱动的对话智能体 sn 为空，寻址一律用 agentId（R-08）
+        ReturnVo<Boolean> visible = frontSkillAccessService.validateVisible(accountId, agentId);
+        if (visible.getData() == null) {
             Map<String, Object> err = new java.util.LinkedHashMap<>();
-            err.put("content", agentSn.getMsg());
+            err.put("content", visible.getMsg());
             err.put("end", true);
             return Flux.just(err);
         }
+        // 存量自注册智能体才有 sn，仅作兼容字段
+        String agentSn = frontSkillAccessService.resolveVisibleAgentSn(accountId, agentId).getData();
         // 2) 显式勾选技能三重交集校验
         ReturnVo<Boolean> access = frontSkillAccessService
             .validateExplicitSkills(accountId, agentId, body.getEnabledSkillIds());
@@ -67,14 +70,16 @@ public class FrontHarnessController {
             return Flux.just(err);
         }
         // 3) 组装请求：前台身份 + 技能范围约束提示（自主模式缝隙缓解）
+        //    R-08：统一以 agentId 寻址（内部走运行时注册表）；harnessSn 仅作存量兼容兜底字段
         HarnessRequest request = HarnessRequest.builder()
             .userId(accountId)
             .sessionId(body.getSessionId())
             .message(body.getMessage())
-            .harnessSn(agentSn.getData())
+            .agentId(agentId)
+            .harnessSn(agentSn)
             .enabledSkillIds(body.getEnabledSkillIds())
             .skillScopeHint(frontSkillAccessService.buildScopeHint(accountId, agentId))
             .build();
-        return harnessChatService.stream(agentSn.getData(), request).map(HarnessEventMapper::toEventMap);
+        return harnessChatService.stream(request).map(HarnessEventMapper::toEventMap);
     }
 }

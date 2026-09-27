@@ -69,7 +69,7 @@ onMounted(load);
       :closable="false"
       class="mb-4"
       show-icon
-      title="技能仅对 Harness 类智能体在运行时生效；其他类型可保存绑定但不加载"
+      title="技能仅对「对话智能体」在运行时生效；存量其他智能体可保存绑定但不加载"
       type="info"
     />
 

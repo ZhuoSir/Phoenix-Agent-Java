@@ -63,10 +63,32 @@
 - **连带影响**：harness 类型**无法通过后台创建**——它由 Java `@Component extends AbstractHarnessAgent` 启动时注册，运行时经 `HarnessStaticLoader` 按 sn 取内存实例（缺失即 `NoSuchElementException`）。因此**不要把库里某行 type 直接改成 harness**，会得到无法运行的坏数据
 - **修复方向**：① 新建时明确默认 type（如 sql）并在 UI 展示类型；② 若要支持"后台可创建 harness 智能体"，需把 harness 构建参数（sysPrompt/工具/模型）数据驱动化 + 动态注册 → 属新功能，另立 spec
 
+### B-11 前台 HITL 确认接口缺失（前端调用 404）
+- **现象**：`views/front/chat` 链路的人工确认走 `POST /api/front/harness/confirm`（`api/front/chat.ts:350` `confirmFrontHarnessChat`），但**后端全仓库无此端点**（`grep -rn "harness/confirm" --include=*.java` 零命中；后台为 `/api/admin/harness/confirm`，前台控制器只有 `getMySkills`/`chat`）
+- **影响**：前台对话一旦触发需要确认的工具调用（HITL），确认按钮必然失败（404）——spec-1 前台通道遗留，非本期引入
+- **修复方向**：在 `FrontHarnessController` 增加 `/harness/confirm`（复用 `HarnessChatService.confirmStream`，带组可见性校验）；或前台直接把确认请求打到后台确认端点（需权限口径确认）。本期（dynamic-agent-types）不修，已登记
+
+### B-12 SqlSecurityValidator 子串匹配误杀只读查询（本期已修）
+- **现象**：`phoenix-tool/.../SqlSecurityValidator.validate` 用 `upperSql.contains(keyword)` 做危险关键字判定 → `create_time`、`update_time`、`delete_flag`、`last_update` 等**普通列名/表名**一律命中 `CREATE`/`UPDATE`/`DELETE`，只读 SELECT 被误判为危险语句
+- **影响面**：任何取数/问数链路的只读 SQL 都会被大面积误杀（本期 T-08 取数工具一上线即暴露）；`BpmToolSearch` 同受影响
+- **修复**：改为**整词匹配**（`\b(...)\b`）并先剔除字符串字面量/引用标识符；真实拦截不放宽
+- **验证（jshell 直调，JDK23）**：`select create_time, update_time from t` → SAFE；`select delete_flag, last_update from t` → SAFE；`WITH ... select` → SAFE；`DROP TABLE x` → BLOCKED；`select * from t; delete from t` → BLOCKED[DELETE]；`UPDATE t SET a=1` → BLOCKED；`select ... where b='drop table x'` → SAFE（字面量不误杀）
+
+### B-13 embedding 模型配置不可用 → NL2SQL 图链路（深度分析）不可用
+- **现象**：`tbl_data_model_config` 的 EMBEDDING 项（id=6，`text-embedding-v4`，`https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1`）调用返回 `404 {"code":"InvalidParameter","message":"Model not exist."}`
+- **影响**：`initializeSchemaForAgentWithDatasource`（写 table/column 向量文档）失败 → 向量库为空 → NL2SQL 状态图的 SchemaRecall 无文档 → **T-09 深度分析工具在当前环境无法完成端到端**（工具已把该失败转成可读文案「深度分析暂不可用：…（可稍后重试）」，模型可降级改用取数工具）
+- **修复方向**：更换为可用的 embedding 配置（正确的模型名/网关或官方 DashScope key）后重跑；属环境配置，非代码缺陷
+
+### B-14 删除智能体残留孤儿数据（运行配置/技能绑定/组授权）
+- **现象**：`DELETE /api/agent/{id}` 只删 `tbl_data_agent` 行；实测删除智能体 29 后，`tbl_data_agent_runtime_config`（1 行）、`tbl_data_agent_skill_info`（1 行）、`tbl_platform_group_agent_info`（1 行）**全部残留**，成为孤儿数据
+- **影响**：运行配置残留会在日后新建同 id 智能体时误命中（id 自增不会复用，但孤儿行长期占用/污染统计）；组授权残留会随历史累计
+- **修复方向**：删除智能体时级联清理三张关联表（或在各表的查询侧统一加 `exists` 校验）；本期（dynamic-agent-types）不修，已登记；本次回归的孤儿行已手工清理
+
 ---
 
 ## 工作区遗留状态（非缺陷，处置需确认）
 - `RulesHarnessAgent.java` 有**未提交实验改动**（开 shell + LocalFilesystemSpec），已编译进 `.mvn-home`；还原：`git checkout -- phoenix-agent/phoenix-agent-core/src/main/java/com/phoenix/agent/harness/agent/rules/RulesHarnessAgent.java` 后重新 install
+- 本期环境改动（dynamic-agent-types 验证所必需）：数据源 id=11「本地测试」的 `host` 由不可达的 `192.168.66.19` 改为 `127.0.0.1`、`connection_url` 同步、`password` 由 `123456` 改为容器实际密码 `phoenix`（改前取数工具一律连接失败/认证失败）
 - 库中实验数据：技能 `py-fib-demo`（含 scripts/fib.py）、`phx-poem-weather`；前台账号 chenzhuo 密码现=12345678；两套账号表密码现均=12345678
 - 未跟踪：`.mvn-home/`、`.pnpm-store/`、`diagrams/`（建议进 .gitignore）；`AGENTS.md` 有 init 追加段（备份 `AGENTS.md.bak.*`）
 
@@ -82,4 +104,8 @@
 | B-07 | P3 | 未修 |
 | B-08 | P3 | 未修 |
 | B-09 | P2 | ✅ 已修（agent-skill-management T-11/T-14） |
-| B-10 | P2 | 未修（新建智能体 type 缺失；harness 无法后台创建） |
+| B-10 | P2 | 部分解决（dynamic-agent-types：新建强制 type=harness、列表去类型标签；存量 5 个自注册类保留） |
+| B-11 | P2 | 未修（前台 HITL 确认端点缺失，前端 404） |
+| B-12 | P2 | ✅ 已修（dynamic-agent-types T-08：整词匹配 + 剔除字面量，jshell 8 例验证） |
+| B-13 | P2 | 未修（环境：embedding 模型 404，深度分析链路受阻） |
+| B-14 | P2 | 未修（删除智能体残留运行配置/技能绑定/组授权孤儿行） |

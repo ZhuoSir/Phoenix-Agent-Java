@@ -116,16 +116,6 @@ function getStatusText(status?: string) {
   return status ? map[status] || status : '';
 }
 
-function getTypeText(type?: string) {
-  const map: Record<string, string> = {
-    sql: '数据智能体',
-    agent: '智能体',
-    workflow: '流程智能体',
-    harness: 'Harness',
-  };
-  return type ? map[type] || type : '';
-}
-
 function getStatusTagType(status?: string) {
   const map: Record<string, 'info' | 'success' | 'warning'> = {
     published: 'success',
@@ -328,9 +318,6 @@ onMounted(loadAgents);
                 <h3 class="agent-name">{{ agent.name }}</h3>
                 <div class="agent-meta">
                   <span class="agent-id">ID: {{ agent.id }}</span>
-                  <ElTag type="info" size="small" effect="plain">
-                    {{ getTypeText(agent.type) }}
-                  </ElTag>
                   <span class="agent-time">{{
                     formatTime(agent.updateTime)
                   }}</span>

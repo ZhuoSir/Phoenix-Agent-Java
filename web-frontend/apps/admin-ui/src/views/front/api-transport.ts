@@ -339,8 +339,8 @@ export const apiChatTransport: ChatTransport = {
           {
             sessionId,
             message: content,
-            harnessSn: currentAgent?.sn || '',
             agentId: Number(agentId),
+            harnessSn: currentAgent?.sn ?? undefined,
             enabledSkillIds: skillIdsForThisTurn,
           },
           async (response) => {
@@ -357,7 +357,7 @@ export const apiChatTransport: ChatTransport = {
                   needConfirm: true,
                   buttons: response.buttons,
                   toolCalls: response.toolCalls,
-                  agentSn: currentAgent?.sn || '',
+                  agentId: Number(agentId),
                   sessionId,
                 },
               });
@@ -669,7 +669,7 @@ export const apiChatTransport: ChatTransport = {
           {
             sessionId,
             content,
-            agentSn: currentAgent?.sn || '',
+            agentSn: currentAgent?.sn ?? '',
             type: currentAgent?.type || '',
           },
           async (response) => {

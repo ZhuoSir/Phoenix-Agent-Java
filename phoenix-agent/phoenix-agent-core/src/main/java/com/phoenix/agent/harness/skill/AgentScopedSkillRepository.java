@@ -22,14 +22,35 @@ import java.util.Set;
  * 写路径（save/delete）直通上游：agent 自管理技能不经发布治理，属已知范围（plan 风险④）。
  */
 @Slf4j
-@RequiredArgsConstructor
 public class AgentScopedSkillRepository implements AgentSkillRepository {
 
     private final AgentSkillRepository delegate;
 
+    /** 库配置路径：按 agentId 解析技能池（R-03/R-10） */
+    private final Long agentId;
+
+    /** 存量自注册路径：按 sn 解析技能池（Java 类承载的智能体没有 agentId 绑定语义） */
     private final String agentSn;
 
     private final HarnessSkillMapper harnessSkillMapper;
+
+    /** 库配置路径（新建对话智能体，按 agentId 取技能池） */
+    public AgentScopedSkillRepository(AgentSkillRepository delegate, Long agentId,
+            HarnessSkillMapper harnessSkillMapper) {
+        this.delegate = delegate;
+        this.agentId = agentId;
+        this.agentSn = null;
+        this.harnessSkillMapper = harnessSkillMapper;
+    }
+
+    /** 存量自注册路径（按 sn 取技能池，行为与本期前一致） */
+    public AgentScopedSkillRepository(AgentSkillRepository delegate, String agentSn,
+            HarnessSkillMapper harnessSkillMapper) {
+        this.delegate = delegate;
+        this.agentId = null;
+        this.agentSn = agentSn;
+        this.harnessSkillMapper = harnessSkillMapper;
+    }
 
     @Override
     public AgentSkill getSkill(String name) {
@@ -92,7 +113,14 @@ public class AgentScopedSkillRepository implements AgentSkillRepository {
     }
 
     private Set<String> allowedNames() {
-        List<String> names = harnessSkillMapper.selectAllowedSkillNamesByAgentSn(agentSn);
+        List<String> names = agentId != null
+            ? harnessSkillMapper.selectAllowedSkillNamesByAgentId(agentId)
+            : harnessSkillMapper.selectAllowedSkillNamesByAgentSn(agentSn);
         return names == null ? Set.of() : new HashSet<>(names);
+    }
+
+    @Override
+    public String toString() {
+        return "AgentScopedSkillRepository" + (agentId != null ? "{agentId=" + agentId + "}" : "{sn=" + agentSn + "}");
     }
 }

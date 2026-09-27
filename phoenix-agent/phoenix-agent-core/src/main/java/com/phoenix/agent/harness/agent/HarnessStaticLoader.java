@@ -34,4 +34,16 @@ public class HarnessStaticLoader {
         }
     }
 
+    /**
+     * 可空查询：用于 Registry 判定「该智能体是否由存量 Java 自注册类承载」（T-06 双路径分支）。
+     *
+     * @return 命中返回实例；未命中返回 null（不抛异常）
+     */
+    public HarnessAgent findAgent(String sn) {
+        if (sn == null || sn.trim().isEmpty()) {
+            return null;
+        }
+        return agents.get(sn);
+    }
+
 }

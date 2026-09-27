@@ -230,9 +230,10 @@ export function streamFrontChat(
 export interface FrontHarnessChatRequest {
   sessionId: string;
   message: string;
-  harnessSn: string;
-  /** 前台按智能体 id 寻址（后端据此做组可见性校验） */
-  agentId?: number | string;
+  /** 前台按智能体 id 寻址（唯一寻址方式，R-08；后端据此做组可见性 + 运行时解析） */
+  agentId: number | string;
+  /** 存量自注册智能体的 sn（兼容字段，agentId 优先） */
+  harnessSn?: string;
   /** 显式执行的技能 id（R-09：不传=模型自主匹配） */
   enabledSkillIds?: number[];
 }
@@ -286,7 +287,7 @@ export function streamFrontHarnessChat(
               return;
             }
             const nodeResponse: GraphNodeResponse = {
-              agentId: request.harnessSn,
+              agentId: String(request.agentId),
               threadId: request.sessionId,
               nodeName: 'Harness',
               textType: TextType.MARK_DOWN,
