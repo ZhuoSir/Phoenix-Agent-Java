@@ -51,6 +51,7 @@ import {
 
 import AccessApi from '#/components/agent/AccessApi.vue';
 import AgentDataSourceConfig from '../edit/components/AgentDataSourceConfig.vue';
+import AgentRuntimeConfig from './components/AgentRuntimeConfig.vue';
 import AgentSkillConfig from '../edit/components/AgentSkillConfig.vue';
 import AgentKnowledgeConfig from './components/AgentKnowledgeConfig.vue';
 import BusinessKnowledgeConfig from './components/BusinessKnowledgeConfig.vue';
@@ -680,6 +681,12 @@ const [Drawer, drawerApi] = useVbenDrawer({
               <span>基本信息</span>
             </ElMenuItem>
           </ElMenuItemGroup>
+          <ElMenuItemGroup title="对话智能体">
+            <ElMenuItem index="runtime">
+              <ElIcon><IconifyIcon icon="lucide:cpu" /></ElIcon>
+              <span>对话智能体配置</span>
+            </ElMenuItem>
+          </ElMenuItemGroup>
           <ElMenuItemGroup title="数据源配置">
             <ElMenuItem index="datasource">
               <ElIcon><IconifyIcon icon="lucide:database" /></ElIcon>
@@ -908,6 +915,11 @@ const [Drawer, drawerApi] = useVbenDrawer({
         <div v-else-if="activeMenu === 'skill'">
           <AgentSkillConfig v-if="editId" :agent-id="editId" />
           <div v-else class="text-sm text-gray-500">请先保存智能体，再配置技能。</div>
+        </div>
+
+        <!-- 对话智能体运行配置 -->
+        <div v-else-if="activeMenu === 'runtime'">
+          <AgentRuntimeConfig :agent-id="editId || 0" />
         </div>
 
         <!-- PROMPT配置 -->
