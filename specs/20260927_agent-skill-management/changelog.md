@@ -1,5 +1,9 @@
 # Changelog: agent-skill-management
 
+## 已合并（2026-09-27）
+- 合并到 main：`ed2e3f9`（merge --no-ff，保留 T-01~T-15 任务级提交），feature 分支已删除
+- 合并前状态：15/15 任务勾选、逐任务验证证据齐备、R-01~R-09 回归矩阵通过、三文档均为「已确认」
+
 ## v1.1.0（2026-09-27）确认人: 陈卓
 - 重确认通过：plan.md v1.1.0 已确认（显式执行改 middleware→系统提示注入），T-10 按新通道返工
 - **修改 决策4**：显式执行通道 user message 注入 → **系统提示注入（ExplicitSkillMiddleware）**
