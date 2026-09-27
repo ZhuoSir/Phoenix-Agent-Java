@@ -50,7 +50,7 @@ public class RulesHarnessAgent extends AbstractHarnessAgent {
                 .enablePlanMode(true)
                 .distributedStore(redisDistributedStore)
                 .stateStore(postgresAgentStateStore)
-                .skillRepository(postgresSkillRepository)
+                .skillRepository(skillRepositoryForCurrentAgent())
                 .filesystem(new LocalFilesystemSpec().isolationScope(IsolationScope.USER))
                 .memory(this.getDefaultModelConfig())
                 .workspace(Paths.get(".agentscope/workspace"))

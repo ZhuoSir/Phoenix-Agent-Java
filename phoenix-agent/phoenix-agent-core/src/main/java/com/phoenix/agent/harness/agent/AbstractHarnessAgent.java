@@ -1,10 +1,13 @@
 package com.phoenix.agent.harness.agent;
 
+import com.phoenix.agent.harness.skill.AgentScopedSkillRepository;
+import com.phoenix.agent.mapper.HarnessSkillMapper;
 import com.phoenix.agent.service.harness.HarnessModelRegistry;
 import com.phoenix.common.enm.AgentTypeEnm;
 import com.phoenix.data.entity.Agent;
 import com.phoenix.data.enums.AgentStatusEnm;
 import com.phoenix.data.service.agent.AgentService;
+import io.agentscope.core.skill.repository.AgentSkillRepository;
 import io.agentscope.core.skill.repository.postgresql.PostgresSkillRepository;
 import io.agentscope.extensions.model.openai.OpenAIChatModel;
 import io.agentscope.extensions.postgresql.state.PostgresAgentStateStore;
@@ -40,6 +43,16 @@ public abstract class AbstractHarnessAgent implements SmartInitializingSingleton
     protected RedisStore redisStore;
     @Autowired
     protected RemoteFilesystemSpec  pgRemoteFilesystemSpec;
+    @Autowired
+    protected HarnessSkillMapper harnessSkillMapper;
+
+    /**
+     * 本智能体的技能仓库：按「已发布 ∧ 已绑定本智能体」隔离（R-06），
+     * 每个 harness agent 各自持有一个装饰实例，共享同一个上游单例。
+     */
+    protected AgentSkillRepository skillRepositoryForCurrentAgent() {
+        return new AgentScopedSkillRepository(postgresSkillRepository, getSn(), harnessSkillMapper);
+    }
 
     public MemoryConfig getDefaultModelConfig() {
         return MemoryConfig.builder()

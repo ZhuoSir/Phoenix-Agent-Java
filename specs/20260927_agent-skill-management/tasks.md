@@ -58,7 +58,7 @@
 
 ## 3. 运行时与对话
 
-- [ ] T-09 实现 FilteredSkillRepository 装饰器（published ∧ 绑定该 sn 过滤 getAllSkills/getSkill），替换两个 harness 智能体 builder 的 skillRepository
+- [x] T-09 实现 FilteredSkillRepository 装饰器（published ∧ 绑定该 sn 过滤 getAllSkills/getSkill），替换两个 harness 智能体 builder 的 skillRepository
   关联: R-06
   依赖: T-05, T-06
   验证方式: 端到端：未绑定状态与制度专家聊「报诗」→不触发；绑定 py-fib-demo 后同话术→触发（对话留证）；绑 A 后与 HumanInTheLoop 聊→感知不到 A
