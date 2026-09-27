@@ -35,6 +35,25 @@ DO $$
 $$;
 
 -- ----------------------------
+-- Sequence structure（B-01 补齐：原导出缺这 5 个 CREATE SEQUENCE，
+-- 导致引用它们的建表语句 DEFAULT nextval(...) 失败，空库重放会级联报 64 处错）
+-- ----------------------------
+CREATE SEQUENCE IF NOT EXISTS "public"."tbl_data_categories_id_seq"
+    INCREMENT 1 START 1 MINVALUE 1 MAXVALUE 9223372036854775807 CACHE 1;
+
+CREATE SEQUENCE IF NOT EXISTS "public"."tbl_data_order_items_id_seq"
+    INCREMENT 1 START 1 MINVALUE 1 MAXVALUE 9223372036854775807 CACHE 1;
+
+CREATE SEQUENCE IF NOT EXISTS "public"."tbl_data_orders_id_seq"
+    INCREMENT 1 START 1 MINVALUE 1 MAXVALUE 9223372036854775807 CACHE 1;
+
+CREATE SEQUENCE IF NOT EXISTS "public"."tbl_data_products_id_seq"
+    INCREMENT 1 START 1 MINVALUE 1 MAXVALUE 9223372036854775807 CACHE 1;
+
+CREATE SEQUENCE IF NOT EXISTS "public"."tbl_data_users_id_seq"
+    INCREMENT 1 START 1 MINVALUE 1 MAXVALUE 9223372036854775807 CACHE 1;
+
+-- ----------------------------
 -- Table structure for act_hi_procinst
 -- ----------------------------
 DROP TABLE IF EXISTS "public"."act_hi_procinst";
@@ -41349,3 +41368,12 @@ ALTER TABLE "public"."tbl_vector_store_simple_data" ADD CONSTRAINT "tbl_vector_s
 -- Primary Key structure for table tbl_vector_store_user_memory
 -- ----------------------------
 ALTER TABLE "public"."tbl_vector_store_user_memory" ADD CONSTRAINT "tbl_vector_store_user_memory_pkey" PRIMARY KEY ("id");
+
+-- ----------------------------
+-- Sequence ownership（B-01 补齐，令序列随表删除而回收）
+-- ----------------------------
+ALTER SEQUENCE "public"."tbl_data_categories_id_seq" OWNED BY "public"."tbl_data_categories"."id";
+ALTER SEQUENCE "public"."tbl_data_order_items_id_seq" OWNED BY "public"."tbl_data_order_items"."id";
+ALTER SEQUENCE "public"."tbl_data_orders_id_seq" OWNED BY "public"."tbl_tmp_orders"."id";
+ALTER SEQUENCE "public"."tbl_data_products_id_seq" OWNED BY "public"."tbl_tmp_products"."id";
+ALTER SEQUENCE "public"."tbl_data_users_id_seq" OWNED BY "public"."tbl_tmp_users"."id";
