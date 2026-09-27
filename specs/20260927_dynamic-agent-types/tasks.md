@@ -18,13 +18,13 @@
   验证方式: `mvn install -pl phoenix-agent/phoenix-agent-core -am` 编译通过；字段与 DDL COMMENT 逐一对齐（人工比对清单）
   验收标准: 无魔法值（开关/策略全枚举）；VO 不暴露内部审计字段
 
-- [ ] T-03 实现 RuntimeConfigService：读写（缺省返回默认值）+ 参数校验
+- [x] T-03 实现 RuntimeConfigService：读写（缺省返回默认值）+ 参数校验
   关联: R-03, R-05, R-09
   依赖: T-02
   验证方式: curl（待 T-04）三分支：无配置→返回默认；开数据库工具未选数据源→参数错误；工具数超上限→错误
   验收标准: 校验规则集中在该服务；异常返回明确错误码不抛裸异常
 
-- [ ] T-04 挂载 REST：GET/PUT `/api/agent/{id}/runtime-config`；`POST /api/agent` 强制 `type=harness`；`PUT` 不改写 type
+- [x] T-04 挂载 REST：GET/PUT `/api/agent/{id}/runtime-config`；`POST /api/agent` 强制 `type=harness`；`PUT` 不改写 type
   关联: R-01
   依赖: T-03
   验证方式: curl：新建（不传 type）→ 落库 type=harness；更新存量 sql 智能体（请求带 type=harness）→ 落库 type 仍为 sql；配置读写往返一致；未登录 401

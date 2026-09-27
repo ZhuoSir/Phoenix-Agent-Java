@@ -1,5 +1,6 @@
 package com.phoenix.data.controller;
 
+import com.phoenix.common.enm.AgentTypeEnm;
 import com.phoenix.data.entity.Agent;
 import com.phoenix.data.service.agent.AgentService;
 import com.phoenix.data.vo.ApiKeyResponse;
@@ -60,6 +61,8 @@ public class AgentController {
         if (StringUtils.isBlank(agent.getStatus())) {
             agent.setStatus("draft");
         }
+        // R-01：新建一律为对话智能体（type=harness），前端不再选择类型；服务端强制优于入参
+        agent.setType(AgentTypeEnm.HARNESS.getCode());
         return agentService.saveAgent(agent);
     }
 
@@ -68,8 +71,10 @@ public class AgentController {
      */
     @PutMapping("/{id}")
     public Agent update(@PathVariable Long id, @RequestBody Agent agent) {
-        checkAgentExists(id);
+        Agent existing = checkAgentExists(id);
         agent.setId(id);
+        // R-01：类型不可通过编辑改写（存量 sql/agent/workflow 保持原类型）
+        agent.setType(existing.getType());
         return agentService.saveAgent(agent);
     }
 
