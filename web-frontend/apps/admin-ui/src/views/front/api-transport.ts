@@ -206,6 +206,16 @@ function generateBlocksHtml(blocks: GraphNodeResponse[][]): string {
 // Per-session threadId for conversation continuation
 const sessionThreadIds = new Map<string, string>();
 
+/**
+ * 本轮显式执行的技能 id（R-09）：由 ChatComposer 在发送前设置，
+ * 发送时读取一次并立即清空，保证只对下一条消息生效（不持久）。
+ */
+let explicitSkillIds: number[] = [];
+
+export function setExplicitSkillIds(ids: number[]) {
+  explicitSkillIds = Array.isArray(ids) ? [...ids] : [];
+}
+
 export const apiChatTransport: ChatTransport = {
   async listSessions(): Promise<ChatSession[]> {
     throw new Error('listSessions is not supported via API transport');
@@ -321,11 +331,17 @@ export const apiChatTransport: ChatTransport = {
         };
         signal?.addEventListener('abort', onAbort, { once: true });
 
+        // 本轮显式技能：读取一次后立即清空（仅对本条消息生效，不持久）
+        const skillIdsForThisTurn = explicitSkillIds.length > 0 ? [...explicitSkillIds] : undefined;
+        explicitSkillIds = [];
+
         const closeStream = streamFrontHarnessChat(
           {
             sessionId,
             message: content,
             harnessSn: currentAgent?.sn || '',
+            agentId: Number(agentId),
+            enabledSkillIds: skillIdsForThisTurn,
           },
           async (response) => {
             if (abortRequested) return;

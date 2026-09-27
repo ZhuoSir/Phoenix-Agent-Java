@@ -90,7 +90,7 @@
   验证方式: 人工走查：编辑制度专家勾选保存→重开回显；下线该技能再开编辑页→灰显仍在
   验收标准: R-04 两场景过
 
-- [ ] T-14 前台对话页技能区：api-transport 增加 harness 分流（type==='harness'→/platform/harness/chat），技能面板按 getMySkills 渲染、勾选随消息发送（不持久）、loadedSkills 可视
+- [x] T-14 前台对话页技能区：api-transport 增加 harness 分流（type==='harness'→/platform/harness/chat），技能面板按 getMySkills 渲染、勾选随消息发送（不持久）、loadedSkills 可视
   关联: R-09
   依赖: T-11, T-12
   验证方式: 人工走查：通用组前台账号登录前台→对话 harness 智能体→勾选 py-fib-demo→非触发词消息被执行；未授权技能不出现在面板；三条既有通道（sql/react/后台harness）回归各一轮
