@@ -77,7 +77,7 @@ export async function setDefaultModelConfigApi(id: number) {
 }
 
 export async function activateModelConfigApi(id: number) {
-  return requestClient.post<string>(
+  return requestClient.post<ModelApiResult>(
     `${API_BASE_URL}/activate/${id}`,
     {},
     {
@@ -89,7 +89,7 @@ export async function activateModelConfigApi(id: number) {
 export async function testModelConfigConnectionApi(
   config: Omit<ModelConfig, 'id'>,
 ) {
-  return requestClient.post<string>(`${API_BASE_URL}/test`, config, {
+  return requestClient.post<ModelApiResult>(`${API_BASE_URL}/test`, config, {
     responseReturn: 'body',
   });
 }

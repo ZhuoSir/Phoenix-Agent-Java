@@ -17,5 +17,6 @@ export function useColumns(): ColumnDef[] {
     { label: '温度', width: 100, slot: 'temperature' },
     { label: '最大Token', width: 120, slot: 'maxTokens' },
     { label: '状态', width: 100, slot: 'status' },
+    { label: '默认', width: 90, slot: 'isDefault' },
   ];
 }

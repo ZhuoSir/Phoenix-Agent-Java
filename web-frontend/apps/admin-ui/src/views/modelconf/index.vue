@@ -269,7 +269,7 @@ function getActions(config: ModelConfig) {
           config.modelType === 'EMBEDDING'
             ? '您正在更换嵌入模型，此操作风险较高！由于不同模型的向量空间不一致，切换后可能导致所有历史向量数据（含数据源、智能体知识、业务知识）将全部失效且无法检索。确定要执行吗？'
             : `确定要启用【${config.provider} - ${config.modelName}】吗？（启用=可被智能体选择的模型，同类型可同时启用多个）`,
-        confirm: () => handleActivate(config.id, config.modelType),
+        confirm: () => handleActivate(config.id),
         okText: '确定',
         cancelText: '取消',
       },
@@ -371,16 +371,20 @@ async function handleSetDefault(id?: number) {
   }
 }
 
-async function handleActivate(id?: number, modelType?: string) {
+async function handleActivate(id?: number) {
   if (!id) return;
 
   try {
     activatingId.value = id;
-    await activateModelConfigApi(id);
-    ElMessage.success('模型启用成功');
+    const res = await activateModelConfigApi(id);
+    if (res && res.success === false) {
+      ElMessage.error(res.message || '启用失败');
+      return;
+    }
+    ElMessage.success('模型已启用（同类型其他启用项不受影响）');
     await loadConfigs();
-  } catch {
-    ElMessage.error('启用过程中发生错误');
+  } catch (error: any) {
+    ElMessage.error(error?.message || '启用过程中发生错误');
   } finally {
     activatingId.value = null;
   }
@@ -483,15 +487,18 @@ onMounted(loadConfigs);
                 >
                   {{ scope.row.isActive ? '已启用' : '未启用' }}
                 </ElTag>
+              </template>
+              <!-- 启用（可多选集合）与默认（每类型唯一）分两列展示，避免一列两个标记难扫读 -->
+              <template v-else-if="col.slot === 'isDefault'">
                 <ElTag
                   v-if="scope.row.isDefault"
                   type="warning"
                   size="small"
                   effect="dark"
-                  class="ml-1"
                 >
                   默认
                 </ElTag>
+                <span v-else class="text-gray-300">—</span>
               </template>
             </template>
           </ElTableColumn>
