@@ -11,7 +11,8 @@ public enum SkillErrorCodeEnm {
     SKILL_EXCEED_LIMIT(41005, "单轮显式执行技能数量超出上限"),
     SKILL_ACCESS_DENIED(41006, "无权使用该技能"),
     SKILL_FILE_TOO_LARGE(41007, "技能包超过大小限制"),
-    SKILL_NOT_PUBLISHED(41008, "仅已发布技能可绑定");
+    SKILL_NOT_PUBLISHED(41008, "仅已发布技能可绑定"),
+    SKILL_GROUP_NOT_FOUND(41009, "授权目标组不存在");
 
     private final int code;
     private final String msg;

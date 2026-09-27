@@ -28,4 +28,19 @@ public interface SkillAdminService {
      * @return 技能 id
      */
     ReturnVo<Long> upload(MultipartFile file, boolean overwrite);
+
+    /**
+     * 发布：置 published 并覆盖式设置授权组（groupIds 可为空=仅后台可见）。
+     */
+    ReturnVo<Boolean> publish(Long id, com.phoenix.agent.dto.SkillPublishDTO dto);
+
+    /**
+     * 下线：published → draft。
+     */
+    ReturnVo<Boolean> offline(Long id);
+
+    /**
+     * 覆盖式调整授权组（任意状态可调用，即时生效，无需下线重发）。
+     */
+    ReturnVo<Boolean> updateGroups(Long id, com.phoenix.agent.dto.SkillPublishDTO dto);
 }

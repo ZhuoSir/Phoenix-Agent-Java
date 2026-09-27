@@ -2,11 +2,15 @@ package com.phoenix.agent.service.impl;
 
 import com.mybatisflex.core.paginate.Page;
 import com.mybatisflex.core.query.QueryWrapper;
+import com.mybatisflex.core.row.Db;
 import com.phoenix.agent.constant.SkillConstant;
+import com.phoenix.agent.dto.SkillPublishDTO;
 import com.phoenix.agent.enums.SkillErrorCodeEnm;
 import com.phoenix.agent.enums.SkillStatusEnm;
+import com.phoenix.agent.mapper.GroupSkillInfoMapper;
 import com.phoenix.agent.mapper.HarnessSkillMapper;
 import com.phoenix.agent.mapper.HarnessSkillResourceMapper;
+import com.phoenix.agent.model.GroupSkillInfo;
 import com.phoenix.agent.model.HarnessSkill;
 import com.phoenix.agent.model.HarnessSkillResource;
 import com.phoenix.agent.service.SkillAdminService;
@@ -44,6 +48,8 @@ public class SkillAdminServiceImpl implements SkillAdminService {
     private final HarnessSkillMapper harnessSkillMapper;
 
     private final HarnessSkillResourceMapper harnessSkillResourceMapper;
+
+    private final GroupSkillInfoMapper groupSkillInfoMapper;
 
     @Override
     public ReturnVo<Page<SkillListVO>> page(String keyword, String status, int pageNum, int pageSize) {
@@ -186,6 +192,86 @@ public class SkillAdminServiceImpl implements SkillAdminService {
         });
         // 批量插入（backend 规范20：禁循环单条）
         harnessSkillResourceMapper.insertBatch(resources);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public ReturnVo<Boolean> publish(Long id, SkillPublishDTO dto) {
+        HarnessSkill skill = harnessSkillMapper.selectOneById(id);
+        if (skill == null) {
+            return ReturnVo.fail(SkillErrorCodeEnm.SKILL_NOT_FOUND.getMsg(),
+                SkillErrorCodeEnm.SKILL_NOT_FOUND.getCode());
+        }
+        ReturnVo<Boolean> grantResult = replaceGroupGrants(id, dto == null ? null : dto.getGroupIds());
+        if (grantResult != null) {
+            return grantResult;
+        }
+        skill.setStatus(SkillStatusEnm.PUBLISHED.getCode());
+        skill.setUpdatedAt(new Date());
+        harnessSkillMapper.update(skill);
+        log.info("技能发布完成, skillId={}, groupIds={}", id, dto == null ? null : dto.getGroupIds());
+        return ReturnVo.ok(true);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public ReturnVo<Boolean> offline(Long id) {
+        HarnessSkill skill = harnessSkillMapper.selectOneById(id);
+        if (skill == null) {
+            return ReturnVo.fail(SkillErrorCodeEnm.SKILL_NOT_FOUND.getMsg(),
+                SkillErrorCodeEnm.SKILL_NOT_FOUND.getCode());
+        }
+        // 幂等：已下线再调无副作用
+        skill.setStatus(SkillStatusEnm.DRAFT.getCode());
+        skill.setUpdatedAt(new Date());
+        harnessSkillMapper.update(skill);
+        return ReturnVo.ok(true);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public ReturnVo<Boolean> updateGroups(Long id, SkillPublishDTO dto) {
+        HarnessSkill skill = harnessSkillMapper.selectOneById(id);
+        if (skill == null) {
+            return ReturnVo.fail(SkillErrorCodeEnm.SKILL_NOT_FOUND.getMsg(),
+                SkillErrorCodeEnm.SKILL_NOT_FOUND.getCode());
+        }
+        ReturnVo<Boolean> grantResult = replaceGroupGrants(id, dto == null ? null : dto.getGroupIds());
+        if (grantResult != null) {
+            return grantResult;
+        }
+        return ReturnVo.ok(true);
+    }
+
+    /**
+     * 覆盖式重写组授权。校验通过返回 null；任一目标组不存在返回失败。
+     */
+    private ReturnVo<Boolean> replaceGroupGrants(Long skillId, List<String> groupIds) {
+        List<String> distinct = groupIds == null ? List.of()
+            : groupIds.stream().filter(StringUtils::hasText).distinct().toList();
+        for (String gid : distinct) {
+            Object cnt = Db.selectObject("select count(*) from tbl_platform_group_info where id = ? and del_flag = 0",
+                gid);
+            if (cnt == null || ((Number) cnt).longValue() == 0) {
+                return ReturnVo.fail(SkillErrorCodeEnm.SKILL_GROUP_NOT_FOUND.getMsg() + ": " + gid,
+                    SkillErrorCodeEnm.SKILL_GROUP_NOT_FOUND.getCode());
+            }
+        }
+        // 覆盖式：物理删后重建（授权关系无审计留存要求）
+        groupSkillInfoMapper.deleteByQuery(QueryWrapper.create().where("skill_id = ?", skillId));
+        if (!distinct.isEmpty()) {
+            Date now = new Date();
+            List<GroupSkillInfo> rows = distinct.stream().map(gid -> {
+                GroupSkillInfo gsi = new GroupSkillInfo();
+                gsi.setGroupId(gid);
+                gsi.setSkillId(skillId);
+                gsi.setCreateTime(now);
+                gsi.setUpdateTime(now);
+                return gsi;
+            }).toList();
+            groupSkillInfoMapper.insertBatch(rows);
+        }
+        return null;
     }
 
     private SkillListVO toListVo(HarnessSkill s) {
