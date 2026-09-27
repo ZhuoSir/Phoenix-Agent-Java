@@ -36,6 +36,12 @@ public class AgentRuntimeConfig implements Serializable {
     /** 知识库检索工具 0关 1开 */
     private Integer knowledgeEnabled = 0;
 
+    /** 知识库检索召回条数（1~50，默认10；原 RulesRagTool 写死值） */
+    private Integer knowledgeTopK = 10;
+
+    /** 知识库检索相似度阈值（0~1，默认0.65；原 RulesRagTool 写死值） */
+    private Double knowledgeSimilarityThreshold = 0.65;
+
     /** 数据库取数工具（NL→SQL→只读结果）0关 1开 */
     private Integer dbQueryEnabled = 0;
 

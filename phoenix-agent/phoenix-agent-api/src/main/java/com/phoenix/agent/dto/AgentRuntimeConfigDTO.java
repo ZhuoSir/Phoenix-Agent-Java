@@ -23,6 +23,12 @@ public class AgentRuntimeConfigDTO implements Serializable {
     /** 知识库检索工具 */
     private Boolean knowledgeEnabled;
 
+    /** 知识库检索召回条数（1~50；不传=10） */
+    private Integer knowledgeTopK;
+
+    /** 知识库检索相似度阈值（0~1；不传=0.65） */
+    private Double knowledgeSimilarityThreshold;
+
     /** 数据库取数工具（NL→SQL→只读结果） */
     private Boolean dbQueryEnabled;
 

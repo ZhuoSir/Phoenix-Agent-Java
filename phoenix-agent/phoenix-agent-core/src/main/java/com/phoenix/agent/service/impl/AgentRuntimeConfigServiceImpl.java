@@ -49,6 +49,8 @@ public class AgentRuntimeConfigServiceImpl implements AgentRuntimeConfigService 
         defaulted.setPlanMode(0);
         defaulted.setMemoryEnabled(1);
         defaulted.setKnowledgeEnabled(0);
+        defaulted.setKnowledgeTopK(AgentRuntimeConstant.DEFAULT_KNOWLEDGE_TOP_K);
+        defaulted.setKnowledgeSimilarityThreshold(AgentRuntimeConstant.DEFAULT_KNOWLEDGE_SIMILARITY_THRESHOLD);
         defaulted.setDbQueryEnabled(0);
         defaulted.setDbDeepAnalysisEnabled(0);
         defaulted.setFilesystemPolicy(FilesystemPolicyEnm.LOCAL.getCode());
@@ -76,6 +78,20 @@ public class AgentRuntimeConfigServiceImpl implements AgentRuntimeConfigService 
             return ReturnVo.fail(AgentRuntimeErrorCodeEnm.CONFIG_TOOL_LIMIT.getMsg()
                 + ": 上限 " + AgentRuntimeConstant.MAX_TOOL_COUNT,
                 AgentRuntimeErrorCodeEnm.CONFIG_TOOL_LIMIT.getCode());
+        }
+        if (target.getKnowledgeTopK() != null
+            && (target.getKnowledgeTopK() < AgentRuntimeConstant.MIN_KNOWLEDGE_TOP_K
+                || target.getKnowledgeTopK() > AgentRuntimeConstant.MAX_KNOWLEDGE_TOP_K)) {
+            return ReturnVo.fail(AgentRuntimeErrorCodeEnm.CONFIG_KNOWLEDGE_PARAM_INVALID.getMsg()
+                + ": topK 取值 " + AgentRuntimeConstant.MIN_KNOWLEDGE_TOP_K + "~"
+                + AgentRuntimeConstant.MAX_KNOWLEDGE_TOP_K,
+                AgentRuntimeErrorCodeEnm.CONFIG_KNOWLEDGE_PARAM_INVALID.getCode());
+        }
+        if (target.getKnowledgeSimilarityThreshold() != null
+            && (target.getKnowledgeSimilarityThreshold() < 0 || target.getKnowledgeSimilarityThreshold() > 1)) {
+            return ReturnVo.fail(AgentRuntimeErrorCodeEnm.CONFIG_KNOWLEDGE_PARAM_INVALID.getMsg()
+                + ": 相似度阈值取值 0~1",
+                AgentRuntimeErrorCodeEnm.CONFIG_KNOWLEDGE_PARAM_INVALID.getCode());
         }
         if (StringUtils.hasText(target.getFilesystemPolicy())
             && !isValidPolicy(target.getFilesystemPolicy())) {
@@ -115,6 +131,12 @@ public class AgentRuntimeConfigServiceImpl implements AgentRuntimeConfigService 
         if (dto.getKnowledgeEnabled() != null) {
             config.setKnowledgeEnabled(toSmallint(dto.getKnowledgeEnabled()));
         }
+        if (dto.getKnowledgeTopK() != null) {
+            config.setKnowledgeTopK(dto.getKnowledgeTopK());
+        }
+        if (dto.getKnowledgeSimilarityThreshold() != null) {
+            config.setKnowledgeSimilarityThreshold(dto.getKnowledgeSimilarityThreshold());
+        }
         if (dto.getDbQueryEnabled() != null) {
             config.setDbQueryEnabled(toSmallint(dto.getDbQueryEnabled()));
         }
@@ -143,6 +165,8 @@ public class AgentRuntimeConfigServiceImpl implements AgentRuntimeConfigService 
         vo.setPlanMode(false);
         vo.setMemoryEnabled(true);
         vo.setKnowledgeEnabled(false);
+        vo.setKnowledgeTopK(AgentRuntimeConstant.DEFAULT_KNOWLEDGE_TOP_K);
+        vo.setKnowledgeSimilarityThreshold(AgentRuntimeConstant.DEFAULT_KNOWLEDGE_SIMILARITY_THRESHOLD);
         vo.setDbQueryEnabled(false);
         vo.setDbDeepAnalysisEnabled(false);
         vo.setFilesystemPolicy(FilesystemPolicyEnm.LOCAL.getCode());
@@ -156,6 +180,11 @@ public class AgentRuntimeConfigServiceImpl implements AgentRuntimeConfigService 
         vo.setPlanMode(isOn(config.getPlanMode()));
         vo.setMemoryEnabled(isOn(config.getMemoryEnabled()));
         vo.setKnowledgeEnabled(isOn(config.getKnowledgeEnabled()));
+        vo.setKnowledgeTopK(config.getKnowledgeTopK() == null
+            ? AgentRuntimeConstant.DEFAULT_KNOWLEDGE_TOP_K : config.getKnowledgeTopK());
+        vo.setKnowledgeSimilarityThreshold(config.getKnowledgeSimilarityThreshold() == null
+            ? AgentRuntimeConstant.DEFAULT_KNOWLEDGE_SIMILARITY_THRESHOLD
+            : config.getKnowledgeSimilarityThreshold());
         vo.setDbQueryEnabled(isOn(config.getDbQueryEnabled()));
         vo.setDbDeepAnalysisEnabled(isOn(config.getDbDeepAnalysisEnabled()));
         vo.setDatasourceId(config.getDatasourceId());

@@ -1,5 +1,13 @@
 # Changelog: dynamic-agent-types
 
+## Implement 记录（2026-09-27 · T-07）
+- 完成 T-07：新增 `KnowledgeRetrievalTool`（按智能体实例化）+ `KnowledgeRetrievalToolContributor`，检索范围 = 本实例 agentId，topK/阈值来自运行配置。
+- **新增增量升级件 `04_knowledge_tool_params.sql`（+回滚件）**：`knowledge_top_k`(默认10) / `knowledge_similarity_threshold`(默认0.65)。原因：plan T-07 验收要求「topK/阈值来自配置」，已确认的 `03` 无此两列；不改 `03`（保持已确认件不动），以增量件补齐，默认值 = 原写死值故存量行为不变。已幂等执行 2 次验证。
+- 校验新增错误码 `42005`（topK 1~50、阈值 0~1），常量集中在 `AgentRuntimeConstant`。
+- 实测：agent25 开知识库 → 工具清单 `[todo, knowledge_retrieval]`，日志 `装配知识库检索工具: agentId=25, topK=10, threshold=0.65`；配 topK=20/阈值=0.5 → 回读一致、日志随配置变化；topK=99 → 42005；阈值=1.5 → 42005；关知识库 → 工具清单 `[todo]`。
+- 遗留（明示，非遗漏）：`RulesRagTool`（存量参考实现，agent24 制度专家在用）仍写死 `agentId=18`；按 plan 决策1「存量 Java 保留作参考、不迁移」本期不动，其泛化归 BL-03 存量迁移。新工具代码内无任何硬编码 agentId。
+- 「两个智能体挂不同知识范围、各自检索命中自身范围」的真实链路证据需 T-11/T-12 打通对话入口后才有可调用的工具链路（且当前向量库为空，需先灌知识文档），归入 T-16 端到端回归。
+
 ## Implement 记录（2026-09-27 · T-06）
 - 完成 T-06：`HarnessAgentRegistry`（agentId→实例；配置指纹失效；LRU 上限 + close；存量 sn 回退）。
   - 双路径**确定性判定**（非 `sn || id` 猜测）：sn 命中 `HarnessStaticLoader` → 返回 Java 类内存实例（`source=legacy`，功能不变）；未命中 → 按运行配置构建并缓存（键 = agentId）。

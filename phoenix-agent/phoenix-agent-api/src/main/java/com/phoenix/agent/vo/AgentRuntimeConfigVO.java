@@ -20,6 +20,10 @@ public class AgentRuntimeConfigVO implements Serializable {
 
     private Boolean knowledgeEnabled;
 
+    private Integer knowledgeTopK;
+
+    private Double knowledgeSimilarityThreshold;
+
     private Boolean dbQueryEnabled;
 
     private Boolean dbDeepAnalysisEnabled;
