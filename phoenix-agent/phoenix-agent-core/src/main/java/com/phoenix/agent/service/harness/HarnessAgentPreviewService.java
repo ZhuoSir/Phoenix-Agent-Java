@@ -2,23 +2,24 @@ package com.phoenix.agent.service.harness;
 
 import com.phoenix.agent.enums.AgentRuntimeErrorCodeEnm;
 import com.phoenix.agent.harness.factory.HarnessAgentFactory;
+import com.phoenix.agent.harness.factory.HarnessAgentRegistry;
 import com.phoenix.agent.model.AgentRuntimeConfig;
 import com.phoenix.agent.service.AgentRuntimeConfigService;
 import com.phoenix.agent.vo.AgentRuntimePreviewVO;
 import com.phoenix.data.entity.Agent;
 import com.phoenix.data.service.agent.AgentService;
 import com.phoenix.tools.vo.ReturnVo;
-import io.agentscope.harness.agent.HarnessAgent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.util.NoSuchElementException;
+
 /**
- * 对话智能体构建预演（T-05 验证入口）。
+ * 对话智能体构建预演（T-05 验证入口 / T-06 缓存可观测入口）。
  *
- * <p>真实调用 {@link HarnessAgentFactory} 构建一次，证明「能力完全由库配置决定、不依赖 Java 自注册」，
- * 并把生效工具清单/模型/技能池回显给管理端。构建成功即关闭实例（{@code close()} 只释放本实例自有资源，
- * 共享的 stateStore/distributedStore/skillRepository 不受影响，见 AgentScopedSkillRepository.close 语义）。
+ * <p>真实走一遍对话入口的实例解析链路（{@link HarnessAgentRegistry#acquire}），
+ * 证明「能力完全由库配置决定、不依赖 Java 自注册」，并把生效工具清单/模型/技能池/实例来源回显给管理端。
  */
 @Slf4j
 @Service
@@ -31,6 +32,8 @@ public class HarnessAgentPreviewService {
 
     private final HarnessAgentFactory harnessAgentFactory;
 
+    private final HarnessAgentRegistry harnessAgentRegistry;
+
     public ReturnVo<AgentRuntimePreviewVO> preview(Long agentId) {
         Agent agent = agentId == null ? null : agentService.findById(agentId);
         if (agent == null) {
@@ -41,6 +44,7 @@ public class HarnessAgentPreviewService {
         AgentRuntimePreviewVO vo = new AgentRuntimePreviewVO();
         vo.setAgentId(agentId);
         vo.setSn(agent.getSn());
+        vo.setRuntimeKey(harnessAgentFactory.runtimeKey(agent));
         vo.setModelConfigId(config.getModelConfigId());
         vo.setPlanMode(isOn(config.getPlanMode()));
         vo.setMemoryEnabled(isOn(config.getMemoryEnabled()));
@@ -50,20 +54,22 @@ public class HarnessAgentPreviewService {
         vo.setDatasourceId(config.getDatasourceId());
         vo.setFilesystemPolicy(config.getFilesystemPolicy());
         vo.setSkillPoolSize(harnessAgentFactory.skillPoolSize(harnessAgentFactory.runtimeKey(agent)));
-        HarnessAgentFactory.BuildResult result;
         try {
-            result = harnessAgentFactory.buildWithSummary(agent);
+            HarnessAgentRegistry.RuntimeHandle handle = harnessAgentRegistry.acquire(agentId);
+            vo.setBuildOk(true);
+            vo.setInstanceSource(handle.source());
+            vo.setSummary(handle.summary());
+            vo.setToolNames(handle.toolNames());
+            vo.setRegistryStats(harnessAgentRegistry.stats());
+        }
+        catch (NoSuchElementException e) {
+            return ReturnVo.fail(AgentRuntimeErrorCodeEnm.AGENT_NOT_FOUND.getMsg(),
+                AgentRuntimeErrorCodeEnm.AGENT_NOT_FOUND.getCode());
         }
         catch (RuntimeException e) {
             vo.setBuildOk(false);
             vo.setErrorMessage(e.getMessage());
             log.error("对话智能体构建预演失败: agentId={}, err={}", agentId, e.toString());
-            return ReturnVo.ok(vo);
-        }
-        try (HarnessAgent built = result.agent()) {
-            vo.setBuildOk(true);
-            vo.setSummary(result.summary());
-            vo.setToolNames(result.toolNames());
         }
         return ReturnVo.ok(vo);
     }

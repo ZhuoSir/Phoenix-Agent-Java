@@ -1,5 +1,14 @@
 # Changelog: dynamic-agent-types
 
+## Implement 记录（2026-09-27 · T-06）
+- 完成 T-06：`HarnessAgentRegistry`（agentId→实例；配置指纹失效；LRU 上限 + close；存量 sn 回退）。
+  - 双路径**确定性判定**（非 `sn || id` 猜测）：sn 命中 `HarnessStaticLoader` → 返回 Java 类内存实例（`source=legacy`，功能不变）；未命中 → 按运行配置构建并缓存（键 = agentId）。
+  - 指纹 = agent.update_time + 运行配置.update_time + 模型/工具/计划/记忆/策略开关 + 提示词哈希 + 技能绑定版本（`HarnessSkillMapper.selectSkillBindingVersion`，查询失败降级不阻断）。
+  - 容量 `phoenix.agent.runtime.max-instances`（默认 200），accessOrder LRU 淘汰即 `close()`；并发构建竞争时放弃后到产物并 close。
+  - `HarnessStaticLoader` 增 `findAgent(sn)`（可空查询，`loadAgent` 原语义不变）。
+  - 构建预演改为走 Registry（`acquire`），回显 `instanceSource`/`registryStats`，成为 T-06 的可观测验证入口。
+- T-06 实测（临时 `max-instances=1` 启动）：① 首次 preview agent25 → `built`；② 再次 → `cached`（hits=1）；③ 改运行配置后再 preview → 指纹变 → `built`（builds=2，旧实例 close）；④ agent24（RulesHarnessAgent）→ `legacy`（技能池=1，存量路径未回归）；⑤ 新建临时智能体并 preview → 淘汰 agent25（evictions=1，日志「超 LRU 上限(1)淘汰」）；⑥ 再 preview agent25 → 重新 built 成功（证明 close 不影响共享 stateStore/distributedStore/技能仓库；另经字节码核实 `ReActAgent.close()` 为空实现，仅释放实例自有 workspace index）。临时智能体已删除，服务已按默认 LRU=200 重启。
+
 ## Implement 记录（2026-09-27 · T-01~T-05）
 - 完成 T-01~T-04（分支 `feature/dynamic-agent-types`）：升级件 03 + 实体/枚举/DTO/VO + 配置服务与校验 + 端点与类型强制。实测：新建不带 type 落 `harness`；存量 sql 智能体即使请求带 `type=harness` 也不被改写；未登录业务码 401；无数据源开库工具→42001；非法策略→42003；保存回读一致。
 - 完成 T-05：`HarnessAgentFactory` + 工具装配扩展点 `AgentToolContributor`（ObjectProvider 收集，允许暂无实现）；

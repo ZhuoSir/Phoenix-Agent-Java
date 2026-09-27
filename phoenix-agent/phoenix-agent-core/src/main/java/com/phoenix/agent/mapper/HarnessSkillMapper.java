@@ -24,4 +24,15 @@ public interface HarnessSkillMapper extends BaseMapper<HarnessSkill> {
                and s.status = 'published'
             """)
     List<String> selectAllowedSkillNamesByAgentSn(@Param("sn") String sn);
+
+    /**
+     * 技能绑定版本（T-06 配置指纹组成项）：绑定条数 + 最近绑定变更时间。
+     * 绑定变更即视为「运行实例已过期」，与 agent/运行配置的 update_time 一起决定是否重建。
+     */
+    @Select("""
+            select count(*) || ':' || coalesce(to_char(max(b.update_time), 'YYYY-MM-DD HH24:MI:SS.MS'), '-')
+              from tbl_data_agent_skill_info b
+             where b.agent_id = #{agentId} and b.del_flag = 0
+            """)
+    String selectSkillBindingVersion(@Param("agentId") Long agentId);
 }

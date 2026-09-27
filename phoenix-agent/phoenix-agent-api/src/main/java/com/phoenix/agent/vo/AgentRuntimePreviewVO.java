@@ -18,13 +18,22 @@ public class AgentRuntimePreviewVO implements Serializable {
 
     private String sn;
 
+    /** 运行时身份：有 sn 用 sn，无 sn 用 agent-{id}（T-05） */
+    private String runtimeKey;
+
     /** 构建是否成功（失败时 errorMessage 给出原因，不抛 500） */
     private Boolean buildOk;
 
     private String errorMessage;
 
+    /** 实例来源：legacy（存量自注册）/ cached（注册表命中）/ built（本次构建） */
+    private String instanceSource;
+
     /** 人类可读构建摘要（与运行日志同一行文本） */
     private String summary;
+
+    /** 注册表计数快照（cached/hits/builds/legacy/evictions） */
+    private String registryStats;
 
     /** 实际装配的工具名清单（与运行配置开关一致） */
     private List<String> toolNames;
