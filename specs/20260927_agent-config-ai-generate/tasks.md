@@ -19,7 +19,7 @@
   验证方式: `mvn install -pl phoenix-data/phoenix-data-core -am` 通过；psql 断言 `selectDefaultByType`/`selectEnabledByType` 返回符合预期；`grep -rn "deactivateOthers" phoenix-data` 仅剩定义无调用（调用点删除）
   验收标准: 列名/类型条件不写魔法值（用实体列引用或集中常量）；所有查询显式列名（无 `SELECT *`）；启用集合查询不含互斥语义
 
-- [ ] T-03 `ModelConfigDataService.getDefaultByType(type)` + 取模型回退策略（默认优先，缺失回落任一启用并 WARN）
+- [x] T-03 `ModelConfigDataService.getDefaultByType(type)` + 取模型回退策略（默认优先，缺失回落任一启用并 WARN）
   关联: R-15, R-17, R-18
   依赖: T-02
   验证方式: 临时库把某类型默认置为 false 后调用 → 日志出现"无默认，回落启用项"且返回该类型某条；恢复默认后再调用 → 返回默认那条（含配置ID可核对）
@@ -27,7 +27,7 @@
 
 ## 2. 模型管理（启用集合 / 默认）
 
-- [ ] T-04 模型管理接口：启用不再互斥、新增停用（默认保护）、新增设为默认（事务清旧+自动启用）
+- [x] T-04 模型管理接口：启用不再互斥、新增停用（默认保护）、新增设为默认（事务清旧+自动启用）
   关联: R-10, R-11, R-12, R-13, R-14
   依赖: T-03
   验证方式: curl 序列并逐条 psql 复核：① 两条 CHAT 依次 `activate` → 两条 `is_active=true` 且都不被停用；② `default/{A}` 后 `default/{B}` → 仅 B 为默认、A/B 启用态不变、EMBEDDING 默认不受影响；③ `deactivate/{B}`（B 是默认）→ 返回 42014 且库中 B 仍启用；④ 对未启用配置设默认 → 自动置启用；⑤ 连续两次并发设不同条为默认 → 最终仅一条默认（唯一索引 + 事务，无 500）

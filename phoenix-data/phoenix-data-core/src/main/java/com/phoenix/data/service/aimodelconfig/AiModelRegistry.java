@@ -122,6 +122,14 @@ public class AiModelRegistry {
     }
 
     /**
+     * 刷新 Transcription（语音）缓存（用于热切换）
+     */
+    public void refreshTranscription() {
+        this.currentTranscriptionModel = null;
+        log.info("Transcription cache cleared.");
+    }
+
+    /**
      * 刷新 Embedding 缓存（用于热切换）
      */
     public void refreshEmbedding() {

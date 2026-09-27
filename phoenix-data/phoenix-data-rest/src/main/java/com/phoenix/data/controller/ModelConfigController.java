@@ -108,6 +108,24 @@ public class ModelConfigController {
 	}
 
 	/**
+	 * 停用指定模型配置（启用为可多选集合；若该配置是其类型默认则拒绝）
+	 */
+	@PostMapping("/deactivate/{id}")
+	public ApiResponse<String> deactivate(@PathVariable Integer id) {
+		modelConfigOpsService.deactivateConfig(id);
+		return ApiResponse.success("模型已停用");
+	}
+
+	/**
+	 * 设为该类型的默认模型（同类型唯一；设默认同时置为启用）
+	 */
+	@PostMapping("/default/{id}")
+	public ApiResponse<String> setDefault(@PathVariable Integer id) {
+		modelConfigOpsService.setDefaultConfig(id);
+		return ApiResponse.success("已设为默认模型");
+	}
+
+	/**
 	 * 6. 连通性测试 接收前端表单里的配置参数，尝试发起一次真实调用
 	 */
 	@PostMapping("/test")
