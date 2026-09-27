@@ -326,12 +326,14 @@ public class SkillAdminServiceImpl implements SkillAdminService {
         }
         List<Long> targetIds = dto == null || dto.getSkillIds() == null ? List.of()
             : dto.getSkillIds().stream().filter(Objects::nonNull).distinct().toList();
-        if (!targetIds.isEmpty()) {
-            // 仅允许绑定已发布技能（R-04）
+        List<Long> alreadyBound = boundIds(agentId);
+        // 仅约束「本次新增的绑定」必须已发布；已绑定但后被下线的技能允许保留（R-04 不级联删绑定）
+        List<Long> newlyAdded = targetIds.stream().filter(id -> !alreadyBound.contains(id)).toList();
+        if (!newlyAdded.isEmpty()) {
             long publishedCnt = harnessSkillMapper.selectCountByQuery(QueryWrapper.create()
                 .where("status = ?", SkillStatusEnm.PUBLISHED.getCode())
-                .in("id", targetIds));
-            if (publishedCnt != targetIds.size()) {
+                .in("id", newlyAdded));
+            if (publishedCnt != newlyAdded.size()) {
                 return ReturnVo.fail(SkillErrorCodeEnm.SKILL_NOT_PUBLISHED.getMsg(),
                     SkillErrorCodeEnm.SKILL_NOT_PUBLISHED.getCode());
             }
