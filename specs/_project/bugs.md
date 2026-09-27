@@ -124,6 +124,11 @@
 - **修复**：`HarnessChatServiceImpl` 显式校验，两者皆缺抛 `InvalidInputException` → 400 + 「agentId 与 harnessSn 至少需要一个」；`confirmStream` 同理
 - **验证**：三分支复测（仅 agentId / 仅 harnessSn / 皆缺）分别为 200 / 200 / 400
 
+### B-01（已修）补充说明
+- 修复内容：`sql/all_schema.sql` 扩展/角色段后补 5 条 `CREATE SEQUENCE IF NOT EXISTS`
+  （tbl_data_categories/order_items/orders/products/users 的 id 序列），文件末尾补 5 条 `ALTER SEQUENCE ... OWNED BY`
+- 验证：全新空库重放基线**零报错**（修前 64）；在此空库继续跑 01→02→03→04→05 全链 `ON_ERROR_STOP=1` 零报错，二次重放同样零报错
+
 ### B-20 「启用模型」按钮实际会把同类型其他模型也置为启用（SQL 与注释相反）
 - **位置**：`phoenix-data/phoenix-data-core/.../mapper/ModelConfigMapper.java:50-52`
 - **证据**：方法注释「将指定类型的其他模型配置设为**非启用**状态」，SQL 却是
@@ -145,7 +150,7 @@
 ## 修复状态跟踪
 | ID | 级别 | 状态 |
 |---|---|---|
-| B-01 | P1 | 未修（容器内已临时补序列；向量表缺主键已另修，见 B-16） |
+| B-01 | P1 | ✅ 已修（all_schema.sql 补 5 个序列，空库重放 64 → 0 报错；提交 34877da） |
 | B-02 | P1 | 未修 |
 | B-03 | P2 | 未修 |
 | B-04 | P2 | 不修（设计问题→技术债/spec） |
@@ -164,4 +169,4 @@
 | B-17 | P2 | ✅ 已修（非 HTTP 调用方无 Sa-Token 上下文时降级，不再打断图链路） |
 | B-18 | P2 | 未修（QA/FAQ 知识只向量化问题，答案检索不到；DOCUMENT 类型正常） |
 | B-19 | P3 | ✅ 已修（harness 对话入参缺失 500 → 400 + 明确提示） |
-| B-20 | P1 | 待修（`deactivateOthers` SQL 写成 `is_active=true`；将由 agent-config-ai-generate 的启用/默认改造消解） |
+| B-20 | P1 | ✅ 已修（agent-config-ai-generate T-02 删除该方法与调用点，启用改为可多选集合） |

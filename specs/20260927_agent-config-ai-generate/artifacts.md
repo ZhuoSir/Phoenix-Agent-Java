@@ -1,0 +1,43 @@
+# 升级件登记: agent-config-ai-generate
+
+| 类型 | 内容摘要 | 来源任务 | 草案位置 | 已汇总至里程碑 |
+|---|---|---|---|---|
+| DDL | `tbl_data_model_config` 增 `is_default boolean NOT NULL DEFAULT false`（含 COMMENT：每类型至多一条，未显式选择模型时加载） | T-01 | `sql/05_model_default.sql` | - |
+| INDEX | 部分唯一索引 `uk_dmc_type_default ON (model_type) WHERE is_default = true AND is_deleted = 0`（每类型唯一默认的 DB 级防线） | T-01 | `sql/05_model_default.sql` | - |
+| DML | 存量回填：为"尚无默认"的每个类型，按「启用优先 → updated/created/id 最新」置一条 `is_default=true`（幂等，重复执行 no-op；先收敛后建索引） | T-01 | `sql/05_model_default.sql` | - |
+| DDL(基线) | `sql/all_schema.sql` 补 5 个缺失的 `CREATE SEQUENCE`（categories/order_items/orders/products/users 的 id 序列）+ 5 条 `ALTER SEQUENCE ... OWNED BY` | T-13（修 B-01） | 基线文件内（已提交 `34877da`） | - |
+| 代码 | 启用互斥调用 `ModelConfigMapper.deactivateOthers` 删除（B-20 消解）；取模型由「该类型唯一启用」改判「该类型默认」（无默认回落启用+WARN） | T-02 / T-03 / T-06 | 无 DDL（行为变更） | - |
+| 配置 | 无新增外部配置项：生成超时 60s、名称≤64 字、描述≤120 字、提示词 300~600 字、骨架四段 均为代码常量（`AgentProfilePromptTemplates` / `AgentProfileController.GENERATE_TIMEOUT`） | T-07~T-09 | plan §接口设计 | - |
+| 依赖 | **前端零新增依赖**：md 编辑器自研（复用已装 `markdown-it`）；补 `src/types/markdown-it.d.ts` 消除既有 TS7016 | T-10 | - | - |
+| 回滚 | `05_model_default_rollback.sql`：drop `uk_dmc_type_default` + drop `is_default` 列（不动 `is_active`/数据）；`all_schema.sql` 的序列补齐为纯增量，回滚=不再需要（旧库本就有这些序列） | T-01 | `sql/` | - |
+
+## 重放验证记录（T-13）
+
+**环境**：容器 `phoenix-pg`；`drop database → create database phoenix_r13`（真·空库）。
+
+| 步骤 | 命令 | 结果 |
+|---|---|---|
+| 基线 | `psql -v ON_ERROR_STOP=0 -f sql/all_schema.sql` | **0 报错**（修复 B-01 前为 64 处） |
+| 01 技能管理 | `psql -v ON_ERROR_STOP=1 -f specs/20260927_agent-skill-management/sql/01_agent_skill_upgrade.sql` | exit=0 errors=0 |
+| 02 技能菜单 | 同上 `02_skill_menu.sql` | exit=0 errors=0 |
+| 03 运行配置 | 同上 `dynamic-agent-types/sql/03_agent_runtime_config.sql` | exit=0 errors=0 |
+| 04 知识库参数 | 同上 `04_knowledge_tool_params.sql` | exit=0 errors=0 |
+| 05 模型默认 | 同上 `05_model_default.sql` | exit=0 errors=0 |
+| 幂等复跑 | 再执行 03 与 05 | 均 exit=0 errors=0 |
+| 对象校验 | information_schema | `tbl_data_agent_runtime_config` 17 列、`is_default` 列存在、3 张新表建成 |
+| 回滚 | `05_model_default_rollback.sql` | exit=0 errors=0，`is_default` 列消失（=0） |
+
+**执行顺序**：`all_schema.sql` → 01 → 02 → 03 → 04 → 05（05 依赖 `tbl_data_model_config` 及其 `is_active` 列；`is_default` 为纯增量新列，旧代码不读，可先升级代码或先跑 SQL 均不报错，但**运行时取默认模型需先执行 05**）。
+
+## 存量库实测（非空库，现网 phoenix）
+
+- 首次执行 05：exit=0；CHAT 因 B-20 历史遗留有 2 条同时启用 → 回填只选中最新一条（`is_default` 计数=1），EMBEDDING 同样=1；索引建成
+- 重复执行 05：exit=0 errors=0（幂等）
+- 回滚 05：`is_active` 快照 md5 与执行前完全一致（`c55fe87b…`）→ 证未动启用数据
+- 回滚后再执行 05：成功
+
+## 回滚操作说明
+
+1. 数据：`05_model_default_rollback.sql`（丢默认标记，回滚后按「唯一启用」取模型；重新升级会重新回填，可能与回滚前不同一条）。
+2. 代码：回退到本 spec 之前提交；由于运行时取模型改判默认，**回退代码前必须先回滚 SQL 或保留该列**（旧代码不读 `is_default`，保留列无害）。
+3. 基线序列补齐（B-01）为纯增量，不需要回滚动作。
