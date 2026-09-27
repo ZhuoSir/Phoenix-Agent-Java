@@ -5,6 +5,7 @@ import com.alibaba.cloud.ai.graph.OverAllState;
 import com.alibaba.cloud.ai.graph.StateGraph;
 import com.alibaba.cloud.ai.graph.streaming.StreamingOutput;
 import com.phoenix.agent.harness.agent.HarnessStaticLoader;
+import com.phoenix.agent.harness.factory.HarnessAgentRegistry;
 import com.phoenix.agent.harness.request.ConfirmRequest;
 import com.phoenix.agent.harness.request.HarnessRequest;
 import com.phoenix.agent.harness.send.HarnessChatService;
@@ -37,6 +38,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class HarnessChatServiceImpl implements HarnessChatService {
     private final HarnessStaticLoader harnessStaticLoader;
+    private final HarnessAgentRegistry harnessAgentRegistry;
     private final HitlCacheService hitlCacheService;
     private final SkillExplicitInjectionService skillExplicitInjectionService;
 
@@ -52,12 +54,52 @@ public class HarnessChatServiceImpl implements HarnessChatService {
     }
 
     @Override
+    public Mono<Msg> call(HarnessRequest request) {
+        HarnessAgent harnessAgent = resolveAgent(request);
+        SkillExplicitInjectionService.InjectionResult injection = resolveInjection(request);
+        if (!injection.ok()) {
+            return Mono.error(new IllegalArgumentException(injection.errorMsg()));
+        }
+        return harnessAgent.call(buildUserMessage(request), buildRuntimeContext(request, injection.block()));
+    }
+
+    @Override
+    public Flux<NodeOutput> stream(HarnessRequest request) {
+        return doStream(resolveAgent(request), request, resolveInjection(request));
+    }
+
+    @Override
     public Flux<NodeOutput> stream(String sn, HarnessRequest request) {
         HarnessAgent harnessAgent = getHarnessAgent(sn);
-        String sessionId = request.getSessionId();
         // R-05：请求入口做三重校验；拒绝时以内容增量事件返回原因并结束流
         SkillExplicitInjectionService.InjectionResult injection = skillExplicitInjectionService
             .prepare(sn, request.getEnabledSkillIds());
+        return doStream(harnessAgent, request, injection);
+    }
+
+    /**
+     * R-08 寻址：agentId（库配置路径，走运行时注册表，存量自注册智能体在注册表内自动回退其 Java 实例）
+     * 优先；未传 agentId 时按 harnessSn 走存量静态加载器。
+     */
+    private HarnessAgent resolveAgent(HarnessRequest request) {
+        if (request.getAgentId() != null) {
+            return harnessAgentRegistry.get(request.getAgentId());
+        }
+        return harnessStaticLoader.loadAgent(request.getHarnessSn());
+    }
+
+    /** 显式技能校验的技能池同样按寻址路径解析（agentId 路径用 agentId，存量路径用 sn） */
+    private SkillExplicitInjectionService.InjectionResult resolveInjection(HarnessRequest request) {
+        if (request.getAgentId() != null) {
+            return skillExplicitInjectionService.prepareByAgentId(request.getAgentId(),
+                request.getEnabledSkillIds());
+        }
+        return skillExplicitInjectionService.prepare(request.getHarnessSn(), request.getEnabledSkillIds());
+    }
+
+    private Flux<NodeOutput> doStream(HarnessAgent harnessAgent, HarnessRequest request,
+            SkillExplicitInjectionService.InjectionResult injection) {
+        String sessionId = request.getSessionId();
         if (!injection.ok()) {
             return Flux.just(errorOutput(injection.errorMsg()), endOutput());
         }
@@ -91,7 +133,24 @@ public class HarnessChatServiceImpl implements HarnessChatService {
     }
 
     @Override
+    public HarnessAgent getHarnessAgent(Long agentId) {
+        return harnessAgentRegistry.get(agentId);
+    }
+
+    @Override
+    public Flux<NodeOutput> confirmStream(ConfirmRequest request) {
+        if (request.getAgentId() != null) {
+            return confirmStream(harnessAgentRegistry.get(request.getAgentId()), request);
+        }
+        return confirmStream(harnessStaticLoader.loadAgent(request.getAgentSn()), request);
+    }
+
+    @Override
     public Flux<NodeOutput> confirmStream(String sn, ConfirmRequest request) {
+        return confirmStream(getHarnessAgent(sn), request);
+    }
+
+    private Flux<NodeOutput> confirmStream(HarnessAgent harnessAgent, ConfirmRequest request) {
         RequireUserConfirmEvent pendingConfirm = hitlCacheService.getAndRemovePendingConfirm(request.getSessionId());
         if (pendingConfirm == null) {
             Map<String, Object> context = new HashMap<>();
@@ -111,7 +170,7 @@ public class HarnessChatServiceImpl implements HarnessChatService {
                 .textContent("User confirmed, continue.")
                 .metadata(Map.of(Msg.METADATA_CONFIRM_RESULTS, List.of(result)))
                 .build();
-        return getHarnessAgent(sn).streamEvents(confirmMsg, RuntimeContext.builder().userId(request.getUserId()).sessionId(request.getSessionId()).build())
+        return harnessAgent.streamEvents(confirmMsg, RuntimeContext.builder().userId(request.getUserId()).sessionId(request.getSessionId()).build())
                 .map(event -> toNodeOutput(event, request.getSessionId()));
     }
 

@@ -26,11 +26,31 @@ public interface HarnessChatService {
     Flux<NodeOutput> stream(String sn, HarnessRequest request);
 
     /**
-     * 获取智能体
+     * 按请求寻址发送消息（R-08：agentId 优先走运行时注册表，harnessSn 为存量兼容路径）
+     */
+    Mono<Msg> call(HarnessRequest request);
+
+    /**
+     * 按请求寻址流式返回（R-08）
+     */
+    Flux<NodeOutput> stream(HarnessRequest request);
+
+    /**
+     * 按请求寻址的人工确认（agentId 优先）
+     */
+    Flux<NodeOutput> confirmStream(ConfirmRequest request);
+
+    /**
+     * 获取智能体（按 agentId 走注册表；按 sn 走存量静态加载器）
      * @param sn 标识
      * @return
      */
     HarnessAgent getHarnessAgent(String sn);
+
+    /**
+     * 按智能体 id 获取运行时实例（库配置路径；存量自注册智能体自动回退其 Java 实例）
+     */
+    HarnessAgent getHarnessAgent(Long agentId);
 
     /**
      * 人工确认

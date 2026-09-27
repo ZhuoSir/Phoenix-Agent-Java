@@ -44,7 +44,7 @@ public class HarnessController {
     public Flux<Map<String, Object>> confirm(@RequestBody ConfirmRequest confirmRequest) {
         String userId = StpUtil.getLoginIdAsString();
         confirmRequest.setUserId(userId);
-        return harnessChatService.confirmStream(confirmRequest.getAgentSn(), confirmRequest).map(output -> {
+        return harnessChatService.confirmStream(confirmRequest).map(output -> {
             Map<String, Object> eventMap = new LinkedHashMap<>();
             eventMap.put("content", "");
             eventMap.put("end", false);
@@ -87,14 +87,20 @@ public class HarnessController {
         });
     }
 
+    /**
+     * 后台对话（R-08 寻址）：传 agentId 走运行时注册表（库配置智能体）；
+     * 传 harnessSn 为存量兼容路径，二者都传时 agentId 优先。
+     */
     @PostMapping(value = "/chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<Map<String, Object>> harnessChat(@RequestBody HarnessRequest  harnessRequest) {
         String userId = StpUtil.getLoginIdAsString();
         HarnessRequest request = HarnessRequest.builder().userId(userId).sessionId(harnessRequest.getSessionId())
                 .message(harnessRequest.getMessage())
+                .harnessSn(harnessRequest.getHarnessSn())
+                .agentId(harnessRequest.getAgentId())
                 .enabledSkillIds(harnessRequest.getEnabledSkillIds())
                 .build();
-        return harnessChatService.stream(harnessRequest.getHarnessSn(), request)
+        return harnessChatService.stream(request)
                 .map(HarnessEventMapper::toEventMap);
     }
 

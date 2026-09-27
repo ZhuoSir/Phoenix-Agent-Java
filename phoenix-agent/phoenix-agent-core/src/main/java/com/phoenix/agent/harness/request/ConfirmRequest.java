@@ -22,6 +22,9 @@ public class ConfirmRequest implements Serializable {
     private String sessionId;
     private String agentSn;
 
+    /** 库配置路径按智能体 id 寻址（R-08）；与 agentSn 二选一，agentId 优先 */
+    private Long agentId;
+
     /**
      * 用户的决策：true 表示允许/确认，false 表示拒绝/取消
      */
