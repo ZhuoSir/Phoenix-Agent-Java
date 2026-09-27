@@ -124,6 +124,16 @@
 - **修复**：`HarnessChatServiceImpl` 显式校验，两者皆缺抛 `InvalidInputException` → 400 + 「agentId 与 harnessSn 至少需要一个」；`confirmStream` 同理
 - **验证**：三分支复测（仅 agentId / 仅 harnessSn / 皆缺）分别为 200 / 200 / 400
 
+### B-20 「启用模型」按钮实际会把同类型其他模型也置为启用（SQL 与注释相反）
+- **位置**：`phoenix-data/phoenix-data-core/.../mapper/ModelConfigMapper.java:50-52`
+- **证据**：方法注释「将指定类型的其他模型配置设为**非启用**状态」，SQL 却是
+  `UPDATE tbl_data_model_config SET is_active = true WHERE model_type = ? AND id != ? AND is_deleted = 0`
+  → 每次「启用」操作都把同类型**其他所有条**置为 `is_active=true`（应为 false）
+- **连带影响**：`selectActiveByType(...) LIMIT 1`（无 ORDER BY）在多条启用时取到哪条不确定 →
+  对话/向量化用的模型可能静默漂移；这也是 `agent-config-ai-generate` 需求把「启用/默认」拆开的直接动因
+- **修复方向**：本次（agent-config-ai-generate）把启用改为**多值集合**并删除 `deactivateOthers` 调用，
+  取模型改判「每类型唯一默认」，该 bug 随语义改造消解；若单独修，则 SQL 改 `is_active = false`
+
 ---
 
 ## 工作区遗留状态（非缺陷，处置需确认）
@@ -154,3 +164,4 @@
 | B-17 | P2 | ✅ 已修（非 HTTP 调用方无 Sa-Token 上下文时降级，不再打断图链路） |
 | B-18 | P2 | 未修（QA/FAQ 知识只向量化问题，答案检索不到；DOCUMENT 类型正常） |
 | B-19 | P3 | ✅ 已修（harness 对话入参缺失 500 → 400 + 明确提示） |
+| B-20 | P1 | 待修（`deactivateOthers` SQL 写成 `is_active=true`；将由 agent-config-ai-generate 的启用/默认改造消解） |
