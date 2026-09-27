@@ -39,6 +39,23 @@ public class AgentRuntimeConfigServiceImpl implements AgentRuntimeConfigService 
     }
 
     @Override
+    public AgentRuntimeConfig resolve(Long agentId) {
+        AgentRuntimeConfig config = find(agentId);
+        if (config != null) {
+            return config;
+        }
+        AgentRuntimeConfig defaulted = new AgentRuntimeConfig();
+        defaulted.setAgentId(agentId);
+        defaulted.setPlanMode(0);
+        defaulted.setMemoryEnabled(1);
+        defaulted.setKnowledgeEnabled(0);
+        defaulted.setDbQueryEnabled(0);
+        defaulted.setDbDeepAnalysisEnabled(0);
+        defaulted.setFilesystemPolicy(FilesystemPolicyEnm.LOCAL.getCode());
+        return defaulted;
+    }
+
+    @Override
     @Transactional(rollbackFor = Exception.class)
     public ReturnVo<Boolean> save(Long agentId, AgentRuntimeConfigDTO dto) {
         if (agentId == null || agentService.findById(agentId) == null) {

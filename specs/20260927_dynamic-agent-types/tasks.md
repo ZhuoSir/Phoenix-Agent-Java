@@ -32,7 +32,7 @@
 
 ## 2. 运行时（Factory / Registry / 工具）
 
-- [ ] T-05 实现 HarnessAgentFactory：按运行配置构建 HarnessAgent，工具按 agent 实例化绑定
+- [x] T-05 实现 HarnessAgentFactory：按运行配置构建 HarnessAgent，工具按 agent 实例化绑定
   关联: R-03
   依赖: T-02, T-03
   验证方式: 单元级验证缺失→以 T-11/T-16 的真实对话链路替代：临时端点或启动日志中打印某 agentId 的构建摘要（工具清单/模型/技能池大小）

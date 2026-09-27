@@ -1,5 +1,13 @@
 # Changelog: dynamic-agent-types
 
+## Implement 记录（2026-09-27 · T-01~T-05）
+- 完成 T-01~T-04（分支 `feature/dynamic-agent-types`）：升级件 03 + 实体/枚举/DTO/VO + 配置服务与校验 + 端点与类型强制。实测：新建不带 type 落 `harness`；存量 sql 智能体即使请求带 `type=harness` 也不被改写；未登录业务码 401；无数据源开库工具→42001；非法策略→42003；保存回读一致。
+- 完成 T-05：`HarnessAgentFactory` + 工具装配扩展点 `AgentToolContributor`（ObjectProvider 收集，允许暂无实现）；
+  - **实现细化（不改变 plan 决策2 语义）**：plan 原文「Factory 内 `new KnowledgeRetrievalTool(agentId)`」→ 改为「每个工具能力各实现 `AgentToolContributor`，由 Factory 构建时按运行配置实例化」。理由：工具实例化仍发生在工厂内、仍绑定各自的 agentId/数据源（决策2 目标不变），但 T-07/T-08/T-09 可独立落任务、Factory 无需二次改动。已用 ObjectProvider 避免「暂无实现」导致启动失败。
+  - **实测发现（纳入 T-10 验收）**：库中新建的对话智能体 `tbl_data_agent.sn` 为 **NULL**（存量自注册才有 sn）→ 运行身份改为「有 sn 用 sn，否则 `agent-{id}`」（R-08 agentId 寻址），构建不再依赖自注册类；但 `AgentScopedSkillRepository` 现按 sn 查绑定，故此类智能体技能池暂为 0，须由 T-10 的 agentId 路径补齐。
+  - 验证入口：`GET /api/agent/{id}/runtime-config/preview`（管理端「构建预演」，真实构建一次后立即 close）。实测 agent 25（sn=NULL，知识库+取数开、数据源1）：buildOk=true，summary 回显 `runtimeKey=agent-25, planMode=true, memory=true, policy=local, tools=[todo], skillPool=0`；记忆关+远程策略分支同样构建成功；不存在智能体→42004。
+  - 附带：`HarnessModelRegistry` 支持按 `model_config_id` 解析模型（空/非 CHAT 降级全局默认并告警）。
+
 ## v1.0.0（2026-09-27）确认人: 陈卓
 - 三重确认第①关通过：requirements.md（R-01~R-11 + Non-goals + 假设7条；Q1/Q2/Q5/Q6 已决，命名统一为「对话智能体」，四类型标签全部去掉，MCP 入 backlog）
 - 三重确认第②关通过：plan.md（Factory+Registry、两类数据库工具接线、知识库工具泛化、agentId 寻址统一、前端去标签与配置面板、03 升级件；6 个决策含被拒方案）

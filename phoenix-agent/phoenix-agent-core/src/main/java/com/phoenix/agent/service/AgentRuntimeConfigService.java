@@ -1,6 +1,7 @@
 package com.phoenix.agent.service;
 
 import com.phoenix.agent.dto.AgentRuntimeConfigDTO;
+import com.phoenix.agent.model.AgentRuntimeConfig;
 import com.phoenix.agent.vo.AgentRuntimeConfigVO;
 import com.phoenix.tools.vo.ReturnVo;
 
@@ -16,6 +17,12 @@ public interface AgentRuntimeConfigService {
      * 读取运行配置；未配置时返回默认值（planMode=false, memory=true, 工具全关, policy=local）。
      */
     ReturnVo<AgentRuntimeConfigVO> get(Long agentId);
+
+    /**
+     * 读取运行配置实体；未配置时返回**已套用默认值**的实体（不落库、不抛错），
+     * 供 HarnessAgentFactory 构建时直接消费（避免解析 ReturnVo 包装）。
+     */
+    AgentRuntimeConfig resolve(Long agentId);
 
     /**
      * 保存运行配置（不存在则创建）。校验：智能体存在、开数据库工具须有数据源、
