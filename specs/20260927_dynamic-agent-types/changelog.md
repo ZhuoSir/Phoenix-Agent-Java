@@ -1,5 +1,35 @@
 # Changelog: dynamic-agent-types
 
+## Implement 记录（2026-09-27 · T-16 端到端总回归）
+**场景① 新建对话智能体全能力**（新建 id=29，不传 type → 落 `harness`；配 知识库 topK=8/阈值0.6 + 取数 + 深度分析 + 数据源11 + 计划模式；绑技能 weather；发布；授权通用组）
+- 构建摘要：`agentId=29, runtimeKey=agent-29, planMode=true, memory=true, policy=local, tools=[todo, database_query, deep_analysis, knowledge_retrieval], skillPool=1`（四工具按配置装配、技能池按 agentId 解析）
+- 后台对话（`/api/admin/harness/chat`，agentId=29，取数问题）：模型自主调用 `queryDatabase` → 日志 `数据库取数完成: agentId=29 …` → 回答 **8**，与 `select count(*) from tbl_data_agent` 一致
+- 前台对话（`/platform/harness/chat`，同一问题）：组可见性 + 技能范围提示生效 → 回答 **8**（同一条库配置实例链路）
+- 知识库工具：真实调用并留日志 `知识库检索: agentId=29, topK=8, threshold=0.6`（参数来自配置）；因向量库为空 + B-13（embedding 404）返回「未找到文档」类可读结果，模型如实说明无原文可引用
+- 深度分析：装配与可读失败路径已验证（B-13 阻断成功路径，见 T-09 记录）
+- **回归中发现并修复的真实缺陷**：前台可见性校验原以「sn 非空」为通过条件 → 新建（sn=NULL）对话智能体在前台被判「智能体不存在」。已改为新增 `FrontSkillAccessService.validateVisible`（只判组-智能体授权，不要求 sn），前台对话准入改用它，`harnessSn` 降为可选兼容字段；修复后前台对话恢复
+
+**场景② 存量 5 个自注册智能体逐轮对话（不回归）**
+| 智能体 | 链路 | 结果 |
+|---|---|---|
+| 19 BpmReactAgent | `/api/admin/agent/chat`（agentSn） | OK，正常自我介绍 |
+| 20 ZhiduReactAgent | 同上 | OK，正常自我介绍 |
+| 21 ParolCompiledGraph | `/api/admin/agent/stream/chatsql`（图链路） | OK，节点流正常（意图识别完成）+ `event:complete`，无 error 事件 |
+| 23 HumanInTheLoop | `/api/admin/harness/chat`（agentId=23 → Registry legacy 分派） | OK，正常自我介绍 |
+| 24 RulesHarnessAgent | agentId=24 **与** harnessSn 兼容路径各一轮 | OK，两条路径均正常 |
+
+**场景③ skills spec 前台技能区与显式执行（不回归）**
+- 前台技能区 `GET /platform/account-info/getMySkills?agentId=24` → `[weather(published)]`（三重交集：已发布 ∧ 已绑定 ∧ 组已授权）
+- 显式执行：`/platform/harness/chat` 带 `enabledSkillIds=[10]` → 日志 `显式技能注入准备完成, agentId=24` （T-11 新增的 agentId 路径）+ 模型加载并遵循该技能
+
+**场景④ 空库重放**：见 `artifacts.md` §重放验证记录（01/02/03/04 四次执行 + 幂等复跑全部 `ON_ERROR_STOP=1` 零报错；基线 `all_schema.sql` 64 处报错属既有 B-01）
+
+**场景⑤ 升级件登记**：`artifacts.md` 已建（DDL/DML/配置/依赖/回滚 + 重放记录 + 回滚说明）
+
+**回归中发现的其他问题（已登记，本期不修）**：B-14（删除智能体残留运行配置/技能绑定/组授权孤儿行，实测 3 张表各残留 1 行，已手工清理）
+**环境修复（回归必需，已记录于 bugs.md §工作区遗留状态）**：数据源 id=11「本地测试」host 由不可达的 `192.168.66.19` 改为 `127.0.0.1`、`connection_url` 同步、密码由 `123456` 改为容器实际密码 `phoenix`
+**测试数据清理**：T-16 测试智能体 29 及其运行配置/技能绑定/组授权、T-10 上传的测试技能 `poem` 均已删除，库回到回归前状态（7 个智能体、技能池仅 `weather`）
+
 ## Implement 记录（2026-09-27 · T-08 / T-09）
 - **T-08**（取数工具，`queryDatabase`）：`DatabaseQueryTool` + Contributor（`dbQueryEnabled==1` 装配）+ 共享支撑 `DatabaseToolSupport`。
   - **实现细化（plan 决策4 语义不变）**：plan 设想「复用 SchemaService 向量召回 schema」，但实测其检索过滤器含 `agentId`，而文档写入用的是**做 schema 初始化的那个 agent**＋`query` 参数是死参数 → 对话智能体（尤其 sn=NULL 的新建智能体）召不回任何表。故 schema 改为**JDBC 实时内省**（`Accessor.showTables/showColumns` + `TableMetadataService.batchEnrichTableMetadata`，表 30/列 40 截断、表名排序保证可复现），SQL 生成与执行仍完全复用 data 域（`Nl2SqlService.generateSql` + `Accessor.executeSqlAndReturnObject` + `SqlSecurityValidator`），未自写 SQL 生成。

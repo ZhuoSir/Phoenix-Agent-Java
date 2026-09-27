@@ -79,6 +79,11 @@
 - **影响**：`initializeSchemaForAgentWithDatasource`（写 table/column 向量文档）失败 → 向量库为空 → NL2SQL 状态图的 SchemaRecall 无文档 → **T-09 深度分析工具在当前环境无法完成端到端**（工具已把该失败转成可读文案「深度分析暂不可用：…（可稍后重试）」，模型可降级改用取数工具）
 - **修复方向**：更换为可用的 embedding 配置（正确的模型名/网关或官方 DashScope key）后重跑；属环境配置，非代码缺陷
 
+### B-14 删除智能体残留孤儿数据（运行配置/技能绑定/组授权）
+- **现象**：`DELETE /api/agent/{id}` 只删 `tbl_data_agent` 行；实测删除智能体 29 后，`tbl_data_agent_runtime_config`（1 行）、`tbl_data_agent_skill_info`（1 行）、`tbl_platform_group_agent_info`（1 行）**全部残留**，成为孤儿数据
+- **影响**：运行配置残留会在日后新建同 id 智能体时误命中（id 自增不会复用，但孤儿行长期占用/污染统计）；组授权残留会随历史累计
+- **修复方向**：删除智能体时级联清理三张关联表（或在各表的查询侧统一加 `exists` 校验）；本期（dynamic-agent-types）不修，已登记；本次回归的孤儿行已手工清理
+
 ---
 
 ## 工作区遗留状态（非缺陷，处置需确认）
@@ -103,3 +108,4 @@
 | B-11 | P2 | 未修（前台 HITL 确认端点缺失，前端 404） |
 | B-12 | P2 | ✅ 已修（dynamic-agent-types T-08：整词匹配 + 剔除字面量，jshell 8 例验证） |
 | B-13 | P2 | 未修（环境：embedding 模型 404，深度分析链路受阻） |
+| B-14 | P2 | 未修（删除智能体残留运行配置/技能绑定/组授权孤儿行） |
