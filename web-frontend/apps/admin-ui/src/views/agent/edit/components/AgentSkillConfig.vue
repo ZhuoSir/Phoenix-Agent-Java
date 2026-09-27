@@ -10,14 +10,12 @@ import {
 } from '#/api/core/skill';
 import { ElAlert, ElButton, ElMessage, ElOption, ElSelect } from 'element-plus';
 
-const props = defineProps<{ agentId: number; agentType?: string }>();
+const props = defineProps<{ agentId: number }>();
 
 const options = ref<SkillOption[]>([]);
 const selected = ref<number[]>([]);
 const loading = ref(false);
 const saving = ref(false);
-
-const isHarness = computed(() => props.agentType === 'harness');
 
 async function load() {
   if (!props.agentId) {
@@ -68,11 +66,10 @@ onMounted(load);
     <h3 class="m-0 mb-4 text-base font-semibold">技能配置</h3>
 
     <ElAlert
-      v-if="!isHarness"
       :closable="false"
       class="mb-4"
       show-icon
-      title="当前智能体类型不是 Harness：技能绑定可保存，但运行时不会生效（仅 Harness 类智能体加载技能）"
+      title="技能仅对 Harness 类智能体在运行时生效；其他类型可保存绑定但不加载"
       type="info"
     />
 
