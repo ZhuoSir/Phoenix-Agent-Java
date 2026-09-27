@@ -26,31 +26,31 @@
   验证方式: T-09 完成后 curl 列表/详情断言（含搜索「poem」仅剩 1 条、未登录 401）
   验收标准: 查询显式列无 SELECT *；返回 VO 不含内部字段
 
-- [ ] T-04 实现 ZIP 上传解析入库：复用 agentscope-core SkillUtil.createFromZip，事务内写 skill+resources；校验 ≤10MB、文本白名单、SKILL.md 必备；同名按 overwrite 参数处理（覆盖后回 draft）
+- [x] T-04 实现 ZIP 上传解析入库：复用 agentscope-core SkillUtil.createFromZip，事务内写 skill+resources；校验 ≤10MB、文本白名单、SKILL.md 必备；同名按 overwrite 参数处理（覆盖后回 draft）
   关联: R-02
   依赖: T-02
   验证方式: curl 三分支实测：标准包成功入库（含 scripts/fib.py 资源行）；无 SKILL.md 包→指定错误码且 `select count(*)` 不变；同名未带 overwrite→冲突错误、带 overwrite→更新且 status=draft
   验收标准: 失败零残留（事务回滚），错误 msg 指明具体原因不带堆栈
 
-- [ ] T-05 实现发布/下线/组授权：publish(id, groupIds[])、offline(id)、putGroups(id, groupIds[])，授权记录覆盖式写 tbl_platform_group_skill_info
+- [x] T-05 实现发布/下线/组授权：publish(id, groupIds[])、offline(id)、putGroups(id, groupIds[])，授权记录覆盖式写 tbl_platform_group_skill_info
   关联: R-03, R-07
   依赖: T-02
   验证方式: curl：草稿→publish 带 2 组→查库两行授权；putGroups 改 1 组→即时生效行数变化；offline→status=draft；publish 空组→允许且无授权行
   验收标准: 全部路径带事务；非法状态流转（如重复 publish）返回明确错误码
 
-- [ ] T-06 实现智能体绑定端点逻辑：binding GET/PUT（覆盖式），可选池查询（published 池 + 已绑定回显标记）
+- [x] T-06 实现智能体绑定端点逻辑：binding GET/PUT（覆盖式），可选池查询（published 池 + 已绑定回显标记）
   关联: R-04
   依赖: T-02
   验证方式: curl PUT agent(RulesHarnessAgent id)=[skillA] 后 GET 回显一致；绑未发布技能→拒绝
   验收标准: 下线不级联删绑定（数据保留），池查询接口对已绑未发布技能返回但标记 offline
 
-- [ ] T-07 实现删除与引用计数：refs(id) 返回绑定数/授权组数；delete(id) 仅 draft，级联清理绑定与授权
+- [x] T-07 实现删除与引用计数：refs(id) 返回绑定数/授权组数；delete(id) 仅 draft，级联清理绑定与授权
   关联: R-08
   依赖: T-02, T-05, T-06
   验证方式: curl：published 删除→拒绝码；草稿 C（预置 1 绑定+1 授权）删除→三表相关行全清、资源行随删
   验收标准: 级联在单事务内
 
-- [ ] T-08 挂载 REST 控制器 `/api/skill/**`（对应 T-03~T-07 全部端点），确认 Sa-Token 拦截覆盖（登录态、无 token 401）
+- [x] T-08 挂载 REST 控制器 `/api/skill/**`（对应 T-03~T-07 全部端点），确认 Sa-Token 拦截覆盖（登录态、无 token 401）
   关联: R-01, R-02, R-03, R-04, R-07, R-08
   依赖: T-03, T-04, T-05, T-06, T-07
   验证方式: 重启后 curl 全端点矩阵（每端点 1 正 1 负），401/403/200 断言留档
