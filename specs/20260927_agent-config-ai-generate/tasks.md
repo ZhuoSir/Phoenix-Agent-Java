@@ -7,7 +7,7 @@
 
 ## 1. 库表与模型元数据（基础）
 
-- [ ] T-01 编写并本地执行 05 升级件（`is_default` 列 + 部分唯一索引 + 存量回填收敛）与回滚件
+- [x] T-01 编写并本地执行 05 升级件（`is_default` 列 + 部分唯一索引 + 存量回填收敛）与回滚件
   关联: R-19, R-20
   依赖: 无
   验证方式: ① 存量库执行升级件 → `\d tbl_data_model_config` 见列与索引、`select model_type,count(*) from tbl_data_model_config where is_default and is_deleted=0 group by 1` 每类型 ≤1；② 构造"同类型多条启用"（模拟 B-20 后果）再在临时库重放 → 收敛为最新一条且索引建成；③ 重复执行零报错；④ 执行回滚件 → 列与索引消失、`is_active` 值逐条不变；⑤ 回滚后再执行升级件成功
