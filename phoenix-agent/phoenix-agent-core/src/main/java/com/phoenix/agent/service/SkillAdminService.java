@@ -6,6 +6,7 @@ import com.phoenix.agent.dto.SkillPublishDTO;
 import com.phoenix.agent.vo.AgentSkillOptionVO;
 import com.phoenix.agent.vo.SkillDetailVO;
 import com.phoenix.agent.vo.SkillListVO;
+import com.phoenix.agent.vo.SkillRefVO;
 import com.phoenix.tools.vo.ReturnVo;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -63,4 +64,14 @@ public interface SkillAdminService {
      * 覆盖式保存智能体绑定；target 必须全部为已发布技能（R-04）。
      */
     ReturnVo<Boolean> bindAgent(Long agentId, SkillBindingDTO dto);
+
+    /**
+     * 删除前引用计数（绑定该技能的智能体数、授权组数）。
+     */
+    ReturnVo<SkillRefVO> refs(Long id);
+
+    /**
+     * 删除技能（仅草稿）：物理删技能+资源，并级联清理绑定与授权（R-08）。
+     */
+    ReturnVo<Boolean> delete(Long id);
 }

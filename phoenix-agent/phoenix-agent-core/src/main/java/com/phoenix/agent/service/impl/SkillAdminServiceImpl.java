@@ -20,6 +20,7 @@ import com.phoenix.agent.service.SkillAdminService;
 import com.phoenix.agent.vo.AgentSkillOptionVO;
 import com.phoenix.agent.vo.SkillDetailVO;
 import com.phoenix.agent.vo.SkillListVO;
+import com.phoenix.agent.vo.SkillRefVO;
 import com.phoenix.agent.vo.SkillResourceVO;
 import com.phoenix.tools.vo.ReturnVo;
 import io.agentscope.core.skill.AgentSkill;
@@ -371,6 +372,42 @@ public class SkillAdminServiceImpl implements SkillAdminService {
         vo.setStatus(s.getStatus());
         vo.setBound(bound);
         return vo;
+    }
+
+    @Override
+    public ReturnVo<SkillRefVO> refs(Long id) {
+        SkillRefVO vo = new SkillRefVO();
+        vo.setBoundAgentCount(countBy("select count(*) from tbl_data_agent_skill_info where skill_id = ? and del_flag = 0",
+            id));
+        vo.setAuthorizedGroupCount(countBy("select count(*) from tbl_platform_group_skill_info where skill_id = ? and del_flag = 0",
+            id));
+        return ReturnVo.ok(vo);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public ReturnVo<Boolean> delete(Long id) {
+        HarnessSkill skill = harnessSkillMapper.selectOneById(id);
+        if (skill == null) {
+            return ReturnVo.fail(SkillErrorCodeEnm.SKILL_NOT_FOUND.getMsg(),
+                SkillErrorCodeEnm.SKILL_NOT_FOUND.getCode());
+        }
+        if (SkillStatusEnm.PUBLISHED.getCode().equals(skill.getStatus())) {
+            return ReturnVo.fail(SkillErrorCodeEnm.SKILL_MUST_OFFLINE.getMsg(),
+                SkillErrorCodeEnm.SKILL_MUST_OFFLINE.getCode());
+        }
+        // 级联清理（同事务）：绑定、授权、资源，最后删技能本体
+        agentSkillInfoMapper.deleteByQuery(QueryWrapper.create().where("skill_id = ?", id));
+        groupSkillInfoMapper.deleteByQuery(QueryWrapper.create().where("skill_id = ?", id));
+        harnessSkillResourceMapper.deleteByQuery(QueryWrapper.create().where("id = ?", id));
+        harnessSkillMapper.deleteById(id);
+        log.info("技能删除完成, skillId={}, name={}", id, skill.getName());
+        return ReturnVo.ok(true);
+    }
+
+    private long countBy(String sql, Object... args) {
+        Object cnt = Db.selectObject(sql, args);
+        return cnt == null ? 0L : ((Number) cnt).longValue();
     }
 
     private SkillListVO toListVo(HarnessSkill s) {
