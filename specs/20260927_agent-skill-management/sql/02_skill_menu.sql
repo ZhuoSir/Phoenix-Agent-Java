@@ -5,17 +5,24 @@
 --       保证已能看智能体管理的角色同时获得技能管理。
 
 INSERT INTO tbl_privilege_module (id, pid, name, url, sn, component, type, order_no, is_show, status,
-                                  create_time, del_flag)
+                                  image, create_time, del_flag)
 SELECT md5('phoenix-skill-menu'),
        '741103abe63748749f82fbd2b420061c',
        '技能管理',
        '/agent/skill',
        'AgentSkillManagement',
        '#/views/agent/skill/index.vue',
-       1, 15, 1, 1, now(), 0
+       1, 15, 1, 1, 'lucide:sparkles', now(), 0
 WHERE NOT EXISTS (
     SELECT 1 FROM tbl_privilege_module WHERE url = '/agent/skill' AND del_flag = 0
 );
+
+-- 存量环境补图标（幂等）
+UPDATE tbl_privilege_module
+   SET image = 'lucide:sparkles'
+ WHERE url = '/agent/skill'
+   AND del_flag = 0
+   AND (image IS NULL OR image <> 'lucide:sparkles');
 
 INSERT INTO tbl_privilege_acl (id, release_id, release_sn, system_sn, module_id, module_sn, acl_state,
                               create_time, del_flag)
