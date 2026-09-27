@@ -6,9 +6,20 @@
 --   其 insert 均显式列名，新增带默认值的 status 列对其读写无破坏（先加后删原则）。
 
 -- 1) 技能表增发布状态列（R-03/R-06/R-07）
-ALTER TABLE tbl_harness_skills
-    ADD COLUMN IF NOT EXISTS status varchar(16) NOT NULL DEFAULT 'draft';
-COMMENT ON COLUMN tbl_harness_skills.status IS '发布状态 draft=草稿 published=已发布；覆盖上传后回 draft';
+--    注意：tbl_harness_skills 由应用启动时 AgentScope PostgresSkillRepository.createIfNotExist 创建，
+--    不在 sql/all_schema.sql 中。故此处做存在性判断：全新环境若尚未启动过应用，跳过列变更并提示，
+--    待应用首次启动后再重放本脚本即可（可重复执行）。
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables
+                WHERE table_schema = 'public' AND table_name = 'tbl_harness_skills') THEN
+        ALTER TABLE tbl_harness_skills
+            ADD COLUMN IF NOT EXISTS status varchar(16) NOT NULL DEFAULT 'draft';
+        COMMENT ON COLUMN tbl_harness_skills.status IS '发布状态 draft=草稿 published=已发布；覆盖上传后回 draft';
+    ELSE
+        RAISE NOTICE 'tbl_harness_skills 不存在（由应用首次启动创建），已跳过 status 列变更；请在应用启动后重放本脚本';
+    END IF;
+END $$;
 
 -- 2) 智能体↔技能绑定表（R-04）
 CREATE TABLE IF NOT EXISTS tbl_data_agent_skill_info (
