@@ -12,7 +12,7 @@
   验证方式: 在本地 phoenix-pg 执行升级脚本后 `\d tbl_harness_skills` 含 status 列、两张新表建成；用同名重复插入触发 uk 报错；执行回滚脚本后结构还原（psql 输出留档 specs/{dir}/artifacts.md 草案）
   验收标准: 升级+回滚两脚本齐备可重复执行（幂等：IF NOT EXISTS/DEFAULT），存量 2 条技能 status=draft
 
-- [ ] T-02 新增 SkillStatusEnm 枚举、SkillErrorCode 错误码与两张关联表实体+Mapper（MyBatis-Flex），AgentSkill 相关查询 VO
+- [x] T-02 新增 SkillStatusEnm 枚举、SkillErrorCode 错误码与两张关联表实体+Mapper（MyBatis-Flex），AgentSkill 相关查询 VO
   关联: R-01, R-03
   依赖: T-01
   验证方式: `mvn install -pl phoenix-agent/phoenix-agent-core -am` 编译通过 + 启动应用后 CommandLine 冒烟：任意 REST 端点前用 JShell 不可行 → 以 T-09 首个 GET 代替
