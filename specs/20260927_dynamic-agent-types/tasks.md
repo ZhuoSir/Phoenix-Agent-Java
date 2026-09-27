@@ -6,7 +6,7 @@
 
 ## 1. 基础（库表与配置模型）
 
-- [ ] T-01 编写并本地执行 03 升级件（新表 + type 默认值/NULL 回填）与回滚脚本
+- [x] T-01 编写并本地执行 03 升级件（新表 + type 默认值/NULL 回填）与回滚脚本
   关联: R-01, R-11
   依赖: 无
   验证方式: 在本地 phoenix-pg 执行升级→`\d tbl_data_agent_runtime_config` 结构齐备、`select count(*) from tbl_data_agent where type is null` 为 0、`type` 列默认值生效（插入不带 type 的行后取值 = harness）；执行回滚后对象消失；空库重放两顺序零报错（psql 输出留档）
