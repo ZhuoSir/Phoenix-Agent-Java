@@ -21,6 +21,17 @@ public class SqlSecurityValidator {
     );
 
     /**
+     * 关键字按「整词」匹配（B-12 修复）：原实现用 {@code String.contains} 子串匹配，
+     * 导致 {@code create_time}、{@code update_time}、{@code last_update} 等**普通列名/表名/别名**
+     * 被误判为危险语句，只读取数查询会被大面积误杀。整词匹配不放宽真实拦截（{@code drop table x} 仍命中）。
+     */
+    private static final Pattern DANGEROUS_KEYWORD_PATTERN = Pattern.compile(
+            "\\b(" + String.join("|", DANGEROUS_KEYWORDS) + ")\\b", Pattern.CASE_INSENSITIVE);
+
+    /** 字符串字面量与引用标识符：其中出现的词不具可执行语义，判关键字前先剔除 */
+    private static final Pattern LITERAL_OR_QUOTED = Pattern.compile("'(?:[^']|'')*'|\"[^\"]*\"|`[^`]*`");
+
+    /**
      * 校验 SQL 语句是否安全
      * @param sql 待校验的 SQL 语句
      * @return 校验结果
@@ -37,11 +48,12 @@ public class SqlSecurityValidator {
             return new ValidationResult(false, "安全拦截：仅允许执行 SELECT 查询");
         }
 
-        // 4. 关键字黑名单拦截
-        for (String keyword : DANGEROUS_KEYWORDS) {
-            if (upperSql.contains(keyword)) {
-                return new ValidationResult(false, "安全拦截：检测到危险关键字 [" + keyword + "]");
-            }
+        // 4. 关键字黑名单拦截（整词匹配、剔除字面量后判定；见 B-12）
+        String maskable = LITERAL_OR_QUOTED.matcher(sql).replaceAll(" ");
+        java.util.regex.Matcher keywordMatcher = DANGEROUS_KEYWORD_PATTERN.matcher(maskable);
+        if (keywordMatcher.find()) {
+            String keyword = keywordMatcher.group(1).toUpperCase();
+            return new ValidationResult(false, "安全拦截：检测到危险关键字 [" + keyword + "]");
         }
 
         // 5. 正则危险模式拦截
