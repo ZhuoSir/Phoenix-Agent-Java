@@ -9,6 +9,7 @@ import com.phoenix.data.service.graph.GraphService;
 import com.phoenix.data.service.schema.SchemaService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 /**
@@ -30,6 +31,18 @@ public class DeepAnalysisToolContributor implements AgentToolContributor {
 
     private final GraphService graphService;
 
+    /** 单次深度分析阻塞等待上限（秒）；默认取常量，可按环境调 */
+    @Value("${phoenix.agent.tool.deep-analysis-timeout-seconds:180}")
+    private int timeoutSeconds = 180;
+
+    /** 报告最终截断字符数 */
+    @Value("${phoenix.agent.tool.deep-analysis-max-chars:6000}")
+    private int maxChars = 6000;
+
+    /** 同一智能体的深度分析并发上限 */
+    @Value("${phoenix.agent.tool.deep-analysis-max-concurrent:2}")
+    private int maxConcurrent = 2;
+
     @Override
     public String toolName() {
         return "deep_analysis";
@@ -42,9 +55,10 @@ public class DeepAnalysisToolContributor implements AgentToolContributor {
 
     @Override
     public Object createTool(Agent agent, AgentRuntimeConfig config) {
-        log.info("装配数据库深度分析工具: agentId={}, datasourceId={}", agent.getId(), config.getDatasourceId());
+        log.info("装配数据库深度分析工具: agentId={}, datasourceId={}, timeout={}s, maxChars={}, maxConcurrent={}",
+            agent.getId(), config.getDatasourceId(), timeoutSeconds, maxChars, maxConcurrent);
         return new DeepAnalysisTool(agent.getId(), config.getDatasourceId(), datasourceService,
-            agentDatasourceService, schemaService, graphService);
+            agentDatasourceService, schemaService, graphService, timeoutSeconds, maxChars, maxConcurrent);
     }
 
 }

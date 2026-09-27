@@ -54,8 +54,8 @@ import java.util.concurrent.TimeoutException;
 @Slf4j
 public class DeepAnalysisTool {
 
-    /** 单次报告原始累积的硬上限（最终还会按 DEEP_ANALYSIS_MAX_CHARS 截断），防止流式文本撑爆内存 */
-    private static final int MAX_RAW_REPORT_CHARS = AgentRuntimeConstant.DEEP_ANALYSIS_MAX_CHARS * 4;
+    /** 单次报告原始累积的硬上限系数（最终还会按 maxChars 截断），防止流式文本撑爆内存 */
+    private static final int RAW_CHARS_FACTOR = 4;
 
     /** schema 就绪探测用的占位 query（该参数不参与检索，但不能为 null，见 ensureReady 注释） */
     private static final String SCHEMA_READINESS_QUERY = "schema-readiness-probe";
@@ -73,16 +73,41 @@ public class DeepAnalysisTool {
     private final GraphService graphService;
 
     /** 实例级信号量 = 该智能体的并发闸门（工具实例按智能体创建） */
-    private final Semaphore concurrency = new Semaphore(AgentRuntimeConstant.MAX_DEEP_ANALYSIS_CONCURRENT, true);
+    private final Semaphore concurrency;
+
+    /** 单次深度分析阻塞等待上限（秒） */
+    private final int timeoutSeconds;
+
+    /** 报告最终截断字符数 */
+    private final int maxChars;
+
+    /** 该智能体的并发上限（仅用于可读文案） */
+    private final int maxConcurrent;
 
     public DeepAnalysisTool(Long agentId, Long datasourceId, DatasourceService datasourceService,
             AgentDatasourceService agentDatasourceService, SchemaService schemaService, GraphService graphService) {
+        this(agentId, datasourceId, datasourceService, agentDatasourceService, schemaService, graphService,
+            AgentRuntimeConstant.DEEP_ANALYSIS_TIMEOUT_SECONDS, AgentRuntimeConstant.DEEP_ANALYSIS_MAX_CHARS,
+            AgentRuntimeConstant.MAX_DEEP_ANALYSIS_CONCURRENT);
+    }
+
+    /**
+     * 全参构造：阈值可由外部配置注入（默认值取自 {@link AgentRuntimeConstant}）。
+     * 这些阈值与运行环境强相关（LLM 延迟、库表规模），故做成可配置而不是编译期常量。
+     */
+    public DeepAnalysisTool(Long agentId, Long datasourceId, DatasourceService datasourceService,
+            AgentDatasourceService agentDatasourceService, SchemaService schemaService, GraphService graphService,
+            int timeoutSeconds, int maxChars, int maxConcurrent) {
         this.agentId = agentId;
         this.datasourceId = datasourceId;
         this.datasourceService = datasourceService;
         this.agentDatasourceService = agentDatasourceService;
         this.schemaService = schemaService;
         this.graphService = graphService;
+        this.timeoutSeconds = timeoutSeconds > 0 ? timeoutSeconds : AgentRuntimeConstant.DEEP_ANALYSIS_TIMEOUT_SECONDS;
+        this.maxChars = maxChars > 0 ? maxChars : AgentRuntimeConstant.DEEP_ANALYSIS_MAX_CHARS;
+        this.maxConcurrent = maxConcurrent > 0 ? maxConcurrent : AgentRuntimeConstant.MAX_DEEP_ANALYSIS_CONCURRENT;
+        this.concurrency = new Semaphore(this.maxConcurrent, true);
     }
 
     @Tool(name = "deepAnalyze",
@@ -102,7 +127,7 @@ public class DeepAnalysisTool {
         }
         Integer datasourceIdValue = DatabaseToolSupport.toDatasourceId(datasourceId);
         if (!concurrency.tryAcquire()) {
-            return "已有 " + AgentRuntimeConstant.MAX_DEEP_ANALYSIS_CONCURRENT + " 个深度分析在进行中，请稍后再试";
+            return "已有 " + maxConcurrent + " 个深度分析在进行中，请稍后再试";
         }
         long start = System.currentTimeMillis();
         try {
@@ -180,7 +205,7 @@ public class DeepAnalysisTool {
                         StringUtils.hasText(text) ? text : "状态图执行失败且未返回错误详情"));
             }
             else if (sse.data() != null && sse.data().getText() != null) {
-                if (report.length() < MAX_RAW_REPORT_CHARS) {
+                if (report.length() < maxChars * RAW_CHARS_FACTOR) {
                     report.append(sse.data().getText());
                 }
             }
@@ -200,17 +225,17 @@ public class DeepAnalysisTool {
             done.completeExceptionally(e);
         }
         try {
-            String text = done.get(AgentRuntimeConstant.DEEP_ANALYSIS_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            String text = done.get(timeoutSeconds, TimeUnit.SECONDS);
             if (!StringUtils.hasText(text)) {
                 return "深度分析已结束但未产出可读结论，请把问题描述得更具体一些后重试";
             }
-            return DatabaseToolSupport.truncate(text, AgentRuntimeConstant.DEEP_ANALYSIS_MAX_CHARS);
+            return DatabaseToolSupport.truncate(text, maxChars);
         }
         catch (TimeoutException e) {
             stopQuietly(threadId);
             log.warn("深度分析超时: agentId={}, threadId={}, timeoutSeconds={}", agentId, threadId,
-                AgentRuntimeConstant.DEEP_ANALYSIS_TIMEOUT_SECONDS);
-            return "深度分析超时（超过 " + AgentRuntimeConstant.DEEP_ANALYSIS_TIMEOUT_SECONDS
+                timeoutSeconds);
+            return "深度分析超时（超过 " + timeoutSeconds
                     + " 秒），请把问题拆解得更聚焦一些后重试";
         }
         catch (ExecutionException e) {

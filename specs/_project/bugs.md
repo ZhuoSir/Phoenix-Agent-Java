@@ -113,6 +113,12 @@
 - **修复**：`AgentMapper.searchByKeyword` 改为 `'%' || CAST(#{keyword} AS text) || '%'`
 - **验证**：keyword=制度/巡逻（存量）→ `[]`；智能体/销售 → 命中平台内创建的智能体，均 HTTP 200 正常返回
 
+### B-18 QA/FAQ 类型知识只向量化「问题」，答案不参与检索
+- **现象**：以 `type=QA` 创建知识（question+content）后，向量库只有 1 条文档且 `content` = **question**，metadata 仅有 `{agentId, vectorType:agentKnowledge, agentKnowledgeId, concreteAgentKnowledgeType:QA}`，**答案文本没进向量库**。知识库检索工具返回的就是这个问题，模型据此无法作答（实测：模型明确回报「疑似入库时内容为空或索引只存了标题」）
+- **影响**：凡是用 QA/FAQ 类型建的知识，走「向量检索 → 作答」链路都拿不到答案（只能用 DOCUMENT 类型）
+- **可能修复**：① 知识检索工具在 metadata 含 `agentKnowledgeId` 且类型为 QA/FAQ 时，回查 `tbl_data_agent_knowledge.content` 一并返回；② 或嵌入端把 answer 一起写入文档文本。需产品确认口径
+- **对照验证**：改用 `type=DOCUMENT`（上传 .md）后向量内容为文件正文，检索作答正常（见 dynamic-agent-types changelog 追加变更）
+
 ---
 
 ## 工作区遗留状态（非缺陷，处置需确认）
@@ -141,3 +147,4 @@
 | B-15 | P2 | ✅ 已修（列表关键字搜索 PG `CONCAT` 参数类型报错 → 改字符串拼接） |
 | B-16 | P2 | ✅ 已修（运行库三表补主键 + 基线 all_schema.sql 同步补齐，空库重放验证报错数不变） |
 | B-17 | P2 | ✅ 已修（非 HTTP 调用方无 Sa-Token 上下文时降级，不再打断图链路） |
+| B-18 | P2 | 未修（QA/FAQ 知识只向量化问题，答案检索不到；DOCUMENT 类型正常） |
