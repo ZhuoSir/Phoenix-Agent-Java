@@ -41,7 +41,7 @@
 
 ## 3. 运行时取模型改造
 
-- [ ] T-06 `AiModelRegistry` / `HarnessModelRegistry` 取模型改判默认；设默认后刷新缓存；换 EMBEDDING 默认留下向量重建提示与审计日志
+- [x] T-06 `AiModelRegistry` / `HarnessModelRegistry` 取模型改判默认；设默认后刷新缓存；换 EMBEDDING 默认留下向量重建提示与审计日志
   关联: R-15, R-17, R-18
   依赖: T-04
   验证方式: ① 设 CHAT 默认=A → 打开某智能体（运行配置不选模型）对话一轮，日志显示使用 A 的 modelName；② 把默认改为 B → **不重启**再对话一轮 → 日志显示 B（证明 refresh 生效）；③ 设 EMBEDDING 默认后做数据源 schema 初始化 → 日志含新默认配置ID 与"历史向量需重建方可与新模型一致"提示
