@@ -17,6 +17,7 @@ import com.phoenix.agent.model.GroupSkillInfo;
 import com.phoenix.agent.model.HarnessSkill;
 import com.phoenix.agent.model.HarnessSkillResource;
 import com.phoenix.agent.service.SkillAdminService;
+import com.phoenix.agent.util.SkillZipSanitizer;
 import com.phoenix.agent.vo.AgentSkillOptionVO;
 import com.phoenix.agent.vo.SkillDetailVO;
 import com.phoenix.agent.vo.SkillListVO;
@@ -120,8 +121,9 @@ public class SkillAdminServiceImpl implements SkillAdminService {
         }
         AgentSkill parsed;
         try {
-            // 复用上游解析：SKILL.md 定位/ frontmatter 必填校验为格式权威（plan 决策3）
-            parsed = SkillUtil.createFromZip(file.getBytes());
+            // 先清洗系统垃圾并锁定 SKILL.md 所在根，再交上游做格式权威校验（plan 决策3 + 兼容层）
+            byte[] sanitized = SkillZipSanitizer.sanitize(file.getBytes());
+            parsed = SkillUtil.createFromZip(sanitized);
         }
         catch (Exception e) {
             // 对外不泄漏内部信息（backend 规范15），细节进日志
