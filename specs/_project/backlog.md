@@ -30,10 +30,11 @@
 ## 三、流程与发版（spec 机制）
 | # | 待办 | 来源 | 状态 | 备注 |
 |---|---|---|---|---|
-| BL-16 | **里程碑挂接（M1）**：建 `releases/vX.Y.Z/`，把 `agent-skill-management`、`dynamic-agent-types`、`agent-config-ai-generate` 挂入，并回填 `bugs.md` 中「待定(未挂里程碑)」的 18 条已修复项版本号 | skill 里程碑流程；项目尚无 `releases/` | 待立项 | 口令：「新建里程碑 vX.Y.Z」→「把 <spec> 纳入 vX.Y.Z」 |
+| BL-16 | **里程碑挂接（M0+M1）**：建 `releases/vX.Y.Z/`、把三个 spec 与已修复缺陷挂入、回填版本号 | skill 里程碑流程；项目原先无 `releases/` | **已交付(v1.2.0)** | 2026-09-27 完成：`releases/v1.2.0/MILESTONE.md`（3 spec + 18 缺陷）；版本号取 MINOR=v1.2.0（历史分支线已到 1.1.x，用户确认）。**M2 冻结前置未满足**：① `agent-config-ai-generate` 未合并；② P1（BUG-01/20）未达「已验证」 |
 | BL-17 | **汇总升级件（M3）**：把 spec-1/2/3 的 `01~05` 升级件重排为 Flyway 风格 `V<版本>_<序号>__<描述>.sql` + rollback 配对，产出 `UPGRADE.md` / `RELEASE-NOTES.md` / `config/changes.md` | 同上 | 待立项 | 铁律：M3 未汇总完不得进 M4；升级件禁止在单需求完成时私自塞进 `releases/` |
 
 ## 四、在手未完成（指向 spec，不占 BL 编号）
 - `specs/20260927_agent-config-ai-generate`：**13 个任务已勾 8 个**，未勾 `T-05 / T-10 / T-11 / T-12 / T-13` —— 只差**界面人工走查**（浏览器扩展未连接，无法自动走查）；代码层证据已齐（`vue-tsc` 189、8 个改动文件 Vite 转译 200）。
   分支 `feature/agent-config-ai-generate`（未合并，合并条件是 tasks 全勾 + 证据齐）；走查清单见该 spec `changelog.md` 末尾「界面走查待办」。
 - `bugs.md` 中 11 条「新建」缺陷待处置（`BUG-02/03/04/05/08/11/14/18/21/24/25`）；其中 `BUG-04` 的「不修复」**需用户批准**、`BUG-18` 的修复口径**需产品决策**。
+- 里程碑 `v1.2.0` 已立项并挂接（M0+M1 完成，BL-16 已交付）；下一步触发词：「**冻结 v1.2.0**」（M2，会先列差距）或「**汇总 v1.2.0**」（M3，需先满足冻结前置）。

@@ -2,41 +2,42 @@
 > 编号永久不复用 | 状态必须带版本 | 修 bug 的 commit footer 必带 `Bug: BUG-xx`
 > 状态机: 新建 → 已规划(vX.Y.Z) → 已修复(vX.Y.Z) → 已验证(vX.Y.Z) → 已发布(vX.Y.Z)；旁路: 已延期(vA→vB) / 不修复(原因+批准人)
 > **编号迁移（2026-09-27）**：早期清单用 `B-01~B-20`，按细则一并迁为 `BUG-01~BUG-20`（一一对应，旧编号保留在各条「关联」列，历史 commit/changelog 里的 `B-xx` 仍可对照）。
-> **版本列说明**：项目尚无里程碑（`releases/` 未创建），已修复项只能记「待定(未挂里程碑)」；M1 挂接里程碑后回填 `vX.Y.Z`，届时状态才能进「已验证/已发布」。
+> **版本列说明**：里程碑 **v1.2.0** 已立项（2026-09-27，见 `releases/v1.2.0/MILESTONE.md`），本版本挂接的 18 条已修复项状态为「已修复(v1.2.0)」；
+> 「已验证(v1.2.0)」需重跑复现步骤且验证人=用户或其明确委托；M4 发版时批量转「已发布(v1.2.0)」+日期。
 > 本表是状态唯一权威；每条的现象/根因/证据/验证输出见文末 **明细留档**（历史条目只增不删）。
 > 勘误留存：早前两条口头推断经核实不成立，未登记——① buildLoginResult 对 NULL 密码 NPE（实际只走「用户名或密码错误」分支）② yml 有 `server.port=3333`（文件与日志均无此值）。
 
 | 编号 | 标题 | 严重度 | 发现于 | 状态 | 修复版本 | 关联 |
 |---|---|---|---|---|---|---|
-| BUG-01 | `all_schema.sql` 缺 5 个序列 → 全新环境导入必失败 | P1 | 本地部署(2026-09-27) | 已修复 待<版本> | 待定(未挂里程碑) | 原 B-01; commit 34877da |
+| BUG-01 | `all_schema.sql` 缺 5 个序列 → 全新环境导入必失败 | P1 | 本地部署(2026-09-27) | 已修复(v1.2.0) | v1.2.0 | 原 B-01; commit 34877da；分支 feature/agent-config-ai-generate 待合并 |
 | BUG-02 | HumanInTheLoop 未挂 skillRepository，技能静默加载不到 | P1 | 本地部署(2026-09-27) | 新建 | - | 原 B-02; 一行修复 |
 | BUG-03 | 前台账号创建时密码无必填校验 → 制造永久无法登录的死账号 | P2 | 本地部署排障(2026-09-27) | 新建 | - | 原 B-03 |
 | BUG-04 | 双账号体系：两张表、状态语义相反、密码互不相通 | P2 | 本地部署排障(2026-09-27) | 新建 | - | 原 B-04; 设计问题，建议立项/不修复**待用户批准** |
 | BUG-05 | 登录密码错误返回了「原密码错误」的错误码（23007） | P2 | 本地部署排障(2026-09-27) | 新建 | - | 原 B-05; 一行修复 |
-| BUG-06 | 技能无管理入口且技能池全局共享（缺失功能 + 死配置） | P3 | 本地部署(2026-09-27) | 已修复 待<版本> | 待定(未挂里程碑) | 原 B-06; Spec: 20260927_agent-skill-management（`phoenix.agent.skillPath` 仍是死配置） |
-| BUG-07 | harness 的 shell 能力与远程文件系统硬绑互斥、无配置开关 | P3 | 本地部署(2026-09-27) | 已修复 待<版本> | 待定(未挂里程碑) | 原 B-07; Spec: 20260927_dynamic-agent-types T-05（filesystem_policy 配置化，remote 自动关 shell） |
+| BUG-06 | 技能无管理入口且技能池全局共享（缺失功能 + 死配置） | P3 | 本地部署(2026-09-27) | 已修复(v1.2.0) | v1.2.0 | 原 B-06; Spec: 20260927_agent-skill-management（`phoenix.agent.skillPath` 仍是死配置） |
+| BUG-07 | harness 的 shell 能力与远程文件系统硬绑互斥、无配置开关 | P3 | 本地部署(2026-09-27) | 已修复(v1.2.0) | v1.2.0 | 原 B-07; Spec: 20260927_dynamic-agent-types T-05（filesystem_policy 配置化，remote 自动关 shell） |
 | BUG-08 | `application-test.yml` 与实际部署环境不一致（密码/他人机器路径/与 AGENTS.md 冲突） | P3 | init体检(2026-09-27) | 新建 | - | 原 B-08 |
-| BUG-09 | 前台与 harness 智能体无对话通道（前端指向不存在的端点） | P2 | spec Implement中(20260927_agent-skill-management) | 已修复 待<版本> | 待定(未挂里程碑) | 原 B-09; Spec: 20260927_agent-skill-management T-11/T-14 |
-| BUG-10 | 后台新建智能体 type 为空、且无类型选择入口（harness 无法后台创建） | P2 | 对话中(2026-09-27) | 已修复 待<版本> | 待定(未挂里程碑) | 原 B-10; Spec: 20260927_dynamic-agent-types T-04/T-14（存量自注册类保留属 BL-03，非缺陷） |
+| BUG-09 | 前台与 harness 智能体无对话通道（前端指向不存在的端点） | P2 | spec Implement中(20260927_agent-skill-management) | 已修复(v1.2.0) | v1.2.0 | 原 B-09; Spec: 20260927_agent-skill-management T-11/T-14 |
+| BUG-10 | 后台新建智能体 type 为空、且无类型选择入口（harness 无法后台创建） | P2 | 对话中(2026-09-27) | 已修复(v1.2.0) | v1.2.0 | 原 B-10; Spec: 20260927_dynamic-agent-types T-04/T-14（存量自注册类保留属 BL-03，非缺陷） |
 | BUG-11 | 前台 HITL 确认接口缺失，前端调用必然 404 | P2 | spec Implement中(20260927_dynamic-agent-types) | 新建 | - | 原 B-11 |
-| BUG-12 | SqlSecurityValidator 子串匹配误杀只读查询（`create_time` 等） | P2 | spec Implement中(20260927_dynamic-agent-types T-08) | 已修复 待<版本> | 待定(未挂里程碑) | 原 B-12; jshell 8 例验证 |
-| BUG-13 | EMBEDDING 模型测试恒 404（base_url 多带 `/v1` + 模型名不被兼容模式支持） | P2 | 对话中(2026-09-27) | 已修复 待<版本> | 待定(未挂里程碑) | 原 B-13; 配置修正 + 实测矩阵 |
+| BUG-12 | SqlSecurityValidator 子串匹配误杀只读查询（`create_time` 等） | P2 | spec Implement中(20260927_dynamic-agent-types T-08) | 已修复(v1.2.0) | v1.2.0 | 原 B-12; jshell 8 例验证 |
+| BUG-13 | EMBEDDING 模型测试恒 404（base_url 多带 `/v1` + 模型名不被兼容模式支持） | P2 | 对话中(2026-09-27) | 已修复(v1.2.0) | v1.2.0 | 原 B-13; 配置修正 + 实测矩阵 |
 | BUG-14 | 删除智能体残留孤儿数据（运行配置/技能绑定/组授权） | P2 | spec Implement中(20260927_dynamic-agent-types T-16) | 新建 | - | 原 B-14; 本次孤儿行已手工清理 |
-| BUG-15 | 智能体列表关键字搜索在 PG 下 500（`CONCAT` 参数类型不可推断） | P2 | spec Implement中(20260927_dynamic-agent-types T-16) | 已修复 待<版本> | 待定(未挂里程碑) | 原 B-15; commit 00eb0ff |
-| BUG-16 | 三张 Spring AI 向量表缺主键 → `ON CONFLICT` 插入必失败 | P2 | spec Implement中(20260927_dynamic-agent-types T-13) | 已修复 待<版本> | 待定(未挂里程碑) | 原 B-16; commit c0fe1b9（基线 + 运行库双修） |
-| BUG-17 | 图链路在非 HTTP 调用方取 Sa-Token 登录态直接抛异常 | P2 | spec Implement中(20260927_dynamic-agent-types T-09) | 已修复 待<版本> | 待定(未挂里程碑) | 原 B-17; commit e74e7ec |
+| BUG-15 | 智能体列表关键字搜索在 PG 下 500（`CONCAT` 参数类型不可推断） | P2 | spec Implement中(20260927_dynamic-agent-types T-16) | 已修复(v1.2.0) | v1.2.0 | 原 B-15; commit 00eb0ff |
+| BUG-16 | 三张 Spring AI 向量表缺主键 → `ON CONFLICT` 插入必失败 | P2 | spec Implement中(20260927_dynamic-agent-types T-13) | 已修复(v1.2.0) | v1.2.0 | 原 B-16; commit c0fe1b9（基线 + 运行库双修） |
+| BUG-17 | 图链路在非 HTTP 调用方取 Sa-Token 登录态直接抛异常 | P2 | spec Implement中(20260927_dynamic-agent-types T-09) | 已修复(v1.2.0) | v1.2.0 | 原 B-17; commit e74e7ec |
 | BUG-18 | QA/FAQ 类型知识只向量化「问题」，答案不参与检索 | P2 | spec Implement中(20260927_dynamic-agent-types T-16) | 新建 | - | 原 B-18; 需产品定口径 |
-| BUG-19 | harness 对话入参缺失时返回 500（应给明确错误码） | P3 | spec Implement中(20260927_dynamic-agent-types T-11) | 已修复 待<版本> | 待定(未挂里程碑) | 原 B-19; commit dc9b333 |
-| BUG-20 | 启用模型会把同类型其他模型一并置为启用（SQL 与注释相反） | P1 | spec Implement中(20260927_agent-config-ai-generate T-02) | 已修复 待<版本> | 待定(未挂里程碑) | 原 B-20; commit b8f728a（启用改多值集合，方法已删） |
+| BUG-19 | harness 对话入参缺失时返回 500（应给明确错误码） | P3 | spec Implement中(20260927_dynamic-agent-types T-11) | 已修复(v1.2.0) | v1.2.0 | 原 B-19; commit dc9b333 |
+| BUG-20 | 启用模型会把同类型其他模型一并置为启用（SQL 与注释相反） | P1 | spec Implement中(20260927_agent-config-ai-generate T-02) | 已修复(v1.2.0) | v1.2.0 | 原 B-20; commit b8f728a（启用改多值集合，方法已删）；分支 feature/agent-config-ai-generate 待合并 |
 | BUG-21 | 模型管理「模型类型」列把 AUDIO 显示成「嵌入模型」 | P3 | 对话中(2026-09-27) | 新建 | - | `views/modelconf/index.vue:458`（三类型都能设默认后才暴露） |
-| BUG-22 | AI 生成「描述」返回整段 JSON（用户实测） | P2 | 对话中(2026-09-27) | 已修复 待<版本> | 待定(未挂里程碑) | Spec: 20260927_agent-config-ai-generate; commit edd9ad9 |
-| BUG-23 | 生成超时 60s 切断**已成功**的调用（实测耗时 45~70s） | P2 | spec Implement中(20260927_agent-config-ai-generate T-09) | 已修复 待<版本> | 待定(未挂里程碑) | 同 commit edd9ad9（缓解：90s 且可配置） |
+| BUG-22 | AI 生成「描述」返回整段 JSON（用户实测） | P2 | 对话中(2026-09-27) | 已修复(v1.2.0) | v1.2.0 | Spec: 20260927_agent-config-ai-generate; commit edd9ad9；分支 feature/agent-config-ai-generate 待合并 |
+| BUG-23 | 生成超时 60s 切断**已成功**的调用（实测耗时 45~70s） | P2 | spec Implement中(20260927_agent-config-ai-generate T-09) | 已修复(v1.2.0) | v1.2.0 | 同 commit edd9ad9（缓解：90s 且可配置）；分支 feature/agent-config-ai-generate 待合并 |
 | BUG-24 | 响应式超时无法中断底层阻塞调用（超时后仍在消耗 token） | P3 | spec Implement中(20260927_agent-config-ai-generate T-09) | 新建 | - | plan 风险⑦已接受该限制，建议转技术债 |
 | BUG-25 | 前端 dev 命令未按 `.env.development` 的 `VITE_PORT` 起端口（5777 起成 5173） | P3 | 对话中(2026-09-27) | 新建 | - | 临时规避：启动加 `--port 5777` |
-| BUG-26 | 技能上传前端未带 multipart 头 → 上传 HTTP 415 | P3 | spec Implement中(20260927_agent-skill-management) | 已修复 待<版本> | 待定(未挂里程碑) | `api/core/skill.ts:80` 补 `Content-Type: multipart/form-data` |
-| BUG-27 | 技能 ZIP 校验报错信息误导（真实规则是「条目须有根目录」） | P3 | spec Implement中(20260927_agent-skill-management) | 已修复 待<版本> | 待定(未挂里程碑) | 新增 `SkillZipSanitizer`（剥 `__MACOSX/`、`.DS_Store`、`._*`，统一包一层合成根） |
-| BUG-28 | `ReturnVo.ok(String)` 命中 msg 重载 → 误把 data 当 msg 传出 | P3 | spec Implement中(20260927_agent-skill-management) | 已修复 待<版本> | 待定(未挂里程碑) | `phoenix-tool/.../ReturnVo.java:84`；改用两参 `ok(msg, data)` |
-| BUG-29 | `tbl_platform_group_agent_info.agent_id` 为 varchar，与 bigint 的 agentId 比较报错 | P3 | spec Implement中(20260927_agent-skill-management) | 已修复 待<版本> | 待定(未挂里程碑) | 代码侧改 `String.valueOf(agentId)`；**列类型不一致的根因仍在**，建议统一 |
+| BUG-26 | 技能上传前端未带 multipart 头 → 上传 HTTP 415 | P3 | spec Implement中(20260927_agent-skill-management) | 已修复(v1.2.0) | v1.2.0 | `api/core/skill.ts:80` 补 `Content-Type: multipart/form-data` |
+| BUG-27 | 技能 ZIP 校验报错信息误导（真实规则是「条目须有根目录」） | P3 | spec Implement中(20260927_agent-skill-management) | 已修复(v1.2.0) | v1.2.0 | 新增 `SkillZipSanitizer`（剥 `__MACOSX/`、`.DS_Store`、`._*`，统一包一层合成根） |
+| BUG-28 | `ReturnVo.ok(String)` 命中 msg 重载 → 误把 data 当 msg 传出 | P3 | spec Implement中(20260927_agent-skill-management) | 已修复(v1.2.0) | v1.2.0 | `phoenix-tool/.../ReturnVo.java:84`；改用两参 `ok(msg, data)` |
+| BUG-29 | `tbl_platform_group_agent_info.agent_id` 为 varchar，与 bigint 的 agentId 比较报错 | P3 | spec Implement中(20260927_agent-skill-management) | 已修复(v1.2.0) | v1.2.0 | 代码侧改 `String.valueOf(agentId)`；**列类型不一致的根因仍在**，建议统一 |
 
 ---
 

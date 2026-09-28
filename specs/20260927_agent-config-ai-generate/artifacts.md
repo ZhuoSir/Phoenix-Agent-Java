@@ -7,7 +7,8 @@
 | DML | 存量回填：为"尚无默认"的每个类型，按「启用优先 → updated/created/id 最新」置一条 `is_default=true`（幂等，重复执行 no-op；先收敛后建索引） | T-01 | `sql/05_model_default.sql` | - |
 | DDL(基线) | `sql/all_schema.sql` 补 5 个缺失的 `CREATE SEQUENCE`（categories/order_items/orders/products/users 的 id 序列）+ 5 条 `ALTER SEQUENCE ... OWNED BY` | T-13（修 B-01） | 基线文件内（已提交 `34877da`） | - |
 | 代码 | 启用互斥调用 `ModelConfigMapper.deactivateOthers` 删除（B-20 消解）；取模型由「该类型唯一启用」改判「该类型默认」（无默认回落启用+WARN） | T-02 / T-03 / T-06 | 无 DDL（行为变更） | - |
-| 配置 | 无新增外部配置项：生成超时 60s、名称≤64 字、描述≤120 字、提示词 300~600 字、骨架四段 均为代码常量（`AgentProfilePromptTemplates` / `AgentProfileController.GENERATE_TIMEOUT`） | T-07~T-09 | plan §接口设计 | - |
+| 配置 | `phoenix.agent.profile-generate-timeout-seconds`（生成调用超时，默认 **90**；实测两项一次出 45~70s，原 60s 会切断成功调用） | T-09 / T-11（BUG-23 修正） | `AgentProfileController` @Value 默认值 | - |
+| 常量 | 名称≤64 字、描述≤120 字、提示词 300~600 字、骨架四段（`AgentProfilePromptTemplates`，代码常量无外部配置源） | T-07~T-09 | plan §接口设计 | - |
 | 依赖 | **前端零新增依赖**：md 编辑器自研（复用已装 `markdown-it`）；补 `src/types/markdown-it.d.ts` 消除既有 TS7016 | T-10 | - | - |
 | 回滚 | `05_model_default_rollback.sql`：drop `uk_dmc_type_default` + drop `is_default` 列（不动 `is_active`/数据）；`all_schema.sql` 的序列补齐为纯增量，回滚=不再需要（旧库本就有这些序列） | T-01 | `sql/` | - |
 
