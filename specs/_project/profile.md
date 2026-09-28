@@ -60,7 +60,7 @@ hooks: 根与 web-frontend 的 `lefthook.yml` 均为全文件注释 = **未启�
 - 种子数据事实：tbl_privilege_user 密码=md5("phoenix"+明文)（LoginServiceImpl，注意失败分支误用 OLD_PASSWORD_ERROR=23007 码）；已本地重置全员为 12345678；tbl_data_model_config 内 API Key 为占位符（sk-xxxx），用前需在后台换真实 key
 
 ## 已知技术债（不得顺手改；改需另立 spec 并先考古原因）
-> 实测发现的缺陷明细与修复状态见同目录 **bugs.md**（B-01~B-08）
+> 实测发现的缺陷明细与修复状态见同目录 **bugs.md**（编号已按 spec 细则迁为 `BUG-01~BUG-29`；旧编号 `B-01~B-20` 见各条「关联」列）
 - **AGENTS.md 与代码现实大面积脱节**: 入口类、模块表（缺 rag/kg/data 三层/admin-manager）、「无测试」「无 Dockerfile」「无 pre-commit」部分失实、settings 路径指向他人机器（考古: 2026-09-27 init 实测）
 - **SQL 无版本管理**: 仅一份全量 `sql/all_schema.sql`，schema 增量无法追溯（改需另立 spec 引入 Flyway 风格）
 - **`${revision}` 版本号未解析**: flatten-maven-plugin 在父 POM 被注释，多模块版本占位符存在构建隐患
