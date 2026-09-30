@@ -29,7 +29,7 @@ code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 8 "http://127.0.0.1:${P
 
 step "[5] admin/123456 首登返回成功"
 body=$(curl -s --max-time 10 -X POST -H 'Content-Type: application/json' \
-  -d '{"username":"admin","password":"123456"}' "http://127.0.0.1:${PHOENIX_HTTP_PORT:-9080}/api/login" || true)
+  -d '{"username":"admin","password":"123456"}' "http://127.0.0.1:${PHOENIX_HTTP_PORT:-9080}/api/privilege/auth/login" || true)
 echo "$body" | grep -q '"success": *true' && ok || no "$body"
 
 step "[6] 迁移台账齐(baseline + V 件)"
