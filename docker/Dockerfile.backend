@@ -1,20 +1,16 @@
-# syntax=docker/dockerfile:1.6
-# Phoenix 后端镜像：多阶段（构建=工程现行 mvn 流程，零改码）
-# 构建机若需内网 maven 仓：--build-arg MAVEN_SETTINGS=docker/maven/settings.example.xml 并在构建前复制到上下文
-ARG MAVEN_IMAGE=maven:3.9-eclipse-temurin-23
-FROM ${MAVEN_IMAGE} AS build
-WORKDIR /src
-COPY . .
-RUN --mount=type=cache,target=/root/.m2 \
-    mvn -q package -DskipTests -Dspring-javaformat.skip=true -pl phoenix-admin/phoenix-admin-manager -am
-
-# 运行层：字节码实测 major=65(Java21, T-01③) → 21-jre 可用
-FROM eclipse-temurin:21-jre-jammy AS run
+# Phoenix 后端镜像（两种模式，plan D7 主案 + 应急通道）
+#
+# [multistage 主案] 构建机可达 maven central/Docker Hub 时：
+#   docker build -f Dockerfile.backend.multistage ..
+# [thin 应急通道·本机实测默认] host 先产出 jar（mvn package），镜像只做组装：
+#   sh scripts/build.sh          # 自动：构建/复用 ../phoenix-admin/.../target/*.jar → .stage/ → 本文件
+#
+FROM ${JRE_BASE_IMG:-eclipse-temurin:21-jre-jammy}
 RUN apt-get update && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/* \
     && useradd -r -u 10001 app
 WORKDIR /app
-COPY --from=build /src/phoenix-admin/phoenix-admin-manager/target/phoenix-admin.jar /app/phoenix-admin.jar
+COPY docker/.stage/phoenix-admin.jar /app/phoenix-admin.jar
 RUN mkdir -p /app/logs && chown -R app:app /app
 USER app
 ENV JAVA_OPTS="-XX:MaxRAMPercentage=70 -XX:+UseContainerSupport" \

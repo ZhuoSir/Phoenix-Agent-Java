@@ -1,7 +1,10 @@
 .git
 .mvn-home
 .pnpm-store
+!docker/.stage/**
 **/target
+!docker/.stage
+!docker/.stage/**
 **/node_modules
 diagrams
 logs

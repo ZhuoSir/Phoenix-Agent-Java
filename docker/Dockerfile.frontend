@@ -1,14 +1,7 @@
-# syntax=docker/dockerfile:1.6
-# admin-ui 前端镜像（vben monorepo；engines 要求 node ^22.18||^24）
-FROM node:24-alpine AS build
-RUN corepack enable
-WORKDIR /repo
-COPY web-frontend/ ./
-RUN --mount=type=cache,target=/root/.pnpm-store \
-    pnpm config set store-dir /root/.pnpm-store \
-    && pnpm install --frozen-lockfile \
-    && pnpm -F @vben/web-ele build --mode production
-FROM nginx:1.27-alpine AS run
-COPY --from=build /repo/apps/admin-ui/dist /usr/share/nginx/html
+# admin-ui 镜像（thin：host pnpm build → dist 进 .stage；nginx 组装）
+# 容器内多阶段版（需 npm 出网）：Dockerfile.frontend.multistage
+ARG NGINX_BASE_IMG=nginx:latest
+FROM ${NGINX_BASE_IMG}
+COPY docker/.stage/dist /usr/share/nginx/html
 COPY docker/nginx/phoenix.conf /etc/nginx/conf.d/default.conf
 EXPOSE 80
