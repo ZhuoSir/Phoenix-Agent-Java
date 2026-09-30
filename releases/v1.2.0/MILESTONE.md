@@ -26,14 +26,14 @@
 | BUG-16 | 三张向量表缺主键 → ON CONFLICT 必失败 | P2 | commit c0fe1b9（已在 main） | 已修复(v1.2.0) |
 | BUG-17 | 图链路在非 HTTP 调用方取登录态抛异常 | P2 | commit e74e7ec（已在 main） | 已修复(v1.2.0) |
 | BUG-19 | harness 对话入参缺失返回 500 | P3 | commit dc9b333（已在 main） | 已修复(v1.2.0) |
-| BUG-20 | 启用模型会把同类型其他模型一并启用 | P1 | Spec: agent-config-ai-generate T-02；commit b8f728a（分支待合并） | 已修复(v1.2.0) |
-| BUG-22 | AI 生成「描述」回吐整段 JSON | P2 | commit edd9ad9（分支待合并） | 已修复(v1.2.0) |
-| BUG-23 | 生成超时 60s 切断已成功的调用 | P2 | commit edd9ad9（分支待合并） | 已修复(v1.2.0) |
+| BUG-20 | 启用模型会把同类型其他模型一并启用 | P1 | Spec: agent-config-ai-generate T-02；commit b8f728a（分支待合并）；用户走查确认(09-30) | 已验证(v1.2.0) |
+| BUG-22 | AI 生成「描述」回吐整段 JSON | P2 | commit edd9ad9（分支待合并）；用户复测(09-30) | 已验证(v1.2.0) |
+| BUG-23 | 生成超时 60s 切断已成功的调用 | P2 | commit edd9ad9（分支待合并）；用户复测(09-30) | 已验证(v1.2.0) |
 | BUG-26 | 技能上传前端未带 multipart 头 → HTTP 415 | P3 | Spec: agent-skill-management（`api/core/skill.ts`） | 已修复(v1.2.0) |
 | BUG-27 | 技能 ZIP 校验报错信息误导（真实规则是「条目须有根目录」） | P3 | Spec: agent-skill-management（新增 `SkillZipSanitizer`） | 已修复(v1.2.0) |
 | BUG-28 | `ReturnVo.ok(String)` 命中 msg 重载 → data 丢失 | P3 | Spec: agent-skill-management（改两参调用） | 已修复(v1.2.0) |
 | BUG-29 | 关联表 `agent_id` varchar 与 bigint 比较报错（代码侧已绕过） | P3 | Spec: agent-skill-management（`String.valueOf`；列类型根因见 BL-07） | 已修复(v1.2.0) |
-| BUG-30 | AI 生成走全局 30s 超时（实测 45~90s）前端掐断 | P2 | `api/core/agentProfile.ts`（timeout 120s） | 已修复(v1.2.0) |
+| BUG-30 | AI 生成走全局 30s 超时（实测 45~90s）前端掐断 | P2 | `api/core/agentProfile.ts`（timeout 120s，commit c916cb4）；用户复测(09-30) | 已验证(v1.2.0) |
 
 未纳入本版本（保持 `新建`）：BUG-02/03/04/05/08/11/14/18/21/24/25 —— 其中 BUG-04 的「不修复」与 BUG-18 的修复口径需用户决策。
 
