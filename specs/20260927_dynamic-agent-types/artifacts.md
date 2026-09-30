@@ -2,14 +2,14 @@
 
 | 类型 | 内容摘要 | 来源任务 | 草案位置 | 已汇总至里程碑 |
 |---|---|---|---|---|
-| DDL | 新表 `tbl_data_agent_runtime_config`（对话智能体运行配置 1:1：模型/计划模式/记忆/三类工具开关/数据源/文件系统策略；含 `uk_arc_agent` 部分唯一索引） | T-01 / T-02 | `sql/03_agent_runtime_config.sql` | - |
-| DML | `tbl_data_agent.type` 存量 NULL/'' 回填为 `harness` + 列默认值改为 `harness`（幂等、含表存在性容错） | T-04 | `sql/03_agent_runtime_config.sql` | - |
-| DDL | `tbl_data_agent_runtime_config` 增 `knowledge_top_k`（int，默认 10）、`knowledge_similarity_threshold`（double precision，默认 0.65） | T-07 | `sql/04_knowledge_tool_params.sql` | - |
-| 配置 | `phoenix.agent.runtime.max-instances`（运行实例 LRU 上限，默认 200） | T-06 | plan §设计（代码默认值，无外部配置源） | - |
-| 配置 | 工具装配上限 `AgentRuntimeConstant.MAX_TOOL_COUNT=3`、schema 内省上限 `MAX_SCHEMA_TABLES=30`/`MAX_COLUMNS_PER_TABLE=40`、结果展示 `MAX_RESULT_ROWS_SHOWN=50`、SQL 生成超时 60s | T-08 | plan §风险（代码常量，无外部配置源） | - |
-| 配置 | `phoenix.agent.tool.deep-analysis-timeout-seconds`（默认 180）、`phoenix.agent.tool.deep-analysis-max-chars`（默认 6000）、`phoenix.agent.tool.deep-analysis-max-concurrent`（默认 2） | T-09（追加验证期改为可配置） | `DeepAnalysisToolContributor` @Value 默认值 | - |
-| 依赖 | 复用 `phoenix.agent.skill.max-explicit`（spec: agent-skill-management 登记，默认 3） | T-11 | 见 `specs/20260927_agent-skill-management/artifacts.md` | - |
-| 回滚 | `03_agent_runtime_config_rollback.sql`（drop 表 + 撤销 type 默认值；NULL 回填不可逆，脚本文末注明）；`04_knowledge_tool_params_rollback.sql`（drop 两列，丢失已配置参数） | T-01 / T-07 | `sql/` | - |
+| DDL | 新表 `tbl_data_agent_runtime_config`（对话智能体运行配置 1:1：模型/计划模式/记忆/三类工具开关/数据源/文件系统策略；含 `uk_arc_agent` 部分唯一索引） | T-01 / T-02 | `sql/03_agent_runtime_config.sql` | **v1.2.0** |
+| DML | `tbl_data_agent.type` 存量 NULL/'' 回填为 `harness` + 列默认值改为 `harness`（幂等、含表存在性容错） | T-04 | `sql/03_agent_runtime_config.sql` | **v1.2.0** |
+| DDL | `tbl_data_agent_runtime_config` 增 `knowledge_top_k`（int，默认 10）、`knowledge_similarity_threshold`（double precision，默认 0.65） | T-07 | `sql/04_knowledge_tool_params.sql` | **v1.2.0** |
+| 配置 | `phoenix.agent.runtime.max-instances`（运行实例 LRU 上限，默认 200） | T-06 | plan §设计（代码默认值，无外部配置源） | **v1.2.0** |
+| 配置 | 工具装配上限 `AgentRuntimeConstant.MAX_TOOL_COUNT=3`、schema 内省上限 `MAX_SCHEMA_TABLES=30`/`MAX_COLUMNS_PER_TABLE=40`、结果展示 `MAX_RESULT_ROWS_SHOWN=50`、SQL 生成超时 60s | T-08 | plan §风险（代码常量，无外部配置源） | **v1.2.0** |
+| 配置 | `phoenix.agent.tool.deep-analysis-timeout-seconds`（默认 180）、`phoenix.agent.tool.deep-analysis-max-chars`（默认 6000）、`phoenix.agent.tool.deep-analysis-max-concurrent`（默认 2） | T-09（追加验证期改为可配置） | `DeepAnalysisToolContributor` @Value 默认值 | **v1.2.0** |
+| 依赖 | 复用 `phoenix.agent.skill.max-explicit`（spec: agent-skill-management 登记，默认 3） | T-11 | 见 `specs/20260927_agent-skill-management/artifacts.md` | **v1.2.0** |
+| 回滚 | `03_agent_runtime_config_rollback.sql`（drop 表 + 撤销 type 默认值；NULL 回填不可逆，脚本文末注明）；`04_knowledge_tool_params_rollback.sql`（drop 两列，丢失已配置参数） | T-01 / T-07 | `sql/` | **v1.2.0** |
 
 ## 重放验证记录（T-16）
 
