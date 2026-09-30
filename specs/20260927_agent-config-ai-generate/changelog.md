@@ -1,6 +1,14 @@
 # Changelog: agent-config-ai-generate
 
 
+## Implement 走查记录（2026-09-30，用户界面走查第 1 轮）
+- ✅ T-05 模型管理页：用户确认无问题（含把默认切到 deepseek，「设为默认」真实生效）→ 勾选
+- ✅ T-10 md 编辑器：用户确认无问题 → 勾选
+- ❌ T-11 生成：用户实测「提示 30 秒超时」「loading 不更新」→ 根因=前端全局 30s 超时（**BUG-30**，此前我误判为旧包残留，向用户致歉口径以台账为准），修复 `generateProfileApi timeout 120s`；同日叠加 macOS 系统代理残留导致后端出站被拒，代理清干净后重启恢复。**待用户复测**
+- ❌ T-12：用户「没找到选择模型的地方」→ 入口为 编辑页 `/agent/:id` 底部卡片 或 抽屉左菜单「对话智能体配置」（新建未保存时只显示引导提示，属设计使然）。**待用户按指引复测**
+- 环境事实：pgjdbc 42.4.1 会读 JVM `socksProxyHost` 系统属性，macOS 开着系统代理时连本机 PG 会走 SOCKS；JDK 23 开机后首次启动 JVM 会注入该属性（Clash 场景）。规避：清系统代理或启动加 `-DsocksProxyHost=`
+
+
 ## Implement 修正（2026-09-27 · 用户实测反馈「生成描述返回 JSON」）
 **缺陷**：`targets=["DESCRIPTION"]` 时 meta-prompt 仍按"两项"要求模型输出 `{"description":...,"prompt":...}`，
 而服务把整段原样塞进描述字段 → 界面描述框里出现一段 JSON。
