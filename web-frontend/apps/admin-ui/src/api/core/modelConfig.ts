@@ -10,6 +10,8 @@ export interface ModelConfig {
   temperature?: number;
   maxTokens?: number;
   isActive?: boolean;
+  /** 该类型的默认模型（每类型至多一条）；智能体未显式选模型时加载它 */
+  isDefault?: boolean;
   completionsPath?: string;
   embeddingsPath?: string;
   proxyEnabled?: boolean;
@@ -26,6 +28,13 @@ export interface ModelCheckReady {
 }
 
 const API_BASE_URL = '/api/model-config';
+
+/** 数据域统一信封（ApiResponse：success/message/data，无 code 字段） */
+export interface ModelApiResult {
+  success: boolean;
+  message: string;
+  data?: null | string;
+}
 
 export async function getModelConfigListApi() {
   return requestClient.get<ModelConfig[]>(`${API_BASE_URL}/list`, {
@@ -51,8 +60,24 @@ export async function deleteModelConfigApi(id: number) {
   });
 }
 
+export async function deactivateModelConfigApi(id: number) {
+  return requestClient.post<ModelApiResult>(
+    `${API_BASE_URL}/deactivate/${id}`,
+    {},
+    { responseReturn: 'body' },
+  );
+}
+
+export async function setDefaultModelConfigApi(id: number) {
+  return requestClient.post<ModelApiResult>(
+    `${API_BASE_URL}/default/${id}`,
+    {},
+    { responseReturn: 'body' },
+  );
+}
+
 export async function activateModelConfigApi(id: number) {
-  return requestClient.post<string>(
+  return requestClient.post<ModelApiResult>(
     `${API_BASE_URL}/activate/${id}`,
     {},
     {
@@ -64,7 +89,7 @@ export async function activateModelConfigApi(id: number) {
 export async function testModelConfigConnectionApi(
   config: Omit<ModelConfig, 'id'>,
 ) {
-  return requestClient.post<string>(`${API_BASE_URL}/test`, config, {
+  return requestClient.post<ModelApiResult>(`${API_BASE_URL}/test`, config, {
     responseReturn: 'body',
   });
 }

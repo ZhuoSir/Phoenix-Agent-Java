@@ -3,6 +3,8 @@ package com.phoenix.data.service.aimodelconfig;
 import com.phoenix.data.dto.ModelConfigDTO;
 import com.phoenix.data.entity.ModelConfig;
 import com.phoenix.data.enums.ModelType;
+import com.phoenix.data.event.AiModelConfigChangedEvent;
+import com.phoenix.data.exception.InvalidInputException;
 import com.phoenix.data.util.JsonUtil;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,6 +25,8 @@ import tools.jackson.databind.ObjectMapper;
 @Transactional(rollbackFor = Exception.class)
 @AllArgsConstructor
 public class ModelConfigOpsService {
+
+	private final org.springframework.context.ApplicationEventPublisher eventPublisher;
 
 	private final ModelConfigDataService modelConfigDataService;
 
@@ -69,8 +73,59 @@ public class ModelConfigOpsService {
 
 		// 3. 更新数据库状态 (调用数据层)
 		modelConfigDataService.switchActiveStatus(id, entity.getModelType());
+		publishChanged(entity.getModelType(), id);
 
 		log.info("Config ID={} activated successfully.", id);
+	}
+
+	/**
+	 * 停用模型配置（R-13：默认项不允许直接停用，否则该类型会失去兜底模型）
+	 */
+	public void deactivateConfig(Integer id) {
+		ModelConfig entity = modelConfigDataService.findById(id);
+		if (entity == null) {
+			throw new InvalidInputException("配置不存在");
+		}
+		if (modelConfigDataService.isDefaultConfig(id)) {
+			throw new InvalidInputException("该模型是「" + entity.getModelType().getCode()
+					+ "」类型的默认模型，请先将其他模型设为默认后再停用");
+		}
+		modelConfigDataService.deactivateConfig(id);
+		// 先落库后刷新：否则重建时仍会读到旧状态
+		refreshMemoryModel(entity.getModelType());
+		publishChanged(entity.getModelType(), id);
+	}
+
+	/**
+	 * 设为该类型的默认模型（R-11/R-12：同类型唯一，且设默认即启用）
+	 */
+	public void setDefaultConfig(Integer id) {
+		ModelConfig entity = modelConfigDataService.findById(id);
+		if (entity == null) {
+			throw new InvalidInputException("配置不存在");
+		}
+		try {
+			modelConfigDataService.setDefaultConfig(id);
+		}
+		catch (org.springframework.dao.DuplicateKeyException e) {
+			// 并发设默认：部分唯一索引 uk_dmc_type_default 兜底，转成可展示提示而非 500
+			throw new InvalidInputException("已有其他请求正在设置该类型默认模型，请稍后重试");
+		}
+		// 先落库后刷新内存，保证换默认后新请求立刻使用新默认（无需重启）
+		refreshMemoryModel(entity.getModelType());
+		publishChanged(entity.getModelType(), id);
+		if (ModelType.EMBEDDING.equals(entity.getModelType())) {
+			// 换嵌入模型后，历史向量与新模型不可比；提示需重建，但不自动重算（plan 风险④）
+			log.warn("EMBEDDING 默认模型已切换为 configId={}, modelName={}；"
+					+ "历史向量数据由旧模型生成，需重新初始化数据源 schema 才与新模型一致（本期不自动重算）",
+					id, entity.getModelName());
+		}
+	}
+
+	/** 通知各运行时"模型配置已变"，让其清理自己的缓存（data → agent 用事件解耦） */
+	private void publishChanged(ModelType type, Integer id) {
+		eventPublisher.publishEvent(new AiModelConfigChangedEvent(this,
+				type == null ? null : type.getCode(), id));
 	}
 
 	/**
@@ -82,6 +137,9 @@ public class ModelConfigOpsService {
 		}
 		else if (ModelType.EMBEDDING.equals(type)) {
 			aiModelRegistry.refreshEmbedding();
+		}
+		else if (ModelType.AUDIO.equals(type)) {
+			aiModelRegistry.refreshTranscription();
 		}
 		else {
 			throw new RuntimeException("未知的模型类型: " + type);

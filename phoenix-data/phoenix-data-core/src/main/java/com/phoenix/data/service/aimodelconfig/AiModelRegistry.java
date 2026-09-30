@@ -42,7 +42,7 @@ public class AiModelRegistry {
                 if (currentChatClient == null) {
                     log.info("Initializing global ChatClient...");
                     try {
-                        ModelConfigDTO config = modelConfigDataService.getActiveConfigByType(ModelType.CHAT);
+                        ModelConfigDTO config = modelConfigDataService.getDefaultConfigByType(ModelType.CHAT);
                         if (config != null) {
                             ChatModel chatModel = modelFactory.createChatModel(config);
                             // 核心：基于新 Model 创建新 Client，彻底消除旧参数缓存
@@ -72,7 +72,7 @@ public class AiModelRegistry {
                 if (currentEmbeddingModel == null) {
                     log.info("Initializing global EmbeddingModel...");
                     try {
-                        ModelConfigDTO config = modelConfigDataService.getActiveConfigByType(ModelType.EMBEDDING);
+                        ModelConfigDTO config = modelConfigDataService.getDefaultConfigByType(ModelType.EMBEDDING);
                         if (config != null) {
                             currentEmbeddingModel = modelFactory.createEmbeddingModel(config);
                         }
@@ -100,7 +100,7 @@ public class AiModelRegistry {
                 if (currentTranscriptionModel == null) {
                     log.info("Initializing global TranscriptionModel...");
                     try {
-                        ModelConfigDTO config = modelConfigDataService.getActiveConfigByType(ModelType.AUDIO);
+                        ModelConfigDTO config = modelConfigDataService.getDefaultConfigByType(ModelType.AUDIO);
                         if (config != null) {
                             currentTranscriptionModel = modelFactory.createTranscriptionModel(config);
                         }
@@ -119,6 +119,14 @@ public class AiModelRegistry {
     public void refreshChat() {
         this.currentChatClient = null;
         log.info("Chat cache cleared.");
+    }
+
+    /**
+     * 刷新 Transcription（语音）缓存（用于热切换）
+     */
+    public void refreshTranscription() {
+        this.currentTranscriptionModel = null;
+        log.info("Transcription cache cleared.");
     }
 
     /**

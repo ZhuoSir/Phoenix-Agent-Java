@@ -38,8 +38,11 @@ public class HarnessModelRegistry {
                 if (currentChatModel == null) {
                     log.info("Initializing global ChatClient...");
                     try {
-                        ModelConfigDTO config = modelConfigDataService.getActiveConfigByType(ModelType.CHAT);
+                        ModelConfigDTO config = modelConfigDataService.getDefaultConfigByType(ModelType.CHAT);
                         if (config != null) {
+                            // 可诊断：换默认后新构建即用新模型，需能看出用的是哪一条
+                            log.info("默认对话模型: configId={}, provider={}, modelName={}", config.getId(),
+                                    config.getProvider(), config.getModelName());
                             currentChatModel = OpenAIChatModel.builder()
                                     .apiKey(config.getApiKey())
                                     .modelName(config.getModelName())
@@ -73,8 +76,10 @@ public class HarnessModelRegistry {
         }
         return configuredChatModels.computeIfAbsent(modelConfigId, id -> {
             ModelConfig config = modelConfigDataService.findById(id.intValue());
-            if (config == null || config.getModelType() != ModelType.CHAT) {
-                log.warn("模型配置不可用于对话，回退全局默认模型: modelConfigId={}", id);
+            // R-16：所选模型必须仍在启用集合内；被停用则回退默认模型并留下可诊断日志
+            if (config == null || config.getModelType() != ModelType.CHAT || !Boolean.TRUE.equals(config.getIsActive())) {
+                log.warn("所选对话模型不可用（不存在/非CHAT/已停用），回退默认模型: modelConfigId={}, 库中状态={}", id,
+                    config == null ? "无记录" : ("active=" + config.getIsActive() + ",type=" + config.getModelType()));
                 return getOpenAIChatModel();
             }
             log.info("初始化智能体指定对话模型: modelConfigId={}, modelName={}", id, config.getModelName());

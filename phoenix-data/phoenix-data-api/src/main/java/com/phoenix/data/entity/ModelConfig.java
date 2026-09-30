@@ -33,6 +33,11 @@ public class ModelConfig {
 
 	private Boolean isActive = false;
 
+	/**
+	 * 该类型的默认模型：智能体未显式选择模型时加载它（每类型至多一条，由部分唯一索引兜底）
+	 */
+	private Boolean isDefault = false;
+
 	private Integer maxTokens;
 
 	// 模型类型

@@ -31,8 +31,8 @@ public class ModelConfigDataServiceImpl extends ServiceImpl<ModelConfigMapper, M
 
 	@Override
 	public void switchActiveStatus(Integer id, ModelType type) {
-		getMapper().deactivateOthers(type.getCode(), id);
-
+		// 启用改为「可多选集合」，不再取消同类型其他配置的启用态
+		// （原 deactivateOthers 的 SQL 与注释相反、会把同类型其他条一并置为 true —— bugs.md B-20，随本改造删除）
 		ModelConfig entity = getById(id);
 		if (entity != null) {
 			entity.setIsActive(true);
@@ -127,6 +127,78 @@ public class ModelConfigDataServiceImpl extends ServiceImpl<ModelConfigMapper, M
 		if (updated == 0) {
 			throw new RuntimeException("删除失败");
 		}
+	}
+
+	@Override
+	@Transactional(rollbackFor = Exception.class)
+	public void setDefaultConfig(Integer id) {
+		ModelConfig entity = getById(id);
+		if (entity == null) {
+			throw new IllegalArgumentException("模型配置不存在: " + id);
+		}
+		// 同类型内先清后设（唯一索引兜底并发）；markDefaultById 同时置为启用（R-12：设默认即启用）
+		getMapper().clearDefaultByType(entity.getModelType().getCode());
+		int updated = getMapper().markDefaultById(id);
+		if (updated == 0) {
+			throw new IllegalArgumentException("模型配置不存在或已删除: " + id);
+		}
+		log.info("模型默认配置已切换: type={}, configId={}, modelName={}", entity.getModelType().getCode(), id,
+				entity.getModelName());
+	}
+
+	@Override
+	@Transactional(rollbackFor = Exception.class)
+	public void deactivateConfig(Integer id) {
+		ModelConfig entity = getById(id);
+		if (entity == null) {
+			throw new IllegalArgumentException("模型配置不存在: " + id);
+		}
+		entity.setIsActive(false);
+		entity.setUpdatedTime(LocalDateTime.now());
+		updateById(entity);
+		log.info("模型配置已停用: configId={}, type={}, modelName={}", id, entity.getModelType().getCode(),
+				entity.getModelName());
+	}
+
+	@Override
+	@Transactional(readOnly = true)
+	public boolean isDefaultConfig(Integer id) {
+		return getMapper().countDefaultById(id) > 0;
+	}
+
+	@Override
+	@Transactional(readOnly = true)
+	public ModelConfigDTO getDefaultConfigByType(ModelType modelType) {
+		ModelConfig entity = getMapper().selectDefaultByType(modelType.getCode());
+		if (entity != null) {
+			return toDTO(entity);
+		}
+		// 无默认：回落该类型启用集合的首条（selectEnabledByType 已按"默认优先→最新"排序）
+		List<ModelConfig> enabled = getMapper().selectEnabledByType(modelType.getCode());
+		if (enabled != null && !enabled.isEmpty()) {
+			ModelConfig fallback = enabled.get(0);
+			log.warn("类型 [{}] 未设置默认模型，回落启用项: configId={}, modelName={} —— 请到模型管理设置默认",
+				modelType.getCode(), fallback.getId(), fallback.getModelName());
+			return toDTO(fallback);
+		}
+		log.warn("类型 [{}] 既无默认模型也无启用配置", modelType.getCode());
+		return null;
+	}
+
+	@Override
+	@Transactional(readOnly = true)
+	public ModelConfigDTO findDefaultConfigByType(ModelType modelType) {
+		return toDTO(getMapper().selectDefaultByType(modelType.getCode()));
+	}
+
+	@Override
+	@Transactional(readOnly = true)
+	public List<ModelConfigDTO> listEnabledConfigsByType(ModelType modelType) {
+		List<ModelConfig> enabled = getMapper().selectEnabledByType(modelType.getCode());
+		if (enabled == null) {
+			return List.of();
+		}
+		return enabled.stream().map(ModelConfigConverter::toDTO).toList();
 	}
 
 	@Override

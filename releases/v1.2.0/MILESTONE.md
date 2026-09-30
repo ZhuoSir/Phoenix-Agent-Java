@@ -26,20 +26,21 @@
 | BUG-16 | 三张向量表缺主键 → ON CONFLICT 必失败 | P2 | commit c0fe1b9（已在 main） | 已修复(v1.2.0) |
 | BUG-17 | 图链路在非 HTTP 调用方取登录态抛异常 | P2 | commit e74e7ec（已在 main） | 已修复(v1.2.0) |
 | BUG-19 | harness 对话入参缺失返回 500 | P3 | commit dc9b333（已在 main） | 已修复(v1.2.0) |
-| BUG-20 | 启用模型会把同类型其他模型一并启用 | P1 | Spec: agent-config-ai-generate T-02；commit b8f728a（分支待合并） | 已修复(v1.2.0) |
-| BUG-22 | AI 生成「描述」回吐整段 JSON | P2 | commit edd9ad9（分支待合并） | 已修复(v1.2.0) |
-| BUG-23 | 生成超时 60s 切断已成功的调用 | P2 | commit edd9ad9（分支待合并） | 已修复(v1.2.0) |
+| BUG-20 | 启用模型会把同类型其他模型一并启用 | P1 | Spec: agent-config-ai-generate T-02；commit b8f728a（分支待合并）；用户走查确认(09-30) | 已验证(v1.2.0) |
+| BUG-22 | AI 生成「描述」回吐整段 JSON | P2 | commit edd9ad9（分支待合并）；用户复测(09-30) | 已验证(v1.2.0) |
+| BUG-23 | 生成超时 60s 切断已成功的调用 | P2 | commit edd9ad9（分支待合并）；用户复测(09-30) | 已验证(v1.2.0) |
 | BUG-26 | 技能上传前端未带 multipart 头 → HTTP 415 | P3 | Spec: agent-skill-management（`api/core/skill.ts`） | 已修复(v1.2.0) |
 | BUG-27 | 技能 ZIP 校验报错信息误导（真实规则是「条目须有根目录」） | P3 | Spec: agent-skill-management（新增 `SkillZipSanitizer`） | 已修复(v1.2.0) |
 | BUG-28 | `ReturnVo.ok(String)` 命中 msg 重载 → data 丢失 | P3 | Spec: agent-skill-management（改两参调用） | 已修复(v1.2.0) |
 | BUG-29 | 关联表 `agent_id` varchar 与 bigint 比较报错（代码侧已绕过） | P3 | Spec: agent-skill-management（`String.valueOf`；列类型根因见 BL-07） | 已修复(v1.2.0) |
+| BUG-30 | AI 生成走全局 30s 超时（实测 45~90s）前端掐断 | P2 | `api/core/agentProfile.ts`（timeout 120s，commit c916cb4）；用户复测(09-30) | 已验证(v1.2.0) |
 
 未纳入本版本（保持 `新建`）：BUG-02/03/04/05/08/11/14/18/21/24/25 —— 其中 BUG-04 的「不修复」与 BUG-18 的修复口径需用户决策。
 
 ## 升级项（对外口径，M3 时从各 spec 的 R 条款聚合）
 - **新增**：技能管理（ZIP 上传自动识别、发布/下线/删除、按组授权、智能体绑定、前台技能区与显式执行）；对话智能体运行配置（对话模型/知识库检索参数/数据库取数/数据库深度分析/计划模式/记忆/文件系统策略）；AI 生成智能体描述与 Markdown 提示词；模型管理「默认模型」与多启用集合
 - **变更**：智能体列表移除四个类型标签、且仅显示平台内创建的智能体（存量 5 个自注册智能体仍可运行，但不再出现在列表）；模型「启用」不再互斥、未显式选择模型时加载该类型**默认**模型；智能体提示词改为 Markdown 编辑（存储与下发仍为原文）；后台新建智能体固定为「对话智能体」
-- **修复**：见上表 18 条（技能管理 6 条 / 动态智能体 7 条 / 配置 1 条 / AI 生成与模型默认 4 条）
+- **修复**：见上表 19 条（技能管理 6 条 / 动态智能体 7 条 / 配置 1 条 / AI 生成与模型默认 5 条）
 
 ## 汇总进度（M3/M4 勾选）
 - [ ] 全部 spec 已合并（M2 冻结前置）—— 当前差 `agent-config-ai-generate`（8/13，仅剩界面人工走查）

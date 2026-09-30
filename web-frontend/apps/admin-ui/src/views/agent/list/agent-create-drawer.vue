@@ -51,6 +51,8 @@ import {
 
 import AccessApi from '#/components/agent/AccessApi.vue';
 import AgentDataSourceConfig from '../edit/components/AgentDataSourceConfig.vue';
+import AgentProfileAiFields from '#/components/agent-profile/AgentProfileAiFields.vue';
+
 import AgentRuntimeConfig from './components/AgentRuntimeConfig.vue';
 import AgentSkillConfig from '../edit/components/AgentSkillConfig.vue';
 import AgentKnowledgeConfig from './components/AgentKnowledgeConfig.vue';
@@ -800,33 +802,11 @@ const [Drawer, drawerApi] = useVbenDrawer({
 
             <ElRow :gutter="20">
               <ElCol :span="24">
-                <div class="mb-5">
-                  <label class="mb-2 block text-sm font-medium text-gray-700">
-                    描述
-                  </label>
-                  <ElInput
-                    v-model="form.description"
-                    :rows="3"
-                    type="textarea"
-                    placeholder="请输入智能体描述"
-                  />
-                </div>
-              </ElCol>
-            </ElRow>
-
-            <ElRow :gutter="20">
-              <ElCol :span="24">
-                <div class="mb-5">
-                  <label class="mb-2 block text-sm font-medium text-gray-700">
-                    智能体Prompt
-                  </label>
-                  <ElInput
-                    v-model="form.prompt"
-                    :rows="4"
-                    type="textarea"
-                    placeholder="请输入智能体Prompt"
-                  />
-                </div>
+                <AgentProfileAiFields
+                  v-model:description="form.description"
+                  v-model:prompt="form.prompt"
+                  :name="form.name"
+                />
               </ElCol>
             </ElRow>
 

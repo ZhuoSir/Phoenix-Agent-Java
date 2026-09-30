@@ -48,6 +48,8 @@ public class HarnessAgentRegistry {
 
     private final HarnessStaticLoader harnessStaticLoader;
 
+    private final com.phoenix.agent.service.harness.AiModelConfigEpoch aiModelConfigEpoch;
+
     @Value("${phoenix.agent.runtime.max-instances:200}")
     private int maxInstances = 200;
 
@@ -173,7 +175,7 @@ public class HarnessAgentRegistry {
             log.warn("技能绑定版本查询失败，指纹降级: agentId={}, err={}", agent.getId(), e.toString());
             bindingVersion = "unknown";
         }
-        return String.join("|", String.valueOf(agent.getUpdateTime()), String.valueOf(config.getUpdateTime()),
+        return String.join("|", String.valueOf(aiModelConfigEpoch.current()), String.valueOf(agent.getUpdateTime()), String.valueOf(config.getUpdateTime()),
             String.valueOf(config.getModelConfigId()), String.valueOf(config.getPlanMode()),
             String.valueOf(config.getMemoryEnabled()), String.valueOf(config.getKnowledgeEnabled()),
             String.valueOf(config.getDbQueryEnabled()), String.valueOf(config.getDbDeepAnalysisEnabled()),

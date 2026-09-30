@@ -56,8 +56,13 @@ const dbToolOn = computed(
   () => !!config.value.dbQueryEnabled || !!config.value.dbDeepAnalysisEnabled,
 );
 
+/** R-16：下拉只列「启用集合」；未选时运行按默认模型（占位符直接显示默认那条） */
 const chatModels = computed(() =>
-  models.value.filter((m) => (m.modelType || '').toUpperCase() === 'CHAT'),
+  models.value.filter((m) => (m.modelType || '').toUpperCase() === 'CHAT' && m.isActive),
+);
+
+const defaultChatModel = computed(
+  () => chatModels.value.find((m) => m.isDefault) ?? null,
 );
 
 /** 部分接口的泛型写的是载荷，运行时返回的是 ReturnVo 包装，这里统一拆包 */
@@ -158,17 +163,22 @@ onMounted(load);
               </label>
               <ElSelect
                 v-model="config.modelConfigId"
-                placeholder="默认模型（系统激活的对话模型）"
+                :placeholder="defaultChatModel
+                  ? `未选择（默认：${defaultChatModel.modelName}）`
+                  : '未选择（需在模型管理设置默认对话模型）'"
                 clearable
                 class="w-full"
               >
                 <ElOption
                   v-for="m in chatModels"
                   :key="m.id"
-                  :label="`${m.modelName}${m.isActive ? '（当前激活）' : ''}`"
+                  :label="`${m.modelName}${m.isDefault ? '（默认）' : ''}`"
                   :value="m.id!"
                 />
               </ElSelect>
+              <p class="m-0 mt-1 text-xs text-gray-400">
+                仅可选「已启用」的对话模型；不选则使用模型管理里的默认模型
+              </p>
             </div>
           </ElCol>
           <ElCol :span="12">
