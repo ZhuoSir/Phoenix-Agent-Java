@@ -1,0 +1,11 @@
+<!-- 内网 Maven 仓钩子：复制你的 settings.xml 覆盖本文件内容，构建时自动带上
+     用法：cp <你的settings.xml> docker/maven/settings.xml && docker/scripts/build.sh -->
+<settings>
+  <mirrors>
+    <mirror>
+      <id>internal</id>
+      <mirrorOf>central</mirrorOf>
+      <url>https://your-internal-registry/repository/maven-central/</url>
+    </mirror>
+  </mirrors>
+</settings>
