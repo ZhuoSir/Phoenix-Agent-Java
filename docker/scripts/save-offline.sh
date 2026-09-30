@@ -1,6 +1,12 @@
 #!/bin/sh
 # 离线交付：六镜像一 tar + sha256（R-03）。前提：已 build.sh --amd64 且 pull 齐基础镜像
 set -eu
+# docker CLI 自愈：非交互 shell 可能不含 Docker Desktop 路径
+if ! command -v docker >/dev/null 2>&1; then
+  for d in /usr/local/bin /Applications/Docker.app/Contents/Resources/bin /snap/bin; do
+    [ -x "$d/docker" ] && PATH="$d:$PATH" && break
+  done
+fi
 cd "$(dirname "$0")/.."
 TAG="${IMAGE_TAG:-v1.2.1}"; OUT="${1:-phoenix-${TAG}-images.tar.gz}"
 docker save pgvector/pgvector:pg16 redis:7-alpine postgres:16-alpine nginx:1.27-alpine \

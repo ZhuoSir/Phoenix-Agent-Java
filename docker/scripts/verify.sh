@@ -1,6 +1,12 @@
 #!/bin/sh
 # 交付验收断言（R-17/R-01/AC-07 的脚本化）：密钥红线、端口暴露、健康与首登
 set -u
+# docker CLI 自愈：非交互 shell 可能不含 Docker Desktop 路径
+if ! command -v docker >/dev/null 2>&1; then
+  for d in /usr/local/bin /Applications/Docker.app/Contents/Resources/bin /snap/bin; do
+    [ -x "$d/docker" ] && PATH="$d:$PATH" && break
+  done
+fi
 cd "$(dirname "$0")/.."
 fail=0; step(){ printf '%-46s' "$1"; }
 ok(){ echo "PASS"; }; no(){ echo "FAIL: $1"; fail=1; }

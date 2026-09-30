@@ -1,6 +1,12 @@
 #!/bin/sh
 # 构建两个自研镜像。默认本机架构（验证用）；交付构建：--amd64（buildx linux/amd64）
 set -eu
+# docker CLI 自愈：非交互 shell 可能不含 Docker Desktop 路径
+if ! command -v docker >/dev/null 2>&1; then
+  for d in /usr/local/bin /Applications/Docker.app/Contents/Resources/bin /snap/bin; do
+    [ -x "$d/docker" ] && PATH="$d:$PATH" && break
+  done
+fi
 cd "$(dirname "$0")/.."
 TAG="${IMAGE_TAG:-$(grep -m1 '^IMAGE_TAG' .env 2>/dev/null | cut -d= -f2 || echo v1.2.1)}"
 SETTINGS_ARG=""
