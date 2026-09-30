@@ -1,6 +1,6 @@
 # Changelog: allinone-docker-packaging
 
-## v1.2.0（2026-09-30）Implement 中发现需求缺陷，回改 R-05 待重确认
+## v1.2.0（2026-09-30）R-05 基线勘误 —— **已重确认（陈卓，2026-09-30）**；plan §3 同步同次确认口径
 - 事实：`all_data.sql` 是含结构+数据+序列的**完整基线**（新库空跑 0 报错，实测 phx_dataonly）；R-05 原「all_schema → all_data 顺序执行」组合在真实迁移中必炸（`tbl_data_categories_id_seq` 缺失，migrator exit 3 复现）——根因是草稿期未核实两文件关系
 - 修订：基线改 `all_data.sql` 单文件；`all_schema.sql` 定位纯结构手工场景；其余链路（admin 种子、V01~05、幂等）不变
 - 意图不变（一键完成全新初始化），属事实纠错；编码暂停，等本条重确认

@@ -47,7 +47,7 @@ SSE（`/api/stream/search`）与 90s 生成（R-01 实测 AC-03）依赖 `buffer
 - **镜像**：`postgres:16-alpine`（只当 psql 客户端用）
 - **挂载**：`sql/`（基线+种子）与 `releases/`（V/R 件）只读挂入，脚本引用**唯一权威路径**（R-02，不复制第二份）
 - **哨兵与台账**：`migrator` 先查 `tbl_phoenix_release`（本包自建的小表：`seq text PK, file text, applied_at timestamptz`）
-  - 表不存在 ⇒ 首启：`all_schema.sql → all_data.sql → 10_seed_admin.sql → 遍历 releases/v1.2.0/sql/V1.2.0_01..05`，每件一个事务，成功即 INSERT 台账；失败即退出非零（compose 可见）
+  - 表不存在 ⇒ 首启：**`all_data.sql`（完整基线：结构+数据+序列，实测空库 0 报错——R-05 v1.2.0 勘误，原 schema→data 叠加顺序必炸）→ `10_seed_admin.sql` → 遍历 releases/v1.2.0/sql/V1.2.0_01..05**，每件一个事务，成功即 INSERT 台账；失败即退出非零（compose 可见）
   - 表存在 ⇒ 非首启：跳过基线，只执行台账中缺失的 V 件（升级即"新版本 releases 目录挂入后重跑一次 up"，R-13）
 - **两拍顺序**（坑②）：`migrator-post`（同镜像）`depends_on: backend: condition: service_healthy`，重放 `V1.2.0_01`（脚本自带存在性容错，harness 表已被应用建出后补齐 status 列），不写台账（幂等件，重复执行 no-op）
 - **非首启+新库并存的裁决**：以哨兵表为唯一判据，不用"目录里有没有文件"之类启发式
