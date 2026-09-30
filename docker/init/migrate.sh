@@ -10,8 +10,9 @@ if [ -z "$FIRST" ]; then
   $PSQL -f /init/00_baseline_sequences.sql
   $PSQL -f /sql/all_data.sql
   $PSQL -f /init/10_seed_admin.sql
+  $PSQL -f /init/20_seed_runtime_agents.sql
   $PSQL -c "CREATE TABLE IF NOT EXISTS tbl_phoenix_release (seq text PRIMARY KEY, file text NOT NULL, applied_at timestamptz DEFAULT now())"
-  $PSQL -c "INSERT INTO tbl_phoenix_release(seq,file) VALUES('0000_baseline','schema+data+admin_seed') ON CONFLICT DO NOTHING"
+  $PSQL -c "INSERT INTO tbl_phoenix_release(seq,file) VALUES('0000_baseline','sequences+data+admin+runtime_agents') ON CONFLICT DO NOTHING"
 else
   echo "[migrator] 检测到哨兵表，非首次初始化，跳过基线（R-08）"
 fi
