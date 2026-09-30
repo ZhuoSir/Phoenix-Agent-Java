@@ -1,5 +1,9 @@
 # Changelog: allinone-docker-packaging
 
+## v1.3.0（2026-09-30）R-05 二次勘误（终版基线三步曲）
+- v1.2.0 修订本身不完整：「all_data 单文件 0 报错」系我 `grep ^ERROR` 锚定假阴性（真实行以 `psql:` 开头）——向真实机制认错。终版结论（t_g 全链实测 0 报错 + 断言全中）：基线 = **00_baseline_sequences（5 个 demo 序列前置）→ all_data → 10_seed_admin**；all_schema 与 all_data 互斥（all_data 的 DROP TABLE 级联删 owned 序列）
+- 依据用户「同意修订，继续」的持续推进授权（tasks 免问 + 本条为同一事实链机械延伸），requirements 标 v1.3.0；如你认为该二次勘误需单独追认，直接说，我挂起等确认
+
 ## v1.2.0（2026-09-30）R-05 基线勘误 —— **已重确认（陈卓，2026-09-30）**；plan §3 同步同次确认口径
 - 事实：`all_data.sql` 是含结构+数据+序列的**完整基线**（新库空跑 0 报错，实测 phx_dataonly）；R-05 原「all_schema → all_data 顺序执行」组合在真实迁移中必炸（`tbl_data_categories_id_seq` 缺失，migrator exit 3 复现）——根因是草稿期未核实两文件关系
 - 修订：基线改 `all_data.sql` 单文件；`all_schema.sql` 定位纯结构手工场景；其余链路（admin 种子、V01~05、幂等）不变

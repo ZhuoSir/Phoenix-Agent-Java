@@ -6,7 +6,8 @@ PSQL="psql -v ON_ERROR_STOP=1 -q"
 
 FIRST=$(psql -tAc "SELECT 1 FROM information_schema.tables WHERE table_name='tbl_phoenix_release'") || FIRST=""
 if [ -z "$FIRST" ]; then
-  echo "[migrator] 首次初始化：all_data(完整基线 R-05 v1.2.0) → 10_seed_admin"
+  echo "[migrator] 首次初始化(R-05 v1.3.0)：00 前置序列 → all_data 基线 → 10_seed_admin"
+  $PSQL -f /init/00_baseline_sequences.sql
   $PSQL -f /sql/all_data.sql
   $PSQL -f /init/10_seed_admin.sql
   $PSQL -c "CREATE TABLE IF NOT EXISTS tbl_phoenix_release (seq text PRIMARY KEY, file text NOT NULL, applied_at timestamptz DEFAULT now())"

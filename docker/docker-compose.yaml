@@ -51,6 +51,7 @@ services:
       dockerfile: docker/Dockerfile.backend
       args:
         JRE_BASE_IMG: ${JRE_BASE_IMG:-eclipse-temurin:21-jre-jammy}
+        JAVA_BIN: ${JAVA_BIN:-java}
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/phoenix?stringtype=unspecified&useGeneratedKeys=true
       SPRING_DATASOURCE_USERNAME: phoenix
@@ -69,7 +70,7 @@ services:
       migrator:
         condition: service_completed_successfully
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8066/echo/ok"]
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8066/echo/ok || wget -qO- http://localhost:8066/echo/ok"]
       interval: 10s
       timeout: 5s
       retries: 90
