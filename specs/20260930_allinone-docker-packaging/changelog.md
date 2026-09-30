@@ -1,5 +1,15 @@
 # Changelog: allinone-docker-packaging
 
+## tasks v1.0.0（2026-09-30）授权确认 + 三重门全通过
+- T-01~T-11（五要素齐备，21 条决策链：前置核实→种子→镜像×2→compose→migrator→断言→离线/运维脚本→README→端到端→收口）
+- 用户授权「task 直接执行不用问了，要在全新的分支实现」→ 生成即标已确认，开分支 feature/allinone-docker-packaging 进入 Implement
+
+## 二重确认通过（2026-09-30，确认人: 陈卓）
+- requirements v1.1.0 重确认通过（用户答「确认」，勘误口径接受）
+- plan v1.0.0 确认通过（含设计点：哨兵表 tbl_phoenix_release 为包私有机制，不进 releases 序号体系——用户未提异议，按方案默认）
+- **tasks 授权免单独确认**：用户明示「task 直接执行不用问了」→ tasks v1.0.0 生成即标已确认（确认依据=该明示指示），并进入 Implement；**要求在全新分支实现**
+- 三重确认门全通过 → 分支 feature/allinone-docker-packaging
+
 ## v0.1.0 plan（2026-09-30）草稿
 - Phase 2 产出 plan.md v0.1.0（待确认）：拓扑/两镜像多阶段/migrator 哨兵两拍/nginx 参数/离线脚本/7 决策/8 风险；实测锚点已写入（PASSWORD_SALT=phoenix、admin 哈希、密钥 git 全历史 0 命中）
 - requirements 状态：v1.1.0 待重确认（勘误随 plan 一并请用户确认）
