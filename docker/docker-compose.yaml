@@ -69,7 +69,7 @@ services:
       migrator:
         condition: service_completed_successfully
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:8066/echo/ok"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:8066/echo/ok"]
       interval: 10s
       timeout: 5s
       retries: 90

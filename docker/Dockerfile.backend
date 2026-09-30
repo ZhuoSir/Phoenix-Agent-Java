@@ -1,14 +1,8 @@
-# Phoenix 后端镜像（两种模式，plan D7 主案 + 应急通道）
-#
-# [multistage 主案] 构建机可达 maven central/Docker Hub 时：
-#   docker build -f Dockerfile.backend.multistage ..
-# [thin 应急通道·本机实测默认] host 先产出 jar（mvn package），镜像只做组装：
-#   sh scripts/build.sh          # 自动：构建/复用 ../phoenix-admin/.../target/*.jar → .stage/ → 本文件
-#
-FROM ${JRE_BASE_IMG:-eclipse-temurin:21-jre-jammy}
-RUN apt-get update && apt-get install -y --no-install-recommends curl \
-    && rm -rf /var/lib/apt/lists/* \
-    && useradd -r -u 10001 app
+# Phoenix 后端镜像（thin：host 预构建 jar → 薄镜像组装；构建零外网依赖）
+# 多阶段版（需出网）见 Dockerfile.backend.multistage
+ARG JRE_BASE_IMG=eclipse-temurin:21-jre-alpine
+FROM ${JRE_BASE_IMG}
+RUN adduser -S -u 10001 app
 WORKDIR /app
 COPY docker/.stage/phoenix-admin.jar /app/phoenix-admin.jar
 RUN mkdir -p /app/logs && chown -R app:app /app
