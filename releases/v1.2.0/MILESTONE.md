@@ -10,12 +10,12 @@
 |---|---|---|---|---|---|
 | specs/20260927_agent-skill-management | v1.0.0 | 已合并 | 2 | 1 | 技能管理（上传/发布/授权/绑定）+ 前台技能区与显式执行；已随 ed2e3f9 合入 main |
 | specs/20260927_dynamic-agent-types | v1.0.0 | 已合并 | 2 | 4 | 对话智能体运行配置 + 三工具（知识库/取数/深度分析）+ 类型去标签 + 列表隐藏存量；已随 f2e106a 合入 main |
-| specs/20260927_agent-config-ai-generate | v1.0.0 | Implement中（8/13，分支 `feature/agent-config-ai-generate`） | 1 | 1 | AI 生成描述/Prompt（Markdown）+ 模型「启用集合 / 默认模型」；未勾任务只差界面人工走查 |
+| specs/20260927_agent-config-ai-generate | v1.0.0 | 已合并(main, 09-30, c90071d) | 1 | 1 | AI 生成描述/Prompt（Markdown）+ 模型「启用集合 / 默认模型」；13/13 任务全勾（09-30 走查+回归完成） |
 
 ## 纳入缺陷（M1 挂接）
 | 编号 | 标题 | 严重度 | 修复落点 | 状态 |
 |---|---|---|---|---|
-| BUG-01 | 基线 `all_schema.sql` 缺 5 个序列 → 全新环境导入必失败 | P1 | `sql/all_schema.sql`；commit 34877da（分支待合并） | 已修复(v1.2.0) |
+| BUG-01 | 基线 `all_schema.sql` 缺 5 个序列 → 全新环境导入必失败 | P1 | `sql/all_schema.sql`；commit 34877da（已合并 main c90071d） | 已修复(v1.2.0) |
 | BUG-06 | 技能无管理入口且技能池全局共享 | P3 | Spec: agent-skill-management | 已修复(v1.2.0) |
 | BUG-07 | shell 与远程文件系统硬绑互斥、无开关 | P3 | Spec: dynamic-agent-types T-05 | 已修复(v1.2.0) |
 | BUG-09 | 前台与 harness 智能体无对话通道 | P2 | Spec: agent-skill-management T-11/T-14 | 已修复(v1.2.0) |
@@ -26,9 +26,9 @@
 | BUG-16 | 三张向量表缺主键 → ON CONFLICT 必失败 | P2 | commit c0fe1b9（已在 main） | 已修复(v1.2.0) |
 | BUG-17 | 图链路在非 HTTP 调用方取登录态抛异常 | P2 | commit e74e7ec（已在 main） | 已修复(v1.2.0) |
 | BUG-19 | harness 对话入参缺失返回 500 | P3 | commit dc9b333（已在 main） | 已修复(v1.2.0) |
-| BUG-20 | 启用模型会把同类型其他模型一并启用 | P1 | Spec: agent-config-ai-generate T-02；commit b8f728a（分支待合并）；用户走查确认(09-30) | 已验证(v1.2.0) |
-| BUG-22 | AI 生成「描述」回吐整段 JSON | P2 | commit edd9ad9（分支待合并）；用户复测(09-30) | 已验证(v1.2.0) |
-| BUG-23 | 生成超时 60s 切断已成功的调用 | P2 | commit edd9ad9（分支待合并）；用户复测(09-30) | 已验证(v1.2.0) |
+| BUG-20 | 启用模型会把同类型其他模型一并启用 | P1 | Spec: agent-config-ai-generate T-02；commit b8f728a（已合并 main c90071d）；用户走查确认(09-30) | 已验证(v1.2.0) |
+| BUG-22 | AI 生成「描述」回吐整段 JSON | P2 | commit edd9ad9（已合并 main c90071d）；用户复测(09-30) | 已验证(v1.2.0) |
+| BUG-23 | 生成超时 60s 切断已成功的调用 | P2 | commit edd9ad9（已合并 main c90071d）；用户复测(09-30) | 已验证(v1.2.0) |
 | BUG-26 | 技能上传前端未带 multipart 头 → HTTP 415 | P3 | Spec: agent-skill-management（`api/core/skill.ts`） | 已修复(v1.2.0) |
 | BUG-27 | 技能 ZIP 校验报错信息误导（真实规则是「条目须有根目录」） | P3 | Spec: agent-skill-management（新增 `SkillZipSanitizer`） | 已修复(v1.2.0) |
 | BUG-28 | `ReturnVo.ok(String)` 命中 msg 重载 → data 丢失 | P3 | Spec: agent-skill-management（改两参调用） | 已修复(v1.2.0) |

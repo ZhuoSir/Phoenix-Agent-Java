@@ -9,7 +9,7 @@
 
 | 编号 | 标题 | 严重度 | 发现于 | 状态 | 修复版本 | 关联 |
 |---|---|---|---|---|---|---|
-| BUG-01 | `all_schema.sql` 缺 5 个序列 → 全新环境导入必失败 | P1 | 本地部署(2026-09-27) | 已修复(v1.2.0) | v1.2.0 | 原 B-01; commit 34877da；分支 feature/agent-config-ai-generate 待合并 |
+| BUG-01 | `all_schema.sql` 缺 5 个序列 → 全新环境导入必失败 | P1 | 本地部署(2026-09-27) | 已修复(v1.2.0) | v1.2.0 | 原 B-01; commit 34877da；已随 merge c90071d 合并 main |
 | BUG-02 | HumanInTheLoop 未挂 skillRepository，技能静默加载不到 | P1 | 本地部署(2026-09-27) | 新建 | - | 原 B-02; 一行修复 |
 | BUG-03 | 前台账号创建时密码无必填校验 → 制造永久无法登录的死账号 | P2 | 本地部署排障(2026-09-27) | 新建 | - | 原 B-03 |
 | BUG-04 | 双账号体系：两张表、状态语义相反、密码互不相通 | P2 | 本地部署排障(2026-09-27) | 新建 | - | 原 B-04; 设计问题，建议立项/不修复**待用户批准** |
@@ -28,10 +28,10 @@
 | BUG-17 | 图链路在非 HTTP 调用方取 Sa-Token 登录态直接抛异常 | P2 | spec Implement中(20260927_dynamic-agent-types T-09) | 已修复(v1.2.0) | v1.2.0 | 原 B-17; commit e74e7ec |
 | BUG-18 | QA/FAQ 类型知识只向量化「问题」，答案不参与检索 | P2 | spec Implement中(20260927_dynamic-agent-types T-16) | 新建 | - | 原 B-18; 需产品定口径 |
 | BUG-19 | harness 对话入参缺失时返回 500（应给明确错误码） | P3 | spec Implement中(20260927_dynamic-agent-types T-11) | 已修复(v1.2.0) | v1.2.0 | 原 B-19; commit dc9b333 |
-| BUG-20 | 启用模型会把同类型其他模型一并置为启用（SQL 与注释相反） | P1 | spec Implement中(20260927_agent-config-ai-generate T-02) | 已修复(v1.2.0) | v1.2.0 | 原 B-20; commit b8f728a（启用改多值集合，方法已删）；分支 feature/agent-config-ai-generate 待合并 |
+| BUG-20 | 启用模型会把同类型其他模型一并置为启用（SQL 与注释相反） | P1 | spec Implement中(20260927_agent-config-ai-generate T-02) | 已修复(v1.2.0) | v1.2.0 | 原 B-20; commit b8f728a（启用改多值集合，方法已删）；已随 merge c90071d 合并 main |
 | BUG-21 | 模型管理「模型类型」列把 AUDIO 显示成「嵌入模型」 | P3 | 对话中(2026-09-27) | 新建 | - | `views/modelconf/index.vue:458`（三类型都能设默认后才暴露） |
-| BUG-22 | AI 生成「描述」返回整段 JSON（用户实测） | P2 | 对话中(2026-09-27) | 已验证(v1.2.0) | v1.2.0 | Spec: 20260927_agent-config-ai-generate; commit edd9ad9；分支待合并；用户复测确认(09-30) |
-| BUG-23 | 生成超时 60s 切断**已成功**的调用（实测耗时 45~70s） | P2 | spec Implement中(20260927_agent-config-ai-generate T-09) | 已验证(v1.2.0) | v1.2.0 | 同 commit edd9ad9（缓解：90s 且可配置）；分支 feature/agent-config-ai-generate 待合并 |
+| BUG-22 | AI 生成「描述」返回整段 JSON（用户实测） | P2 | 对话中(2026-09-27) | 已验证(v1.2.0) | v1.2.0 | Spec: 20260927_agent-config-ai-generate; commit edd9ad9；已合并 main(c90071d)；用户复测确认(09-30) |
+| BUG-23 | 生成超时 60s 切断**已成功**的调用（实测耗时 45~70s） | P2 | spec Implement中(20260927_agent-config-ai-generate T-09) | 已验证(v1.2.0) | v1.2.0 | 同 commit edd9ad9（缓解：90s 且可配置）；已随 merge c90071d 合并 main |
 | BUG-24 | 响应式超时无法中断底层阻塞调用（超时后仍在消耗 token） | P3 | spec Implement中(20260927_agent-config-ai-generate T-09) | 新建 | - | plan 风险⑦已接受该限制，建议转技术债 |
 | BUG-25 | 前端 dev 命令未按 `.env.development` 的 `VITE_PORT` 起端口（5777 起成 5173） | P3 | 对话中(2026-09-27) | 新建 | - | 临时规避：启动加 `--port 5777` |
 | BUG-26 | 技能上传前端未带 multipart 头 → 上传 HTTP 415 | P3 | spec Implement中(20260927_agent-skill-management) | 已修复(v1.2.0) | v1.2.0 | `api/core/skill.ts:80` 补 `Content-Type: multipart/form-data` |
