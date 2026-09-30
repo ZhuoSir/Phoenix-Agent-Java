@@ -1,5 +1,11 @@
 # Changelog: allinone-docker-packaging
 
+## v1.2.0（2026-09-30）Implement 中发现需求缺陷，回改 R-05 待重确认
+- 事实：`all_data.sql` 是含结构+数据+序列的**完整基线**（新库空跑 0 报错，实测 phx_dataonly）；R-05 原「all_schema → all_data 顺序执行」组合在真实迁移中必炸（`tbl_data_categories_id_seq` 缺失，migrator exit 3 复现）——根因是草稿期未核实两文件关系
+- 修订：基线改 `all_data.sql` 单文件；`all_schema.sql` 定位纯结构手工场景；其余链路（admin 种子、V01~05、幂等）不变
+- 意图不变（一键完成全新初始化），属事实纠错；编码暂停，等本条重确认
+
+
 ## tasks v1.0.0（2026-09-30）授权确认 + 三重门全通过
 - T-01~T-11（五要素齐备，21 条决策链：前置核实→种子→镜像×2→compose→migrator→断言→离线/运维脚本→README→端到端→收口）
 - 用户授权「task 直接执行不用问了，要在全新的分支实现」→ 生成即标已确认，开分支 feature/allinone-docker-packaging 进入 Implement

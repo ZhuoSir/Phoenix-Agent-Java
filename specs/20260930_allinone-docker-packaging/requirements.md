@@ -1,4 +1,4 @@
-> 版本: v1.1.0 | 状态: 已确认 | 更新: 2026-09-30 | 确认人: 陈卓 | 确认日期: 2026-09-30
+> 版本: v1.2.0 | 状态: 待重确认 | 更新: 2026-09-30 | 确认人: 陈卓 | 确认日期: 2026-09-30
 
 # 需求：一键部署 Docker 交付包（allinone-docker-packaging）
 
@@ -29,7 +29,7 @@
 ### 二、配置与初始化
 
 - **R-04** THE 部署包 SHALL 将所有环境相关配置（DB/Redis 主机与口令、JVM 堆、暴露端口、TZ/locale）经 `.env`/环境变量注入；镜像内不含任何明文口令与模型密钥
-- **R-05** WHEN 全新空数据卷首次启动 THE migrator SHALL 依次执行 `all_schema.sql → V1.2.0_01~05`（序号权威=releases 目录，执行序写入代码常量清单文件），并保证重复执行幂等（脚本本身已幂等，重跑 no-op 属预期）
+- **R-05** WHEN 全新空数据卷首次启动 THE migrator SHALL 以 **`all_data.sql` 单文件为完整基线**（实测：其为含结构+数据+序列的完整 pg_dump，空库全量执行 0 报错；`all_schema.sql` 仅用于"纯结构"手工场景，**不得与 all_data 叠加执行**——两者表定义重叠且 all_schema 缺 all_data 自带对象的依赖），随后执行 `10_seed_admin.sql → releases/v1.2.0/sql/V1.2.0_01~05`，并保证重复执行幂等
 - **R-06** WHEN backend 首次健康检查通过 THE 部署包 SHALL 自动重跑 `V1.2.0_01`（补 `tbl_harness_skills.status` 列，解决首启自建表顺序坑），失败则明确报错退出而非静默
 - **R-07** THE 首次初始化种子 SHALL 内置初始账号 **admin / 123456**（实测：口令哈希=`md5("phoenix"+密码)`，落点为包内 `docker/init/10_seed_admin.sql` 幂等 INSERT，不改仓库种子文件；哈希值 `f1c457c84af9bc85acaeb64bee218755`，AC-02 实登必验）；README 显著标注「装后首次登录立即改密」
 - **R-08** IF 检测到数据卷已有数据（非首次启动）THEN THE 部署包 SHALL 跳过 `all_schema/all_data` 基线初始化，仅按需执行尚未跑过的 releases 增量件（版本号记录表或哨兵对象判断，机制见 plan），不覆盖既有数据
