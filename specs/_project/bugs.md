@@ -9,7 +9,7 @@
 
 | 编号 | 标题 | 严重度 | 发现于 | 状态 | 修复版本 | 关联 |
 |---|---|---|---|---|---|---|
-| BUG-01 | `all_schema.sql` 缺 5 个序列 → 全新环境导入必失败 | P1 | 本地部署(2026-09-27) | 已修复(v1.2.0) | v1.2.0 | 原 B-01; commit 34877da；已随 merge c90071d 合并 main |
+| BUG-01 | `all_schema.sql` 缺 5 个序列 → 全新环境导入必失败 | P1 | 本地部署(2026-09-27) | 已验证(v1.2.0) | v1.2.0 | 原 B-01; commit 34877da；已合并 main(c90071d)；09-30 用户委托 agent 复验（复现步骤全过，明细见文末） |
 | BUG-02 | HumanInTheLoop 未挂 skillRepository，技能静默加载不到 | P1 | 本地部署(2026-09-27) | 新建 | - | 原 B-02; 一行修复 |
 | BUG-03 | 前台账号创建时密码无必填校验 → 制造永久无法登录的死账号 | P2 | 本地部署排障(2026-09-27) | 新建 | - | 原 B-03 |
 | BUG-04 | 双账号体系：两张表、状态语义相反、密码互不相通 | P2 | 本地部署排障(2026-09-27) | 新建 | - | 原 B-04; 设计问题，建议立项/不修复**待用户批准** |
@@ -50,6 +50,7 @@
 - **修复（已完成）**：`sql/all_schema.sql` 扩展/角色段后补 5 条 `CREATE SEQUENCE IF NOT EXISTS`（tbl_data_categories/order_items/orders/products/users 的 id 序列），文件末尾按既有风格补 5 条 `ALTER SEQUENCE ... OWNED BY`
 - **验证**：全新空库重放基线**零报错**（修前 64 处）；在同一空库继续跑 `01→02→03→04→05` 全链 `ON_ERROR_STOP=1` 零报错，二次重放同样零报错；05 回滚零报错
 - **附带**：这批表 + `tbl_tmp_*` 疑似早期 demo 遗留、应用代码零引用，可考虑整体移出种子（另议）
+- **复验（2026-09-30，验证人=用户明确委托，agent 执行）**：全新临时库 `phx_verify_09301810` 按全序重放 `all_schema.sql → 01 → 02 → 03 → 04 → 05`（`ON_ERROR_STOP=1`）六个文件全部 errors=0；断言 `is_default` 列存在、部分唯一索引 `uk_dmc_type_default` 建成；05 重跑幂等 errors=0；05 回滚 errors=0 且列消失；临时库已 DROP。验证人：用户委托（ask_user_question 记录在会话）
 
 ### BUG-02 HumanInTheLoop 智能体未挂 skillRepository（同框架行为不一致）
 - **现象**：两个 harness 智能体里只有 `RulesHarnessAgent` 能加载技能，`HumanInTheLoop` 静默加载不到
