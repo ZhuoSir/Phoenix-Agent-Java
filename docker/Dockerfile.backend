@@ -5,7 +5,11 @@ ARG JRE_BASE_IMG=eclipse-temurin:21-jre-alpine
 FROM ${JRE_BASE_IMG}
 ARG JAVA_BIN=java
 # 基座可能自带非 root 用户(如 ES 镜像)，构建层需 root
+# python3 为 LocalCodePoolExecutorService 启动硬依赖；curl 供 healthcheck。三分支适配 基座发行版(debian/alpine/UBI)
 USER root
+RUN (apt-get update -qq && apt-get install -y -qq --no-install-recommends curl python3 python3-pip && rm -rf /var/lib/apt/lists/*) \
+    || (apk add --no-cache curl python3 py3-pip) \
+    || (microdnf install -y python3 && microdnf clean all)
 ENV JAVA_BIN=${JAVA_BIN} \
     JAVA_OPTS="-XX:MaxRAMPercentage=70 -XX:+UseContainerSupport" \
     TZ=Asia/Shanghai \
