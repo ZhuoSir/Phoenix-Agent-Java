@@ -1,5 +1,9 @@
 # Changelog: allinone-docker-packaging
 
+## v0.1.0 plan（2026-09-30）草稿
+- Phase 2 产出 plan.md v0.1.0（待确认）：拓扑/两镜像多阶段/migrator 哨兵两拍/nginx 参数/离线脚本/7 决策/8 风险；实测锚点已写入（PASSWORD_SALT=phoenix、admin 哈希、密钥 git 全历史 0 命中）
+- requirements 状态：v1.1.0 待重确认（勘误随 plan 一并请用户确认）
+
 ## v1.1.0（2026-09-30）**勘误修订，状态回退待重确认**
 - Plan 期实测证伪 v1.0.0 背景事实一条：`all_data.sql` 的「3 处真实 sk- 密钥」不成立——3 命中=1 注释+2 占位符；真实密钥在种子与 git 全历史 0 命中（`git log -S` 两已知前缀）
 - 随之修订：背景事实（勘误注）、**R-17**（清洗→断言+装后录入引导，删"轮换/git 泄露"动作）、**Q1 决议记录**、**AC-07**
