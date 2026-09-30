@@ -1,5 +1,12 @@
 # Changelog: allinone-docker-packaging
 
+## v1.1.0（2026-09-30）**勘误修订，状态回退待重确认**
+- Plan 期实测证伪 v1.0.0 背景事实一条：`all_data.sql` 的「3 处真实 sk- 密钥」不成立——3 命中=1 注释+2 占位符；真实密钥在种子与 git 全历史 0 命中（`git log -S` 两已知前缀）
+- 随之修订：背景事实（勘误注）、**R-17**（清洗→断言+装后录入引导，删"轮换/git 泄露"动作）、**Q1 决议记录**、**AC-07**
+- **R-07** 设计事实落定：哈希=md5("phoenix"+密码)（`LoginConstant.PASSWORD_SALT="phoenix"`，hutool SecureUtil），admin 种子改放包内 `docker/init/10_seed_admin.sql`（幂等），不再动仓库种子——R-16 例外声明随之取消
+- 承认并记录：错误源于我用 `grep -c 'sk-'` 计数未看内容即下结论；教训=密钥类断言必须逐条看命中内容
+- Q1 用户口径不变（真实密钥不随包分发），修订不改变决议语义
+
 ## v1.0.0（2026-09-30）确认人: 陈卓
 - **三重确认第①关通过**：requirements.md v1.0.0 已确认（用户答复「确认」）
 - 进入 Phase 2 Plan
