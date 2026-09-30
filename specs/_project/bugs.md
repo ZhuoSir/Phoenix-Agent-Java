@@ -28,7 +28,7 @@
 | BUG-17 | 图链路在非 HTTP 调用方取 Sa-Token 登录态直接抛异常 | P2 | spec Implement中(20260927_dynamic-agent-types T-09) | 已修复(v1.2.0) | v1.2.0 | 原 B-17; commit e74e7ec |
 | BUG-18 | QA/FAQ 类型知识只向量化「问题」，答案不参与检索 | P2 | spec Implement中(20260927_dynamic-agent-types T-16) | 新建 | - | 原 B-18; 需产品定口径 |
 | BUG-19 | harness 对话入参缺失时返回 500（应给明确错误码） | P3 | spec Implement中(20260927_dynamic-agent-types T-11) | 已修复(v1.2.0) | v1.2.0 | 原 B-19; commit dc9b333 |
-| BUG-20 | 启用模型会把同类型其他模型一并置为启用（SQL 与注释相反） | P1 | spec Implement中(20260927_agent-config-ai-generate T-02) | 已修复(v1.2.0) | v1.2.0 | 原 B-20; commit b8f728a（启用改多值集合，方法已删）；已随 merge c90071d 合并 main |
+| BUG-20 | 启用模型会把同类型其他模型一并置为启用（SQL 与注释相反） | P1 | spec Implement中(20260927_agent-config-ai-generate T-02) | 已验证(v1.2.0) | v1.2.0 | 原 B-20; commit b8f728a（启用改多值集合，方法已删）；已随 merge c90071d 合并 main |
 | BUG-21 | 模型管理「模型类型」列把 AUDIO 显示成「嵌入模型」 | P3 | 对话中(2026-09-27) | 新建 | - | `views/modelconf/index.vue:458`（三类型都能设默认后才暴露） |
 | BUG-22 | AI 生成「描述」返回整段 JSON（用户实测） | P2 | 对话中(2026-09-27) | 已验证(v1.2.0) | v1.2.0 | Spec: 20260927_agent-config-ai-generate; commit edd9ad9；已合并 main(c90071d)；用户复测确认(09-30) |
 | BUG-23 | 生成超时 60s 切断**已成功**的调用（实测耗时 45~70s） | P2 | spec Implement中(20260927_agent-config-ai-generate T-09) | 已验证(v1.2.0) | v1.2.0 | 同 commit edd9ad9（缓解：90s 且可配置）；已随 merge c90071d 合并 main |
