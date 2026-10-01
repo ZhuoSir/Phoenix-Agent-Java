@@ -6,10 +6,10 @@
 ## 纳入需求
 | spec | spec版本 | 状态 | SQL件 | 配置项 | 备注 |
 |---|---|---|---|---|---|
-| specs/20261001_agent-session-files | v0.1.0 | Specify中（待三重确认） | 待定 | 待定 | 会话文件面板；前置含 workspace 挂卷 |
+| specs/20261001_agent-session-files | v1.0.0 | 开发中（feature/agent-session-files） | 1 | 1 | 会话文件面板；前置含 workspace-root 配置化 |
 
 ## 汇总进度（M3/M4 勾选）
-- [ ] M1 挂接完成
+- [x] M1 挂接完成（本 spec + 缺陷后续挂）
 - [ ] M2 冻结前置
 - [ ] M3 汇总
 - [ ] M4 发版
