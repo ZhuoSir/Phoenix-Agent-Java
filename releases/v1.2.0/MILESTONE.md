@@ -1,5 +1,5 @@
 # 里程碑 v1.2.0
-> 状态: **进行中(2026-09-30 解冻：用户明示将 allinone-docker-packaging 挤入本版本，重走 M2)** | 目标日期: 待定 | 负责人: 陈卓 | 立项: 2026-09-27
+> 状态: **已冻结(2026-10-01 重新冻结；09-30 因挤入 docker 包短暂解冻)** | 目标日期: 待定 | 负责人: 陈卓 | 立项: 2026-09-27
 
 **版本号说明**：项目历史分支线已到 `phoenix-1.1.1-release` / `phoenix-1.1.2-dev`（从未打过 tag、无项目级 CHANGELOG）；
 本次三批需求均为**向下兼容的新功能**（技能管理 / 对话智能体动态化 / AI 生成+默认模型），按 SemVer 取 MINOR = **v1.2.0**（用户 2026-09-27 确认）。
@@ -11,7 +11,7 @@
 | specs/20260927_agent-skill-management | v1.0.0 | 已合并 | 2 | 1 | 技能管理（上传/发布/授权/绑定）+ 前台技能区与显式执行；已随 ed2e3f9 合入 main |
 | specs/20260927_dynamic-agent-types | v1.0.0 | 已合并 | 2 | 4 | 对话智能体运行配置 + 三工具（知识库/取数/深度分析）+ 类型去标签 + 列表隐藏存量；已随 f2e106a 合入 main |
 | specs/20260927_agent-config-ai-generate | v1.0.0 | 已合并(main, 09-30, c90071d) | 1 | 1 | AI 生成描述/Prompt（Markdown）+ 模型「启用集合 / 默认模型」；13/13 任务全勾（09-30 走查+回归完成） |
-| specs/20260930_allinone-docker-packaging | v1.4.0(待重确认) | 开发中（分支 feature/allinone-docker-packaging 待合并；tasks 10/11，差用户 UI 验收） | 0 | 0 | 一键部署交付包（compose 编排，非 releases 升级件；哨兵表/admin·runtime 种子为包私有机制）。挤入依据：用户 2026-09-30 明示；连带真缺陷修复：admin-ui 补声明 json-bigint |
+| specs/20260930_allinone-docker-packaging | v1.4.0 | 已合并(main, 10-01, b2a5e4c) | 0 | 0 | 一键部署交付包（compose 编排，非 releases 升级件；哨兵表/admin·runtime 种子为包私有机制）。挤入依据：用户 2026-09-30 明示；连带真缺陷修复：admin-ui 补声明 json-bigint |
 
 ## 纳入缺陷（M1 挂接）
 | 编号 | 标题 | 严重度 | 修复落点 | 状态 |
@@ -44,7 +44,7 @@
 - **修复**：见上表 19 条（技能管理 6 条 / 动态智能体 7 条 / 配置 1 条 / AI 生成与模型默认 5 条）
 
 ## 汇总进度（M3/M4 勾选）
-- [x] 全部 spec 已合并（M2 冻结前置）—— 3/3 已合并（`agent-config-ai-generate` 随 c90071d 合入，13/13 任务全勾）
+- [x] 全部 spec 已合并（M2 冻结前置）—— **4/4**（docker 包随 b2a5e4c 合入，tasks 11/11）
 - [x] SQL 汇总编号 + rollback 配对（**已汇总** `V1.2.0_01~05` + `R1.2.0_01~05`，序号与开发期一致；R01 汇总时补 harness 表存在性容错——与草案唯一差异，已双场景实测）
 - [x] 配置汇总 `config/changes.md`（6 个新增代码默认键 + #7 EMBEDDING 数据变更含参考 SQL）
 - [x] `RELEASE-NOTES.md`（新增/变更/修复 19 条/已知问题/包含 spec）
@@ -65,3 +65,4 @@
 
 ## 变更记录（里程碑）
 - 2026-09-30 M4 前挤入：用户明示把 docker 交付包从「拟 v1.2.1」改挂 v1.2.0。按细则执行解冻重走 M2；M3 产物需补 RELEASE-NOTES（新增一键部署）；重新冻结前置差 ①docker spec 合并 ②T-10 用户界面验收 ③spec 三文档因归属变更待重确认。v1.2.1 不再单独立项。
+- 2026-10-01 **重新冻结**：①已合并('+mg+')；②T-10/11 全勾（verify 9/9 + 迁移实测 + 用户全程 UI 实操，真隔离网复证留 M4 演练）；③三文档已确认（陈卓）。验收期新发现全部闭环：BUG-33 已规避(nginx 折叠，根治 BL-18)、BUG-35/36 已修复、json-bigint 依赖修复、BUG-34 遗留新建。业务代码增量=仅上述登记缺陷修复（HarnessModelRegistry 一处 + 前端两处 + package.json），其余全部为 docker/ 与 specs/ 纯新增。
