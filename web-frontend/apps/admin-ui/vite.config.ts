@@ -30,12 +30,19 @@ export default defineConfig(async () => {
             target: targetUrl,
             ws: true,
           },
+          // BL-18（BUG-33 根治）：前端直出后端真实路径，dev 代理只透传不剥层
           '/api': {
             changeOrigin: true,
-            rewrite: (path) => path.replace(/^\/api/, ''),
-            // mock代理目标地址
             target: targetUrl,
             ws: true,
+          },
+          '/platform': {
+            changeOrigin: true,
+            target: targetUrl,
+          },
+          '/auth': {
+            changeOrigin: true,
+            target: targetUrl,
           },
           '/nl2sql': {
             changeOrigin: true,

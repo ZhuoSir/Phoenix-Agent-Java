@@ -113,7 +113,7 @@ export async function deleteSessionApi(sessionId: string): Promise<void> {
 
 export async function downloadHtmlReportApi(sessionId: string, content: string): Promise<void> {
   const token = localStorage.getItem('phoenix-token');
-  const response = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}/reports/html`, {
+  const response = await fetch(`${API_BASE_URL}/sessions/${sessionId}/reports/html`, {
     method: 'POST',
     headers: {
       'Content-Type': 'text/plain;charset=utf-8',

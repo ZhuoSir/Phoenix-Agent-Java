@@ -21,7 +21,9 @@ import { useAuthStore } from '#/store';
 
 import { refreshTokenApi } from './core';
 
-const { apiURL } = useAppConfig(import.meta.env, import.meta.env.PROD);
+// BL-18（BUG-33 根治）：不再给 axios 拼 /api 前缀——api/ 下所有路径与 fetch 拼串
+// 一律写成后端真实路径（/api/xxx 或裸域 /platform|/auth/xxx），代理只按前缀透传、不剥层。
+const apiURL = '';
 
 function createRequestClient(baseURL: string, options?: RequestClientOptions) {
   const client = new RequestClient({

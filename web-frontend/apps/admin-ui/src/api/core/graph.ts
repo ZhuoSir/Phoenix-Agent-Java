@@ -58,7 +58,7 @@ export interface HarnessChatRequest {
   enabledSkillIds?: number[];
 }
 
-const API_BASE_URL = '/api';
+const API_BASE_URL = ''; // BL-18: 拼接串已含 /api 真实前缀
 
 export interface ChatApiRequest {
   sessionId: string;

@@ -135,7 +135,7 @@ export function streamFrontChat(
   onError?: (error: Error) => Promise<void>,
   onComplete?: () => Promise<void>,
 ): () => void {
-  const url = `${API_BASE_URL}/api/front/stream/chat`;
+  const url = `${API_BASE_URL}/front/stream/chat`;
   const controller = new AbortController();
 
   const doFetch = async () => {
@@ -251,7 +251,7 @@ export function streamFrontHarnessChat(
   onError?: (error: Error) => Promise<void>,
   onComplete?: () => Promise<void>,
 ): () => void {
-  const url = `${API_BASE_URL}/platform/harness/chat`;
+  const url = `/platform/harness/chat`; // BL-18: 裸域直连（曾靠代理剥层）
   const controller = new AbortController();
 
   const doFetch = async () => {
@@ -349,7 +349,7 @@ export async function confirmFrontHarnessChat(
   onMessage?: (response: GraphNodeResponse) => Promise<void>,
   onComplete?: () => Promise<void>,
 ): Promise<void> {
-  const httpResponse = await fetch(`${API_BASE_URL}/api/front/harness/confirm`, {
+  const httpResponse = await fetch(`${API_BASE_URL}/front/harness/confirm`, {
     method: 'POST',
     headers: {
       'phoenix-token': getAuthToken(),
