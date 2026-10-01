@@ -46,4 +46,4 @@
 ## 五、待办增补（2026-10-01 刷新）
 
 | BL-20 | **多子智能体编排模式**：智能体编辑页新增「运行模式」选择——**单智能体**（现状：一个主智能体独立完成，默认）/**多智能体**（主智能体拆解任务→派生多个子智能体并行执行子任务→**页面上可实时查看各子智能体的子任务详情**→最终由主智能体汇总产出统一回复；子任务流需 SSE 透出子 agent 身份与状态）。实现落点预判：AgentScope harness 原生具备 subagent 原语（`HarnessAgent$Builder.buildSubagentEntries`、`middleware/SubagentEntry`、`IsolationScope`），核心工作=运行配置加 mode 字段（Flyway 件）+ 编辑页模式选择 UI + 子任务详情面板 + SSE 事件扩展（复用 BL-19 agentFiles 帧先例的通道） | 2026-10-01 用户口述立项（明确：**列入待办，暂不实施**；将来立项时走 spec 四阶段，建议挂下一 MINOR 或 v1.3.0 若冻结前挤入需明示） | 待立项 | 关联既有：BL-19 会话文件面板（子智能体产物同样进面板）；BL-05 账号体系（子任务归属人展示）；开放问题预置：子智能体可否独立配置模型/知识库？并发上限？失败子任务的重试语义？ |
-
+| BL-21 | **对话页「深度思考」与「回答正文」分离展示**：智能体对话页当前把模型的思考增量（THINKING_BLOCK_DELTA）与最终回答（TEXT_BLOCK_DELTA）**混在同一条 content 流**里呈现（HarnessChatServiceImpl.toNodeOutput 两者同构造 StreamingOutput、mapper 同键透出）——用户实测多次看到英文思考独白混入答案（如「The user asks me to...」）。目标：思考内容经独立事件通道（如 eventMap.thinking）下发，前端渲染为**可折叠的「深度思考」区**（灰底/字号弱、默认收起或流式中展开结束后折叠），回答正文区只含最终输出；历史消息回显需持久区分（chat_message 增 thinking 列或 metadata 标记，M3 前定稿）；前台/后台两套聊天页同规范 | 2026-10-01 用户口述立项（列待办，暂不实施） | 待立项 | 关联：BL-19 agentFiles 帧先例（新增独立键向后兼容旧客户端）；BUG 面：现思考泄漏混排属既有行为，本单以功能形态收编不再单列缺陷 |
