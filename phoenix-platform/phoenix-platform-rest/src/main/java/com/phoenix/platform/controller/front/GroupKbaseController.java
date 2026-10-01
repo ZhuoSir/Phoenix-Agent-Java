@@ -36,6 +36,12 @@ public class GroupKbaseController {
         return ReturnVo.ok(groupKbaseInfoService.getKbaseIdsByGroup(groupId));
     }
 
+    /** 反向入口：某库已授权的组 id 清单（知识库页「分配组」dialog 预选用）。 */
+    @GetMapping("/kbase/{kbaseId}/groups")
+    public ReturnVo<List<String>> groupsOfKbase(@PathVariable Long kbaseId) {
+        return ReturnVo.ok(groupKbaseInfoService.getGroupIdsByKbase(kbaseId));
+    }
+
     /** 该库当前被多少智能体绑定（撤组提示用）。 */
     @GetMapping("/kbase/{kbaseId}/bound-count")
     public ReturnVo<Long> boundCount(@PathVariable Long kbaseId) {

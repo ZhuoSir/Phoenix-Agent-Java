@@ -70,6 +70,13 @@ export async function groupKbasesApi(groupId: string) {
   return r.data ?? [];
 }
 
+export async function kbaseGroupsApi(kbaseId: number) {
+  const r = await requestClient.get<{ data: string[] }>(
+    `/platform/group-kbase/kbase/${kbaseId}/groups`, { responseReturn: 'body' },
+  );
+  return r.data ?? [];
+}
+
 export async function groupKbaseAssignApi(groupId: string, kbaseIds: number[]) {
   return requestClient.put<{ success: boolean }>(
     `/platform/group-kbase/${groupId}/assign`, { kbaseIds }, { responseReturn: 'body' },

@@ -7,6 +7,7 @@ import { onMounted, ref } from 'vue';
 
 import {
   ElButton,
+  ElCheckbox,
   ElDialog,
   ElDrawer,
   ElForm,
@@ -21,12 +22,16 @@ import {
 } from 'element-plus';
 
 import {
+  groupKbaseAssignApi,
+  groupKbasesApi,
+  kbaseGroupsApi,
   kbCreateApi,
   kbPageApi,
   kbRemoveApi,
   kbUpdateApi,
   type KnowledgeBase,
 } from '#/api/core/knowledgeBase';
+import { getGroupInfoPageApi } from '#/api/core/platform-group-info';
 
 import AgentKnowledgeConfig from '#/views/agent/list/components/AgentKnowledgeConfig.vue';
 
@@ -42,6 +47,59 @@ const dialogVisible = ref(false);
 const editId = ref<null | number>(null);
 const form = ref<{ description: string; name: string }>({ name: '', description: '' });
 const saving = ref(false);
+
+// 分配组
+const groupsDialogVisible = ref(false);
+const groupsSaving = ref(false);
+const groupsTarget = ref<null | KnowledgeBase>(null);
+const allGroups = ref<{ id: string; name: string }[]>([]);
+const checkedGroupIds = ref<Set<string>>(new Set());
+const initialGroupIds = ref<Set<string>>(new Set());
+
+async function openGroups(row: KnowledgeBase) {
+  groupsTarget.value = row;
+  const [pageRes, mine] = await Promise.all([
+    getGroupInfoPageApi(1, 999),
+    kbaseGroupsApi(row.id),
+  ]);
+  allGroups.value = ((pageRes as any)?.records || (pageRes as any)?.data?.records || [])
+    .map((g: any) => ({ id: String(g.id), name: g.name || String(g.id) }));
+  checkedGroupIds.value = new Set(mine);
+  initialGroupIds.value = new Set(mine);
+  groupsDialogVisible.value = true;
+}
+
+function toggleGroup(id: string) {
+  const s = new Set(checkedGroupIds.value);
+  if (s.has(id)) s.delete(id);
+  else s.add(id);
+  checkedGroupIds.value = s;
+}
+
+async function saveGroups() {
+  if (!groupsTarget.value) return;
+  const kbId = groupsTarget.value.id;
+  const added = [...checkedGroupIds.value].filter((g) => !initialGroupIds.value.has(g));
+  const removed = [...initialGroupIds.value].filter((g) => !checkedGroupIds.value.has(g));
+  groupsSaving.value = true;
+  try {
+    for (const gid of added) {
+      const cur = await groupKbasesApi(gid);
+      await groupKbaseAssignApi(gid, [...new Set([...cur, kbId])]);
+    }
+    for (const gid of removed) {
+      const cur = await groupKbasesApi(gid);
+      await groupKbaseAssignApi(gid, cur.filter((x) => x !== kbId));
+    }
+    ElMessage.success('组授权已保存');
+    groupsDialogVisible.value = false;
+    await load();
+  } catch (e: any) {
+    ElMessage.error(e?.message || '组授权保存失败');
+  } finally {
+    groupsSaving.value = false;
+  }
+}
 
 // 条目管理抽屉
 const drawerVisible = ref(false);
@@ -174,6 +232,7 @@ onMounted(load);
       <ElTableColumn align="right" label="操作" width="230">
         <template #default="{ row }">
           <ElButton link type="primary" @click="openItems(row as KnowledgeBase)">知识管理</ElButton>
+          <ElButton link type="primary" @click="openGroups(row as KnowledgeBase)">分配组</ElButton>
           <ElButton link type="primary" @click="openEdit(row as KnowledgeBase)">编辑</ElButton>
           <ElButton link type="danger" @click="remove(row as KnowledgeBase)">删除</ElButton>
         </template>
@@ -202,6 +261,23 @@ onMounted(load);
       </template>
     </ElDialog>
 
+    <ElDialog v-model="groupsDialogVisible" :title="`分配组 · ${groupsTarget?.name || ''}`" width="420px">
+      <div v-if="!allGroups.length" style="font-size: 13px; color: #909399">暂无组，请到「组管理」创建</div>
+      <div
+        v-for="g in allGroups"
+        :key="g.id"
+        class="kb-page__group-row"
+        @click="toggleGroup(g.id)"
+      >
+        <ElCheckbox :model-value="checkedGroupIds.has(g.id)" @click.stop="toggleGroup(g.id)" />
+        <span>{{ g.name }}</span>
+      </div>
+      <template #footer>
+        <ElButton @click="groupsDialogVisible = false">取消</ElButton>
+        <ElButton :loading="groupsSaving" type="primary" @click="saveGroups">保存</ElButton>
+      </template>
+    </ElDialog>
+
     <ElDrawer v-model="drawerVisible" :title="`知识管理 · ${activeKb?.name || ''}`" size="72%">
       <AgentKnowledgeConfig v-if="activeKb" :key="activeKb.id" :kb-id="activeKb.id" />
     </ElDrawer>
@@ -225,6 +301,14 @@ onMounted(load);
 .kb-page__spacer { flex: 1; }
 .kb-page__table { flex: 1; }
 .kb-page__tag { margin-right: 4px; }
+.kb-page__group-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 4px;
+  font-size: 13px;
+  cursor: pointer;
+}
 .kb-page__none { font-size: 12px; color: #c0c4cc; }
 .kb-page__pager {
   display: flex;
