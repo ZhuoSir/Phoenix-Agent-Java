@@ -14,6 +14,7 @@
 | BUG-33 | 前端 API 双重 /api 前缀（生产从未成功部署的结构性缺陷） | P1 | baseURL 置空+路径归一+代理透传（已合 main，e3824f5） | 已修复(v1.3.0) |
 | BUG-38 | 组管理启用/禁用语义判反（前端标签镜像循环） | P2 | onToggleStatus 对齐 0=启用（已合 main） | 已修复(v1.3.0) |
 | BUG-39 | index.html 无缓存头致升级后旧 bundle 成片 404/500 | P3 | nginx no-cache + hash 产物长缓存（已合 main） | 已修复(v1.3.0) |
+| BUG-40 | EventSource 硬编码双前缀致重连风暴（BL-18 审计漏网） | P2 | ChatSessionSidebar 改真实路径，dist 清零 | 已修复(v1.3.0) |
 
 ## 汇总进度（M3/M4 勾选）
 - [x] M1 挂接完成（本 spec + 缺陷后续挂）
