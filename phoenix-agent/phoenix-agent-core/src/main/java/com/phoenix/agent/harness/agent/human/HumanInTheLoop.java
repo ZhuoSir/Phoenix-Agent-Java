@@ -84,7 +84,8 @@ public class HumanInTheLoop extends AbstractHarnessAgent {
 
         HarnessAgent harnessAgent = HarnessAgent.builder()
                 .name(this.getSn())
-                .description(agent.getDescription())
+                // BUG-31 双保险：库行缺失时回落代码默认描述，不再 NPE
+                .description(agent != null ? StrUtil.blankToDefault(agent.getDescription(), getDescription()) : getDescription())
                 .sysPrompt(sytemPrompt)
                 .model(this.createChatModel()) // 请替换为你实际的模型配置
                 .workspace(Path.of(".agentscope/workspace"))

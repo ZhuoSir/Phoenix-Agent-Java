@@ -11,9 +11,9 @@
 ## 纳入缺陷（M1 挂接）
 | 编号 | 标题 | 严重度 | 修复落点 | 状态 |
 |---|---|---|---|---|
-| BUG-31 | 全新库首启自注册智能体 NPE（createHarnessAgent 先于 saveBySn 读库） | P1 | `HumanInTheLoop` 等判空 + 交付包种子保留双保险 | 已规划(v1.2.1) |
-| BUG-32 | deepseek AI 生成双字段 42013（空 content/JSON 解析失败） | P2 | `AgentProfileGenerationService` 解析容错 | 已规划(v1.2.1) |
-| BUG-34 | model-config 列表接口回显明文 apiKey | P2 | DTO 出口脱敏 + 更新保旧 + 前端编辑态适配 | 已规划(v1.2.1) |
+| BUG-31 | 全新库首启自注册智能体 NPE（createHarnessAgent 先于 saveBySn 读库） | P1 | `HumanInTheLoop` 判空双保险 + 交付包种子保留 | 已修复(v1.2.1) |
+| BUG-32 | deepseek AI 生成双字段 42013（空 content/JSON 解析失败） | P2 | `AgentProfileGenerationService` 重试+修复解析+字段兜底 | 已修复(v1.2.1) |
+| BUG-34 | model-config 列表接口回显明文 apiKey | P2 | list 出口脱敏 + 回源解析 + 日志脱敏 + 前端提示 | 已修复(v1.2.1) |
 
 ## 汇总进度（M3/M4 勾选）
 - [ ] 全部修复合并 main（M2 冻结前置）
@@ -22,3 +22,8 @@
 
 ## 备注
 - 三项均源于 v1.2.0 交付包验收期实测，明细见 `specs/_project/bugs.md`
+
+## 修复验证记录（2026-10-01，A 交付栈=v1.2.1-dev 镜像）
+- BUG-34：/list 返回 `sk-****JICw / sk-****9ade` 全脱敏；脱敏串回传 /test 连接成功（按 id 回源）；错误日志 masked 序列化
+- BUG-32：deepseek 默认下双项生成 19s 成功（描述 43 字、提示词 595 字四段齐全）
+- BUG-31：dump 克隆库（DELETE 5 个 sn 行，剩余 0）→ 新镜像一次性容器首启 `Started PhoenixAgentApplication`、NPE=0；克隆库已清理

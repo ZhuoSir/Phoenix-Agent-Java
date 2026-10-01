@@ -99,9 +99,11 @@ public abstract class AbstractHarnessAgent implements SmartInitializingSingleton
      * 注册智能体到容器里面
      */
     public void register() {
-        HarnessAgent harnessAgent = createHarnessAgent();
+        // BUG-31 根治：先按 sn 落行（幂等 upsert），再创建——createHarnessAgent() 读库时行必存在，
+        // 全新库首启不再 NPE。saveBySn 只带 code 侧字段，不覆盖库内 prompt。
         Agent agent = Agent.builder().sn(getSn()).type(AgentTypeEnm.HARNESS.getCode()).name(getName()).status(AgentStatusEnm.DRAFT.getCode()).description(getDescription()).build();
         agentService.saveBySn(agent);
+        HarnessAgent harnessAgent = createHarnessAgent();
         harnessStaticLoader.addAgent(getSn(), harnessAgent);
     }
 
