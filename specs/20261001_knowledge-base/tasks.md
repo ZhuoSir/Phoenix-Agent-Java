@@ -13,7 +13,7 @@
 
 ## 2. 库与绑定（后端）
 
-- [ ] T-02 data 域知识库 CRUD（KnowledgeBase entity/mapper/service/controller：page/create/update/delete/detail；42040 查重、42041 删除保护附绑定清单）
+- [x] T-02 data 域知识库 CRUD（KnowledgeBase entity/mapper/service/controller：page/create/update/delete/detail；42040 查重、42041 删除保护附绑定清单）
   关联: R-01,03,04,12 | 依赖: T-01
   验证方式: curl 四端点全路径+负例（重名/删被绑库/无 token 401）
   验收标准: ReturnVo 信封、错误码入枚举集中、组标签与条目数在列表/详情可见
