@@ -32,7 +32,13 @@ public class ModelConfigController {
 	@GetMapping("/list")
 	public ApiResponse<List<ModelConfigDTO>> list() {
 		try {
-			return ApiResponse.success("获取模型配置列表成功", modelConfigDataService.listConfigs());
+			List<ModelConfigDTO> configs = modelConfigDataService.listConfigs();
+			// BUG-34：展示层脱敏（DTO 为每次新建副本，不影响运行时取数；
+			// 编辑/测试回传脱敏值时由服务端按 id 回源，见 ModelConfigOpsService）
+			for (ModelConfigDTO c : configs) {
+				c.setApiKey(com.phoenix.data.service.aimodelconfig.ModelConfigOpsService.maskApiKey(c.getApiKey()));
+			}
+			return ApiResponse.success("获取模型配置列表成功", configs);
 		}
 		catch (Exception e) {
 			return ApiResponse.error("获取模型配置列表失败: " + e.getMessage());

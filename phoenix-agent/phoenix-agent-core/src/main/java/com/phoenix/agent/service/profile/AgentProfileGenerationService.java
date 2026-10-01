@@ -63,7 +63,13 @@ public class AgentProfileGenerationService {
             req.getDescription(), req.getPrompt());
         String raw;
         try {
+            // BUG-32：部分模型（deepseek 实测）首轮偶发空 content，自动重试一次
             raw = aiModelRegistry.getChatClient().prompt().user(metaPrompt).call().content();
+            if (raw == null || raw.isBlank()) {
+                log.warn("AI 生成返回空内容，自动重试一次: configId={}, modelName={}", defaultChat.getId(),
+                    defaultChat.getModelName());
+                raw = aiModelRegistry.getChatClient().prompt().user(metaPrompt).call().content();
+            }
         }
         catch (RuntimeException e) {
             log.error("AI 生成调用模型失败: configId={}, modelName={}, err={}", defaultChat.getId(),
@@ -71,7 +77,7 @@ public class AgentProfileGenerationService {
             return fail(ProfileGenerationErrorCodeEnm.MODEL_CALL_FAILED);
         }
         if (raw == null || raw.isBlank()) {
-            log.error("AI 生成返回空内容: configId={}, modelName={}", defaultChat.getId(), defaultChat.getModelName());
+            log.error("AI 生成重试后仍为空内容: configId={}, modelName={}", defaultChat.getId(), defaultChat.getModelName());
             return fail(ProfileGenerationErrorCodeEnm.RESULT_PARSE_FAILED);
         }
 
@@ -133,8 +139,24 @@ public class AgentProfileGenerationService {
             prompt = node.path("prompt").asString("");
         }
         catch (RuntimeException e) {
-            log.error("AI 生成结果 JSON 解析失败: {}, 原文前 200 字: {}", e.toString(), abbrev(raw));
-            return fail(ProfileGenerationErrorCodeEnm.RESULT_PARSE_FAILED);
+            // BUG-32 容错一：模型常把提示词里的真实换行裸插进 JSON 字符串（deepseek 实测）
+            // ——把字符串体内的控制字符转义后重试解析
+            JsonNode repaired = repairJson(json);
+            if (repaired != null) {
+                description = repaired.path("description").asString("");
+                prompt = repaired.path("prompt").asString("");
+            }
+            else {
+                // 容错二：字段级正则提取（最后手段），提取失败才报 42013
+                description = extractField(json, "description");
+                prompt = extractField(json, "prompt");
+                if (description == null && prompt == null) {
+                    log.error("AI 生成结果 JSON 解析失败: {}, 原文前 200 字: {}", e.toString(), abbrev(raw));
+                    return fail(ProfileGenerationErrorCodeEnm.RESULT_PARSE_FAILED);
+                }
+                description = description == null ? "" : description;
+                prompt = prompt == null ? "" : prompt;
+            }
         }
         if (description == null || description.isBlank() || prompt == null || prompt.isBlank()) {
             log.error("AI 生成结果 JSON 缺字段: description空={}, prompt空={}",
@@ -149,6 +171,61 @@ public class AgentProfileGenerationService {
         vo.setDescription(oneLine(description));
         vo.setPrompt(prompt.trim());
         return null;
+    }
+
+    /** 把 JSON 字符串字面量内的裸控制字符转义后重解析；失败返回 null */
+    private JsonNode repairJson(String json) {
+        try {
+            StringBuilder sb = new StringBuilder(json.length() + 64);
+            boolean inStr = false;
+            boolean esc = false;
+            for (int i = 0; i < json.length(); i++) {
+                char c = json.charAt(i);
+                if (inStr) {
+                    if (esc) {
+                        esc = false;
+                        sb.append(c);
+                    }
+                    else if (c == '\\') {
+                        esc = true;
+                        sb.append(c);
+                    }
+                    else if (c == '"') {
+                        inStr = false;
+                        sb.append(c);
+                    }
+                    else if (c == '\n') {
+                        sb.append("\\n");
+                    }
+                    else if (c == '\r') {
+                        sb.append("\\r");
+                    }
+                    else if (c == '\t') {
+                        sb.append("\\t");
+                    }
+                    else {
+                        sb.append(c);
+                    }
+                }
+                else {
+                    if (c == '"') {
+                        inStr = true;
+                    }
+                    sb.append(c);
+                }
+            }
+            return objectMapper.readTree(sb.toString());
+        }
+        catch (RuntimeException ignore) {
+            return null;
+        }
+    }
+
+    /** 最后手段：按字段名提取值（容忍非标准 JSON）；找不到返回 null */
+    private String extractField(String json, String field) {
+        java.util.regex.Matcher m = java.util.regex.Pattern
+            .compile("\"" + field + "\"\\s*:\\s*\"([\\s\\S]*?)\"\\s*(,|\\})").matcher(json);
+        return m.find() ? m.group(1) : null;
     }
 
     /** 必含段落校验（R-06）：缺失返回可读说明，全部齐备返回 null */

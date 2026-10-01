@@ -146,10 +146,50 @@ public class ModelConfigOpsService {
 		}
 	}
 
+	private static boolean looksMasked(String key) {
+		return key != null && key.contains("****");
+	}
+
+	/** 脱敏值按 id 回源真实 key（前端编辑/测试场景回传脱敏串） */
+	private void resolveMaskedApiKey(ModelConfigDTO config) {
+		if (config.getId() == null || !looksMasked(config.getApiKey())) {
+			return;
+		}
+		ModelConfig stored = modelConfigDataService.findById(config.getId());
+		if (stored != null) {
+			config.setApiKey(stored.getApiKey());
+		}
+	}
+
+	/** 测试失败日志用：apiKey 一律脱敏后再序列化 */
+	private String maskedConfigLog(ModelConfigDTO config) {
+		String real = config.getApiKey();
+		try {
+			config.setApiKey(maskApiKey(real));
+			return objectMapper.writeValueAsString(config);
+		}
+		catch (Exception ex) {
+			return "<unserializable>";
+		}
+		finally {
+			config.setApiKey(real);
+		}
+	}
+
+	public static String maskApiKey(String key) {
+		if (key == null || key.isBlank()) {
+			return key;
+		}
+		String t = key.trim();
+		return t.length() <= 7 ? "****" : t.substring(0, 3) + "****" + t.substring(t.length() - 4);
+	}
+
 	/**
 	 * 测试模型连接（创建临时模型，不影响正在运行的模型）
 	 */
 	public void testConnection(ModelConfigDTO config) {
+		// BUG-34：前端回传的是列表脱敏值（含****）→ 按 id 从库解析真实 key 再测
+		resolveMaskedApiKey(config);
 		String modelType = config.getModelType();
 
 		try {
@@ -165,7 +205,7 @@ public class ModelConfigOpsService {
 		}
 		catch (Exception e) {
 			try {
-				log.error("Failed to test model connection. Config: {}", objectMapper.writeValueAsString(config), e);
+				log.error("Failed to test model connection. Config: {}", maskedConfigLog(config), e);
 			}
 			catch (JacksonException e1) {
 				log.error("Failed to convert config to JSON. Config: {}", config, e1);

@@ -570,7 +570,11 @@ onMounted(loadConfigs);
             type="password"
             show-password
             :placeholder="
-              formData.provider === 'custom' ? '可选填' : '请输入API密钥'
+              formData.apiKey && formData.apiKey.includes('****')
+                ? '已脱敏显示；保持不变则沿用原密钥，重新输入则替换'
+                : formData.provider === 'custom'
+                  ? '可选填'
+                  : '请输入API密钥'
             "
           />
         </ElFormItem>
