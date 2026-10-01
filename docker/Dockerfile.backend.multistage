@@ -1,0 +1,18 @@
+# [主案] 容器内多阶段构建（需出网）；字节码实测 major=65 → 21 编译/运行均可（T-01③）
+ARG MAVEN_IMAGE=maven:3.9-eclipse-temurin-21
+FROM ${MAVEN_IMAGE} AS build
+WORKDIR /src
+COPY . .
+RUN mvn -q package -DskipTests -Dspring-javaformat.skip=true -pl phoenix-admin/phoenix-admin-manager -am
+
+FROM eclipse-temurin:21-jre-jammy AS run
+RUN apt-get update && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd -r -u 10001 app
+WORKDIR /app
+COPY --from=build /src/phoenix-admin/phoenix-admin-manager/target/phoenix-admin.jar /app/phoenix-admin.jar
+RUN mkdir -p /app/logs && chown -R app:app /app
+USER app
+ENV JAVA_OPTS="-XX:MaxRAMPercentage=70 -XX:+UseContainerSupport" TZ=Asia/Shanghai LANG=C.UTF-8
+EXPOSE 8066
+ENTRYPOINT ["sh","-c","exec java $JAVA_OPTS -jar /app/phoenix-admin.jar"]

@@ -1,0 +1,4 @@
+.env
+backup/
+phoenix-*-images.tar.gz*
+.stage/

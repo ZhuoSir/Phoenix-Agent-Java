@@ -155,8 +155,7 @@ const formRules: FormRules = {
     {
       type: 'number',
       min: 100,
-      max: 10_000,
-      message: '最大Token必须在100-10000之间',
+      message: '最大Token至少为100',
       trigger: 'blur',
     },
   ],
@@ -623,11 +622,13 @@ onMounted(loadConfigs);
           <ElInputNumber
             v-model="formData.maxTokens"
             :min="100"
-            :max="10000"
-            :step="100"
+            :step="1000"
             style="width: 100%"
           />
-          <div class="text-xs text-gray-500 mt-1">控制生成文本的最大长度</div>
+          <div class="text-xs text-gray-500 mt-1">
+            单位 token（约 0.7 token/汉字）。填多大由你手动设定；超过模型自身上限时
+            API 会按模型最大值截断或不报错，请按所用模型的官方输出上限填写
+          </div>
         </ElFormItem>
 
         <ElDivider content-position="left">网络代理配置</ElDivider>

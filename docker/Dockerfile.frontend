@@ -1,0 +1,7 @@
+# admin-ui 镜像（thin：host pnpm build → dist 进 .stage；nginx 组装）
+# 容器内多阶段版（需 npm 出网）：Dockerfile.frontend.multistage
+ARG NGINX_BASE_IMG=nginx:latest
+FROM ${NGINX_BASE_IMG}
+COPY docker/.stage/dist /usr/share/nginx/html
+COPY docker/nginx/phoenix.conf /etc/nginx/conf.d/default.conf
+EXPOSE 80

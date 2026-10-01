@@ -49,6 +49,7 @@
     "echarts": "catalog:",
     "element-plus": "catalog:",
     "highlight.js": "catalog:",
+    "json-bigint": "catalog:",
     "markdown-it": "catalog:",
     "markdown-it-container": "catalog:",
     "marked": "catalog:",

@@ -1,0 +1,23 @@
+# Phoenix 后端镜像（thin：host 预构建 jar → 薄镜像组装；构建零外网依赖）
+# 基座要求：glibc + java(≥21)。默认 eclipse-temurin；受限网络可用 JRE_BASE_IMG 指向
+# 任意含 JDK 的本地基座（本机验证实测用 ES9 镜像 java25 + JAVA_BIN 覆盖）。多阶段版见 Dockerfile.backend.multistage
+ARG JRE_BASE_IMG=eclipse-temurin:21-jre-alpine
+FROM ${JRE_BASE_IMG}
+ARG JAVA_BIN=java
+# 基座可能自带非 root 用户(如 ES 镜像)，构建层需 root
+# python3 为 LocalCodePoolExecutorService 启动硬依赖；curl 供 healthcheck。三分支适配 基座发行版(debian/alpine/UBI)
+USER root
+RUN (apt-get update -qq && apt-get install -y -qq --no-install-recommends curl python3 python3-pip && rm -rf /var/lib/apt/lists/*) \
+    || (apk add --no-cache curl python3 py3-pip) \
+    || (microdnf install -y python3 && microdnf clean all)
+ENV JAVA_BIN=${JAVA_BIN} \
+    JAVA_OPTS="-XX:MaxRAMPercentage=70 -XX:+UseContainerSupport" \
+    TZ=Asia/Shanghai \
+    LANG=C.UTF-8
+RUN mkdir -p /app/logs /app/uploads \
+    && (chown -R 10001:10001 /app 2>/dev/null || chmod -R 777 /app)
+WORKDIR /app
+COPY --chown=app:app docker/.stage/phoenix-admin.jar /app/phoenix-admin.jar
+USER 10001
+EXPOSE 8066
+ENTRYPOINT ["sh","-c","exec ${JAVA_BIN:-java} $JAVA_OPTS -jar /app/phoenix-admin.jar"]

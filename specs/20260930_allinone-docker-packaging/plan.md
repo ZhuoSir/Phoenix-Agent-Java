@@ -1,4 +1,4 @@
-> 版本: v1.0.0 | 状态: 已确认 | 更新: 2026-09-30 | 确认人: 陈卓 | 确认日期: 2026-09-30
+> 版本: v1.1.0 | 状态: 已确认 | 更新: 2026-10-01 | 确认人: 陈卓 | 确认日期: 2026-09-30
 
 # 技术方案：一键部署 Docker 交付包（对齐 requirements v1.1.0）
 
@@ -47,7 +47,7 @@ SSE（`/api/stream/search`）与 90s 生成（R-01 实测 AC-03）依赖 `buffer
 - **镜像**：`postgres:16-alpine`（只当 psql 客户端用）
 - **挂载**：`sql/`（基线+种子）与 `releases/`（V/R 件）只读挂入，脚本引用**唯一权威路径**（R-02，不复制第二份）
 - **哨兵与台账**：`migrator` 先查 `tbl_phoenix_release`（本包自建的小表：`seq text PK, file text, applied_at timestamptz`）
-  - 表不存在 ⇒ 首启：`all_schema.sql → all_data.sql → 10_seed_admin.sql → 遍历 releases/v1.2.0/sql/V1.2.0_01..05`，每件一个事务，成功即 INSERT 台账；失败即退出非零（compose 可见）
+  - 表不存在 ⇒ 首启：**`all_data.sql`（完整基线：结构+数据+序列，实测空库 0 报错——R-05 v1.2.0 勘误，原 schema→data 叠加顺序必炸）→ `10_seed_admin.sql` → 遍历 releases/v1.2.0/sql/V1.2.0_01..05**，每件一个事务，成功即 INSERT 台账；失败即退出非零（compose 可见）
   - 表存在 ⇒ 非首启：跳过基线，只执行台账中缺失的 V 件（升级即"新版本 releases 目录挂入后重跑一次 up"，R-13）
 - **两拍顺序**（坑②）：`migrator-post`（同镜像）`depends_on: backend: condition: service_healthy`，重放 `V1.2.0_01`（脚本自带存在性容错，harness 表已被应用建出后补齐 status 列），不写台账（幂等件，重复执行 no-op）
 - **非首启+新库并存的裁决**：以哨兵表为唯一判据，不用"目录里有没有文件"之类启发式
@@ -63,7 +63,7 @@ SSE（`/api/stream/search`）与 90s 生成（R-01 实测 AC-03）依赖 `buffer
 | migrator-post | 同上 | 一次性 | backend healthy | — |
 | nginx | 自研 | `wget -qO- localhost/ ≥200` | backend | `${PHOENIX_HTTP_PORT:-9080}:80` |
 
-`.env.example`：`PHOENIX_HTTP_PORT=9080 PG_PASSWORD=phoenix REDIS_PASSWORD= IMAGE_TAG=v1.2.1 JAVA_OPTS=… TZ=Asia/Shanghai`；镜像内零口令（build arg 不落层，运行注入，R-04）。
+`.env.example`：`PHOENIX_HTTP_PORT=9080 PG_PASSWORD=phoenix REDIS_PASSWORD= IMAGE_TAG=v1.2.0 JAVA_OPTS=… TZ=Asia/Shanghai`；镜像内零口令（build arg 不落层，运行注入，R-04）。
 
 ## 5. 首登种子（R-07，实测事实）
 - 登录校验：`SecureUtil.md5(LoginConstant.PASSWORD_SALT + 明文)`，`PASSWORD_SALT="phoenix"`（`LoginServiceImpl:68`）
@@ -72,7 +72,7 @@ SSE（`/api/stream/search`）与 90s 生成（R-01 实测 AC-03）依赖 `buffer
 - 改密路径复用现有「修改密码」接口（已存在 `PrivilegeUserServiceImpl`）
 
 ## 6. 离线交付与运维脚本（R-03/14）
-- `docker/scripts/build.sh`（buildx 双镜像+拉基础镜像）→ `save-offline.sh`：`docker save -o phoenix-v1.2.1-images.tar pgvector redis:7-alpine postgres:16-alpine nginx:1.27-alpine backend:v1.2.1 frontend:v1.2.1` + `sha256sum.txt`（约 2.3G，gzip 后 ~1.3G）
+- `docker/scripts/build.sh`（buildx 双镜像+拉基础镜像）→ `save-offline.sh`：`docker save -o phoenix-v1.2.0-images.tar pgvector redis:7-alpine postgres:16-alpine nginx:1.27-alpine backend:v1.2.0 frontend:v1.2.0` + `sha256sum.txt`（约 2.3G，gzip 后 ~1.3G）
 - `load-and-run.sh`（目标机）：`docker load -i` → `docker compose up -d`
 - `backup.sh`：容器内 `pg_dump -U phoenix -Fc phoenix > backup/phx_$(date).dump` + 卷清单说明；`upgrade.sh <vX.Y.Z>`：校验 releases 目录存在→compose 重跑 migrator→migrator-post；回滚指引=引用 `releases/vX.Y.Z/UPGRADE.md` 逆序章节（不重复造流程，R-14）
 - README（R-15）八节：一键起停/离线部署/首登改密/配置表/备份恢复/升级/故障排查/安全红线
@@ -101,5 +101,5 @@ SSE（`/api/stream/search`）与 90s 生成（R-01 实测 AC-03）依赖 `buffer
 
 ## 9. 与既有机制的衔接
 - 升级件序号权威在 `releases/v1.2.0/`（M3 已冻结）；新包只是**执行器**，不产生新 SQL（除哨兵表与 admin 种子，均在包内）
-- 里程碑：v1.2.0 发版后立 **v1.2.1** M0，本 spec 挂 M1；哨兵台账表为部署包私有（tbl_phoenix_release），不登记进 releases 序号体系（避免版本语义混淆——它属于包机制而非产品升级件，此点若你认为应入库 releases 请在确认时说）
+- 里程碑：经用户 09-30 明示改为**挤入 v1.2.0**（解冻重走 M2，v1.2.1 不再单独立项）；哨兵台账表为部署包私有（tbl_phoenix_release），不登记进 releases 序号体系（避免版本语义混淆——它属于包机制而非产品升级件，此点若你认为应入库 releases 请在确认时说）
 - 测试口径沿用项目无测试基建现实：AC-01~08 以真实部署/接口/断言输出为证据

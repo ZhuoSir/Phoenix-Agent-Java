@@ -1,4 +1,4 @@
-> 版本: v1.1.0 | 状态: 已确认 | 更新: 2026-09-30 | 确认人: 陈卓 | 确认日期: 2026-09-30
+> 版本: v1.4.0 | 状态: 已确认 | 更新: 2026-10-01 | 确认人: 陈卓 | 确认日期: 2026-09-30
 
 # 需求：一键部署 Docker 交付包（allinone-docker-packaging）
 
@@ -29,7 +29,7 @@
 ### 二、配置与初始化
 
 - **R-04** THE 部署包 SHALL 将所有环境相关配置（DB/Redis 主机与口令、JVM 堆、暴露端口、TZ/locale）经 `.env`/环境变量注入；镜像内不含任何明文口令与模型密钥
-- **R-05** WHEN 全新空数据卷首次启动 THE migrator SHALL 依次执行 `all_schema.sql → V1.2.0_01~05`（序号权威=releases 目录，执行序写入代码常量清单文件），并保证重复执行幂等（脚本本身已幂等，重跑 no-op 属预期）
+- **R-05** WHEN 全新空数据卷首次启动 THE migrator SHALL 依次执行 **`docker/init/00_baseline_sequences.sql`（5 个 demo 序列前置）→ `all_data.sql`（完整结构+数据基线，缺前置序列时其 1597 行必炸；不可与 all_schema 叠加——all_data 的 DROP TABLE 会级联删 owned 序列）→ `10_seed_admin.sql` → `releases/v1.2.0/sql/V1.2.0_01~05`**（以上全链已实测 0 报错：menus=24/用户/admin/默认标记=2 断言全中），并保证重复执行幂等
 - **R-06** WHEN backend 首次健康检查通过 THE 部署包 SHALL 自动重跑 `V1.2.0_01`（补 `tbl_harness_skills.status` 列，解决首启自建表顺序坑），失败则明确报错退出而非静默
 - **R-07** THE 首次初始化种子 SHALL 内置初始账号 **admin / 123456**（实测：口令哈希=`md5("phoenix"+密码)`，落点为包内 `docker/init/10_seed_admin.sql` 幂等 INSERT，不改仓库种子文件；哈希值 `f1c457c84af9bc85acaeb64bee218755`，AC-02 实登必验）；README 显著标注「装后首次登录立即改密」
 - **R-08** IF 检测到数据卷已有数据（非首次启动）THEN THE 部署包 SHALL 跳过 `all_schema/all_data` 基线初始化，仅按需执行尚未跑过的 releases 增量件（版本号记录表或哨兵对象判断，机制见 plan），不覆盖既有数据
@@ -78,12 +78,12 @@
 - **Q3 → 9 开头端口**：默认 **9080**（`.env` 可改，落 R-01/R-11/AC-07）
 - **Q4 → 未明确表态，按建议默认**：仅交付 `linux/amd64`（确认本需求时如有异议一并提出）
 - **Q5 → 移交 plan 期核实**：新环境种子完整性（菜单/权限是否已全在 all_data；缺则回本 spec 补 R 条款重确认）
-- **版本**：用户明示 **v1.2.1**（A-04 定稿）
+- **版本**：用户 09-30 明示 v1.2.1；**同日改判挤入 v1.2.0**（A-04 随之修订，待重确认）
 
 ## 假设
 
 - A-01 目标主机内存 ≥4G、磁盘 ≥20G（JVM 3G + PG + 镜像约 2.3G）
 - A-02 Docker ≥24 且含 compose v2 插件；有 root 或 docker 组权限
 - A-03 部署完成后，模型调用需出网可达 dashscope.aliyuncs.com / api.deepseek.com（完全断网环境功能降级为"可登录不可生成"，属预期）
-- A-04 交付包版本随产品版本走，**定稿 v1.2.1**（用户 2026-09-30 确认；语义=交付物工程+数据卫生修复，产品代码零变更，取 PATCH）
+- A-04 交付包**挂里程碑 v1.2.0**（用户 2026-09-30 明示挤入；语义=交付物工程+数据卫生修复，产品代码零变更，随 MINOR 主版本发版；镜像标签口径 = v1.2.0）
 - A-05 现网 `phoenix-pg`/`phoenix-redis` 两个开发容器与本交付包互不干扰（compose project name 隔离，宿主端口错开或默认不映射）

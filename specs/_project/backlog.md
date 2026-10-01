@@ -38,3 +38,7 @@
   分支 `feature/agent-config-ai-generate`（未合并，合并条件是 tasks 全勾 + 证据齐）；走查清单见该 spec `changelog.md` 末尾「界面走查待办」。
 - `bugs.md` 中 11 条「新建」缺陷待处置（`BUG-02/03/04/05/08/11/14/18/21/24/25`）；其中 `BUG-04` 的「不修复」**需用户批准**、`BUG-18` 的修复口径**需产品决策**。
 - 里程碑 `v1.2.0` 已立项并挂接（M0+M1 完成，BL-16 已交付）；下一步触发词：「**冻结 v1.2.0**」（M2，会先列差距）或「**汇总 v1.2.0**」（M3，需先满足冻结前置）。
+
+- **BL-18 前端 API 前缀治理**（关联 BUG-33）：requestClient baseURL 与代码内 /api 路径二选一；改动面=apps/admin-ui/src/api/** 与 graph.ts fetch 处；做完可撤 nginx 折叠规则。优先级 P2；待确认。
+
+- **BL-19 会话文件面板（生成文件可见+可下载）**：方案已成稿 `specs/20261001_agent-session-files/design-proposal.md`（v0.1.0 草案，含 T1~T10 与 Q1~Q4）；待用户回答开放问题后按 spec 流程立项，建议挂 v1.3.0。

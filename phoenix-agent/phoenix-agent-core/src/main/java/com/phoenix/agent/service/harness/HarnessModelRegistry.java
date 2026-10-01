@@ -6,6 +6,7 @@ import com.phoenix.data.enums.ModelType;
 import com.phoenix.data.service.aimodelconfig.ModelConfigDataService;
 import io.agentscope.core.embedding.EmbeddingModel;
 import io.agentscope.core.embedding.dashscope.DashScopeTextEmbedding;
+import io.agentscope.core.model.GenerateOptions;
 import io.agentscope.extensions.model.openai.OpenAIChatModel;
 import io.agentscope.extensions.model.openai.formatter.DeepSeekFormatter;
 import lombok.RequiredArgsConstructor;
@@ -49,6 +50,12 @@ public class HarnessModelRegistry {
                                     .baseUrl(config.getBaseUrl())
                                     .stream(true)
                                     .formatter(new DeepSeekFormatter())
+                                    // BUG-35：模型管理的 maxTokens/temperature 此前从未传给对话请求，
+                                    // 长输出被服务端默认上限截断
+                                    .generateOptions(GenerateOptions.builder()
+                                            .maxTokens(config.getMaxTokens())
+                                            .temperature(config.getTemperature())
+                                            .build())
                                     .build();
                         }
                     } catch (Exception e) {
@@ -89,6 +96,10 @@ public class HarnessModelRegistry {
                     .baseUrl(config.getBaseUrl())
                     .stream(true)
                     .formatter(new DeepSeekFormatter())
+                    .generateOptions(GenerateOptions.builder()
+                            .maxTokens(config.getMaxTokens())
+                            .temperature(config.getTemperature())
+                            .build())
                     .build();
         });
     }
