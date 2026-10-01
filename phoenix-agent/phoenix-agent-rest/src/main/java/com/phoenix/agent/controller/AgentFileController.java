@@ -50,7 +50,8 @@ public class AgentFileController {
     public Mono<ReturnVo<List<AgentFileVO>>> list(@RequestParam String sessionId) {
         String userId = StpUtil.getLoginIdAsString();
         return Mono.fromCallable(() -> ReturnVo.ok("操作成功!", agentFileService.listBySession(sessionId, userId)))
-                .subscribeOn(Schedulers.boundedElastic());
+                .subscribeOn(Schedulers.boundedElastic())
+                .onErrorResume(AgentFileException.class, e -> Mono.just(ReturnVo.fail(e.getMessage(), e.getCode())));
     }
 
     @GetMapping("/{id}/download")
@@ -82,7 +83,8 @@ public class AgentFileController {
         return Mono.fromCallable(() -> {
             agentFileService.logicalDelete(id, userId);
             return ReturnVo.ok("删除成功!", Boolean.TRUE);
-        }).subscribeOn(Schedulers.boundedElastic());
+        }).subscribeOn(Schedulers.boundedElastic())
+          .onErrorResume(AgentFileException.class, e -> Mono.just(ReturnVo.fail(e.getMessage(), e.getCode())));
     }
 
     /**
