@@ -1,5 +1,8 @@
 # Changelog: allinone-docker-packaging
 
+## max_tokens 表单放开（2026-10-01，验收期反馈）
+- 用户指出 10000 上限过小：定位为前端两处硬编码（校验规则 max:10_000 + ElInputNumber :max）——后端/库表本无限制；已放开为纯手填（min 100 保留），提示语说明 token 语义与"超模型上限按模型截断"；dist 重建+镜像重制+9080 实测 200。deepseek/qwen 现值仍是 10000，用户可在模型管理自行改大
+
 ## 用户 UI 验收第三轮：长回复截半（2026-10-01，BUG-35）
 - 用户报告智能体执行到一半停 → 定位：HarnessModelRegistry 构造 OpenAIChatModel 时不传 GenerateOptions，模型管理 max_tokens 对 harness 链路从未生效；Spring AI 路径（生成/图节点）有传（DynamicModelFactory:65）——只有对话智能体链路漏
 - 修复+部署+实测（400|160000 写到尾，9680 字符完整）；登记 BUG-35 已修复(v1.2.0)
