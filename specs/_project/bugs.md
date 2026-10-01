@@ -1,6 +1,7 @@
 # Bug 列表 · Phoenix-Agent-Java
 > 编号永久不复用 | 状态必须带版本 | 修 bug 的 commit footer 必带 `Bug: BUG-xx`
 > 状态机: 新建 → 已规划(vX.Y.Z) → 已修复(vX.Y.Z) → 已验证(vX.Y.Z) → 已发布(vX.Y.Z)；旁路: 已延期(vA→vB) / 不修复(原因+批准人)
+> **v1.2.0 发布注记（2026-10-01）**：本版本全部 21 条修复（16 已修复+5 已验证→已发布+1 已规避）随 tag v1.2.0 出；仅复验过的 5 条按状态机标「已发布」，其余「已修复(v1.2.0)」即表示修复代码已含于 v1.2.0（已发布未逐条复验口径），追溯以 tag 内容为准。
 > **编号迁移（2026-09-27）**：早期清单用 `B-01~B-20`，按细则一并迁为 `BUG-01~BUG-20`（一一对应，旧编号保留在各条「关联」列，历史 commit/changelog 里的 `B-xx` 仍可对照）。
 > **版本列说明**：里程碑 **v1.2.0** 已立项（2026-09-27，见 `releases/v1.2.0/MILESTONE.md`），本版本挂接的 19 条修复项中 BUG-20/22/23/30 经用户界面走查/复测于 2026-09-30 转「已验证(v1.2.0)」，其余为「已修复(v1.2.0)」；
 > 「已验证(v1.2.0)」需重跑复现步骤且验证人=用户或其明确委托；M4 发版时批量转「已发布(v1.2.0)」+日期。
@@ -9,7 +10,7 @@
 
 | 编号 | 标题 | 严重度 | 发现于 | 状态 | 修复版本 | 关联 |
 |---|---|---|---|---|---|---|
-| BUG-01 | `all_schema.sql` 缺 5 个序列 → 全新环境导入必失败 | P1 | 本地部署(2026-09-27) | 已验证(v1.2.0) | v1.2.0 | 原 B-01; commit 34877da；已合并 main(c90071d)；09-30 用户委托 agent 复验（复现步骤全过，明细见文末） |
+| BUG-01 | `all_schema.sql` 缺 5 个序列 → 全新环境导入必失败 | P1 | 本地部署(2026-09-27) | 已发布(v1.2.0) 2026-10-01 | v1.2.0 | 原 B-01; commit 34877da；已合并 main(c90071d)；09-30 用户委托 agent 复验（复现步骤全过，明细见文末） |
 | BUG-02 | HumanInTheLoop 未挂 skillRepository，技能静默加载不到 | P1 | 本地部署(2026-09-27) | 新建 | - | 原 B-02; 一行修复 |
 | BUG-03 | 前台账号创建时密码无必填校验 → 制造永久无法登录的死账号 | P2 | 本地部署排障(2026-09-27) | 新建 | - | 原 B-03 |
 | BUG-04 | 双账号体系：两张表、状态语义相反、密码互不相通 | P2 | 本地部署排障(2026-09-27) | 新建 | - | 原 B-04; 设计问题，建议立项/不修复**待用户批准** |
@@ -28,17 +29,17 @@
 | BUG-17 | 图链路在非 HTTP 调用方取 Sa-Token 登录态直接抛异常 | P2 | spec Implement中(20260927_dynamic-agent-types T-09) | 已修复(v1.2.0) | v1.2.0 | 原 B-17; commit e74e7ec |
 | BUG-18 | QA/FAQ 类型知识只向量化「问题」，答案不参与检索 | P2 | spec Implement中(20260927_dynamic-agent-types T-16) | 新建 | - | 原 B-18; 需产品定口径 |
 | BUG-19 | harness 对话入参缺失时返回 500（应给明确错误码） | P3 | spec Implement中(20260927_dynamic-agent-types T-11) | 已修复(v1.2.0) | v1.2.0 | 原 B-19; commit dc9b333 |
-| BUG-20 | 启用模型会把同类型其他模型一并置为启用（SQL 与注释相反） | P1 | spec Implement中(20260927_agent-config-ai-generate T-02) | 已验证(v1.2.0) | v1.2.0 | 原 B-20; commit b8f728a（启用改多值集合，方法已删）；已随 merge c90071d 合并 main |
+| BUG-20 | 启用模型会把同类型其他模型一并置为启用（SQL 与注释相反） | P1 | spec Implement中(20260927_agent-config-ai-generate T-02) | 已发布(v1.2.0) 2026-10-01 | v1.2.0 | 原 B-20; commit b8f728a（启用改多值集合，方法已删）；已随 merge c90071d 合并 main |
 | BUG-21 | 模型管理「模型类型」列把 AUDIO 显示成「嵌入模型」 | P3 | 对话中(2026-09-27) | 新建 | - | `views/modelconf/index.vue:458`（三类型都能设默认后才暴露） |
-| BUG-22 | AI 生成「描述」返回整段 JSON（用户实测） | P2 | 对话中(2026-09-27) | 已验证(v1.2.0) | v1.2.0 | Spec: 20260927_agent-config-ai-generate; commit edd9ad9；已合并 main(c90071d)；用户复测确认(09-30) |
-| BUG-23 | 生成超时 60s 切断**已成功**的调用（实测耗时 45~70s） | P2 | spec Implement中(20260927_agent-config-ai-generate T-09) | 已验证(v1.2.0) | v1.2.0 | 同 commit edd9ad9（缓解：90s 且可配置）；已随 merge c90071d 合并 main |
+| BUG-22 | AI 生成「描述」返回整段 JSON（用户实测） | P2 | 对话中(2026-09-27) | 已发布(v1.2.0) 2026-10-01 | v1.2.0 | Spec: 20260927_agent-config-ai-generate; commit edd9ad9；已合并 main(c90071d)；用户复测确认(09-30) |
+| BUG-23 | 生成超时 60s 切断**已成功**的调用（实测耗时 45~70s） | P2 | spec Implement中(20260927_agent-config-ai-generate T-09) | 已发布(v1.2.0) 2026-10-01 | v1.2.0 | 同 commit edd9ad9（缓解：90s 且可配置）；已随 merge c90071d 合并 main |
 | BUG-24 | 响应式超时无法中断底层阻塞调用（超时后仍在消耗 token） | P3 | spec Implement中(20260927_agent-config-ai-generate T-09) | 新建 | - | plan 风险⑦已接受该限制，建议转技术债 |
 | BUG-25 | 前端 dev 命令未按 `.env.development` 的 `VITE_PORT` 起端口（5777 起成 5173） | P3 | 对话中(2026-09-27) | 新建 | - | 临时规避：启动加 `--port 5777` |
 | BUG-26 | 技能上传前端未带 multipart 头 → 上传 HTTP 415 | P3 | spec Implement中(20260927_agent-skill-management) | 已修复(v1.2.0) | v1.2.0 | `api/core/skill.ts:80` 补 `Content-Type: multipart/form-data` |
 | BUG-27 | 技能 ZIP 校验报错信息误导（真实规则是「条目须有根目录」） | P3 | spec Implement中(20260927_agent-skill-management) | 已修复(v1.2.0) | v1.2.0 | 新增 `SkillZipSanitizer`（剥 `__MACOSX/`、`.DS_Store`、`._*`，统一包一层合成根） |
 | BUG-28 | `ReturnVo.ok(String)` 命中 msg 重载 → 误把 data 当 msg 传出 | P3 | spec Implement中(20260927_agent-skill-management) | 已修复(v1.2.0) | v1.2.0 | `phoenix-tool/.../ReturnVo.java:84`；改用两参 `ok(msg, data)` |
 | BUG-29 | `tbl_platform_group_agent_info.agent_id` 为 varchar，与 bigint 的 agentId 比较报错 | P3 | spec Implement中(20260927_agent-skill-management) | 已修复(v1.2.0) | v1.2.0 | 代码侧改 `String.valueOf(agentId)`；**列类型不一致的根因仍在**，建议统一 |
-| BUG-30 | AI 生成请求走全局 30s 超时（实测生成 45~90s）→ 前端掐断请求、按钮转圈无结果（用户实测） | P2 | 界面走查(2026-09-30) | 已验证(v1.2.0) | v1.2.0 | Spec: 20260927_agent-config-ai-generate T-11；`api/core/agentProfile.ts` 单独设 `timeout: 120_000` |
+| BUG-30 | AI 生成请求走全局 30s 超时（实测生成 45~90s）→ 前端掐断请求、按钮转圈无结果（用户实测） | P2 | 界面走查(2026-09-30) | 已发布(v1.2.0) 2026-10-01 | v1.2.0 | Spec: 20260927_agent-config-ai-generate T-11；`api/core/agentProfile.ts` 单独设 `timeout: 120_000` |
 | BUG-31 | 全新库首启 NPE：自注册智能体 `createHarnessAgent()` 在 `saveBySn` 之前读库，`HumanInTheLoop.java:87` 对 null agent 取 description 崩溃 | P1 | 交付包首启实测(20260930_allinone-docker-packaging) | 新建 | - | 交付包已用 `docker/init/20_seed_runtime_agents.sql` 补 5 个 sn 行规避（不改码，R-16）；根治=判空，建议随 v1.2.0 M4 前或 v1.2.1 修（挤入后归属 v1.2.0 发现） |
 | BUG-32 | deepseek 模型走 AI 生成双字段时 42013（一次空 content、一次 JSON 未被解析出对象；qwen 同链路正常） | P2 | 交付包实测(20260930_allinone-docker-packaging) | 新建 | - | 疑输出形态（reasoning 混排/转义）与解析容错不足；建议增强 `AgentProfileGenerationService` 解析 + 模型差异回归 |
 | BUG-33 | 前端生产包 API 双重 /api 前缀：axios baseURL=/api 且代码路径自带 /api（fetch 处 API_BASE_URL 同），**生产构建从未成功部署过**，dev 全靠 vite proxy rewrite 掩盖；浏览器实测登录 401 | P1 | 交付包 9080 用户实测(20260930_allinone-docker-packaging) | 已规避(v1.2.0) | - | 交付包 nginx 完全复刻 dev proxy 语义：凡 /api/* 剥一层再转后端（代码两种写法并存：双前缀域 login/agent/model + **单前缀 platform 域**，第一版只折双前缀导致 /api/platform/group-info/page 404→500，10-01 用户实测抓到已修正）；两形态 9/9 断言全绿；**根治=前端 baseURL 统一**（BL-18），nginx 折叠属包层适配非产品修复 |
