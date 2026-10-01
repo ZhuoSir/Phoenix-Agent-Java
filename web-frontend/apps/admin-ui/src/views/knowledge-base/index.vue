@@ -7,6 +7,7 @@ import { onMounted, ref } from 'vue';
 
 import {
   ElButton,
+  ElDialog,
   ElDrawer,
   ElForm,
   ElFormItem,
