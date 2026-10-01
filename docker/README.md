@@ -47,7 +47,7 @@ sh scripts/verify.sh          # 7 项断言全 PASS 即部署成功
 | 对话流式断流/生成 30s 报错 | 本包 nginx 已配 `buffering off/300s`；若前面还有企业代理，需在代理层同样放行 |
 | 模型调用 Connection refused 且本机开过 Clash/系统代理 | 仅影响**非容器**本地起服：JDK 会注入死代理属性（BUG-30 环境坑）。容器内无此问题；本地调试用 `-DsocksProxyHost= -Dhttp.proxyHost=` 或关掉系统代理 |
 | Apple Silicon 上跑交付镜像 | `--amd64` 产物经 qemu 可运行但慢；本机构建验证不带参数即可 |
-| 接口 404/未授权 | v1.2.2 起前端直出后端真实路径，反代按 /api、/platform、/auth 前缀透传即可；≤v1.2.1 旧 dist 需同步升级（当时靠 nginx 剥层折叠） |
+| 接口 404/未授权 | v1.3.0 起前端直出后端真实路径，反代按 /api、/platform、/auth 前缀透传即可；v1.2.0~1.2.1 的旧 dist 需同步升级（v1.3.0 起无需折叠）（当时靠 nginx 剥层折叠） |
 | 首登密码错误 | 确认库内 admin 行：`docker compose exec postgres psql -U phoenix -d phoenix -c "select username,status,del_flag from tbl_privilege_user"` |
 
 ## 8. 安全红线
