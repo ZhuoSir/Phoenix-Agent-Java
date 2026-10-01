@@ -14,7 +14,7 @@ ENV JAVA_BIN=${JAVA_BIN} \
     JAVA_OPTS="-XX:MaxRAMPercentage=70 -XX:+UseContainerSupport" \
     TZ=Asia/Shanghai \
     LANG=C.UTF-8
-RUN mkdir -p /app/logs \
+RUN mkdir -p /app/logs /app/uploads \
     && (chown -R 10001:10001 /app 2>/dev/null || chmod -R 777 /app)
 WORKDIR /app
 COPY --chown=app:app docker/.stage/phoenix-admin.jar /app/phoenix-admin.jar
