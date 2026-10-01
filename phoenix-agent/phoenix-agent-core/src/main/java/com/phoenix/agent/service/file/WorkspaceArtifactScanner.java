@@ -42,11 +42,20 @@ public class WorkspaceArtifactScanner {
     private String workspaceRoot;
 
     private static final Set<String> SKIP_NAME_PREFIX = Set.of(".");
-    private static final Set<String> SKIP_DIRS = Set.of("sessions", "tasks");
+    private static final Set<String> SKIP_DIRS = Set.of("sessions", "tasks", ".index");
     private static final Set<String> SKIP_SUFFIX = Set.of(".jsonl", ".marker", ".db");
+    /** 框架内部状态文件（记忆固化/会话索引等），不是用户产物（实测 2026-10-01 捕获到 MEMORY.md/consolidation_state）。 */
+    private static final Set<String> INTERNAL_FILES = Set.of("MEMORY.md", "consolidation_state", "sessions.json",
+            "memory.md", "AGENTS.md.bak");
 
     /** 扫描并登记本会话新产物；返回新登记的 AgentFile 列表（空=无新文件）。异常吞掉只 WARN，不阻断会话。 */
     public List<AgentFile> scanAndRegister(Long agentId, String sn, String userId, String sessionId) {
+        return scanAndRegister(agentId, sn, userId, sessionId, null);
+    }
+
+    /** turnStart 非空时只登记该时刻后落盘的产出；null=全量补登（storeKey 去重防重复）。 */
+    public List<AgentFile> scanAndRegister(Long agentId, String sn, String userId, String sessionId,
+            Instant turnStart) {
         List<AgentFile> registered = new ArrayList<>();
         try {
             Path root = Paths.get(workspaceRoot).toAbsolutePath().normalize();
@@ -59,6 +68,7 @@ public class WorkspaceArtifactScanner {
                     walk.filter(Files::isRegularFile)
                         .filter(f -> !isInternal(f, dir))
                         .filter(this::writeSettled)
+                        .filter(f -> afterTurn(f, turnStart))
                         .forEach(f -> registerQuietly(registered, root, f, agentId, sessionId, userId));
                 }
             }
@@ -69,9 +79,13 @@ public class WorkspaceArtifactScanner {
         return registered;
     }
 
-    /** {root}/{userId}/agents/{agent-N|N|sn} 与 {root}/agents/{sn}（无用户隔离的历史布局）兼容并扫。 */
+    /** 实测(2026-10-01)：LOCAL write_file 相对 workspace 根解析 → 产物直接落 {root}/{userId}/...
+     *  故扫整棵用户目录（含任意子层），并兼容 {root}/agents/{key} 历史布局；agent 归属由调用轮次决定。 */
     private List<Path> candidateAgentDirs(Path root, String userId, Long agentId, String sn) {
         List<Path> dirs = new ArrayList<>();
+        if (userId != null && !userId.isBlank()) {
+            dirs.add(root.resolve(userId));
+        }
         List<String> keys = new ArrayList<>();
         if (agentId != null) {
             keys.add("agent-" + agentId);
@@ -81,9 +95,6 @@ public class WorkspaceArtifactScanner {
             keys.add(sn);
         }
         for (String key : keys) {
-            if (userId != null && !userId.isBlank()) {
-                dirs.add(root.resolve(userId).resolve("agents").resolve(key));
-            }
             dirs.add(root.resolve("agents").resolve(key));
         }
         return dirs;
@@ -91,6 +102,9 @@ public class WorkspaceArtifactScanner {
 
     private boolean isInternal(Path file, Path agentDir) {
         String name = file.getFileName().toString();
+        if (INTERNAL_FILES.contains(name)) {
+            return true;
+        }
         if (SKIP_NAME_PREFIX.stream().anyMatch(name::startsWith) && !name.contains(".")) {
             return true;
         }
@@ -106,6 +120,19 @@ public class WorkspaceArtifactScanner {
             }
         }
         return false;
+    }
+
+    /** turnStart 窗口：仅收本轮（或补登全量）产出；容差 3s 吸收时钟抖动。 */
+    private boolean afterTurn(Path file, Instant turnStart) {
+        if (turnStart == null) {
+            return true;
+        }
+        try {
+            return Files.getLastModifiedTime(file).toInstant().isAfter(turnStart.minusSeconds(3));
+        }
+        catch (IOException e) {
+            return false;
+        }
     }
 
     /** 最后修改距今 <2s 视为可能仍在写，本轮跳过（下轮扫描再收）。 */

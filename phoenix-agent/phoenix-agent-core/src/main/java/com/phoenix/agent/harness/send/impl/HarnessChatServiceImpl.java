@@ -116,7 +116,8 @@ public class HarnessChatServiceImpl implements HarnessChatService {
             .streamEvents(buildUserMessage(request), buildRuntimeContext(request, injection.block()))
             .map(event -> toNodeOutput(event, sessionId));
         // BL-19：轮末扫 workspace 产物（LOCAL 主捕获通路），有新文件则以 agent_files 事件收尾前追加
-        Flux<NodeOutput> filesTail = Flux.defer(() -> artifactsTail(request));
+        java.time.Instant turnStart = java.time.Instant.now();
+        Flux<NodeOutput> filesTail = Flux.defer(() -> artifactsTail(request, turnStart));
         if (injection.skillNames().isEmpty()) {
             return body.concatWith(filesTail);
         }
@@ -127,9 +128,10 @@ public class HarnessChatServiceImpl implements HarnessChatService {
                 filesTail);
     }
 
-    private Flux<NodeOutput> artifactsTail(HarnessRequest request) {
+    private Flux<NodeOutput> artifactsTail(HarnessRequest request, java.time.Instant turnStart) {
         List<AgentFile> files = workspaceArtifactScanner.scanAndRegister(
-                request.getAgentId(), request.getHarnessSn(), request.getUserId(), request.getSessionId());
+                request.getAgentId(), request.getHarnessSn(), request.getUserId(), request.getSessionId(),
+                turnStart);
         if (files.isEmpty()) {
             return Flux.empty();
         }
