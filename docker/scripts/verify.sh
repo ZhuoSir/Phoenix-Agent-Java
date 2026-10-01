@@ -32,10 +32,14 @@ step "[4] compose 全绿 + /echo/ok 经 nginx"
 code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 8 "http://127.0.0.1:${PHOENIX_HTTP_PORT:-9080}/echo/ok" || true)
 [ "$code" = "200" ] && ok || no "GET /echo/ok -> ${code:-n/a}"
 
-step "[5] admin/123456 首登返回成功"
+step "[5] 登录（浏览器双前缀形态 /api/api/*）"
 body=$(curl -s --max-time 10 -X POST -H 'Content-Type: application/json' \
-  -d '{"username":"admin","password":"123456"}' "http://127.0.0.1:${PHOENIX_HTTP_PORT:-9080}/api/privilege/auth/login" || true)
-echo "$body" | grep -q '"success": *true' && ok || no "$body"
+  -d '{"username":"admin","password":"123456"}' "http://127.0.0.1:${PHOENIX_HTTP_PORT:-9080}/api/api/privilege/auth/login" || true)
+echo "$body" | grep -q '"code":"100"' && ok || no "$(echo $body | head -c 60)"
+
+step "[9] platform 域（浏览器单前缀形态 /api/platform/*）"
+b9=$(curl -s --max-time 10 "http://127.0.0.1:${PHOENIX_HTTP_PORT:-9080}/api/platform/group-info/page?page=1&size=200" | grep -cE '"code":|success' || true)
+[ "${b9:-0}" -ge 1 ] && ok || no "group-info/page 未按 dev 语义折叠（BUG-33）"
 
 step "[6] 迁移台账齐(baseline + V 件)"
 n=$(docker compose exec -T postgres psql -U phoenix -d phoenix -tAc "select count(*) from tbl_phoenix_release" 2>/dev/null || echo 0)

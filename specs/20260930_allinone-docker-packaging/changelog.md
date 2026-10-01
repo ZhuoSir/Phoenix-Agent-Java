@@ -1,5 +1,9 @@
 # Changelog: allinone-docker-packaging
 
+## 用户 UI 验收第二轮：platform 域 500（2026-10-01）
+- 技能管理「发布/授权」弹窗请求 /api/platform/group-info/page → 500。根因仍是 BUG-33 家族：后端两种前缀约定并存（platform 域 Controller **无 /api 前缀**），我第一版折叠只处理双前缀形态、第二版"只折双前缀"又把单前缀透传成 /api/platform/*——正确语义是**无条件剥一层 /api（与 dev proxy rewrite 完全等价）**。修正后 9/9 断言全绿（新增 [9] platform 形态断言；[5] 改为浏览器真实双前缀形态，此前它测的是不存在的 URL 形态，误导了一轮，教训已记）
+- 同步完成：dev 库 55 表全量迁移进交付栈（pg_dump/restore + 台账标记 + admin 重置 123456）、B 栈（宿主机 java/vite + phoenix-pg/redis 容器）全部停止
+
 ## 用户 UI 验收暴露真缺陷（2026-10-01）
 - 浏览器登录 401 → 定位为**前端生产包双重 /api 前缀（BUG-33, P1）**：dev 的 vite proxy rewrite 掩盖了"生产构建从未成功部署"的事实；交付包 nginx 增加同款折叠规则（精确版：仅 /api/api/* 折叠，标准 /api/* 透传；第一版全量 rewrite 误伤单前缀，verify [5] 抓到后已修正）后 login/menus/list/SSE 实测全通 → 状态记「已规避(v1.2.0)」，根治走 BL-18
 - 巡检顺带发现 **BUG-34**：model-config list 返回明文 apiKey（既有产品行为，新建待排期）
