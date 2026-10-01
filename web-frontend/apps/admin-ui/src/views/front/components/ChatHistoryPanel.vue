@@ -4,13 +4,13 @@ import { storeToRefs } from 'pinia';
 import { useAgentStore, useChatStore } from '@phoenix/chat-shared';
 import { useUserStore } from '@vben/stores';
 import { ElMessage, ElMessageBox, ElTooltip, ElIcon } from 'element-plus';
-import { FolderOpened, Fold, More } from '@element-plus/icons-vue';
+import { Fold, More } from '@element-plus/icons-vue';
 
 
 import { useAuthStore } from '#/store';
 import SystemSettingsModal from './SystemSettingsModal.vue';
 
-const emit = defineEmits(['collapse', 'open-files'])
+const emit = defineEmits(['collapse'])
 
 const settingsModalRef = ref<InstanceType<typeof SystemSettingsModal>>();
 
@@ -287,14 +287,6 @@ defineExpose({
                 <button type="button" class="history-panel__agent-collapse" @click="handleCloseChatHistoryPanel">
                   <el-icon :size="16">
                     <Fold />
-                  </el-icon>
-                </button>
-              </el-tooltip>
-              <!-- BL-19：历史面板展开态的文件抽屉入口（收起按钮右侧；折叠态入口在 collapsed-bar） -->
-              <el-tooltip content="本会话文件" placement="bottom" :show-after="300">
-                <button type="button" class="history-panel__agent-collapse" @click="emit('open-files')">
-                  <el-icon :size="16">
-                    <FolderOpened />
                   </el-icon>
                 </button>
               </el-tooltip>

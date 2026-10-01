@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { storeToRefs } from 'pinia';
 import { useAgentStore, useChatStore } from '@phoenix/chat-shared';
 import type { Agent as ChatAgent, ChatSession } from '@phoenix/chat-shared';
-import { Expand, FolderOpened, Plus } from '@element-plus/icons-vue';
+import { Expand, Plus } from '@element-plus/icons-vue';
 import { ElButton, ElIcon, ElTooltip } from 'element-plus';
 
 import { getAgentListApi } from '#/api/front/agent';
@@ -186,7 +186,7 @@ init();
   </div>
   <div v-else class="chat-layout">
     <aside class="chat-layout__history" :class="{'hidden': chatHistoryPanelCollapsed}">
-      <ChatHistoryPanel ref="chatHistoryPanelRef" @collapse="handleCloseChatHistoryPanel" @open-files="filesPanelRef?.open()"/>
+      <ChatHistoryPanel ref="chatHistoryPanelRef" @collapse="handleCloseChatHistoryPanel"/>
     </aside>
 
     <section class="chat-layout__main relative">
@@ -231,11 +231,6 @@ init();
               <el-icon><Expand /></el-icon>
             </button>
           </el-tooltip>
-          <el-tooltip content="本会话文件" placement="bottom" :show-after="300">
-            <button type="button" class="collapsed-bar__btn" @click="filesPanelRef?.open()">
-              <el-icon><FolderOpened /></el-icon>
-            </button>
-          </el-tooltip>
           <el-tooltip content="开启新对话" placement="bottom" :show-after="300">
             <button
               type="button"
@@ -252,7 +247,7 @@ init();
       </div>
       <ChatFilesPanel ref="filesPanelRef" />
       <div class="chat-layout__composer">
-        <ChatComposer />
+        <ChatComposer @open-files="filesPanelRef?.open()" />
       </div>
 
       <el-tooltip :content="agentPanelCollapsed ? '展开智能体列表' : '收起智能体列表'" placement="left" :show-after="300">

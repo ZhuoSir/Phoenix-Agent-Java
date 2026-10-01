@@ -1,9 +1,10 @@
 <script setup lang="ts">
+const emit = defineEmits(['open-files'])
 import { computed, nextTick, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useAgentStore, useChatStore } from '@phoenix/chat-shared';
 import { ElMessage, ElIcon, ElOption, ElSelect, ElTooltip } from 'element-plus';
-import { ArrowDown, ArrowUp } from '@element-plus/icons-vue';
+import { FolderOpened, ArrowDown, ArrowUp } from '@element-plus/icons-vue';
 
 import { getMySkillsApi } from '#/api/front/agent';
 
@@ -110,48 +111,55 @@ function handleKeydown(event: KeyboardEvent) {
 
 <template>
   <div class="composer">
-    <div
-      v-if="activeAgent?.type === 'harness' && mySkills.length > 0"
-      class="mb-2 flex items-center gap-2 px-1"
-    >
-      <span class="text-xs text-gray-500">显式技能</span>
-      <ElSelect
-        v-model="selectedSkillIds"
-        class="min-w-[220px]"
-        clearable
-        collapse-tags
-        collapse-tags-tooltip
-        filterable
-        multiple
-        placeholder="不选则由模型自主匹配"
-        size="small"
+    <!-- BL-19 重排：对话上方操作条——技能、预设问题左列并列，文件列表最右 -->
+    <div class="composer__ops-bar">
+      <div
+        v-if="activeAgent?.type === 'harness' && mySkills.length > 0"
+        class="composer__ops-skills"
       >
-        <ElOption
-          v-for="skill in mySkills"
-          :key="skill.id"
-          :label="skill.name"
-          :value="skill.id"
-        />
-      </ElSelect>
-      <span class="text-xs text-gray-400">勾选后本轮强制执行所选技能</span>
+        <span class="text-xs text-gray-500">显式技能</span>
+        <ElSelect
+          v-model="selectedSkillIds"
+          class="min-w-[200px]"
+          clearable
+          collapse-tags
+          collapse-tags-tooltip
+          filterable
+          multiple
+          placeholder="不选则由模型自主匹配（勾选后本轮强制执行）"
+          size="small"
+        >
+          <ElOption
+            v-for="skill in mySkills"
+            :key="skill.id"
+            :label="skill.name"
+            :value="skill.id"
+          />
+        </ElSelect>
+      </div>
+      <button
+        type="button"
+        class="composer__ops-chip"
+        @click="presetCollapsed = !presetCollapsed"
+      >
+        预设问题
+        <el-icon class="composer__ops-chip-icon"><ArrowUp v-if="!presetCollapsed" /><ArrowDown v-else /></el-icon>
+      </button>
+      <span class="composer__ops-spacer" />
+      <button
+        type="button"
+        class="composer__ops-chip composer__ops-chip--files"
+        @click="emit('open-files')"
+      >
+        <el-icon class="composer__ops-chip-icon"><FolderOpened /></el-icon>
+        文件列表
+      </button>
     </div>
 
-    <div class="composer__preset">
-      <el-tooltip v-if="!presetCollapsed" content="隐藏预设问题">
-        <div class="composer__preset-close" @click="presetCollapsed = !presetCollapsed">
-          <el-icon
-            class="composer__preset-toggle"
-            :class="{ collapsed: presetCollapsed }"
-          >
-            <ArrowUp v-if="presetCollapsed" />
-            <ArrowDown v-else />
-          </el-icon>
-        </div>
-      </el-tooltip>
-      <div v-show="!presetCollapsed" class="composer__preset-body">
+    <div v-show="!presetCollapsed" class="composer__preset">
+      <div class="composer__preset-body">
         <PresetQuestions @select="handlePresetQuestionClick" />
       </div>
-
     </div>
     <form class="composer__inner" @submit.prevent="handleSubmit">
       <div
@@ -376,4 +384,32 @@ function handleKeydown(event: KeyboardEvent) {
     margin-top: 8px;
   }
 }
+
+.composer__ops-bar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 0 1px 8px;
+}
+.composer__ops-skills {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.composer__ops-spacer { flex: 1; }
+.composer__ops-chip {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  padding: 4px 10px;
+  font-size: 12px;
+  color: #606266;
+  cursor: pointer;
+  background: #fff;
+  border: 1px solid var(--el-border-color-lighter, #ebeef5);
+  border-radius: 14px;
+}
+.composer__ops-chip:hover { color: var(--el-color-primary, #409eff); border-color: var(--el-color-primary-light-5, #a0cfff); }
+.composer__ops-chip--files { color: #337ecc; }
+.composer__ops-chip-icon { font-size: 13px; }
 </style>
