@@ -59,11 +59,11 @@
   验证方式: 重建滚动后 verify 11 断言全绿；compose down/up 迁移台账一致
   验收标准: 无新对外端口；存量数据升级一遍到位（幂等）
 
-- [ ] T-10 E2E 全链 + AC-01~06 留证（重点 AC-02 双 agent 复用、AC-04 迁移零感知对照、AC-05 解绑即停）
+- [x] T-10 E2E 全链 + AC-01~06 留证（重点 AC-02 双 agent 复用、AC-04 迁移零感知对照、AC-05 解绑即停）
   关联: 全部 | 依赖: T-01~T-09
   验证方式: curl/psql/SSE 命令输出全录 artifacts；对照表逐 AC 红绿
   验收标准: 十项全绿可勾
 
-- [ ] T-11 收口：artifacts.md、completion.md、changelog、backlog 销账、MILESTONE 推进、合并 main（发版仍等你指令，用户既定：v1.3.0 续收）
+- [x] T-11 收口：artifacts.md、completion.md、changelog、backlog 销账、MILESTONE 推进、合并 main（发版仍等你指令，用户既定：v1.3.0 续收）
   关联: R-20~22 | 依赖: T-10
   验收标准: git diff main 无 spec 外越界改动；三重确认门全绿
