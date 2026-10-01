@@ -2,8 +2,7 @@
 import { computed, nextTick, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useAgentStore, useChatStore } from '@phoenix/chat-shared';
-import { ElMessage, ElMessageBox } from 'element-plus';
-import { materializeAgentFileApi, notifyFilesChanged } from '#/api/core/agentFiles';
+import { ElMessage } from 'element-plus';
 import ReportMessage from './report/ReportMessage.vue';
 import type { ResultData } from '#/api/core/resultSet';
 import ResultSetDisplay from '#/components/run/ResultSetDisplay.vue';
@@ -69,26 +68,6 @@ let msgCounter = 0;
 function uid(): string {
   msgCounter++;
   return `m-${Date.now().toString(36)}-${msgCounter}`;
-}
-
-async function onMaterialize(msg: any) {
-  const sessionId = chat.activeSessionId;
-  if (!sessionId) { ElMessage.warning('会话未就绪'); return; }
-  let name = '';
-  try {
-    const r = await ElMessageBox.prompt('文件名（将登记到本会话文件面板）', '另存为文件', {
-      inputValue: `报告-${new Date().toISOString().slice(0, 19).replaceAll(':', '-')}.html`,
-      inputValidator: (v: string) => (v && v.trim() ? true : '文件名不能为空'),
-    });
-    name = (r.value || '').trim();
-  } catch { return; }
-  try {
-    await materializeAgentFileApi(sessionId, name, String(msg.content || ''));
-    ElMessage.success('已保存到本会话文件');
-    notifyFilesChanged();
-  } catch (error: any) {
-    ElMessage.error(error?.message || '保存失败');
-  }
 }
 
 const confirming = ref(false);
@@ -280,13 +259,6 @@ async function handleConfirmAction(
             }"
             v-html="renderMessage(msg)"
           ></div>
-          <!-- BL-19：报告等消息内容物化为可下载文件（P4 手动，不自动） -->
-          <button
-            v-if="msg.role === 'assistant' && !msg.streaming && String(msg.content || '').length > 80"
-            class="chat-message__save-file"
-            type="button"
-            @click="onMaterialize(msg)"
-          >另存为文件</button>
         </div>
 
         <div
@@ -900,15 +872,4 @@ async function handleConfirmAction(
   border-radius: 4px;
 }
 
-.chat-message__save-file {
-  margin-top: 4px;
-  padding: 2px 8px;
-  font-size: 12px;
-  color: #909399;
-  cursor: pointer;
-  background: none;
-  border: 1px dashed #dcdfe6;
-  border-radius: 6px;
-}
-.chat-message__save-file:hover { color: var(--el-color-primary, #409eff); }
 </style>
