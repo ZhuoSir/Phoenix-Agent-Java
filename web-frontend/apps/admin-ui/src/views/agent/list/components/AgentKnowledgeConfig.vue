@@ -36,7 +36,9 @@ import {
 
 defineOptions({ name: 'AgentKnowledgeConfig' });
 
-const props = defineProps<{ agentId: number }>();
+const props = defineProps<{ agentId?: number; kbId?: number }>();
+// knowledge-base T-07：作用域双维——kbId 优先（知识库页复用），agentId 仅旧入口兼容
+const scopeParams = () => (props.kbId == null ? { agentId: props.agentId } : { kbId: props.kbId });
 
 const knowledgeList = ref<AgentKnowledge[]>([]);
 const loading = ref(false);
@@ -49,7 +51,7 @@ const currentEditId = ref<null | number>(null);
 const saveLoading = ref(false);
 const fileList = ref<{ name: string; size: number; raw: File }[]>([]);
 const knowledgeForm = ref<AgentKnowledge & { question?: string; answer?: string; file?: File; splitterType?: string }>({
-  agentId: props.agentId,
+  agentId: props.agentId ?? (undefined as any),
   title: '',
   content: '',
   type: 'DOCUMENT',
@@ -64,7 +66,7 @@ function openCreateDialog() {
   currentEditId.value = null;
   fileList.value = [];
   knowledgeForm.value = {
-    agentId: props.agentId,
+    agentId: props.agentId ?? (undefined as any),
     title: '',
     content: '',
     type: 'DOCUMENT',
@@ -136,7 +138,8 @@ async function saveKnowledge() {
       ElMessage.success('更新成功');
     } else {
       const fd = new FormData();
-      fd.append('agentId', String(props.agentId));
+      if (props.kbId == null) fd.append('agentId', String(props.agentId));
+      else fd.append('kbId', String(props.kbId));
       fd.append('title', form.title);
       fd.append('type', form.type || 'DOCUMENT');
       fd.append('isRecall', form.isRecall ? '1' : '0');
@@ -174,7 +177,7 @@ async function loadKnowledgeList() {
   loading.value = true;
   try {
     const result = await queryAgentKnowledgePageApi({
-      agentId: props.agentId,
+      ...scopeParams(),
       title: searchKeyword.value || undefined,
       pageNum: 1,
       pageSize: 9999,
@@ -252,10 +255,16 @@ onMounted(loadKnowledgeList);
   <div>
     <div class="mb-4 flex items-center justify-between">
       <div>
-        <h3 class="m-0 text-base font-semibold">智能体知识配置</h3>
+        <h3 class="m-0 text-base font-semibold">{{ kbId != null ? "知识库内容管理" : "智能体知识配置" }}</h3>
         <p class="mt-1 text-sm text-gray-500">管理用于增强智能体能力的知识源</p>
       </div>
       <div class="flex gap-2">
+        <ElButton
+          size="small"
+          :loading="loading"
+          title="重新拉取列表与向量化状态"
+          @click="loadKnowledgeList"
+        >刷新</ElButton>
         <ElInput
           v-model="searchKeyword"
           placeholder="搜索知识标题..."

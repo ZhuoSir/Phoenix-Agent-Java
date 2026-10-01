@@ -51,10 +51,14 @@ public class AgentKnowledgeServiceImpl extends ServiceImpl<AgentKnowledgeMapper,
      */
     private final ApplicationEventPublisher eventPublisher;
 
-    public AgentKnowledgeServiceImpl(FileStorageService fileStorageService, AgentKnowledgeConverter agentKnowledgeConverter, ApplicationEventPublisher eventPublisher) {
+    private final com.phoenix.data.mapper.KnowledgeBaseMapper knowledgeBaseMapper;
+
+    public AgentKnowledgeServiceImpl(FileStorageService fileStorageService, AgentKnowledgeConverter agentKnowledgeConverter, ApplicationEventPublisher eventPublisher,
+            com.phoenix.data.mapper.KnowledgeBaseMapper knowledgeBaseMapper) {
         this.fileStorageService = fileStorageService;
         this.agentKnowledgeConverter = agentKnowledgeConverter;
         this.eventPublisher = eventPublisher;
+        this.knowledgeBaseMapper = knowledgeBaseMapper;
     }
 
     /**
@@ -80,6 +84,21 @@ public class AgentKnowledgeServiceImpl extends ServiceImpl<AgentKnowledgeMapper,
     public AgentKnowledgeVO createKnowledge(CreateKnowledgeDTO createKnowledgeDto) {
         String storagePath = null;
         checkCreateKnowledgeDto(createKnowledgeDto);
+        // knowledge-base R-05/T-05：条目归属统一走 kbId；agent 维度创建停用（P5 兼容引导）
+        if (createKnowledgeDto.getKbId() == null) {
+            if (createKnowledgeDto.getAgentId() != null) {
+                throw new RuntimeException("智能体维度创建知识已停用，请改为知识库维度提交（传 kbId）");
+            }
+            throw new RuntimeException("kbId 不能为空");
+        }
+        com.phoenix.data.entity.KnowledgeBase kbBound = knowledgeBaseMapper.selectOneById(createKnowledgeDto.getKbId());
+        if (kbBound == null || Integer.valueOf(1).equals(kbBound.getDelFlag())) {
+            throw new RuntimeException("知识库不存在或已删除");
+        }
+        if (!Integer.valueOf(1).equals(kbBound.getStatus())) {
+            throw new RuntimeException("知识库已停用，不能新增知识");
+        }
+        createKnowledgeDto.setAgentId(null); // kb 条目不留 agent 归属，agent_id 仅存量溯源（plan §1）
 
         if (createKnowledgeDto.getType().equals(KnowledgeType.DOCUMENT.getCode())) {
             // 将文件保存到磁盘
@@ -198,6 +217,9 @@ public class AgentKnowledgeServiceImpl extends ServiceImpl<AgentKnowledgeMapper,
     @Override
     @Transactional(readOnly = true)
     public PageResult<AgentKnowledgeVO> queryByConditionsWithPage(AgentKnowledgeQueryDTO queryDTO) {
+        if (queryDTO.getAgentId() == null && queryDTO.getKbId() == null) {
+            throw new RuntimeException("agentId 或 kbId 至少指定一个");
+        }
 
         int offset = (queryDTO.getPageNum() - 1) * queryDTO.getPageSize();
 

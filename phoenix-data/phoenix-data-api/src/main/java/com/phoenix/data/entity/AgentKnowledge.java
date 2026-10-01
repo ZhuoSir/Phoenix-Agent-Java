@@ -26,6 +26,9 @@ public class AgentKnowledge {
 
 	private Integer agentId;
 
+	/** 归属知识库（knowledge-base R-05；agent_id 降级为存量溯源） */
+	private Long knowledgeBaseId;
+
 	private String title;
 
 	// DOCUMENT, QA, FAQ

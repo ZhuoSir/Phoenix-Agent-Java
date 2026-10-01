@@ -58,7 +58,8 @@ public class AgentKnowledgeController {
 	 * Create knowledge,supporting file upload
 	 */
 	@PostMapping(value = "/create", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-	public Mono<ApiResponse<AgentKnowledgeVO>> createKnowledge(@RequestPart("agentId") String agentId,
+	public Mono<ApiResponse<AgentKnowledgeVO>> createKnowledge(@RequestPart(value = "agentId", required = false) String agentId,
+			@RequestPart(value = "kbId", required = false) String kbId,
 			@RequestPart("title") String title, @RequestPart("type") String type,
 			@RequestPart(value = "question", required = false) String question,
 			@RequestPart(value = "content", required = false) String content,
@@ -68,11 +69,12 @@ public class AgentKnowledgeController {
 		// 如果没有文件，直接同步处理
 		if (filePart == null) {
 			return Mono.fromCallable(() -> {
-				CreateKnowledgeDTO dto = buildCreateKnowledgeDTO(agentId, title, type, question, content, null,
+				CreateKnowledgeDTO dto = buildCreateKnowledgeDTO(agentId, kbId, title, type, question, content, null,
 						splitterType);
 				AgentKnowledgeVO knowledge = agentKnowledgeService.createKnowledge(dto);
 				return ApiResponse.success("创建知识成功，后台向量存储开始更新，请耐心等待...", knowledge);
-			}).subscribeOn(Schedulers.boundedElastic());
+			}).onErrorResume(e -> Mono.just(ApiResponse.error(e.getMessage())))
+			  .subscribeOn(Schedulers.boundedElastic());
 		}
 
 		// 有文件时，先读取文件内容再处理
@@ -87,11 +89,12 @@ public class AgentKnowledgeController {
 
 			return Mono.fromCallable(() -> {
 				MultipartFile multipartFile = new ByteArrayMultipartFile(bytes, filename, fileContentType);
-				CreateKnowledgeDTO dto = buildCreateKnowledgeDTO(agentId, title, type, question, content, multipartFile,
+				CreateKnowledgeDTO dto = buildCreateKnowledgeDTO(agentId, kbId, title, type, question, content, multipartFile,
 						splitterType);
 				AgentKnowledgeVO knowledge = agentKnowledgeService.createKnowledge(dto);
 				return ApiResponse.success("创建知识成功，后台向量存储开始更新，请耐心等待...", knowledge);
-			}).subscribeOn(Schedulers.boundedElastic());
+			}).onErrorResume(e -> Mono.just(ApiResponse.error(e.getMessage())))
+			  .subscribeOn(Schedulers.boundedElastic());
 		});
 	}
 
@@ -107,10 +110,15 @@ public class AgentKnowledgeController {
 	 * @param splitterType 分块策略类型
 	 * @return 创建知识DTO
 	 */
-	private CreateKnowledgeDTO buildCreateKnowledgeDTO(String agentId, String title, String type, String question,
-			String content, MultipartFile file, String splitterType) {
+	private CreateKnowledgeDTO buildCreateKnowledgeDTO(String agentId, String kbId, String title, String type,
+			String question, String content, MultipartFile file, String splitterType) {
 		CreateKnowledgeDTO dto = new CreateKnowledgeDTO();
-		dto.setAgentId(Integer.parseInt(agentId));
+		if (kbId != null && !kbId.isBlank()) {
+			dto.setKbId(Long.parseLong(kbId.trim()));
+		}
+		if (agentId != null && !agentId.isBlank()) {
+			dto.setAgentId(Integer.parseInt(agentId.trim()));
+		}
 		dto.setTitle(title);
 		dto.setType(type);
 		dto.setQuestion(question);

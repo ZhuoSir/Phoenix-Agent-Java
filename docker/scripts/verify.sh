@@ -54,6 +54,12 @@ b10=$(docker compose exec -T postgres psql -U phoenix -d phoenix -tAc "select co
 l10=$(curl -s --max-time 10 -H "phoenix-token: $(curl -s --max-time 10 -X POST -H 'Content-Type: application/json' -d '{"username":"admin","password":"123456"}' "http://127.0.0.1:${PHOENIX_HTTP_PORT:-9080}/api/privilege/auth/login" | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')" "http://127.0.0.1:${PHOENIX_HTTP_PORT:-9080}/api/agent/files?sessionId=verify-nonexistent" | grep -cE '"code":|"success":' || true)
 [ "${b10:-0}" = "1" ] && [ "${l10:-0}" -ge 1 ] && ok || no "表=$b10 端点信封=$l10（需跑 V1.3.0_01 并部署 T-04）"
 
+step "[12] 知识库模块就位（表×菜单×端点）(knowledge-base)"
+kb12=$(docker compose exec -T postgres psql -U phoenix -d phoenix -tAc "select count(*) from information_schema.tables where table_name in ('tbl_data_knowledge_base','tbl_data_agent_kbase_bind','tbl_platform_group_kbase_info')" 2>/dev/null || echo 0)
+km12=$(docker compose exec -T postgres psql -U phoenix -d phoenix -tAc "select count(*) from tbl_privilege_module where url='/knowledge-base' and del_flag=0" 2>/dev/null || echo 0)
+en12=$(curl -s --max-time 10 -X POST -H "phoenix-token: $(curl -s --max-time 10 -X POST -H 'Content-Type: application/json' -d '{"username":"admin","password":"123456"}' "http://127.0.0.1:${PHOENIX_HTTP_PORT:-9080}/api/privilege/auth/login" | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')" -H 'Content-Type: application/json' -d '{"pageNum":1,"pageSize":1}' "http://127.0.0.1:${PHOENIX_HTTP_PORT:-9080}/api/knowledge-base/query/page" | grep -cE '"success":true|"message"' || true)
+[ "${kb12:-0}" = "3" ] && [ "${km12:-0}" = "1" ] && [ "${en12:-0}" -ge 1 ] && ok || no "表=$kb12 菜单=$km12 端点=$en12（需 V1.3.0_02 + 部署 T-02）"
+
 step "[7] harness status 列已由两拍补齐"
 c=$(docker compose exec -T postgres psql -U phoenix -d phoenix -tAc "select count(*) from information_schema.columns where table_name='tbl_harness_skills' and column_name='status'" 2>/dev/null || echo 0)
 [ "$c" = "1" ] && ok || no "若为 0：应用可能未首启（表未建），启动一轮对话后重跑本断言"

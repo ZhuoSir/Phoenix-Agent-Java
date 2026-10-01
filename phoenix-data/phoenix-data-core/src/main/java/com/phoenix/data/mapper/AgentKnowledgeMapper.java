@@ -63,8 +63,19 @@ public interface AgentKnowledgeMapper extends BaseMapper<AgentKnowledge> {
 	 */
 	@Select("""
 			<script>
-			SELECT * FROM tbl_data_agent_knowledge
-			WHERE agent_id = #{queryDTO.agentId}
+			SELECT id, agent_id AS agentId, title, type, question, content, is_recall AS isRecall,
+			embedding_status AS embeddingStatus, error_msg AS errorMsg, source_filename AS sourceFilename,
+			file_path AS filePath, file_size AS fileSize, file_type AS fileType, splitter_type AS splitterType,
+			created_time AS createdTime, updated_time AS updatedTime, is_deleted AS isDeleted,
+			is_resource_cleaned AS isResourceCleaned, knowledge_base_id AS knowledgeBaseId
+			FROM tbl_data_agent_knowledge
+			WHERE 1=1
+			<if test="queryDTO.agentId != null">
+				AND agent_id = #{queryDTO.agentId}
+			</if>
+			<if test="queryDTO.kbId != null">
+				AND knowledge_base_id = #{queryDTO.kbId}
+			</if>
 			<if test="queryDTO.title != null and queryDTO.title != ''">
 				AND title LIKE '%' || #{queryDTO.title} || '%'
 			</if>
@@ -87,7 +98,13 @@ public interface AgentKnowledgeMapper extends BaseMapper<AgentKnowledge> {
 	@Select("""
 			<script>
 			SELECT COUNT(*) FROM tbl_data_agent_knowledge
-			WHERE agent_id = #{queryDTO.agentId}
+			WHERE 1=1
+			<if test="queryDTO.agentId != null">
+				AND agent_id = #{queryDTO.agentId}
+			</if>
+			<if test="queryDTO.kbId != null">
+				AND knowledge_base_id = #{queryDTO.kbId}
+			</if>
 			<if test="queryDTO.title != null and queryDTO.title != ''">
 				AND title LIKE '%' || #{queryDTO.title} || '%'
 			</if>
@@ -109,6 +126,18 @@ public interface AgentKnowledgeMapper extends BaseMapper<AgentKnowledge> {
 			SELECT id FROM tbl_data_agent_knowledge WHERE agent_id = #{agentId} AND is_recall = 1 AND is_deleted = 0
 			""")
 	List<Integer> selectRecalledKnowledgeIds(@Param("agentId") Integer agentId);
+
+	/**
+	 * 知识-base T-06 召回主路径：智能体 → 绑定知识库(启用未删) → 召回中条目。
+	 * 依赖 idx_dakb_agent 与 idx_dak_kb；存量兼容由迁移回填保障（bind+kb_id 已就位）。
+	 */
+	@Select("""
+			SELECT k.id FROM tbl_data_agent_knowledge k
+			JOIN tbl_data_agent_kbase_bind bd ON bd.knowledge_base_id = k.knowledge_base_id
+			JOIN tbl_data_knowledge_base kb ON kb.id = k.knowledge_base_id AND kb.status = 1 AND kb.del_flag = 0
+			WHERE bd.agent_id = #{agentId} AND k.is_recall = 1 AND k.is_deleted = 0
+			""")
+	List<Integer> selectRecalledKnowledgeIdsByBindings(@Param("agentId") Long agentId);
 
 	/**
 	 * 查询待清理的“僵尸”记录 条件：is_deleted = 1 AND is_resource_cleaned = 0 AND updated_time <(当前时间

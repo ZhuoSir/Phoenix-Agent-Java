@@ -16,7 +16,8 @@ export interface AgentKnowledge {
 }
 
 export interface AgentKnowledgeQueryDTO {
-  agentId: number;
+  kbId?: number;
+  agentId?: number;
   title?: string;
   type?: string;
   embeddingStatus?: string;

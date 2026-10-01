@@ -54,8 +54,8 @@ import AgentDataSourceConfig from '../edit/components/AgentDataSourceConfig.vue'
 import AgentProfileAiFields from '#/components/agent-profile/AgentProfileAiFields.vue';
 
 import AgentRuntimeConfig from './components/AgentRuntimeConfig.vue';
+import AgentKbaseBind from './components/AgentKbaseBind.vue';
 import AgentSkillConfig from '../edit/components/AgentSkillConfig.vue';
-import AgentKnowledgeConfig from './components/AgentKnowledgeConfig.vue';
 import BusinessKnowledgeConfig from './components/BusinessKnowledgeConfig.vue';
 import SemanticsConfig from './components/SemanticsConfig.vue';
 
@@ -710,7 +710,7 @@ const [Drawer, drawerApi] = useVbenDrawer({
           <ElMenuItemGroup title="知识配置">
             <ElMenuItem index="agent-knowledge">
               <ElIcon><IconifyIcon icon="lucide:book-open" /></ElIcon>
-              <span>智能体知识配置</span>
+              <span>知识库绑定</span>
             </ElMenuItem>
             <ElMenuItem index="business-knowledge">
               <ElIcon><IconifyIcon icon="lucide:users" /></ElIcon>
@@ -1082,9 +1082,9 @@ const [Drawer, drawerApi] = useVbenDrawer({
           </div>
         </div>
 
-        <!-- 智能体知识配置 -->
+        <!-- 知识库绑定（knowledge-base T-08：原条目编辑迁至知识库页） -->
         <div v-else-if="activeMenu === 'agent-knowledge'">
-          <AgentKnowledgeConfig v-if="editId" :agent-id="editId" />
+          <AgentKbaseBind v-if="editId" :agent-id="Number(editId)" />
           <div
             v-else
             class="rounded-lg border border-gray-200 p-4 text-center text-gray-400"

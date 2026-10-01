@@ -10,6 +10,7 @@ import { ElButton, ElMessage, ElMessageBox, ElTag } from 'element-plus';
 import { getGroupInfoPageApi, toggleStatusGroupInfoApi } from '#/api';
 
 import AssignAgentForm from './assign-agent-form.vue';
+import AssignKbaseForm from './assign-kbase-form.vue';
 import AssignPeopleForm from './assign-people-form.vue';
 import Form from './form.vue';
 import { useColumns, useSearchFormSchema } from './data';
@@ -25,6 +26,9 @@ const [AssignPeopleModal, assignPeopleModalApi] = useVbenModal({
 const [AssignAgentModal, assignAgentModalApi] = useVbenModal({
   connectedComponent: AssignAgentForm,
   destroyOnClose: true,
+});
+const [AssignKbaseModal, assignKbaseModalApi] = useVbenModal({
+  connectedComponent: AssignKbaseForm,
 });
 
 const formOptions: VbenFormProps = {
@@ -117,6 +121,11 @@ function getActions(row: any) {
       onClick: () => assignAgentModalApi.setData({ ...row }).open(),
     },
     {
+      text: '分配知识库',
+      icon: 'lucide:book-open',
+      onClick: () => assignKbaseModalApi.setData({ ...row }).open(),
+    },
+    {
       text: '编辑',
       icon: 'lucide:edit',
       onClick: () => onEdit(row),
@@ -141,6 +150,7 @@ function getActions(row: any) {
     <FormModal @success="refreshGrid" />
     <AssignPeopleModal @success="refreshGrid" />
     <AssignAgentModal @success="refreshGrid" />
+    <AssignKbaseModal @success="refreshGrid" />
     <Grid table-title="组管理">
       <template #toolbar-tools>
         <ElButton type="primary" @click="onCreate">新增</ElButton>
