@@ -63,8 +63,19 @@ public interface AgentKnowledgeMapper extends BaseMapper<AgentKnowledge> {
 	 */
 	@Select("""
 			<script>
-			SELECT * FROM tbl_data_agent_knowledge
-			WHERE agent_id = #{queryDTO.agentId}
+			SELECT id, agent_id AS agentId, title, type, question, content, is_recall AS isRecall,
+			embedding_status AS embeddingStatus, error_msg AS errorMsg, source_filename AS sourceFilename,
+			file_path AS filePath, file_size AS fileSize, file_type AS fileType, splitter_type AS splitterType,
+			created_time AS createdTime, updated_time AS updatedTime, is_deleted AS isDeleted,
+			is_resource_cleaned AS isResourceCleaned, knowledge_base_id AS knowledgeBaseId
+			FROM tbl_data_agent_knowledge
+			WHERE 1=1
+			<if test="queryDTO.agentId != null">
+				AND agent_id = #{queryDTO.agentId}
+			</if>
+			<if test="queryDTO.kbId != null">
+				AND knowledge_base_id = #{queryDTO.kbId}
+			</if>
 			<if test="queryDTO.title != null and queryDTO.title != ''">
 				AND title LIKE '%' || #{queryDTO.title} || '%'
 			</if>
@@ -87,7 +98,13 @@ public interface AgentKnowledgeMapper extends BaseMapper<AgentKnowledge> {
 	@Select("""
 			<script>
 			SELECT COUNT(*) FROM tbl_data_agent_knowledge
-			WHERE agent_id = #{queryDTO.agentId}
+			WHERE 1=1
+			<if test="queryDTO.agentId != null">
+				AND agent_id = #{queryDTO.agentId}
+			</if>
+			<if test="queryDTO.kbId != null">
+				AND knowledge_base_id = #{queryDTO.kbId}
+			</if>
 			<if test="queryDTO.title != null and queryDTO.title != ''">
 				AND title LIKE '%' || #{queryDTO.title} || '%'
 			</if>

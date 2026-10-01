@@ -26,8 +26,9 @@ COMMENT ON COLUMN tbl_data_knowledge_base.description IS '普通库=用户描述
 COMMENT ON COLUMN tbl_data_knowledge_base.status IS '1启用 0停用；停用库整体不参与召回（A-03/R-09）';
 CREATE UNIQUE INDEX IF NOT EXISTS uk_dkb_name_alive ON tbl_data_knowledge_base (name) WHERE del_flag = 0;
 
--- ② 条目表加库归属
+-- ② 条目表加库归属；agent_id 放掉 NOT NULL（新 kb 条目无归属 agent，agent_id 仅存量溯源；幂等）
 ALTER TABLE tbl_data_agent_knowledge ADD COLUMN IF NOT EXISTS knowledge_base_id bigint;
+ALTER TABLE tbl_data_agent_knowledge ALTER COLUMN agent_id DROP NOT NULL;
 COMMENT ON COLUMN tbl_data_agent_knowledge.knowledge_base_id IS '归属知识库；agent_id 降级为溯源冗余（T-06 起查询不用）';
 CREATE INDEX IF NOT EXISTS idx_dak_kb ON tbl_data_agent_knowledge (knowledge_base_id, is_deleted);
 

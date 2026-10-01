@@ -14,10 +14,14 @@ import org.springframework.web.multipart.MultipartFile;
 public class CreateKnowledgeDTO {
 
 	/**
-	 * 智能体ID
+	 * 智能体ID（旧版兼容字段；新版建条目走 kbId）
 	 */
-	@NotNull(message = "智能体ID不能为空")
 	private Integer agentId;
+
+	/**
+	 * 归属知识库ID（knowledge-base R-05，新版必传）
+	 */
+	private Long kbId;
 
 	/**
 	 * 知识标题

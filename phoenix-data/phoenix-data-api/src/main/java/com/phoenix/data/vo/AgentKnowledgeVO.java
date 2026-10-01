@@ -20,6 +20,8 @@ public class AgentKnowledgeVO {
 
 	private Integer agentId;
 
+	private Long knowledgeBaseId;
+
 	private String title;
 
 	// DOCUMENT, QA, FAQ

@@ -135,7 +135,10 @@ public class DocumentConverterUtil {
 		String content = knowledge.getQuestion();
 		Map<String, Object> metadata = new HashMap<>();
 		// answer和isRecall经常变更的放到关系数据库
-		metadata.put(Constant.AGENT_ID, knowledge.getAgentId().toString());
+		// kb 条目无归属 agent：哨兵"0"保持键存在（addDocuments 一致性断言）；AGENT_KNOWLEDGE 召回自 T-06
+		// 起仅按 knowledge_id 集合过滤，不读本键
+		metadata.put(Constant.AGENT_ID,
+				knowledge.getAgentId() == null ? "0" : knowledge.getAgentId().toString());
 		metadata.put(DocumentMetadataConstant.VECTOR_TYPE, DocumentMetadataConstant.AGENT_KNOWLEDGE);
 		metadata.put(DocumentMetadataConstant.DB_AGENT_KNOWLEDGE_ID, knowledge.getId());
 		metadata.put(DocumentMetadataConstant.CONCRETE_AGENT_KNOWLEDGE_TYPE, knowledge.getType().getCode());
@@ -157,7 +160,8 @@ public class DocumentConverterUtil {
 			// isRecall经常变更的放到关系数据库不放metadata中
 			// 创建元数据
 			Map<String, Object> metadata = new HashMap<>(doc.getMetadata());
-			metadata.put(Constant.AGENT_ID, knowledge.getAgentId().toString());
+			metadata.put(Constant.AGENT_ID,
+					knowledge.getAgentId() == null ? "0" : knowledge.getAgentId().toString());
 			metadata.put(DocumentMetadataConstant.DB_AGENT_KNOWLEDGE_ID, knowledge.getId());
 			metadata.put(DocumentMetadataConstant.VECTOR_TYPE, DocumentMetadataConstant.AGENT_KNOWLEDGE);
 			metadata.put(DocumentMetadataConstant.CONCRETE_AGENT_KNOWLEDGE_TYPE, knowledge.getType().getCode());

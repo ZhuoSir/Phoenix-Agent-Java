@@ -4,6 +4,18 @@
 - **第②关通过**（用户「确认方案」，P1~P6 与 4 风险整体接受）→ plan 转 v1.0.0 已确认
 - Phase 3：tasks T-01~T-11 生成即确认（沿用既定授权）；开分支 feature/knowledge-base，进入 Implement
 
+## T-05 完成注记（2026-10-01）——条目端点 kbId 化 + 空 agent 全链 null 安全
+- 端点改造：create/query 双维（kbId 新主流；agentId 写侧停用返回引导文案、读侧兼容）；kb 存在性/启用态校验；
+  测试九项全对（建 QA/DOCUMENT 落 kb、停用库拒增、双空报错、旧维度引导）
+- **修正 4 处**：①page SQL 替换时丢 FROM 子句（自查重验发现）②原 SELECT * 顺带规范为显式列（动到即治理）
+  ③QueryDTO 遗留 @NotNull(agentId) 挡死 kbId-only 查询→移除改 service 守门 ④嵌入/删除路径 NPE：
+  kb 条目 agent_id 为空——**哨兵 "0" 方案**统一（util/manager/listener 四处；agent_id 列放 NOT NULL 入 V 件）
+- **事实纠正**：AGENT_KNOWLEDGE 向量实存 **tbl_vector_store_simple_data**（631+行，metadata 驼峰键
+  agentId/agentKnowledgeId）；plan 写的 tbl_harness_vector_store_knowledge 是 harness SimpleKnowledge 空表——
+  T-06 改造与召回验证一律以 simple_data 为准（risk 注记）
+- retry-embedding 为 **POST**（先前 curl 用 PUT 撞 500 属测试姿势，非产品缺陷）；哨兵行重试后 4/4 COMPLETED 实证
+- 环境插曲：Docker VM 磁盘写满致 Redis MISCONF/登录 500/容器退——清理旧镜像 tag+构建缓存回收 ~10GB 后全栈恢复
+
 ## T-03/T-04 实测修正两处类型地雷（2026-10-01）
 1. 组×agent 表 agent_id 列是 varchar（BL-07 同族遗留）而实体 Long——QueryChain 传 Long 触发 PG「varchar=bigint」无算子 500；改显式 String.valueOf 并注释钉死
 2. platform BaseModel 的 create/update_time 是 java.util.Date（非 LocalDateTime），insert 未显式填 update_time 撞 NOT NULL 500；两处补齐

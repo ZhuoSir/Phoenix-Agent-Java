@@ -25,6 +25,7 @@ public class AgentKnowledgeConverter {
 		AgentKnowledgeVO vo = new AgentKnowledgeVO();
 		vo.setId(po.getId());
 		vo.setAgentId(po.getAgentId());
+		vo.setKnowledgeBaseId(po.getKnowledgeBaseId());
 		vo.setTitle(po.getTitle());
 		vo.setType(po.getType() != null ? po.getType().getCode() : null);
 		vo.setQuestion(po.getQuestion());
@@ -49,6 +50,7 @@ public class AgentKnowledgeConverter {
 		// 创建AgentKnowledge对象
 		AgentKnowledge knowledge = new AgentKnowledge();
 		knowledge.setAgentId(createKnowledgeDto.getAgentId());
+		knowledge.setKnowledgeBaseId(createKnowledgeDto.getKbId());
 		knowledge.setTitle(createKnowledgeDto.getTitle());
 		knowledge.setType(KnowledgeType.valueOf(createKnowledgeDto.getType()));
 		knowledge.setQuestion(createKnowledgeDto.getQuestion());

@@ -30,7 +30,7 @@
 
 ## 3. 条目与召回
 
-- [ ] T-05 条目端点作用域切换：/api/agent-knowledge 全端点支持 kbId（query/create/update/delete/recall/retry），旧 agentId 参数返回 42042 引导
+- [x] T-05 条目端点作用域切换：/api/agent-knowledge 全端点支持 kbId（query/create/update/delete/recall/retry），旧 agentId 参数返回 42042 引导
   关联: R-05,06,07 | 依赖: T-01, T-02
   验证方式: curl 以 kbId 建 QA/FAQ/上传 DOCUMENT→列表/召回开关/retry-embedding 全链路；向量化状态流转实测
   验收标准: 类型/字段/校验与旧一致（对照 R-05"沿用"）；kb 停用状态不可新增

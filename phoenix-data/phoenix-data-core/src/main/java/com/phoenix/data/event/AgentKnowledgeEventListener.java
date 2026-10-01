@@ -100,7 +100,8 @@ public class AgentKnowledgeEventListener {
 
 		try {
 			// 2. 删除向量
-			boolean vectorDeleted = agentKnowledgeResourceManager.deleteFromVectorStore(knowledge.getAgentId(), id);
+			boolean vectorDeleted = agentKnowledgeResourceManager.deleteFromVectorStore(
+					knowledge.getAgentId() == null ? 0 : knowledge.getAgentId(), id);
 
 			// 3. 删除文件
 			boolean fileDeleted = agentKnowledgeResourceManager.deleteKnowledgeFile(knowledge);

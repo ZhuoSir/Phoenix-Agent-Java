@@ -56,7 +56,8 @@ public class AgentKnowledgeResourceManager {
 	 */
 	public void doEmbedingToVectorStore(AgentKnowledge agentKnowledge) throws Exception {
 		// delete old data
-		this.deleteFromVectorStore(agentKnowledge.getAgentId(), agentKnowledge.getId());
+		this.deleteFromVectorStore(agentKnowledge.getAgentId() == null ? 0 : agentKnowledge.getAgentId(),
+				agentKnowledge.getId());
 
 		if (KnowledgeType.QA.equals(agentKnowledge.getType()) || KnowledgeType.FAQ.equals(agentKnowledge.getType())) {
 			processQaKnowledge(agentKnowledge);
@@ -75,7 +76,8 @@ public class AgentKnowledgeResourceManager {
 	 */
 	private void processQaKnowledge(AgentKnowledge knowledge) {
 		Document document = DocumentConverterUtil.convertQaFaqKnowledgeToDocument(knowledge);
-		agentVectorStoreService.addDocuments(knowledge.getAgentId().toString(), List.of(document));
+		agentVectorStoreService.addDocuments(knowledge.getAgentId() == null ? "0" : knowledge.getAgentId().toString(),
+				List.of(document));
 		log.info("Successfully vectorized AgentKnowledge: id={}, type={}", knowledge.getId(), knowledge.getType());
 	}
 
@@ -97,7 +99,8 @@ public class AgentKnowledgeResourceManager {
 			.convertAgentKnowledgeDocumentsWithMetadata(documents, knowledge);
 
 		// 添加到向量存储
-		agentVectorStoreService.addDocuments(knowledge.getAgentId().toString(), documentsWithMetadata);
+		agentVectorStoreService.addDocuments(knowledge.getAgentId() == null ? "0" : knowledge.getAgentId().toString(),
+				documentsWithMetadata);
 		log.info("Successfully vectorized DOCUMENT knowledge: id={}, filePath={}, documentCount={}, splitterType={}",
 				knowledge.getId(), knowledge.getFilePath(), documentsWithMetadata.size(), knowledge.getSplitterType());
 

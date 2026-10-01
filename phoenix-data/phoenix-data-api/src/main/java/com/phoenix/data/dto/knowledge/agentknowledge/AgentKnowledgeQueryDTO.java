@@ -20,8 +20,10 @@ public class AgentKnowledgeQueryDTO {
 	/**
 	 * 智能体ID（必填）
 	 */
-	@NotNull(message = "agentId不能为空")
-	private Integer agentId;
+		private Integer agentId;
+
+	/** 知识库维度过滤（R-06） */
+	private Long kbId;
 
 	/**
 	 * 知识标题（模糊查询）
