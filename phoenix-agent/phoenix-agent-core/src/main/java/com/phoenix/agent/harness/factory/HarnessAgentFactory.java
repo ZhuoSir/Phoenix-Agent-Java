@@ -23,6 +23,7 @@ import io.agentscope.harness.agent.memory.MemoryConfig;
 import io.agentscope.harness.agent.memory.compaction.CompactionConfig;
 import io.agentscope.harness.agent.memory.compaction.ToolResultEvictionConfig;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
@@ -48,7 +49,10 @@ import java.util.List;
 public class HarnessAgentFactory {
 
     /** 工作区（与存量自注册智能体保持一致，避免两套目录） */
-    public static final String WORKSPACE = ".agentscope/workspace";
+    /** BL-19/R-01：workspace 根配置化。默认与历史一致（裸机开发零感知）；
+     *  交付包经 env 指向 uploads 卷内路径，使产物持久化可备份。旧常量无外部引用，安全收敛。 */
+    @Value("${phoenix.agent.workspace-root:.agentscope/workspace}")
+    private String workspaceRoot = ".agentscope/workspace";
 
     /** 默认系统提示词：工具能力由各 @Tool 描述自述，此处只约束「不得编造」这一底线 */
     private static final String DEFAULT_SYS_PROMPT = """
@@ -102,7 +106,7 @@ public class HarnessAgentFactory {
             .sysPrompt(sysPrompt(agent))
             .model(model)
             .toolkit(bundle.toolkit())
-            .workspace(Path.of(WORKSPACE))
+            .workspace(Path.of(workspaceRoot))
             .enablePlanMode(isOn(config.getPlanMode()))
             .distributedStore(redisDistributedStore)
             .stateStore(postgresAgentStateStore)

@@ -13,6 +13,8 @@ import com.phoenix.agent.harness.send.HarnessChatService;
 import com.phoenix.agent.harness.service.HitlCacheService;
 import com.phoenix.agent.harness.skill.ExplicitSkillMiddleware;
 import com.phoenix.agent.harness.skill.SkillExplicitInjectionService;
+import com.phoenix.agent.model.AgentFile;
+import com.phoenix.agent.service.file.WorkspaceArtifactScanner;
 import io.agentscope.core.agent.RuntimeContext;
 import io.agentscope.core.event.AgentEvent;
 import io.agentscope.core.event.AgentEventType;
@@ -42,6 +44,7 @@ public class HarnessChatServiceImpl implements HarnessChatService {
     private final HarnessAgentRegistry harnessAgentRegistry;
     private final HitlCacheService hitlCacheService;
     private final SkillExplicitInjectionService skillExplicitInjectionService;
+    private final WorkspaceArtifactScanner workspaceArtifactScanner;
 
     @Override
     public Mono<Msg> call(String sn, HarnessRequest request) {
@@ -112,13 +115,38 @@ public class HarnessChatServiceImpl implements HarnessChatService {
         Flux<NodeOutput> body = harnessAgent
             .streamEvents(buildUserMessage(request), buildRuntimeContext(request, injection.block()))
             .map(event -> toNodeOutput(event, sessionId));
+        // BL-19：轮末扫 workspace 产物（LOCAL 主捕获通路），有新文件则以 agent_files 事件收尾前追加
+        Flux<NodeOutput> filesTail = Flux.defer(() -> artifactsTail(request));
         if (injection.skillNames().isEmpty()) {
-            return body;
+            return body.concatWith(filesTail);
         }
         // 让前端可见本轮实际加载了哪些技能（R-05）
         Map<String, Object> leadData = new HashMap<>();
         leadData.put("loaded_skills", String.join(",", injection.skillNames()));
-        return Flux.concat(Flux.just(NodeOutput.of("harness_agent", "harness", new OverAllState(leadData), null)), body);
+        return Flux.concat(Flux.just(NodeOutput.of("harness_agent", "harness", new OverAllState(leadData), null)), body,
+                filesTail);
+    }
+
+    private Flux<NodeOutput> artifactsTail(HarnessRequest request) {
+        List<AgentFile> files = workspaceArtifactScanner.scanAndRegister(
+                request.getAgentId(), request.getHarnessSn(), request.getUserId(), request.getSessionId());
+        if (files.isEmpty()) {
+            return Flux.empty();
+        }
+        List<Map<String, Object>> payload = files.stream()
+                .map(f -> {
+                    Map<String, Object> m = new HashMap<String, Object>();
+                    m.put("id", f.getId());
+                    m.put("fileName", f.getFileName());
+                    m.put("sizeBytes", f.getSizeBytes());
+                    m.put("mime", f.getMime());
+                    m.put("source", f.getSource());
+                    return m;
+                })
+                .toList();
+        Map<String, Object> data = new HashMap<>();
+        data.put("agent_files", com.phoenix.data.util.JsonUtil.getObjectMapper().writeValueAsString(payload));
+        return Flux.just(NodeOutput.of("harness_agent", "harness", new OverAllState(data), null));
     }
 
     /** 拒绝原因用内容增量事件承载，前端 content 直接可见 */
