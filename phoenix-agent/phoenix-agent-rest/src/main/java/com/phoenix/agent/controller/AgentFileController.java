@@ -45,11 +45,24 @@ public class AgentFileController {
 
     private final AgentFileService agentFileService;
     private final ChatSessionMapper chatSessionMapper;
+    private final com.phoenix.agent.service.file.WorkspaceArtifactScanner workspaceArtifactScanner;
 
     @GetMapping
-    public Mono<ReturnVo<List<AgentFileVO>>> list(@RequestParam String sessionId) {
+    public Mono<ReturnVo<List<AgentFileVO>>> list(@RequestParam String sessionId,
+            @RequestParam(required = false, defaultValue = "false") boolean scan) {
         String userId = StpUtil.getLoginIdAsString();
-        return Mono.fromCallable(() -> ReturnVo.ok("操作成功!", agentFileService.listBySession(sessionId, userId)))
+        return Mono.fromCallable(() -> {
+            // BL-19：抽屉打开即补扫（此前只靠轮末扫描，写尾文件会"看不到"；scan 由 storeKey 幂等去重）
+            if (scan) {
+                ChatSession session = chatSessionMapper.selectOneById(sessionId);
+                if (session != null && userId.equals(session.getUserId())) {
+                    workspaceArtifactScanner.scanAndRegister(
+                            session.getAgentId() == null ? null : session.getAgentId().longValue(),
+                            null, userId, sessionId, java.time.Instant.EPOCH);
+                }
+            }
+            return ReturnVo.ok("操作成功!", agentFileService.listBySession(sessionId, userId));
+        })
                 .subscribeOn(Schedulers.boundedElastic())
                 .onErrorResume(AgentFileException.class, e -> Mono.just(ReturnVo.fail(e.getMessage(), e.getCode())));
     }

@@ -52,6 +52,7 @@
 | BUG-38 | 组管理启用/禁用语义判反：`group-info/index.vue` 的 `onToggleStatus` 用 `status===1` 判启用，与同文件 statusSlot/getActions 及后端(status=0 为有效组)相反，致"点启用后状态永远停在禁用、按钮不变"（写库正常，纯前端标签镜像循环） | P2 | 9080 用户实测(2026-10-01) | 已修复(v1.3.0) | v1.3.0 | Spec: 交付包验收期；根因是 account(1=启用) 与 group(0=启用) 两域语义相反（双账号体系 BL-05）；修复对齐 0=启用并加防误伤注释 |
 | BUG-39 | 前端 index.html 无 Cache-Control：部署新 dist 后浏览器沿用旧缓存 bundle，旧包依赖的 `/api/api` 双前缀折叠已删 → 升级后接口成片 404/500（本次 logout 500 即此因，非 logout 本身） | P3 | 9080 logout 排查(2026-10-01) | 已修复(v1.3.0) | v1.3.0 | 已在交付包 nginx 落地：index.html/SPA fallback no-cache，js/css/assets 前缀 30d immutable；实测响应头到位；受影响用户需最后强刷一次清掉当前旧缓存 |
 | BUG-40 | ChatSessionSidebar 的 EventSource 硬编码 `/api/api/agent/{id}/sessions/stream`（BL-18 全量审计漏网：fetch/EventSource 不过 axios，当时只查了 api/core 与视图拼接）→ 页面开着时后端持续 404→500，EventSource 原生重连放大成"会话结束后自动再发起会话"风暴 | P2 | 9080 用户实测(2026-10-01) | 已修复(v1.3.0) | v1.3.0 | 改真实路径单前缀；dist 全文扫描双前缀=0；教训：全局改写必须把 fetch/EventSource/Worker 等旁路通道纳入审计 |
+| BUG-41 | BL-19 验收反馈三连：①轮末扫描的 agentFiles 帧落在 end=true 之后，前端已收尾→面板不更新、且补帧被渲染成"幽灵新会话框"；②文件写在轮末 2s 内被 settle 门槛跳过且不重试→本轮登记不上；③抽屉打开只查库不补扫，漏网文件永不见日 | P1 | 9080 用户实测(2026-10-01) | 已修复(v1.3.0) | v1.3.0 | 四层修复：END 从 body 剥离改 concat(core,files,end) 保证事件在结束帧前；轮询 3×1.2s 兜写尾；settle 2s→1s；list 支持 scan=1 开抽屉即补扫（storeKey 幂等）。回归实测：agentFiles 帧位 69 < end 帧位 70，同轮文件入列，补扫捞回历史漏网 4 件；memory/ 日记文件入黑名单 |
 ---
 
 ## 明细留档（历史证据，只增不删）

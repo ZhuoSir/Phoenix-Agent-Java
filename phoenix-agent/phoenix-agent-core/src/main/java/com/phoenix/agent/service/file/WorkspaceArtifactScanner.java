@@ -42,7 +42,7 @@ public class WorkspaceArtifactScanner {
     private String workspaceRoot;
 
     private static final Set<String> SKIP_NAME_PREFIX = Set.of(".");
-    private static final Set<String> SKIP_DIRS = Set.of("sessions", "tasks", ".index");
+    private static final Set<String> SKIP_DIRS = Set.of("sessions", "tasks", ".index", "memory");
     private static final Set<String> SKIP_SUFFIX = Set.of(".jsonl", ".marker", ".db");
     /** 框架内部状态文件（记忆固化/会话索引等），不是用户产物（实测 2026-10-01 捕获到 MEMORY.md/consolidation_state）。 */
     private static final Set<String> INTERNAL_FILES = Set.of("MEMORY.md", "consolidation_state", "sessions.json",
@@ -139,7 +139,7 @@ public class WorkspaceArtifactScanner {
     private boolean writeSettled(Path file) {
         try {
             Instant mtime = Files.getLastModifiedTime(file).toInstant();
-            return Duration.between(mtime, Instant.now()).toMillis() >= 2000;
+            return Duration.between(mtime, Instant.now()).toMillis() >= 1000;
         }
         catch (IOException e) {
             return false;

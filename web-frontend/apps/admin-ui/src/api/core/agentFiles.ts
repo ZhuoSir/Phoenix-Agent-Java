@@ -10,9 +10,9 @@ export interface AgentFileItem {
   createTime: string;
 }
 
-export async function listAgentFilesApi(sessionId: string) {
+export async function listAgentFilesApi(sessionId: string, scan = false) {
   return requestClient.get<AgentFileItem[]>('/api/agent/files', {
-    params: { sessionId },
+    params: { sessionId, scan },
     responseReturn: 'body',
   });
 }

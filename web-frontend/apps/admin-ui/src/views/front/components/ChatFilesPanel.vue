@@ -37,7 +37,7 @@ async function refresh(silent = true) {
   }
   loading.value = true;
   try {
-    const res = await listAgentFilesApi(activeSessionId.value);
+    const res = await listAgentFilesApi(activeSessionId.value, true);
     files.value = (res as any)?.data ?? res ?? [];
     if (!silent) ElMessage.success('文件列表已刷新');
   } catch (error: any) {

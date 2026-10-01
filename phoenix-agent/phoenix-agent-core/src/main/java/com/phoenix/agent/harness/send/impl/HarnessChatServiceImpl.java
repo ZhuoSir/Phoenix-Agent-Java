@@ -115,23 +115,41 @@ public class HarnessChatServiceImpl implements HarnessChatService {
         Flux<NodeOutput> body = harnessAgent
             .streamEvents(buildUserMessage(request), buildRuntimeContext(request, injection.block()))
             .map(event -> toNodeOutput(event, sessionId));
-        // BL-19：轮末扫 workspace 产物（LOCAL 主捕获通路），有新文件则以 agent_files 事件收尾前追加
+        // BL-19：轮末扫 workspace 产物。END 帧从 body 中剥离、在扫描事件之后统一补发——
+        // 否则 agentFiles 落在 end=true 之后，前端（按 end 收尾）收不到，还会多渲染一个空消息框。
         java.time.Instant turnStart = java.time.Instant.now();
+        Flux<NodeOutput> core = body.filter(output -> !output.isEND());
         Flux<NodeOutput> filesTail = Flux.defer(() -> artifactsTail(request, turnStart));
+        Flux<NodeOutput> endFrame = Flux.defer(() -> Flux.just(endOutputStatic()));
         if (injection.skillNames().isEmpty()) {
-            return body.concatWith(filesTail);
+            return Flux.concat(core, filesTail, endFrame);
         }
         // 让前端可见本轮实际加载了哪些技能（R-05）
         Map<String, Object> leadData = new HashMap<>();
         leadData.put("loaded_skills", String.join(",", injection.skillNames()));
-        return Flux.concat(Flux.just(NodeOutput.of("harness_agent", "harness", new OverAllState(leadData), null)), body,
-                filesTail);
+        return Flux.concat(Flux.just(NodeOutput.of("harness_agent", "harness", new OverAllState(leadData), null)), core,
+                filesTail, endFrame);
     }
 
     private Flux<NodeOutput> artifactsTail(HarnessRequest request, java.time.Instant turnStart) {
-        List<AgentFile> files = workspaceArtifactScanner.scanAndRegister(
-                request.getAgentId(), request.getHarnessSn(), request.getUserId(), request.getSessionId(),
-                turnStart);
+        // 有界轮询：文件写在轮末紧贴发生（settle 1s 门槛），最多 3 轮、每轮间隔 1.2s，直到某轮无新增
+        List<AgentFile> files = new java.util.ArrayList<>();
+        for (int round = 0; round < 3; round++) {
+            List<AgentFile> added = workspaceArtifactScanner.scanAndRegister(
+                    request.getAgentId(), request.getHarnessSn(), request.getUserId(), request.getSessionId(),
+                    turnStart);
+            files.addAll(added);
+            if (added.isEmpty()) {
+                break;
+            }
+            try {
+                Thread.sleep(1200);
+            }
+            catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
         if (files.isEmpty()) {
             return Flux.empty();
         }
@@ -156,6 +174,10 @@ public class HarnessChatServiceImpl implements HarnessChatService {
         Map<String, Object> data = new HashMap<>();
         data.put("error_message", msg);
         return new StreamingOutput<>(msg, "harness_agent", "harness", new OverAllState(data));
+    }
+
+    private static NodeOutput endOutputStatic() {
+        return NodeOutput.of(StateGraph.END, "harness", new OverAllState(new HashMap<>()), null);
     }
 
     private NodeOutput endOutput() {
