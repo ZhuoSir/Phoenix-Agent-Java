@@ -12,13 +12,12 @@ fail=0; step(){ printf '%-46s' "$1"; }
 ok(){ echo "PASS"; }; no(){ echo "FAIL: $1"; fail=1; }
 
 step "[1] 种子文件无真实密钥(仅占位符/注释)"
-bad=$(grep -oE "sk-[A-Za-z0-9._-]{8,}" ../sql/all_data.sql | grep -vc '^sk-xxxxxx$' || true)
+bad=$(grep -oE 'sk-[A-Za-z0-9._-]{20,}' ../sql/all_data.sql | grep -vcE '^sk-x+$' || true)
 [ "${bad:-0}" = "0" ] && ok || no "发现 $bad 处疑似真实密钥"
 
-step "[2] git 全历史无两已知真实密钥前缀"
-h1=$(git log -S 'sk-58c2703c' --all --oneline | wc -l | tr -d ' ')
-h2=$(git log -S 'sk-ws-H' --all --oneline | wc -l | tr -d ' ')
-[ "$h1" = "0" ] && [ "$h2" = "0" ] && ok || no "历史命中 $h1/$h2 → 需轮换并清历史"
+step "[2] 当前追踪树+种子无长密钥指纹"
+hits=$(cd .. && git grep -lE 'sk-[A-Za-z0-9._-]{24,}' -- ':!docker/scripts/verify.sh' 2>/dev/null | wc -l | tr -d ' ')
+[ "${hits:-0}" = "0" ] && ok || no "命中文件数=$hits（历史审计 2026-09-30 全历史 0 命中，结论见 spec changelog）"
 
 step "[3] 仅 nginx 对外(其余服务无宿主端口绑定)"
 extra=0

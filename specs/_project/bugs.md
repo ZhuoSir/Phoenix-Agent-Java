@@ -39,6 +39,8 @@
 | BUG-28 | `ReturnVo.ok(String)` 命中 msg 重载 → 误把 data 当 msg 传出 | P3 | spec Implement中(20260927_agent-skill-management) | 已修复(v1.2.0) | v1.2.0 | `phoenix-tool/.../ReturnVo.java:84`；改用两参 `ok(msg, data)` |
 | BUG-29 | `tbl_platform_group_agent_info.agent_id` 为 varchar，与 bigint 的 agentId 比较报错 | P3 | spec Implement中(20260927_agent-skill-management) | 已修复(v1.2.0) | v1.2.0 | 代码侧改 `String.valueOf(agentId)`；**列类型不一致的根因仍在**，建议统一 |
 | BUG-30 | AI 生成请求走全局 30s 超时（实测生成 45~90s）→ 前端掐断请求、按钮转圈无结果（用户实测） | P2 | 界面走查(2026-09-30) | 已验证(v1.2.0) | v1.2.0 | Spec: 20260927_agent-config-ai-generate T-11；`api/core/agentProfile.ts` 单独设 `timeout: 120_000` |
+| BUG-31 | 全新库首启 NPE：自注册智能体 `createHarnessAgent()` 在 `saveBySn` 之前读库，`HumanInTheLoop.java:87` 对 null agent 取 description 崩溃 | P1 | 交付包首启实测(20260930_allinone-docker-packaging) | 新建 | - | 交付包已用 `docker/init/20_seed_runtime_agents.sql` 补 5 个 sn 行规避（不改码，R-16）；根治=判空，建议 v1.2.1 修 |
+| BUG-32 | deepseek 模型走 AI 生成双字段时 42013（一次空 content、一次 JSON 未被解析出对象；qwen 同链路正常） | P2 | 交付包实测(20260930_allinone-docker-packaging) | 新建 | - | 疑输出形态（reasoning 混排/转义）与解析容错不足；建议增强 `AgentProfileGenerationService` 解析 + 模型差异回归 |
 
 ---
 

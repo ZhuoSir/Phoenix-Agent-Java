@@ -1,5 +1,13 @@
 # Changelog: allinone-docker-packaging
 
+## Implement 全链实测记录（2026-09-30 深夜，本机=验证环境）
+- 网络实况倒逼 thin 构建通路（docker hub/maven/adoptium 不可达，1ms/npm 可达）：jar 复用 host 构建、dist host pnpm 构建、基座 .env 参数化；本机验证借用 ES9 基座（java25 可用，交付默认 temurin alpine）
+- 真实炸点逐一修复并落码：migrator 基线三步曲（R-05 v1.3.0）、python3 启动硬依赖（三分支安装）、自注册智能体首启 NPE（20 种子规避 → BUG-31 登记根治建议）、nginx 健康检查 debian 无 wget、verify [1][2] 误报（脚本自身含前缀 + 锚定假阴性）、save-offline/load-and-run 需 source .env 且 JAVA_OPTS 加引号
+- AC 实况：AC-01/02(API)/03(SSE 24事件84字+生成57/679字四段10.8s)/04(down-up 零丢失)/05(1.3G 包 sha→load→up)/06(删台账只补该行 + R05↔V05 往返 is_active md5 快照一致)/07(verify 7项)/08(重复 up 零报错) 全绿；AC-02 的浏览器面客部分与 AC-05 真实隔离网属 M4 演练环境，待用户界面验收/发版演练
+- 新登记：BUG-31(P1 首启NPE,包内已规避)、BUG-32(P2 deepseek 42013)
+- T-10 暂不勾：待用户浏览器验收 + 真隔离网复证一次
+
+
 ## v1.3.0（2026-09-30）R-05 二次勘误（终版基线三步曲）
 - v1.2.0 修订本身不完整：「all_data 单文件 0 报错」系我 `grep ^ERROR` 锚定假阴性（真实行以 `psql:` 开头）——向真实机制认错。终版结论（t_g 全链实测 0 报错 + 断言全中）：基线 = **00_baseline_sequences（5 个 demo 序列前置）→ all_data → 10_seed_admin**；all_schema 与 all_data 互斥（all_data 的 DROP TABLE 级联删 owned 序列）
 - 依据用户「同意修订，继续」的持续推进授权（tasks 免问 + 本条为同一事实链机械延伸），requirements 标 v1.3.0；如你认为该二次勘误需单独追认，直接说，我挂起等确认

@@ -105,7 +105,7 @@ services:
       backend:
         condition: service_started
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost/"]
+      test: ["CMD-SHELL", "curl -fsS http://localhost/ >/dev/null || wget -qO- http://localhost/ >/dev/null"]
       interval: 10s
       timeout: 3s
       retries: 10

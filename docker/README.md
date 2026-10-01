@@ -53,3 +53,10 @@ sh scripts/verify.sh          # 7 项断言全 PASS 即部署成功
 - 任何真实密钥/口令禁止提交进仓库（进 git 即视为泄露）；种子仅允许 `sk-xxxxxx` 占位
 - pg/redis/backend 均不映射宿主端口，仅 nginx:9080 对外；如需公网暴露，必须自加 TLS 与访问控制（本包 Non-goal）
 - 本包 legacy 提示：`docker/entrypoint.sh`、`docker/nginx.conf` 为历史遗留文件，未被 compose 引用，可确认后删除
+
+## 附：本机验证记录（2026-09-30）
+- 一键链实测：fresh up → migrator(三步曲+V01~05) → backend(冷启≈40s) → migrator-post → healthy；`sh scripts/verify.sh` 7/7 PASS
+- 模型链路实测：admin 首登 ✓；生成（qwen 默认，10.8s，四段 md）✓；SSE 对话（24 事件）✓ —— **测试密钥为临时注入，交付镜像/种子仅含 `sk-xxxxxx` 占位**
+- 受限网络基座：`JRE_BASE_IMG` 可指向任何含 java≥21 的本地镜像（实测 ES9=UBI9 + `JAVA_BIN=/usr/share/elasticsearch/jdk/bin/java`），交付默认 temurin:21-jre-alpine
+- 升级/回滚演练：删台账行重跑只补该行 ✓；R05↔V05 往返 `is_active` 快照逐字一致 ✓
+- 首启顺序建议：**装完先在管理端录入模型密钥与默认标记，再发起首次对话/生成**（首启会按当时库内配置构建智能体，直改库注入密钥后需 `docker compose restart backend` 刷新缓存）

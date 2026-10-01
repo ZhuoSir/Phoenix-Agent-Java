@@ -8,6 +8,7 @@ if ! command -v docker >/dev/null 2>&1; then
   done
 fi
 cd "$(dirname "$0")/.."
+[ -f .env ] && . ./.env 2>/dev/null || true
 TAG="${IMAGE_TAG:-v1.2.1}"; OUT="${1:-phoenix-${TAG}-images.tar.gz}"
 docker save "${PGVECTOR_IMAGE:-pgvector/pgvector:pg16}" "${REDIS_IMAGE:-redis:7-alpine}" "${PGCLIENT_IMAGE:-postgres:16-alpine}" "${NGINX_BASE_IMG:-nginx:1.27-alpine}" \
   "phoenix-backend:${TAG}" "phoenix-frontend:${TAG}" | gzip > "$OUT"
