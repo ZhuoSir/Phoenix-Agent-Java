@@ -56,6 +56,7 @@
 | BUG-42 | 文件预览中文乱码：下载/inline 响应 Content-Type 不带 charset（text/plain），浏览器按规范对 text/* 无参默认 ISO-8859-1 渲染 UTF-8 字节流；前端 blob 预览继承同一头，新标签页同样乱码 | P2 | 9080 用户实测(2026-10-01) | 已修复(v1.3.0) | v1.3.0 | withUtf8ForTextual()：text/*、json、xml、javascript 一律追加 charset=UTF-8（二进制类不加）；实测头变 text/plain;charset=UTF-8，正文与 blob 预览中文完好 |
 | BUG-43 | 前台对话页默认态（历史面板展开）无文件抽屉入口：入口按钮只放在折叠态 collapsed-bar（v-if 折叠），展开态整页找不到文件列表；admin 页不受影响 | P2 | 9080 用户实测(2026-10-01) | 已修复(v1.3.0) | v1.3.0 | ChatHistoryPanel header 动作区「收起」按钮右侧增 📁（emit open-files→页面开抽屉），折叠态入口保留在 collapsed-bar，两态恒可见 |
 | BUG-44 | 新会话点「文件列表」抽屉打不开：chat store 新会话用本地 temp-{ts} id 占位、首条消息才落库（persistCurrentSessionIfNeeded 设计），面板拿 temp id 请求后端→属主校验必败(403)→异常路径吞掉后抽屉无内容呈现 | P2 | 9080 用户实测(2026-10-01) | 已修复(v1.3.0) | v1.3.0 | 面板对 temp id 短路：不发请求直接空态，文案提示"发送第一条消息后出现"；真实 id 才走补扫+列表 |
+| BUG-45 | 前台聊天页预设问题面板带「添加/删除」管理功能：预设是智能体级共享资源，前台普通用户可增删影响所有人；管理动作应只在 admin 侧 | P2 | 9080 用户实测(2026-10-01) | 已修复(v1.3.0) | v1.3.0 | front/components/PresetQuestions.vue 重写为只读（列表+点击填入），增删逻辑与 UI 全删；⚠️ 遗留：add/delete API 本身未做角色限制（前后账号体系未打通 BL-05），UI 撤了但直调接口仍可写——需后端权限加固，待用户拍板 |
 ---
 
 ## 明细留档（历史证据，只增不删）
