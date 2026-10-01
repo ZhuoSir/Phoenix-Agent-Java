@@ -62,6 +62,7 @@
 | BUG-48 | 交付镜像缺智能体工具链：UBI/ES9 分支只装 python3 无 pip，且无任何 svg→png 转换器与 CJK 字体（librsvg2 在该基座不含 rsvg-convert CLI）——智能体做图转码时被迫自装工具，烧光迭代触发 ExceedMaxIters（用户实测 gantt svg→png 半途中断的直接推手） | P1 | 9080 用户实测+排查(2026-10-01) | 已修复(v1.3.0) | v1.3.0 | Dockerfile.backend 三基座分支统一补 python3-pip；UBI 分支加 fontconfig+cairo；构建期下载 NotoSansCJKsc 烧入（jsdelivr/清华源双兜底）；pip 装 cairosvg。E2E 实证：agent30 write_file svg→shell cairosvg→test.png 双文件自动入面板 |
 | BUG-49 | QA/FAQ 知识召回只返回**问题文本**不含答案：向量 content=question（注释明示 answer 放关系库）但检索工具（KnowledgeRetrievalTool/RulesRagTool）不回表取 answer——QA 知识事实上不可用 | P2 | knowledge-base T-10 E2E(2026-10-01) | 新建 | - | 存量设计缺口（非 knowledge-base 引入，DOCUMENT 类型不受影响）；修法候选：工具命中后按 agentKnowledgeId 回表拼 question+answer 返回；处置与优先级待用户拍板 |
 | BUG-50 | 知识库管理页 ElDialog 组件漏 import——未注册组件被当未知标签裸渲染，新建/编辑弹窗的名称描述表单裸露在列表底部且常显 | P3 | 9080 用户实测(2026-10-01) | 已修复(v1.3.0) | v1.3.0 | 补 ElDialog import；教训：element-plus 组件全部显式 import 后应过一遍「模板用到的组件名 ⊆ import 列表」自查（本次 ElDialog/ElDrawer 一对照即穿） |
+| BUG-51 | 知识库页「知识管理」抽屉切换不同库时列表不刷新：AgentKnowledgeConfig 无 props watch（原为智能体抽屉静态组件），复用实例残留上一库数据——两库点开内容相同 | P3 | 9080 用户实测(2026-10-01) | 已修复(v1.3.0) | v1.3.0 | 抽屉内容挂 :key="activeKb.id" 强制随库重建；后端双维查询分库正确性 curl kb1/kb2 同步实证 |
 ---
 
 ## 明细留档（历史证据，只增不删）

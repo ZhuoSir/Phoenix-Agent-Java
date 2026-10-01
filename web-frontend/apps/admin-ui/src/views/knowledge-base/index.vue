@@ -203,7 +203,7 @@ onMounted(load);
     </ElDialog>
 
     <ElDrawer v-model="drawerVisible" :title="`知识管理 · ${activeKb?.name || ''}`" size="72%">
-      <AgentKnowledgeConfig v-if="activeKb" :kb-id="activeKb.id" />
+      <AgentKnowledgeConfig v-if="activeKb" :key="activeKb.id" :kb-id="activeKb.id" />
     </ElDrawer>
   </div>
 </template>
