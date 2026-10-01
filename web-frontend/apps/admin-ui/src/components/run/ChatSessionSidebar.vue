@@ -155,7 +155,7 @@ const connectSessionStream = () => {
     try {
       const token = localStorage.getItem('phoenix-token');
       const response = await fetch(
-        `/api/api/agent/${currentAgentId}/sessions/stream`,
+        `/api/agent/${currentAgentId}/sessions/stream`, // BL-18 遗留硬编码双前缀（EventSource 不过 baseURL，靠剥层时代写的死路径）
         {
           headers: {
             'phoenix-token': token || '',
