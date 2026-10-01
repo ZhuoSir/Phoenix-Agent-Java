@@ -1,5 +1,5 @@
 # 里程碑 v1.2.1
-> 状态: 进行中 | 目标日期: 尽快（小版本） | 负责人: 陈卓 | 立项: 2026-10-01
+> 状态: **已发布(tag v1.2.1, 2026-10-01)** | 目标日期: 达成 | 负责人: 陈卓 | 立项: 2026-10-01
 
 **版本语义**：PATCH——仅向下兼容缺陷修复（BUG-31/32/34），无新功能。前端 baseURL 根治（BL-18）与会话文件面板（BL-19）**不进**本版。
 
@@ -17,9 +17,9 @@
 | BUG-37 | deepseek brotli 响应体解不出致连接测试/生成间歇失败（BUG-22/23/32 总根因） | P1 | `DynamicModelFactory.noBrotli()` 钉死 Accept-Encoding: identity | 已修复(v1.2.1) |
 
 ## 汇总进度（M3/M4 勾选）
-- [ ] 全部修复合并 main（M2 冻结前置）
-- [ ] M3 汇总（预计无 SQL/配置件——纯代码，changes.md 记"无"）
-- [ ] M4：checklist → tag v1.2.1 → CHANGELOG → bugs 转已发布
+- [x] 全部修复合并 main（M2 冻结前置）—— 0006a5a + ace8fb9
+- [x] M3 汇总：无 SQL/配置件，RELEASE-NOTES/UPGRADE/checklist/config 齐
+- [x] M4：checklist 全勾 → tag v1.2.1 → CHANGELOG → bugs 转已发布
 
 ## 备注
 - 三项均源于 v1.2.0 交付包验收期实测，明细见 `specs/_project/bugs.md`
@@ -28,3 +28,9 @@
 - BUG-34：/list 返回 `sk-****JICw / sk-****9ade` 全脱敏；脱敏串回传 /test 连接成功（按 id 回源）；错误日志 masked 序列化
 - BUG-32：deepseek 默认下双项生成 19s 成功（描述 43 字、提示词 595 字四段齐全）
 - BUG-31：dump 克隆库（DELETE 5 个 sn 行，剩余 0）→ 新镜像一次性容器首启 `Started PhoenixAgentApplication`、NPE=0；克隆库已清理
+
+## M4 发布记录（2026-10-01）
+- 触发：用户「测试通过了，发版 v1.2.1」
+- 内容：BUG-31/32/34/37 修复（4 条），无 SQL/配置
+- checklist 全勾（deepseek 连接测试 3/3、生成 21s 四段齐全、空库首启零 NPE、apiKey 脱敏+回源），用户界面复验通过
+- bugs 4 条转已发布(v1.2.1)；CHANGELOG 追加；tag -a v1.2.1
