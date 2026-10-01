@@ -1,5 +1,10 @@
 # Changelog: allinone-docker-packaging
 
+## 用户 UI 验收第三轮：长回复截半（2026-10-01，BUG-35）
+- 用户报告智能体执行到一半停 → 定位：HarnessModelRegistry 构造 OpenAIChatModel 时不传 GenerateOptions，模型管理 max_tokens 对 harness 链路从未生效；Spring AI 路径（生成/图节点）有传（DynamicModelFactory:65）——只有对话智能体链路漏
+- 修复+部署+实测（400|160000 写到尾，9680 字符完整）；登记 BUG-35 已修复(v1.2.0)
+- 附带结论：绘画类"整篇 HTML 塞单条回复"任务仍建议分段/落盘（任何模型的单轮上限都扛不住 600 行文档），属技能用法非本 bug
+
 ## 用户 UI 验收第二轮：platform 域 500（2026-10-01）
 - 技能管理「发布/授权」弹窗请求 /api/platform/group-info/page → 500。根因仍是 BUG-33 家族：后端两种前缀约定并存（platform 域 Controller **无 /api 前缀**），我第一版折叠只处理双前缀形态、第二版"只折双前缀"又把单前缀透传成 /api/platform/*——正确语义是**无条件剥一层 /api（与 dev proxy rewrite 完全等价）**。修正后 9/9 断言全绿（新增 [9] platform 形态断言；[5] 改为浏览器真实双前缀形态，此前它测的是不存在的 URL 形态，误导了一轮，教训已记）
 - 同步完成：dev 库 55 表全量迁移进交付栈（pg_dump/restore + 台账标记 + admin 重置 123456）、B 栈（宿主机 java/vite + phoenix-pg/redis 容器）全部停止
