@@ -38,17 +38,21 @@ public class DynamicFilterService {
 		List<Filter.Expression> conditions = new ArrayList<>();
 
 		// 必须条件
-		conditions.add(b.eq(Constant.AGENT_ID, agentId).build());
 		conditions.add(b.eq(DocumentMetadataConstant.VECTOR_TYPE, vectorType).build());
+		// knowledge-base T-06：AGENT_KNOWLEDGE 不再按 agent_id 过滤——条目经「绑定→知识库」集合
+		// (agent_knowledge_id IN)承载全部归属语义（id 全局唯一无泄漏）；其余 vectorType 维持 agent_id 旧口径
+		if (!DocumentMetadataConstant.AGENT_KNOWLEDGE.equals(vectorType)) {
+			conditions.add(b.eq(Constant.AGENT_ID, agentId).build());
+		}
 
 		switch (vectorType) {
 
 			case DocumentMetadataConstant.AGENT_KNOWLEDGE:
-				// 场景 A: 知识库文档 -> 需要查 MySQL 获取启用状态
-				List<Integer> validIds = agentKnowledgeMapper.selectRecalledKnowledgeIds(Integer.valueOf(agentId));
+				// 场景 A: 知识库文档 -> 绑定库(启用)内召回中条目
+				List<Integer> validIds = agentKnowledgeMapper.selectRecalledKnowledgeIdsByBindings(Long.valueOf(agentId));
 
 				if (validIds.isEmpty()) {
-					log.warn("Agent {} has no recalled knowledge documents. Returning empty filter signal.", agentId);
+					log.warn("Agent {} has no recalled knowledge via bindings. Returning empty filter signal.", agentId);
 					return null;
 				}
 				else {

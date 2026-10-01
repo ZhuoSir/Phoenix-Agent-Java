@@ -35,7 +35,7 @@
   验证方式: curl 以 kbId 建 QA/FAQ/上传 DOCUMENT→列表/召回开关/retry-embedding 全链路；向量化状态流转实测
   验收标准: 类型/字段/校验与旧一致（对照 R-05"沿用"）；kb 停用状态不可新增
 
-- [ ] T-06 召回切换：selectRecalledKnowledgeIdsByBindings + DynamicFilterService AGENT_KNOWLEDGE 分支改 in(knowledge_id)（去 eq(agent_id)）；向量写入 metadata 去 agent 语义；删 agent 不级联删向量（P6 调用点改造）
+- [x] T-06 召回切换：selectRecalledKnowledgeIdsByBindings + DynamicFilterService AGENT_KNOWLEDGE 分支改 in(knowledge_id)（去 eq(agent_id)）；向量写入 metadata 去 agent 语义；删 agent 不级联删向量（P6 调用点改造）
   关联: R-09,10,15 | 依赖: T-03, T-05
   验证方式: AC-04 对照脚本（克隆现库跑迁移→同问召回命中同条目）；绑定/解绑/停用库三态召回增减实测（SSE 或工具返回）
   验收标准: BUSINESS 分支零改动；RulesRagTool 风险注记落地（无绑定=空召回可观察）

@@ -4,6 +4,15 @@
 - **第②关通过**（用户「确认方案」，P1~P6 与 4 风险整体接受）→ plan 转 v1.0.0 已确认
 - Phase 3：tasks T-01~T-11 生成即确认（沿用既定授权）；开分支 feature/knowledge-base，进入 Implement
 
+## T-06 完成注记（2026-10-01）——召回切换绑定语义，三态实证
+- Mapper selectRecalledKnowledgeIdsByBindings（绑定→启用库→召回条目）；DynamicFilterService AGENT_KNOWLEDGE
+  分支去 eq(agent_id) 改纯 in(knowledge_id)（BUSINESS/其余维持旧口径一字未动）
+- AC-04 数据面：agent20 旧口径=[19]=新口径绑定路（psql 实跑）
+- AC-05 功能面：agent33 绑定态原文引用知识特征词"7+1"、解绑态明确"检索不到"（特征词零命中+空召回WARN）
+- **发现（非缺陷）**：解绑后 agent25 仍能"引用"——AgentScope 长期记忆固化了历史对话（记忆体系范畴，
+  与召回过滤无关）；测试改用无记忆 agent33 做判定，特征词法区分命中/未命中
+- P6 落实为自然成立：删 agent 现流程本就不级联删知识行/向量（grep 无调用点），绑定行遗留不影响语义
+
 ## T-05 完成注记（2026-10-01）——条目端点 kbId 化 + 空 agent 全链 null 安全
 - 端点改造：create/query 双维（kbId 新主流；agentId 写侧停用返回引导文案、读侧兼容）；kb 存在性/启用态校验；
   测试九项全对（建 QA/DOCUMENT 落 kb、停用库拒增、双空报错、旧维度引导）
