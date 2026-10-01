@@ -1,5 +1,9 @@
 # Changelog: knowledge-base
 
+## v1.0.0 方案确认 + tasks（2026-10-01）确认人: 陈卓
+- **第②关通过**（用户「确认方案」，P1~P6 与 4 风险整体接受）→ plan 转 v1.0.0 已确认
+- Phase 3：tasks T-01~T-11 生成即确认（沿用既定授权）；开分支 feature/knowledge-base，进入 Implement
+
 ## Plan v0.1.0（2026-10-01）初稿
 - 实证取巧点：向量过滤 validIds 本为条目表实时查询（DynamicFilterService:48/56），故**向量零迁移**（P1）
 - 域划分：写侧校验在 platform（组数据域），召回读侧在 data（同域读绑定表）（P3）
