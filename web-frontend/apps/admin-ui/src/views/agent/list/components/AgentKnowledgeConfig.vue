@@ -255,10 +255,16 @@ onMounted(loadKnowledgeList);
   <div>
     <div class="mb-4 flex items-center justify-between">
       <div>
-        <h3 class="m-0 text-base font-semibold">智能体知识配置</h3>
+        <h3 class="m-0 text-base font-semibold">{{ kbId != null ? "知识库内容管理" : "智能体知识配置" }}</h3>
         <p class="mt-1 text-sm text-gray-500">管理用于增强智能体能力的知识源</p>
       </div>
       <div class="flex gap-2">
+        <ElButton
+          size="small"
+          :loading="loading"
+          title="重新拉取列表与向量化状态"
+          @click="loadKnowledgeList"
+        >刷新</ElButton>
         <ElInput
           v-model="searchKeyword"
           placeholder="搜索知识标题..."
