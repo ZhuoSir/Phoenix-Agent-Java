@@ -41,6 +41,10 @@ step "[6] 迁移台账齐(baseline + V 件)"
 n=$(docker compose exec -T postgres psql -U phoenix -d phoenix -tAc "select count(*) from tbl_phoenix_release" 2>/dev/null || echo 0)
 [ "$n" -ge 2 ] && ok || no "台账行数=$n"
 
+step "[8] 双重前缀登录可用(nginx 折叠在位, BUG-33)"
+b8=$(curl -s --max-time 10 -X POST -H 'Content-Type: application/json' -d '{"username":"admin","password":"123456"}' "http://127.0.0.1:${PHOENIX_HTTP_PORT:-9080}/api/api/privilege/auth/login" | grep -c '"code":"100"' || true)
+[ "${b8:-0}" = "1" ] && ok || no "nginx /api 折叠规则缺失？见 BUG-33"
+
 step "[7] harness status 列已由两拍补齐"
 c=$(docker compose exec -T postgres psql -U phoenix -d phoenix -tAc "select count(*) from information_schema.columns where table_name='tbl_harness_skills' and column_name='status'" 2>/dev/null || echo 0)
 [ "$c" = "1" ] && ok || no "若为 0：应用可能未首启（表未建），启动一轮对话后重跑本断言"

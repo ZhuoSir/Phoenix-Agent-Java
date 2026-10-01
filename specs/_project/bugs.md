@@ -44,7 +44,9 @@
 
 ---
 
-## 明细留档（历史证据，只增不删）
+## 明细留| BUG-33 | 前端生产包 API 双重 /api 前缀：axios baseURL=/api 且代码路径自带 /api（fetch 处 API_BASE_URL 同），**生产构建从未成功部署过**，dev 全靠 vite proxy rewrite 掩盖；浏览器实测登录 401 | P1 | 交付包 9080 用户实测(20260930_allinone-docker-packaging) | 已规避(v1.2.0) | - | 交付包 nginx `rewrite ^/api/(.*)$ /$1` 复刻 dev 折叠语义（已实测 login/menus/list/SSE 全通）；**根治=前端 baseURL 清理**（改 BL-18），nginx 折叠属包层适配非产品修复 |
+| BUG-34 | `GET /api/model-config/list` 响应体返回**明文 apiKey**（全局接口行为，非 docker 包引入） | P2 | 交付包验证接口巡检出 | 新建 | - | 建议后端 DTO 出口脱敏（只回 masked 或尾4位）；涉及接口契约变更，另立需求 |
+档（历史证据，只增不删）
 
 ### BUG-01 `all_schema.sql` 缺 5 个序列 → 全新环境导入必失败
 - **现象**：demo 表 `tbl_data_categories / order_items / orders / products / users` 建表报 `relation "..._id_seq" does not exist`（CREATE TABLE 引用 `nextval()` 但全文没有对应 CREATE SEQUENCE）；连带 `tbl_tmp_*` 3 张表也不存在，数据段进入 aborted 事务后级联报错

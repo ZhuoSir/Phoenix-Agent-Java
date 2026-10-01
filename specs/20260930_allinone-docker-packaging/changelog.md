@@ -1,5 +1,10 @@
 # Changelog: allinone-docker-packaging
 
+## 用户 UI 验收暴露真缺陷（2026-10-01）
+- 浏览器登录 401 → 定位为**前端生产包双重 /api 前缀（BUG-33, P1）**：dev 的 vite proxy rewrite 掩盖了"生产构建从未成功部署"的事实；交付包 nginx 增加同款折叠规则后 login/menus/list/SSE 实测全通 → 状态记「已规避(v1.2.0)」，根治走 BL-18
+- 巡检顺带发现 **BUG-34**：model-config list 返回明文 apiKey（既有产品行为，新建待排期）
+- verify.sh 增断言 [8]：双重前缀登录必须 200（防折叠规则丢失）
+
 ## 里程碑改挂（2026-09-30，用户明示）
 - 「拟 v1.2.1」→ **挤入 v1.2.0**（M4 前，v1.2.0 未发布、v1.2.1 未立项，无版本冲突）。按细则：MILESTONE 解冻 + 纳入表登记 + RELEASE-NOTES/UPGRADE 口径补充 + 全链 IMAGE_TAG/命名 v1.2.1→v1.2.0；requirements/plan/tasks 因归属条款变更 bump 至 v1.4.0/v1.1.0/v1.1.0 **待重确认**
 
