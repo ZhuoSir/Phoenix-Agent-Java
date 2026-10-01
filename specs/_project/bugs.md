@@ -38,16 +38,17 @@
 | BUG-27 | 技能 ZIP 校验报错信息误导（真实规则是「条目须有根目录」） | P3 | spec Implement中(20260927_agent-skill-management) | 已修复(v1.2.0) | v1.2.0 | 新增 `SkillZipSanitizer`（剥 `__MACOSX/`、`.DS_Store`、`._*`，统一包一层合成根） |
 | BUG-28 | `ReturnVo.ok(String)` 命中 msg 重载 → 误把 data 当 msg 传出 | P3 | spec Implement中(20260927_agent-skill-management) | 已修复(v1.2.0) | v1.2.0 | `phoenix-tool/.../ReturnVo.java:84`；改用两参 `ok(msg, data)` |
 | BUG-29 | `tbl_platform_group_agent_info.agent_id` 为 varchar，与 bigint 的 agentId 比较报错 | P3 | spec Implement中(20260927_agent-skill-management) | 已修复(v1.2.0) | v1.2.0 | 代码侧改 `String.valueOf(agentId)`；**列类型不一致的根因仍在**，建议统一 |
-| BUG-35 | 模型管理 maxTokens/temperature 从未传给 harness 对话请求（HarnessModelRegistry 两处 builder 缺 generateOptions），长回复被服务端默认上限截半（用户实测"开画执行到一半不执行"） | P1 | 9080 用户实测(2026-10-01) | 已修复(v1.2.0) | v1.2.0 | Spec: 20260930_allinone-docker-packaging 会话暴露；修复=两处 builder 补 GenerateOptions(maxTokens,temperature)；实测 400 行数到完（fix 前同类 14K 字符断在半句） |
 | BUG-30 | AI 生成请求走全局 30s 超时（实测生成 45~90s）→ 前端掐断请求、按钮转圈无结果（用户实测） | P2 | 界面走查(2026-09-30) | 已验证(v1.2.0) | v1.2.0 | Spec: 20260927_agent-config-ai-generate T-11；`api/core/agentProfile.ts` 单独设 `timeout: 120_000` |
 | BUG-31 | 全新库首启 NPE：自注册智能体 `createHarnessAgent()` 在 `saveBySn` 之前读库，`HumanInTheLoop.java:87` 对 null agent 取 description 崩溃 | P1 | 交付包首启实测(20260930_allinone-docker-packaging) | 新建 | - | 交付包已用 `docker/init/20_seed_runtime_agents.sql` 补 5 个 sn 行规避（不改码，R-16）；根治=判空，建议随 v1.2.0 M4 前或 v1.2.1 修（挤入后归属 v1.2.0 发现） |
 | BUG-32 | deepseek 模型走 AI 生成双字段时 42013（一次空 content、一次 JSON 未被解析出对象；qwen 同链路正常） | P2 | 交付包实测(20260930_allinone-docker-packaging) | 新建 | - | 疑输出形态（reasoning 混排/转义）与解析容错不足；建议增强 `AgentProfileGenerationService` 解析 + 模型差异回归 |
+| BUG-33 | 前端生产包 API 双重 /api 前缀：axios baseURL=/api 且代码路径自带 /api（fetch 处 API_BASE_URL 同），**生产构建从未成功部署过**，dev 全靠 vite proxy rewrite 掩盖；浏览器实测登录 401 | P1 | 交付包 9080 用户实测(20260930_allinone-docker-packaging) | 已规避(v1.2.0) | - | 交付包 nginx 完全复刻 dev proxy 语义：凡 /api/* 剥一层再转后端（代码两种写法并存：双前缀域 login/agent/model + **单前缀 platform 域**，第一版只折双前缀导致 /api/platform/group-info/page 404→500，10-01 用户实测抓到已修正）；两形态 9/9 断言全绿；**根治=前端 baseURL 统一**（BL-18），nginx 折叠属包层适配非产品修复 |
+| BUG-34 | `GET /api/model-config/list` 响应体返回**明文 apiKey**（全局接口行为，非 docker 包引入） | P2 | 交付包验证接口巡检出 | 新建 | - | 建议后端 DTO 出口脱敏（只回 masked 或尾4位）；涉及接口契约变更，另立需求 |
+| BUG-35 | 模型管理 maxTokens/temperature 从未传给 harness 对话请求（HarnessModelRegistry 两处 builder 缺 generateOptions），长回复被服务端默认上限截半（用户实测"开画执行到一半不执行"） | P1 | 9080 用户实测(2026-10-01) | 已修复(v1.2.0) | v1.2.0 | Spec: 20260930_allinone-docker-packaging 会话暴露；修复=两处 builder 补 GenerateOptions(maxTokens,temperature)；实测 400 行数到完（fix 前同类 14K 字符断在半句） |
+| BUG-36 | 模型管理表单 max_tokens 硬编码上限 10000，用户无法为高上限模型配置 | P3 | 交付包验收期用户反馈(20261001) | 已修复(v1.2.0) | v1.2.0 | Spec: 20260930_allinone-docker-packaging 连带；`modelconf/index.vue` 去 :max 与校验 max（后端/库表本无限制） |
 
 ---
 
-## 明细留| BUG-33 | 前端生产包 API 双重 /api 前缀：axios baseURL=/api 且代码路径自带 /api（fetch 处 API_BASE_URL 同），**生产构建从未成功部署过**，dev 全靠 vite proxy rewrite 掩盖；浏览器实测登录 401 | P1 | 交付包 9080 用户实测(20260930_allinone-docker-packaging) | 已规避(v1.2.0) | - | 交付包 nginx 完全复刻 dev proxy 语义：凡 /api/* 剥一层再转后端（代码两种写法并存：双前缀域 login/agent/model + **单前缀 platform 域**，第一版只折双前缀导致 /api/platform/group-info/page 404→500，10-01 用户实测抓到已修正）；两形态 9/9 断言全绿；**根治=前端 baseURL 统一**（BL-18），nginx 折叠属包层适配非产品修复 |
-| BUG-34 | `GET /api/model-config/list` 响应体返回**明文 apiKey**（全局接口行为，非 docker 包引入） | P2 | 交付包验证接口巡检出 | 新建 | - | 建议后端 DTO 出口脱敏（只回 masked 或尾4位）；涉及接口契约变更，另立需求 |
-档（历史证据，只增不删）
+## 明细留档（历史证据，只增不删）
 
 ### BUG-01 `all_schema.sql` 缺 5 个序列 → 全新环境导入必失败
 - **现象**：demo 表 `tbl_data_categories / order_items / orders / products / users` 建表报 `relation "..._id_seq" does not exist`（CREATE TABLE 引用 `nextval()` 但全文没有对应 CREATE SEQUENCE）；连带 `tbl_tmp_*` 3 张表也不存在，数据段进入 aborted 事务后级联报错
@@ -229,6 +230,28 @@
 - **叠加环境因素**：走查当天 macOS 系统代理残留指向已退出的 Clash(127.0.0.1:7890)，JDK 把 `socksProxyHost/http.proxyHost` 注入 JVM → 后端出站连接被拒 + JDBC 走 SOCKS 失败。处置：Clash 代理配置清空后干净重启（未加启动参数亦恢复）；pgjdbc 42.4.1 的 SOCKS 读取路径是长期风险，见关联说明
 - **修复**：`generateProfileApi` 单独 `timeout: 120_000`（覆盖全局 30s，与后端 90s+余量对齐）；错误分支已有 `finally` 清 loading，无需改
 - **验证**：待用户复测生成（deepseek 直连可达已验证：401/0.27s）
+
+### BUG-33 前端生产包 API 双重 /api 前缀
+- **现象**：9080 浏览器登录 401「未授权」；技能管理发布/授权弹窗 /api/platform/group-info/page 500
+- **根因**：requestClient baseURL=/api 且 api 文件路径自带 /api/...（fetch 处 API_BASE_URL 拼接同）→ 浏览器实发 /api/api/*；platform 域 Controller 无 /api 前缀 → 该域实发单前缀。dev 全靠 vite proxy 剥一层 /api 掩盖，**生产构建从未成功部署过**
+- **修复（包层）**：交付包 nginx 完全复刻 dev 语义——凡 /api/* 剥一层转发；两形态实测全通（verify [5][9]）
+- **遗留**：根治=前端 baseURL 统一（BL-18）；nginx 折叠属包层适配非产品修复
+- **教训**：初版断言测了浏览器不会发的 URL 形态，误导一轮修复方向——断言必须按真实抓包形态写
+
+### BUG-34 model-config 列表接口回显明文 apiKey
+- **现象**：GET /api/model-config/list 返回体含 apiKey 原值（交付包接口巡检发现）
+- **影响**：登录用户可经列表接口取得全部模型密钥，接口层无脱敏
+- **建议**：出口脱敏（masked/尾4位）；涉及契约变更另立需求。状态保持新建待排期
+
+### BUG-35 harness 对话链路不传 maxTokens/temperature
+- **现象**：智能体长回复执行到一半停（diagram「开画」断在"我就直接生成文件。"）
+- **根因**：HarnessModelRegistry 两处 OpenAIChatModel.builder() 未设 generateOptions，模型管理配置对对话链路从未生效（Spring AI 路径有传，仅 harness 漏）
+- **修复**：两处补 GenerateOptions(maxTokens,temperature)；部署后实测 400 行数到 400|160000 完整返回
+
+### BUG-36 模型管理表单 max_tokens 上限 10000
+- **现象**：高上限模型无法配置更大值
+- **根因**：前端两处硬编码（校验 max:10_000 + ElInputNumber :max），后端/库表本无限制
+- **修复**：去上限纯手填（min 100 保留），提示语补 token 语义与"超模型上限按模型截断"说明
 
 ## 工作区遗留状态（非缺陷，处置需确认）
 - `RulesHarnessAgent.java` 有**未提交实验改动**（开 shell + LocalFilesystemSpec），已编译进 `.mvn-home`；还原：`git checkout -- phoenix-agent/phoenix-agent-core/src/main/java/com/phoenix/agent/harness/agent/rules/RulesHarnessAgent.java` 后重新 install
