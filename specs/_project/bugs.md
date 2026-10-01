@@ -50,7 +50,7 @@
 | BUG-37 | Spring AI 底层 HTTP 栈宣告支持 brotli（Accept-Encoding: …, br）但无 br 解码器，deepseek(CloudFront) 命中 br 时响应体解不出 → 连接测试/生成 JSON EOF、空内容（间歇，按 CDN 节点分布；curl 不带 br 故正常） | P1 | 交付包 deepseek 连接测试复现(2026-10-01) | 已发布(v1.2.1) 2026-10-01 | v1.2.1 | Spec: 20260930_allinone-docker-packaging；修复=`DynamicModelFactory.noBrotli()` 对所有 OpenAI 兼容 RestClient（含代理分支）钉死 `Accept-Encoding: identity`；实测 deepseek×3 + qwen 连接测试全过、双项生成 21s 四段齐全。亦为 BUG-22/23/32 间歇截断的总根因 |
 
 | BUG-38 | 组管理启用/禁用语义判反：`group-info/index.vue` 的 `onToggleStatus` 用 `status===1` 判启用，与同文件 statusSlot/getActions 及后端(status=0 为有效组)相反，致"点启用后状态永远停在禁用、按钮不变"（写库正常，纯前端标签镜像循环） | P2 | 9080 用户实测(2026-10-01) | 已修复(v1.2.3) | v1.2.3 | Spec: 交付包验收期；根因是 account(1=启用) 与 group(0=启用) 两域语义相反（双账号体系 BL-05）；修复对齐 0=启用并加防误伤注释 |
-| BUG-39 | 前端 index.html 无 Cache-Control：部署新 dist 后浏览器沿用旧缓存 bundle，旧包依赖的 `/api/api` 双前缀折叠已删 → 升级后接口成片 404/500（本次 logout 500 即此因，非 logout 本身） | P3 | 9080 logout 排查(2026-10-01) | 新建 | - | 根治：nginx 对 index.html 加 no-cache、静态资源带 hash 长缓存；用户侧临时=强刷(Cmd+Shift+R) |
+| BUG-39 | 前端 index.html 无 Cache-Control：部署新 dist 后浏览器沿用旧缓存 bundle，旧包依赖的 `/api/api` 双前缀折叠已删 → 升级后接口成片 404/500（本次 logout 500 即此因，非 logout 本身） | P3 | 9080 logout 排查(2026-10-01) | 已修复(v1.2.3) | v1.2.3 | 已在交付包 nginx 落地：index.html/SPA fallback no-cache，js/css/assets 前缀 30d immutable；实测响应头到位；受影响用户需最后强刷一次清掉当前旧缓存 |
 ---
 
 ## 明细留档（历史证据，只增不删）
