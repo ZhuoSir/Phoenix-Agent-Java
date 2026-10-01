@@ -47,7 +47,7 @@ sh scripts/verify.sh          # 7 项断言全 PASS 即部署成功
 | 对话流式断流/生成 30s 报错 | 本包 nginx 已配 `buffering off/300s`；若前面还有企业代理，需在代理层同样放行 |
 | 模型调用 Connection refused 且本机开过 Clash/系统代理 | 仅影响**非容器**本地起服：JDK 会注入死代理属性（BUG-30 环境坑）。容器内无此问题；本地调试用 `-DsocksProxyHost= -Dhttp.proxyHost=` 或关掉系统代理 |
 | Apple Silicon 上跑交付镜像 | `--amd64` 产物经 qemu 可运行但慢；本机构建验证不带参数即可 |
-| 登录报「未授权，请先登录」 | 浏览器 URL 带双重 /api 前缀属已知形态（BUG-33），nginx 已折叠适配；若你自建反代请完全复刻 dev 语义：`rewrite ^/api/(.*)$ /$1`（无条件剥一层，两种前缀形态都靠它） |
+| 接口 404/未授权 | v1.2.2 起前端直出后端真实路径，反代按 /api、/platform、/auth 前缀透传即可；≤v1.2.1 旧 dist 需同步升级（当时靠 nginx 剥层折叠） |
 | 首登密码错误 | 确认库内 admin 行：`docker compose exec postgres psql -U phoenix -d phoenix -c "select username,status,del_flag from tbl_privilege_user"` |
 
 ## 8. 安全红线
@@ -61,3 +61,5 @@ sh scripts/verify.sh          # 7 项断言全 PASS 即部署成功
 - 受限网络基座：`JRE_BASE_IMG` 可指向任何含 java≥21 的本地镜像（实测 ES9=UBI9 + `JAVA_BIN=/usr/share/elasticsearch/jdk/bin/java`），交付默认 temurin:21-jre-alpine
 - 升级/回滚演练：删台账行重跑只补该行 ✓；R05↔V05 往返 `is_active` 快照逐字一致 ✓
 - 首启顺序建议：**装完先在管理端录入模型密钥与默认标记，再发起首次对话/生成**（首启会按当时库内配置构建智能体，直改库注入密钥后需 `docker compose restart backend` 刷新缓存）
+
+- **IMAGE_TAG 纪律**：改 `.env` 的 IMAGE_TAG 后必须显式 `docker compose up -d backend nginx`；compose 会按 .env 静默重建不一致服务，漏配将把服务打回旧镜像（2026-10-01 实测踩坑，verify 可抓获）

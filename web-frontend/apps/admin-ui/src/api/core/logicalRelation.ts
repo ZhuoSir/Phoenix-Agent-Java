@@ -14,7 +14,7 @@ export interface LogicalRelation {
   updatedTime?: string;
 }
 
-const API_BASE_URL = '/datasource';
+const API_BASE_URL = '/api/datasource'; // BL-18: 后端真实映射是 /api/datasource
 
 export async function getLogicalRelationsApi(datasourceId: number) {
   return requestClient.get<{ success: boolean; data: LogicalRelation[] }>(

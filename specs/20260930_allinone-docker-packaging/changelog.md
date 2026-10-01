@@ -1,5 +1,10 @@
 # Changelog: allinone-docker-packaging
 
+## BL-18 根治落地（2026-10-01，随 v1.2.2）
+- BUG-33 已规避→已修复：前端 baseURL 置空、URL 直写后端真实路径、vite/nginx 透传化、折叠删除；verify 增负断言；logicalRelation/prompt-config/模板下载三个历史坏点痊愈
+- 部署事故复盘：IMAGE_TAG 不一致时 compose 静默回滚旧镜像，被 verify 抓获；README 立 IMAGE_TAG 纪律
+
+
 ## BUG-37 总根因（2026-10-01，deepseek 连接测试复现）
 - 用户实测 deepseek「测试连接」报 extracting response 失败。nc 抓出站请求头发现 Spring AI 带 `Accept-Encoding: …, br`（客户端无 br 解码器），deepseek/CloudFront 回 `content-encoding: br` → 响应体解不出 → JSON EOF。这正是早前 BUG-22/23/32「生成空内容/截断」间歇复发的**总根因**（我此前只做了解析容错=治标）
 - 修复：DynamicModelFactory.noBrotli() 对所有 OpenAI 兼容 RestClient 钉死 Accept-Encoding: identity（含代理分支）；实测 deepseek 连接测试 3/3、qwen 1/1、生成 21s 四段齐全
