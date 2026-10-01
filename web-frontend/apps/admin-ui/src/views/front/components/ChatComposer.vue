@@ -11,6 +11,8 @@ import { getMySkillsApi } from '#/api/front/agent';
 import { setExplicitSkillIds } from '../api-transport';
 import PresetQuestions from './PresetQuestions.vue';
 
+const presetCount = ref(0);
+
 const chat = useChatStore();
 const agentStore = useAgentStore();
 const { isActiveSessionSending, activeSessionId } = storeToRefs(chat);
@@ -139,6 +141,7 @@ function handleKeydown(event: KeyboardEvent) {
           </ElSelect>
         </div>
         <button
+          v-if="presetCount > 0"
           type="button"
           class="composer__tb-chip"
           :class="{ 'is-open': !presetCollapsed }"
@@ -158,7 +161,7 @@ function handleKeydown(event: KeyboardEvent) {
         </button>
       </div>
       <div v-show="!presetCollapsed" class="composer__preset-body">
-        <PresetQuestions @select="handlePresetQuestionClick" />
+        <PresetQuestions @select="handlePresetQuestionClick" @loaded="presetCount = $event" />
       </div>
       <textarea
         ref="textareaRef"

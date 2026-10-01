@@ -13,6 +13,7 @@ import type { PresetQuestion } from '#/api/front/chat';
 
 const emit = defineEmits<{
   select: [question: string];
+  loaded: [count: number];
 }>();
 
 const agentStore = useAgentStore();
@@ -32,6 +33,7 @@ async function loadPresetQuestions() {
     questions.value = (await getPresetQuestionsApi(
       Number(activeAgent.value.id),
     )) as PresetQuestion[];
+    emit('loaded', activeQuestions.value.length);
   } catch {
     ElMessage.error('加载预设问题失败');
   } finally {
