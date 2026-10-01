@@ -164,7 +164,7 @@ onMounted(load);
       </ElTableColumn>
       <ElTableColumn align="center" label="启用" width="80">
         <template #default="{ row }">
-          <ElSwitch :model-value="row.status === 1" @change="toggleStatus(row)" />
+          <ElSwitch :model-value="row.status === 1" @change="toggleStatus(row as KnowledgeBase)" />
         </template>
       </ElTableColumn>
       <ElTableColumn label="更新时间" width="170">
@@ -172,9 +172,9 @@ onMounted(load);
       </ElTableColumn>
       <ElTableColumn align="right" label="操作" width="230">
         <template #default="{ row }">
-          <ElButton link type="primary" @click="openItems(row)">知识管理</ElButton>
-          <ElButton link type="primary" @click="openEdit(row)">编辑</ElButton>
-          <ElButton link type="danger" @click="remove(row)">删除</ElButton>
+          <ElButton link type="primary" @click="openItems(row as KnowledgeBase)">知识管理</ElButton>
+          <ElButton link type="primary" @click="openEdit(row as KnowledgeBase)">编辑</ElButton>
+          <ElButton link type="danger" @click="remove(row as KnowledgeBase)">删除</ElButton>
         </template>
       </ElTableColumn>
     </ElTable>
