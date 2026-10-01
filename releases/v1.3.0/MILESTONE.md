@@ -6,7 +6,7 @@
 ## 纳入需求
 | spec | spec版本 | 状态 | SQL件 | 配置项 | 备注 |
 |---|---|---|---|---|---|
-| specs/20261001_knowledge-base | v1.0.0 | 开发中（feature/knowledge-base） | 2 | 1 | 独立知识库模块（含组授权）；升级件 V1.3.0_02 |
+| specs/20261001_knowledge-base | v1.0.0 | 实现完成待验收（feature/knowledge-base；T-01~11 全勾，六 AC 绿，verify[12] 就位） | 2 | 3 | 独立知识库模块（含组授权）；升级件 V1.3.0_02 |
 | specs/20261001_agent-session-files | v1.1.0 | **已合并 main（2026-10-01 验收通过；随附验收期缺陷批 BUG-40~48）** | 1 | 3 | 会话文件面板；workspace-root 配置化随附 |
 
 ## 纳入缺陷（随版修复批）
