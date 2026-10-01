@@ -6,7 +6,7 @@
 ## 纳入需求
 | spec | spec版本 | 状态 | SQL件 | 配置项 | 备注 |
 |---|---|---|---|---|---|
-| specs/20261001_agent-session-files | v1.0.0 | 开发中（feature/agent-session-files） | 1 | 1 | 会话文件面板；前置含 workspace-root 配置化 |
+| specs/20261001_agent-session-files | v1.1.0(两处修订待追认) | 实现完成待验收（分支 feature/agent-session-files；AC 全录 artifacts.md，verify 10/10） | 1 | 3 | 会话文件面板；workspace-root 配置化随附 |
 
 ## 汇总进度（M3/M4 勾选）
 - [x] M1 挂接完成（本 spec + 缺陷后续挂）
