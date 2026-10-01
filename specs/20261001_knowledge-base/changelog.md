@@ -1,5 +1,12 @@
 # Changelog: knowledge-base
 
+## Implement 收口 + 验收期补充（2026-10-01）
+- T-01~T-11 全勾；六 AC 全绿（artifacts/completion 全录）；关键实证：双 agent 复用一库、解绑即停、迁移 [19]=[19]
+- 用户实测三缺全修：BUG-50 弹窗裸渲染(ElDialog 漏 import) / BUG-51 切库抽屉残留(:key 重建) / 
+  「分配组无入口」→ 知识库行新增「分配组」dialog（预选+增撤合并），组管理侧入口保留成双向；
+  后端补 GET /platform/group-kbase/kbase/{id}/groups 反查端点（5534c0f）
+- 环境插曲：宿主磁盘写满→Redis MISCONF→登录 500 假象，清 10GB 自愈（非产品缺陷）
+- 发现存量缺口 BUG-49（QA 召回不回表答案）登记待拍板
 ## v1.0.0 方案确认 + tasks（2026-10-01）确认人: 陈卓
 - **第②关通过**（用户「确认方案」，P1~P6 与 4 风险整体接受）→ plan 转 v1.0.0 已确认
 - Phase 3：tasks T-01~T-11 生成即确认（沿用既定授权）；开分支 feature/knowledge-base，进入 Implement
