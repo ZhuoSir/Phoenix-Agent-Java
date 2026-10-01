@@ -4,6 +4,11 @@
 - **第②关通过**（用户「确认方案」，P1~P6 与 4 风险整体接受）→ plan 转 v1.0.0 已确认
 - Phase 3：tasks T-01~T-11 生成即确认（沿用既定授权）；开分支 feature/knowledge-base，进入 Implement
 
+## T-03/T-04 实测修正两处类型地雷（2026-10-01）
+1. 组×agent 表 agent_id 列是 varchar（BL-07 同族遗留）而实体 Long——QueryChain 传 Long 触发 PG「varchar=bigint」无算子 500；改显式 String.valueOf 并注释钉死
+2. platform BaseModel 的 create/update_time 是 java.util.Date（非 LocalDateTime），insert 未显式填 update_time 撞 NOT NULL 500；两处补齐
+教训：跨域借用实体/mapper 前先核对列物理类型与基类字段类型，不靠命名惯例推断
+
 ## Implement 注记（2026-10-01）
 - **措辞落地**：data 域 ApiResponse 无 code 位——plan §2 的 42040/42041/42042 在本域以**可读 message** 承载（查重/删除保护/引导文案），行为等价；错误码枚举仅用于 agent 域（files 4203x）
 - T-01 实测修正一处：条目表软删列实为 is_deleted（DDL 已改，四拍重验通过）

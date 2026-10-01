@@ -18,12 +18,12 @@
   验证方式: curl 四端点全路径+负例（重名/删被绑库/无 token 401）
   验收标准: ReturnVo 信封、错误码入枚举集中、组标签与条目数在列表/详情可见
 
-- [ ] T-03 绑定（data 表/服务 + platform 端点 kbase-bindable/kbase-bind，组交集校验与无组兜底，服务端复核）
+- [x] T-03 绑定（data 表/服务 + platform 端点 kbase-bindable/kbase-bind，组交集校验与无组兜底，服务端复核）
   关联: R-08,14,15 | 依赖: T-01, T-02
   验证方式: curl：候选含 disabled_reason；跨组直绑被服务端拒绝；无组 agent 全量可选；绑定回显
   验收标准: 绑定唯一键防重；解绑即时生效（联动 T-06 召回）
 
-- [ ] T-04 platform 组分配库（GroupKbaseInfo mapper/service + group-info 分配/清单端点，同构 assign-agent）
+- [x] T-04 platform 组分配库（GroupKbaseInfo mapper/service + group-info 分配/清单端点，同构 assign-agent）
   关联: R-13 | 依赖: T-01
   验证方式: curl 分配两组×查询回显×撤组后 T-03 候选置灰联动
   验收标准: 与 tbl_platform_group_agent_info 同构；级联撤组时清绑定or提示（按实现最小语义：保留绑定仅提示孤儿——记 changelog）
