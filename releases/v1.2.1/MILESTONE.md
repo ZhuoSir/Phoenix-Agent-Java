@@ -14,6 +14,7 @@
 | BUG-31 | 全新库首启自注册智能体 NPE（createHarnessAgent 先于 saveBySn 读库） | P1 | `HumanInTheLoop` 判空双保险 + 交付包种子保留 | 已修复(v1.2.1) |
 | BUG-32 | deepseek AI 生成双字段 42013（空 content/JSON 解析失败） | P2 | `AgentProfileGenerationService` 重试+修复解析+字段兜底 | 已修复(v1.2.1) |
 | BUG-34 | model-config 列表接口回显明文 apiKey | P2 | list 出口脱敏 + 回源解析 + 日志脱敏 + 前端提示 | 已修复(v1.2.1) |
+| BUG-37 | deepseek brotli 响应体解不出致连接测试/生成间歇失败（BUG-22/23/32 总根因） | P1 | `DynamicModelFactory.noBrotli()` 钉死 Accept-Encoding: identity | 已修复(v1.2.1) |
 
 ## 汇总进度（M3/M4 勾选）
 - [ ] 全部修复合并 main（M2 冻结前置）
