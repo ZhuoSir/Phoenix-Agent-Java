@@ -3,6 +3,8 @@ package com.phoenix.agent.harness.tool;
 import cn.hutool.core.collection.CollUtil;
 import com.phoenix.agent.constant.AgentRuntimeConstant;
 import com.phoenix.data.dto.search.AgentSearchRequest;
+import com.phoenix.data.entity.AgentKnowledge;
+import com.phoenix.data.mapper.AgentKnowledgeMapper;
 import com.phoenix.data.service.vectorstore.AgentVectorStoreService;
 import io.agentscope.core.tool.Tool;
 import io.agentscope.core.tool.ToolParam;
@@ -40,13 +42,32 @@ public class KnowledgeRetrievalTool {
 
     private final AgentVectorStoreService agentVectorStoreService;
 
+    private final AgentKnowledgeMapper agentKnowledgeMapper;
+
     public KnowledgeRetrievalTool(Long agentId, Integer topK, Double similarityThreshold,
-            AgentVectorStoreService agentVectorStoreService) {
+            AgentVectorStoreService agentVectorStoreService, AgentKnowledgeMapper agentKnowledgeMapper) {
         this.agentId = agentId;
         this.topK = topK == null || topK <= 0 ? AgentRuntimeConstant.DEFAULT_KNOWLEDGE_TOP_K : topK;
         this.similarityThreshold = similarityThreshold == null
             ? AgentRuntimeConstant.DEFAULT_KNOWLEDGE_SIMILARITY_THRESHOLD : similarityThreshold;
         this.agentVectorStoreService = agentVectorStoreService;
+        this.agentKnowledgeMapper = agentKnowledgeMapper;
+    }
+
+    /**
+     * BUG-49：QA/FAQ 向量文本只存问题（答案设计上留在关系库），命中后必须回表拼「问题+答案」，
+     * 否则答案永远到不了模型。DOCUMENT 类型正文本就在向量文本，原样返回。
+     */
+    private String renderDocument(Document document) {
+        Object type = document.getMetadata().get(com.phoenix.data.constant.DocumentMetadataConstant.CONCRETE_AGENT_KNOWLEDGE_TYPE);
+        Object kidObj = document.getMetadata().get(com.phoenix.data.constant.DocumentMetadataConstant.DB_AGENT_KNOWLEDGE_ID);
+        if (("QA".equals(type) || "FAQ".equals(type)) && kidObj instanceof Number kid) {
+            AgentKnowledge knowledge = agentKnowledgeMapper.selectOneById(kid.intValue());
+            if (knowledge != null && knowledge.getContent() != null && !knowledge.getContent().isBlank()) {
+                return "问题：" + knowledge.getQuestion() + "\n答案：" + knowledge.getContent();
+            }
+        }
+        return document.getText();
     }
 
     @Tool(name = "getRagInfo", description = "根据用户的自然语言生成的关键词获取知识库向量列表，如果查询到数据就不需要再次调用了", readOnly = true, concurrencySafe = true)
@@ -86,7 +107,7 @@ public class KnowledgeRetrievalTool {
         }
         StringBuilder sb = new StringBuilder();
         for (Document document : topDocuments) {
-            sb.append(document.getText()).append("\n");
+            sb.append(renderDocument(document)).append("\n");
         }
         return """
                 找到 %s 条相关文档 无需调用tool，直接输出

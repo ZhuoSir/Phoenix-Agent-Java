@@ -3,6 +3,7 @@ package com.phoenix.agent.harness.tool;
 import com.phoenix.agent.harness.factory.AgentToolContributor;
 import com.phoenix.agent.model.AgentRuntimeConfig;
 import com.phoenix.data.entity.Agent;
+import com.phoenix.data.mapper.AgentKnowledgeMapper;
 import com.phoenix.data.service.vectorstore.AgentVectorStoreService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,6 +18,7 @@ import org.springframework.stereotype.Component;
 public class KnowledgeRetrievalToolContributor implements AgentToolContributor {
 
     private final AgentVectorStoreService agentVectorStoreService;
+    private final AgentKnowledgeMapper agentKnowledgeMapper;
 
     @Override
     public String toolName() {
@@ -33,6 +35,6 @@ public class KnowledgeRetrievalToolContributor implements AgentToolContributor {
         log.info("装配知识库检索工具: agentId={}, topK={}, threshold={}", agent.getId(), config.getKnowledgeTopK(),
             config.getKnowledgeSimilarityThreshold());
         return new KnowledgeRetrievalTool(agent.getId(), config.getKnowledgeTopK(),
-            config.getKnowledgeSimilarityThreshold(), agentVectorStoreService);
+            config.getKnowledgeSimilarityThreshold(), agentVectorStoreService, agentKnowledgeMapper);
     }
 }
