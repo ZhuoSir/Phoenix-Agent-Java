@@ -98,8 +98,8 @@ public class AgentFileServiceImpl implements AgentFileService {
     public List<AgentFileVO> listBySession(String sessionId, String requesterUserId) {
         requireSessionOwner(sessionId, requesterUserId);
         return QueryChain.of(agentFileMapper)
-                .where(AgentFile::getSessionId).eq(sessionId)
-                .and(AgentFile::getDelFlag).eq(0)
+                .eq(AgentFile::getSessionId, sessionId)
+                .eq(AgentFile::getDelFlag, 0)
                 .orderBy(AgentFile::getCreateTime, false)
                 .list()
                 .stream()
@@ -146,8 +146,8 @@ public class AgentFileServiceImpl implements AgentFileService {
             return false;
         }
         return QueryChain.of(agentFileMapper)
-                .where(AgentFile::getStoreKey).eq(storeKey)
-                .and(AgentFile::getDelFlag).eq(0)
+                .eq(AgentFile::getStoreKey, storeKey)
+                .eq(AgentFile::getDelFlag, 0)
                 .count() > 0;
     }
 
