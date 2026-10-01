@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import ChatFilesPanel from '#/views/front/components/ChatFilesPanel.vue';
+import { notifyFilesChanged } from '#/api/core/agentFiles';
 import type { Agent } from '#/api/core/agent';
 import type { ChatMessage, ChatSession } from '#/api/core/chat';
 import type {
@@ -539,6 +541,8 @@ async function sendGraphRequest(request: GraphRequest, rejectedPlan: boolean) {
       return streamHarnessChat(
         harnessRequest,
         async (response: GraphNodeResponse) => {
+          // BL-19：本轮产物登记事件 → 刷新文件面板（admin 运行页）
+          if ((response as any).agentFiles) notifyFilesChanged();
           if (response.error) {
             ElMessage.error(`处理错误: ${response.text}`);
             return;
@@ -1258,7 +1262,8 @@ onMounted(async () => {
               class="empty-state-preset"
             />
           </div>
-          <div v-else class="messages-area">
+          <div v-else class="messages-area" style="position: relative">
+            <ChatFilesPanel :session-id="currentSession?.id ?? null" />
             <div
               v-for="message in currentMessages"
               :key="message.id"

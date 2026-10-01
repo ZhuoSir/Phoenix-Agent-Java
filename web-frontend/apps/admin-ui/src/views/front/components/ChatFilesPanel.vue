@@ -7,7 +7,7 @@ import { storeToRefs } from '@vben/stores';
 import { useChatStore } from '@phoenix/chat-shared';
 import { ElButton, ElIcon, ElMessage, ElMessageBox, ElTag, ElTooltip } from 'element-plus';
 import { Document, Download, Delete, View, FolderOpened } from '@element-plus/icons-vue';
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 import {
   deleteAgentFileApi,
@@ -18,8 +18,11 @@ import {
   type AgentFileItem,
 } from '#/api/core/agentFiles';
 
+const props = withDefaults(defineProps<{ sessionId?: null | string }>(), { sessionId: null });
 const chat = useChatStore();
-const { activeSessionId } = storeToRefs(chat);
+const { activeSessionId: chatStoreSessionId } = storeToRefs(chat);
+/** admin 运行页显式传入；前台聊天页缺省用 chat store 的当前会话 */
+const activeSessionId = computed(() => props.sessionId ?? chatStoreSessionId.value ?? null);
 
 const open = ref(false);
 const loading = ref(false);
