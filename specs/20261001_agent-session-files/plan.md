@@ -1,4 +1,4 @@
-> 版本: v0.1.0 | 状态: 待确认 | 更新: 2026-10-01 | 确认人: | 确认日期:
+> 版本: v1.1.0 | 状态: 已确认 | 更新: 2026-10-01 | 确认人: 陈卓 | 确认日期: 2026-10-01
 
 # 技术方案：会话文件面板（对齐 requirements v1.0.0）
 
@@ -71,7 +71,7 @@ REST /api/agent/files*（ReturnVo 信封，Sa-Token + 会话属主）  ←→  C
 
 | # | 决策 | 被否替代 & 理由 |
 |---|---|---|
-| P1 | 装饰器 tee（读侧双后端+写侧收敛 uploads） | 改 AgentScope 落点——否（外部 jar 不可改）；REMOTE 直读 Redis 不落盘——否（备份/迁移语义弱，用户 Q2 已拍 uploads） |
+| P1 | **v1.1.0 修订：轮末 workspace 扫描为主通路**（实测 LOCAL write_file 直落 {root}/{uid}/，扫描全覆盖且天然含 shell 直写；装饰器需 AgentScope 私有 NamespaceFactory，会破坏 USER 隔离语义） | 原「装饰器 tee」——实施否决（同上）；改 AgentScope 落点——否（外部 jar 不可改）。**代价：REMOTE 策略(Redis store)产物扫描不可见，本版本由 materialize 兜底**——requirements R-02 随之修订待追认 |
 | P2 | workspace root 走配置默认不变 | 直接改常量到 uploads——否（裸机开发路径被污染） |
 | P3 | tee 副本为下载权威，store_key 仅溯源 | 下载回源 Redis——否（AOF 清理/迁移即断供；双份存储代价可接受，50MB×量级小） |
 | P4 | 报告「另存为文件」手动化 | 自动物化每条报告——否（消息正文已是可用呈现，自动落盘产生噪音文件；D6 决策沿袭） |

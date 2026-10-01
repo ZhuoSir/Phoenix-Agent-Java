@@ -1,3 +1,4 @@
+import { notifyFilesChanged } from '#/api/core/agentFiles';
 import type {
   ChatMessage,
   ChatSession,
@@ -346,6 +347,8 @@ export const apiChatTransport: ChatTransport = {
           async (response) => {
             if (abortRequested) return;
             if (response.error) return;
+            // BL-19：本轮产物登记成功（轮末扫描事件），刷新文件面板
+            if ((response as any).agentFiles) notifyFilesChanged();
             if (response.needConfirm && response.buttons) {
               onNodeMessage?.({
                 id: uid(),

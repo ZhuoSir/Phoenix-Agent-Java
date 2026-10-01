@@ -49,6 +49,11 @@ step "[8] 负断言：双前缀 /api/api/* 不再存在折叠依赖"
 b8=$(curl -s --max-time 10 -X POST -H 'Content-Type: application/json' -d '{"username":"admin","password":"123456"}' "http://127.0.0.1:${PHOENIX_HTTP_PORT:-9080}/api/api/privilege/auth/login" | grep -c '"code":"100"' || true)
 [ "${b8:-0}" = "0" ] && ok || no "折叠规则仍在？BL-18 后应移除"
 
+step "[10] 会话文件面板表与端点在位 (BL-19)"
+b10=$(docker compose exec -T postgres psql -U phoenix -d phoenix -tAc "select count(*) from information_schema.tables where table_name='tbl_data_agent_file'" 2>/dev/null || echo 0)
+l10=$(curl -s --max-time 10 -H "phoenix-token: $(curl -s --max-time 10 -X POST -H 'Content-Type: application/json' -d '{"username":"admin","password":"123456"}' "http://127.0.0.1:${PHOENIX_HTTP_PORT:-9080}/api/privilege/auth/login" | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')" "http://127.0.0.1:${PHOENIX_HTTP_PORT:-9080}/api/agent/files?sessionId=verify-nonexistent" | grep -cE '"code":|"success":' || true)
+[ "${b10:-0}" = "1" ] && [ "${l10:-0}" -ge 1 ] && ok || no "表=$b10 端点信封=$l10（需跑 V1.3.0_01 并部署 T-04）"
+
 step "[7] harness status 列已由两拍补齐"
 c=$(docker compose exec -T postgres psql -U phoenix -d phoenix -tAc "select count(*) from information_schema.columns where table_name='tbl_harness_skills' and column_name='status'" 2>/dev/null || echo 0)
 [ "$c" = "1" ] && ok || no "若为 0：应用可能未首启（表未建），启动一轮对话后重跑本断言"

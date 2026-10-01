@@ -38,6 +38,8 @@ public final class HarnessEventMapper {
         // 显式技能：拒绝原因（R-05）与本轮实际加载技能（R-05 可见性）
         output.state().value("error_message", String.class).ifPresent(msg -> eventMap.putIfAbsent("content", msg));
         output.state().value("loaded_skills", String.class).ifPresent(skills -> eventMap.put("loadedSkills", skills));
+        // BL-19：本轮新产物文件（JSON 数组字符串），前端收到即刷新文件面板；旧客户端忽略该键无副作用
+        output.state().value("agent_files", String.class).ifPresent(filesJson -> eventMap.put("agentFiles", filesJson));
         output.state().value("agent_event", AgentEvent.class).ifPresent(event -> {
             if (event instanceof RequireUserConfirmEvent confirmEvent) {
                 eventMap.put("needConfirm", true);

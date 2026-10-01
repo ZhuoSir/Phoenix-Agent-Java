@@ -1,4 +1,4 @@
-> 版本: v1.0.0 | 状态: 已确认 | 更新: 2026-10-01 | 确认人: 陈卓 | 确认日期: 2026-10-01
+> 版本: v1.1.0 | 状态: 已确认 | 更新: 2026-10-01 | 确认人: 陈卓 | 确认日期: 2026-10-01
 
 # 需求：会话文件面板（agent-session-files）
 
@@ -26,7 +26,7 @@
 
 ### 一、持久化前置
 - **R-01** THE 交付包 compose SHALL 为 workspace 目录（`/app/.agentscope/workspace`）配置 named volume，使 LOCAL 策略产物跨容器重建持久（当前缺失，是面板可用性的硬前提）
-- **R-02** WHERE `filesystemPolicy=REMOTE` THE 平台 SHALL 使该策略产生的文件产物亦可被文件面板枚举与下载（落点收敛或双介质读取，机制见 plan；若技术上不可行须回本 spec 修订并重新确认，不得静默降级为「该策略不支持文件下载」）
+- **R-02（v1.1.0 修订，待追认）** 实测证实 REMOTE 策略产物落 Redis store（无公开结构契约，反向工程不采用），轮末扫描不可见。THE 平台 SHALL 为 REMOTE 策略提供 **materialize 物化通道**（消息内容另存为文件）作为本版本兜底；store 级适配器列 v1.3.x 增强。本条由"不可降级"调整为"兜底降级"，**需需求方追认**
 
 ### 二、文件登记与存储
 - **R-03** THE 平台 SHALL 新增文件登记能力：智能体一次会话中产出的文件（含工具/技能/报告写出的文件）统一经一个写入口落 `/app/uploads/{agentId}/{sessionId}/` 并在数据库登记（新表 `tbl_data_agent_file`：id/agent_id/session_id/file_name/store_key/size/mime/source/creator/del_flag/create_time）

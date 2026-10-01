@@ -1,14 +1,17 @@
 <script setup lang="ts">
+const emit = defineEmits(['open-files'])
 import { computed, nextTick, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useAgentStore, useChatStore } from '@phoenix/chat-shared';
 import { ElMessage, ElIcon, ElOption, ElSelect, ElTooltip } from 'element-plus';
-import { ArrowDown, ArrowUp } from '@element-plus/icons-vue';
+import { FolderOpened, ArrowDown, ArrowUp } from '@element-plus/icons-vue';
 
 import { getMySkillsApi } from '#/api/front/agent';
 
 import { setExplicitSkillIds } from '../api-transport';
 import PresetQuestions from './PresetQuestions.vue';
+
+const presetCount = ref(0);
 
 const chat = useChatStore();
 const agentStore = useAgentStore();
@@ -110,66 +113,55 @@ function handleKeydown(event: KeyboardEvent) {
 
 <template>
   <div class="composer">
-    <div
-      v-if="activeAgent?.type === 'harness' && mySkills.length > 0"
-      class="mb-2 flex items-center gap-2 px-1"
-    >
-      <span class="text-xs text-gray-500">显式技能</span>
-      <ElSelect
-        v-model="selectedSkillIds"
-        class="min-w-[220px]"
-        clearable
-        collapse-tags
-        collapse-tags-tooltip
-        filterable
-        multiple
-        placeholder="不选则由模型自主匹配"
-        size="small"
-      >
-        <ElOption
-          v-for="skill in mySkills"
-          :key="skill.id"
-          :label="skill.name"
-          :value="skill.id"
-        />
-      </ElSelect>
-      <span class="text-xs text-gray-400">勾选后本轮强制执行所选技能</span>
-    </div>
-
-    <div class="composer__preset">
-      <el-tooltip v-if="!presetCollapsed" content="隐藏预设问题">
-        <div class="composer__preset-close" @click="presetCollapsed = !presetCollapsed">
-          <el-icon
-            class="composer__preset-toggle"
-            :class="{ collapsed: presetCollapsed }"
-          >
-            <ArrowUp v-if="presetCollapsed" />
-            <ArrowDown v-else />
-          </el-icon>
-        </div>
-      </el-tooltip>
-      <div v-show="!presetCollapsed" class="composer__preset-body">
-        <PresetQuestions @select="handlePresetQuestionClick" />
-      </div>
-
-    </div>
     <form class="composer__inner" @submit.prevent="handleSubmit">
-      <div
-        v-if="presetCollapsed"
-        class="composer__preset-header"
-        @click="presetCollapsed = !presetCollapsed"
-      >
-        <span class="composer__preset-title">预设问题</span>
-        <el-tooltip content="展开预设问题">
-          <el-icon
-            class="composer__preset-toggle"
-            :class="{ collapsed: presetCollapsed }"
+      <!-- BL-19：卡内顶栏工具条——左技能/预设，右文件；与输入区同容器天然对齐 -->
+      <div class="composer__toolbar">
+        <div
+          v-if="activeAgent?.type === 'harness' && mySkills.length > 0"
+          class="composer__tb-skills"
+        >
+          <span class="composer__tb-label">显式技能</span>
+          <ElSelect
+            v-model="selectedSkillIds"
+            class="composer__tb-select"
+            clearable
+            collapse-tags
+            collapse-tags-tooltip
+            filterable
+            multiple
+            placeholder="模型自主匹配"
+            size="small"
           >
-            <ArrowUp v-if="presetCollapsed" />
-            <ArrowDown v-else />
-          </el-icon>
-        </el-tooltip>
-
+            <ElOption
+              v-for="skill in mySkills"
+              :key="skill.id"
+              :label="skill.name"
+              :value="skill.id"
+            />
+          </ElSelect>
+        </div>
+        <button
+          v-if="presetCount > 0"
+          type="button"
+          class="composer__tb-chip"
+          :class="{ 'is-open': !presetCollapsed }"
+          @click="presetCollapsed = !presetCollapsed"
+        >
+          <el-icon class="composer__tb-icon"><ArrowUp v-if="!presetCollapsed" /><ArrowDown v-else /></el-icon>
+          预设问题
+        </button>
+        <span class="composer__tb-spacer" />
+        <button
+          type="button"
+          class="composer__tb-chip composer__tb-chip--files"
+          @click="emit('open-files')"
+        >
+          <el-icon class="composer__tb-icon"><FolderOpened /></el-icon>
+          文件列表
+        </button>
+      </div>
+      <div v-show="!presetCollapsed" class="composer__preset-body">
+        <PresetQuestions @select="handlePresetQuestionClick" @loaded="presetCount = $event" />
       </div>
       <textarea
         ref="textareaRef"
@@ -375,5 +367,54 @@ function handleKeydown(event: KeyboardEvent) {
   &__preset-body {
     margin-top: 8px;
   }
+}
+
+
+
+.composer__toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 14px;
+  border-bottom: 1px solid #f0f2f5;
+}
+.composer__tb-skills {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+}
+.composer__tb-label {
+  font-size: 12px;
+  color: #909399;
+  white-space: nowrap;
+}
+.composer__tb-select {
+  width: 190px;
+}
+.composer__tb-spacer { flex: 1; }
+.composer__tb-chip {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+  padding: 4px 12px;
+  font-size: 12px;
+  color: #606266;
+  cursor: pointer;
+  background: #f4f6f8;
+  border: none;
+  border-radius: 14px;
+  transition: all 0.15s;
+}
+.composer__tb-chip:hover,
+.composer__tb-chip.is-open {
+  color: var(--el-color-primary, #409eff);
+  background: #ecf5ff;
+}
+.composer__tb-chip--files { color: #337ecc; }
+.composer__tb-chip--files:hover { color: var(--el-color-primary, #409eff); }
+.composer__tb-icon { font-size: 13px; }
+.composer__preset-body {
+  padding: 10px 14px 2px;
 }
 </style>

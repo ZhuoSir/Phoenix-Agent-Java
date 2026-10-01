@@ -160,6 +160,7 @@ export function streamFrontChat(
       }
 
       let buffer = '';
+      let endDispatched = false;
       let currentData = '';
 
       const dispatchEvent = async () => {
@@ -167,6 +168,7 @@ export function streamFrontChat(
           try {
             const parsed = JSON.parse(currentData);
             if (parsed.end) {
+              endDispatched = true;
               await onComplete?.();
               return;
             }
@@ -213,6 +215,11 @@ export function streamFrontChat(
           currentData = line.slice(5).trim();
           await dispatchEvent();
         }
+      }
+      // BUG-46：流被关闭但没有 end 帧（中断/刷新/断网）→ 兜底触发 onComplete，保住已生成内容
+      if (!endDispatched) {
+        endDispatched = true;
+        await onComplete?.();
       }
     } catch (error: any) {
       if (error.name === 'AbortError') return;
@@ -276,6 +283,7 @@ export function streamFrontHarnessChat(
       }
 
       let buffer = '';
+      let endDispatched = false;
       let currentData = '';
 
       const dispatchEvent = async () => {
@@ -283,6 +291,7 @@ export function streamFrontHarnessChat(
           try {
             const parsed = JSON.parse(currentData);
             if (parsed.end) {
+              endDispatched = true;
               await onComplete?.();
               return;
             }
@@ -331,6 +340,11 @@ export function streamFrontHarnessChat(
           await dispatchEvent();
         }
       }
+      // BUG-46：流被关闭但没有 end 帧（中断/刷新/断网）→ 兜底触发 onComplete，保住已生成内容
+      if (!endDispatched) {
+        endDispatched = true;
+        await onComplete?.();
+      }
     } catch (error: any) {
       if (error.name === 'AbortError') return;
       await onError?.(new Error('Stream connection failed'));
@@ -365,12 +379,14 @@ export async function confirmFrontHarnessChat(
   const decoder = new TextDecoder();
   if (!reader) return;
   let buffer = '';
+      let endDispatched = false;
   let currentData = '';
   const dispatchEvent = async () => {
     if (currentData) {
       try {
         const parsed = JSON.parse(currentData);
         if (parsed.end) {
+          endDispatched = true;
           await onComplete?.();
           return;
         }
@@ -477,6 +493,7 @@ export function streamFrontChatSql(
       }
 
       let buffer = '';
+      let endDispatched = false;
       let currentEvent = '';
       let currentData = '';
 
@@ -525,6 +542,11 @@ export function streamFrontChatSql(
           currentEvent = buffer.slice(6).trim();
         }
         await dispatchEvent();
+      }
+      // BUG-46：流被关闭但没有 end 帧（中断/刷新/断网）→ 兜底触发 onComplete，保住已生成内容
+      if (!endDispatched) {
+        endDispatched = true;
+        await onComplete?.();
       }
     } catch (error: any) {
       if (error.name === 'AbortError') return;

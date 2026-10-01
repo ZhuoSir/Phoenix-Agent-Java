@@ -14,6 +14,8 @@ import { getAgentSessionsApi } from '#/api/front/chat';
 import AgentListPanel from './components/AgentListPanel.vue';
 import ChatHistoryPanel from './components/ChatHistoryPanel.vue';
 import ChatMessages from './components/ChatMessages.vue';
+import ChatFilesPanel from './components/ChatFilesPanel.vue';
+const filesPanelRef = ref<InstanceType<typeof ChatFilesPanel> | null>(null);
 import ChatComposer from './components/ChatComposer.vue';
 import { apiChatTransport } from './api-transport';
 
@@ -243,8 +245,9 @@ init();
       <div class="chat-layout__messages">
         <ChatMessages />
       </div>
+      <ChatFilesPanel ref="filesPanelRef" />
       <div class="chat-layout__composer">
-        <ChatComposer />
+        <ChatComposer @open-files="filesPanelRef?.open()" />
       </div>
 
       <el-tooltip :content="agentPanelCollapsed ? '展开智能体列表' : '收起智能体列表'" placement="left" :show-after="300">
