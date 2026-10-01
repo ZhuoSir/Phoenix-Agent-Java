@@ -31,14 +31,22 @@ const loading = ref(false);
 const files = ref<AgentFileItem[]>([]);
 
 async function refresh(silent = true) {
-  if (!activeSessionId.value) {
+  const sid = activeSessionId.value;
+  // 新会话为本地 temp id（chat store createSession 设计），尚未落库——后端无从校验属主，
+  // 直接空态提示，不发请求（修复：新会话点文件列表抽屉打不开）
+  if (!sid || sid.startsWith('temp-')) {
     files.value = [];
     return;
   }
   loading.value = true;
   try {
-    const res = await listAgentFilesApi(activeSessionId.value, true);
-    files.value = (res as any)?.data ?? res ?? [];
+    const res: any = await listAgentFilesApi(sid, true);
+    const list = res?.data ?? res;
+    files.value = Array.isArray(list) ? list : [];
+    // 后端信封失败（如属主校验拒绝）时给可读提示，不再静默空列表
+    if (res && res.success === false && res.msg) {
+      ElMessage.warning(res.msg);
+    }
     if (!silent) ElMessage.success('文件列表已刷新');
   } catch (error: any) {
     if (!silent) ElMessage.error(error?.message || '获取文件列表失败');
@@ -113,7 +121,9 @@ async function onDelete(f: AgentFileItem) {
     <div v-if="loading && !files.length" class="files-panel__empty">加载中…</div>
     <div v-else-if="!files.length" class="files-panel__empty">
       暂无产物文件<br />
-      <small>智能体写出的文件会在回复结束后出现在这里</small>
+      <small>{{ (activeSessionId || '').startsWith('temp-')
+        ? '发送第一条消息后，本会话生成的文件会出现在这里'
+        : '智能体写出的文件会在回复结束后出现在这里' }}</small>
     </div>
     <div v-for="f in files" :key="f.id" class="files-panel__row">
       <ElIcon class="files-panel__icon"><Document /></ElIcon>

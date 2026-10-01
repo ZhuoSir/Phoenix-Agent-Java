@@ -55,6 +55,7 @@
 | BUG-41 | BL-19 验收反馈三连：①轮末扫描的 agentFiles 帧落在 end=true 之后，前端已收尾→面板不更新、且补帧被渲染成"幽灵新会话框"；②文件写在轮末 2s 内被 settle 门槛跳过且不重试→本轮登记不上；③抽屉打开只查库不补扫，漏网文件永不见日 | P1 | 9080 用户实测(2026-10-01) | 已修复(v1.3.0) | v1.3.0 | 四层修复：END 从 body 剥离改 concat(core,files,end) 保证事件在结束帧前；轮询 3×1.2s 兜写尾；settle 2s→1s；list 支持 scan=1 开抽屉即补扫（storeKey 幂等）。回归实测：agentFiles 帧位 69 < end 帧位 70，同轮文件入列，补扫捞回历史漏网 4 件；memory/ 日记文件入黑名单 |
 | BUG-42 | 文件预览中文乱码：下载/inline 响应 Content-Type 不带 charset（text/plain），浏览器按规范对 text/* 无参默认 ISO-8859-1 渲染 UTF-8 字节流；前端 blob 预览继承同一头，新标签页同样乱码 | P2 | 9080 用户实测(2026-10-01) | 已修复(v1.3.0) | v1.3.0 | withUtf8ForTextual()：text/*、json、xml、javascript 一律追加 charset=UTF-8（二进制类不加）；实测头变 text/plain;charset=UTF-8，正文与 blob 预览中文完好 |
 | BUG-43 | 前台对话页默认态（历史面板展开）无文件抽屉入口：入口按钮只放在折叠态 collapsed-bar（v-if 折叠），展开态整页找不到文件列表；admin 页不受影响 | P2 | 9080 用户实测(2026-10-01) | 已修复(v1.3.0) | v1.3.0 | ChatHistoryPanel header 动作区「收起」按钮右侧增 📁（emit open-files→页面开抽屉），折叠态入口保留在 collapsed-bar，两态恒可见 |
+| BUG-44 | 新会话点「文件列表」抽屉打不开：chat store 新会话用本地 temp-{ts} id 占位、首条消息才落库（persistCurrentSessionIfNeeded 设计），面板拿 temp id 请求后端→属主校验必败(403)→异常路径吞掉后抽屉无内容呈现 | P2 | 9080 用户实测(2026-10-01) | 已修复(v1.3.0) | v1.3.0 | 面板对 temp id 短路：不发请求直接空态，文案提示"发送第一条消息后出现"；真实 id 才走补扫+列表 |
 ---
 
 ## 明细留档（历史证据，只增不删）
