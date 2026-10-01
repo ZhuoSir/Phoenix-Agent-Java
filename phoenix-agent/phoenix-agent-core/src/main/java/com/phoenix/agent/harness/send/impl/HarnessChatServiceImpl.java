@@ -112,9 +112,10 @@ public class HarnessChatServiceImpl implements HarnessChatService {
             return Flux.just(errorOutput(injection.errorMsg()), endOutput());
         }
         // 技能全文经 RuntimeContext 交给 ExplicitSkillMiddleware 注入系统提示（plan v1.1.0 决策4）
+        java.util.concurrent.atomic.AtomicBoolean textDeltaSeen = new java.util.concurrent.atomic.AtomicBoolean(false);
         Flux<NodeOutput> body = harnessAgent
             .streamEvents(buildUserMessage(request), buildRuntimeContext(request, injection.block()))
-            .map(event -> toNodeOutput(event, sessionId));
+            .map(event -> toNodeOutput(event, sessionId, textDeltaSeen));
         // BL-19：轮末扫 workspace 产物。END 帧从 body 中剥离、在扫描事件之后统一补发——
         // 否则 agentFiles 落在 end=true 之后，前端（按 end 收尾）收不到，还会多渲染一个空消息框。
         java.time.Instant turnStart = java.time.Instant.now();
@@ -230,11 +231,41 @@ public class HarnessChatServiceImpl implements HarnessChatService {
                 .textContent("User confirmed, continue.")
                 .metadata(Map.of(Msg.METADATA_CONFIRM_RESULTS, List.of(result)))
                 .build();
+        java.util.concurrent.atomic.AtomicBoolean textDeltaSeen = new java.util.concurrent.atomic.AtomicBoolean(false);
         return harnessAgent.streamEvents(confirmMsg, RuntimeContext.builder().userId(request.getUserId()).sessionId(request.getSessionId()).build())
-                .map(event -> toNodeOutput(event, request.getSessionId()));
+                .map(event -> toNodeOutput(event, request.getSessionId(), textDeltaSeen));
     }
 
     private NodeOutput toNodeOutput(AgentEvent event, String sessionId) {
+        return toNodeOutput(event, sessionId, new java.util.concurrent.atomic.AtomicBoolean(true));
+    }
+
+    private NodeOutput toNodeOutput(AgentEvent event, String sessionId,
+            java.util.concurrent.atomic.AtomicBoolean textDeltaSeen) {
+        // BUG-46：超限终止必须可见（此前被 mapper 吞掉，表现为"执行一半戛然而止"）
+        if (event instanceof io.agentscope.core.event.ExceedMaxItersEvent) {
+            String warn = "\n\n⚠️ 已达到最大迭代次数，本轮任务被中断（工具调用次数超限）。可重试，或将任务拆成更小步骤。";
+            Map<String, Object> wd = new HashMap<>();
+            return new StreamingOutput<>(warn, "harness_agent", "harness", new OverAllState(wd));
+        }
+        // BUG-46：结果事件兜底——本轮没有任何流式增量时，用最终 Msg 文本补发内容
+        if (event instanceof io.agentscope.core.event.AgentResultEvent resultEvent) {
+            if (!textDeltaSeen.get() && resultEvent.getResult() != null) {
+                String text = resultEvent.getResult().getContentBlocks(io.agentscope.core.message.TextBlock.class)
+                        .stream().map(io.agentscope.core.message.TextBlock::getText)
+                        .filter(t -> t != null && !t.isEmpty()).reduce((a, b) -> a + "\n" + b).orElse("");
+                if (!text.isBlank()) {
+                    Map<String, Object> rd = new HashMap<>();
+                    return new StreamingOutput<>(text, "harness_agent", "harness", new OverAllState(rd));
+                }
+            }
+            return NodeOutput.of("harness_agent", "harness", new OverAllState(new HashMap<>()), null);
+        }
+        // 工具/模型生命周期事件：不上屏、不打 WARN（降噪）
+        String simple = event.getClass().getSimpleName();
+        if (simple.startsWith("ToolResult") || simple.startsWith("ToolCall") || simple.startsWith("ModelCall")) {
+            return NodeOutput.of("harness_agent", "harness", new OverAllState(new HashMap<>()), null);
+        }
         Map<String, Object> data = new HashMap<>();
         data.put("agent_event", event);
         // 1. 确认事件优先处理（可能同时是 AGENT_END，必须放在前面）
@@ -244,6 +275,7 @@ public class HarnessChatServiceImpl implements HarnessChatService {
         }
         // 2. 文本增量事件
         if (event.getType() == AgentEventType.TEXT_BLOCK_DELTA && event instanceof TextBlockDeltaEvent textEvent) {
+            textDeltaSeen.set(true);
             return new StreamingOutput<>(textEvent.getDelta(), "harness_agent", "harness", new OverAllState(data));
         }
         // 2b. 思考内容增量事件（DeepSeek-R1 等深度思考模型）

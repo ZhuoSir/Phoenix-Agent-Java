@@ -57,6 +57,8 @@
 | BUG-43 | 前台对话页默认态（历史面板展开）无文件抽屉入口：入口按钮只放在折叠态 collapsed-bar（v-if 折叠），展开态整页找不到文件列表；admin 页不受影响 | P2 | 9080 用户实测(2026-10-01) | 已修复(v1.3.0) | v1.3.0 | ChatHistoryPanel header 动作区「收起」按钮右侧增 📁（emit open-files→页面开抽屉），折叠态入口保留在 collapsed-bar，两态恒可见 |
 | BUG-44 | 新会话点「文件列表」抽屉打不开：chat store 新会话用本地 temp-{ts} id 占位、首条消息才落库（persistCurrentSessionIfNeeded 设计），面板拿 temp id 请求后端→属主校验必败(403)→异常路径吞掉后抽屉无内容呈现 | P2 | 9080 用户实测(2026-10-01) | 已修复(v1.3.0) | v1.3.0 | 面板对 temp id 短路：不发请求直接空态，文案提示"发送第一条消息后出现"；真实 id 才走补扫+列表 |
 | BUG-45 | 前台聊天页预设问题面板带「添加/删除」管理功能：预设是智能体级共享资源，前台普通用户可增删影响所有人；管理动作应只在 admin 侧 | P2 | 9080 用户实测(2026-10-01) | 已修复(v1.3.0) | v1.3.0 | front/components/PresetQuestions.vue 重写为只读（列表+点击填入），增删逻辑与 UI 全删；⚠️ 遗留（用户拍板 2026-10-01）：add/delete API 暂不做角色限制，随 BL-05 账号体系统一一并解决（现强做易误伤 admin 自身操作） |
+| BUG-46 | harness 事件面缺失致"执行一半戛然而止+输出消失"：①ExceedMaxItersEvent 未被映射，工具迭代超限静默终止（agent25 svg转png 实测触发）；②AgentResultEvent 承载的最终 Msg 被丢弃，无增量文本的轮次回吐全丢；③前端流循环遇服务端/代理断流（无 end 帧）不触发 onComplete，已生成内容不落库；④ToolResult*/ModelCall* 事件刷 WARN 噪音 | P1 | 9080 用户实测+复现(2026-10-01) | 已修复(v1.3.0) | v1.3.0 | 后端：ExceedMaxIters→⚠️可见警告帧；AgentResult→按轮内 textDeltaSeen 状态兜底补发内容；生命周期事件静默；前端：reader done 未收到 end 帧时兜底 onComplete 保存。复现验证：同 prompt 重现时警告入流、Unhandled WARN 从刷屏降至 1；快轮 end 帧居末 PASS |
+| BUG-47 | ChatSessionSidebar 的 EventSource 无法携带 phoenix-token 头（浏览器 EventSource API 不支持自定义头），/api/agent/{id}/sessions/stream 每连必 NotLoginException——后台日志周期性 sa 异常的真正来源（BUG-40 止血后仍存） | P3 | BUG-46 排查连带发现(2026-10-01) | 新建 | - | 修法候选：token 走 query 参数+后端解析，或该路径按 agentId 白名单+会话归属校验；涉安全口径，待拍板 |
 ---
 
 ## 明细留档（历史证据，只增不删）
