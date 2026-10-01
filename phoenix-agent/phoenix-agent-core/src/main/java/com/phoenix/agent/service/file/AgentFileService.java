@@ -1,0 +1,48 @@
+package com.phoenix.agent.service.file;
+
+import com.phoenix.agent.enums.AgentFileBackendEnm;
+import com.phoenix.agent.enums.AgentFileSourceEnm;
+import com.phoenix.agent.model.AgentFile;
+import com.phoenix.agent.vo.AgentFileVO;
+import lombok.Builder;
+
+import java.util.List;
+
+/**
+ * 会话产物文件门面（BL-19）：登记（tee 落 uploads + 入库）、列表、下载、逻辑删除。
+ * 下载恒走 tee 副本；storeKey 仅溯源。
+ */
+public interface AgentFileService {
+
+    /** 登记命令：content 为文件字节；fileName 可未净化（服务端清洗）。 */
+    @Builder
+    record RegisterCmd(Long agentId, String sessionId, String fileName, byte[] content,
+                       AgentFileSourceEnm source, AgentFileBackendEnm backend,
+                       String storeKey, String creator) {
+    }
+
+    /** tee 落盘 + 登记；超 50MB 抛 FILE_TOO_LARGE。 */
+    AgentFile register(RegisterCmd cmd);
+
+    /** 会话属主校验后的列表（del_flag=0，新→旧）。 */
+    List<AgentFileVO> listBySession(String sessionId, String requesterUserId);
+
+    /** 下载载荷（属主校验 + inline 白名单）。 */
+    @Builder
+    record Download(String fileName, String mime, byte[] content) {
+    }
+
+    Download download(String fileId, String requesterUserId, boolean inline);
+
+    /** 属主逻辑删（不物理删，R-10/R-19）。 */
+    void logicalDelete(String fileId, String requesterUserId);
+
+    /** inline 预览白名单（HTML/图片/文本类，R-09；.sh 等仅下载）。 */
+    static boolean inlineAllowed(String mime) {
+        if (mime == null) {
+            return false;
+        }
+        String m = mime.toLowerCase();
+        return m.startsWith("image/") || m.startsWith("text/") || m.contains("json") || m.contains("xml");
+    }
+}
