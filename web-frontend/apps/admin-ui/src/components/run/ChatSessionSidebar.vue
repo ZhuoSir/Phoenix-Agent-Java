@@ -60,6 +60,7 @@ const sessionEventSource = ref<{ close: () => void } | null>(null);
 
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let isComponentActive = true;
+let authFailStreak = 0;
 
 const route = useRoute();
 const agentId = computed(() => route.params.id as string);
@@ -152,6 +153,14 @@ const connectSessionStream = () => {
   };
 
   const doFetch = async () => {
+    // 护栏（BUG-47 勘误+加固）：侧栏早已是 fetch+token 头实现（非 EventSource 限制）；
+    // 真实噪音=登出残留页拿空 token 每 3s 重连。无 token 不发请求，15s 慢轮询等登录态恢复。
+    if (!localStorage.getItem('phoenix-token')) {
+      if (isComponentActive) {
+        reconnectTimer = setTimeout(() => connectSessionStream(), 15_000);
+      }
+      return;
+    }
     try {
       const token = localStorage.getItem('phoenix-token');
       const response = await fetch(
@@ -167,6 +176,7 @@ const connectSessionStream = () => {
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
+      authFailStreak = 0;
       const reader = response.body?.getReader();
       const decoder = new TextDecoder();
       if (!reader) throw new Error('No reader available');
@@ -182,6 +192,12 @@ const connectSessionStream = () => {
       }
     } catch (error: any) {
       if (error.name === 'AbortError') return;
+      const authFail = /401/.test(String(error.message || ''));
+      authFailStreak = authFail ? authFailStreak + 1 : 0;
+      if (authFailStreak >= 3) {
+        console.warn('会话推送连续 3 次鉴权失败，停止重连（登录失效页自动静默）');
+        return;
+      }
       console.error('会话推送连接异常:', error);
       sessionEventSource.value = null;
       if (isComponentActive) {
