@@ -75,8 +75,7 @@ public class AgentFileController {
             AgentFileService.Download d = agentFileService.download(id, userId, inline);
             String encoded = URLEncoder.encode(d.fileName(), StandardCharsets.UTF_8).replace("+", "%20");
             return ResponseEntity.ok()
-                    .contentType(MediaType.parseMediaType(
-                            d.mime() != null ? d.mime() : MediaType.APPLICATION_OCTET_STREAM_VALUE))
+                    .contentType(withUtf8ForTextual(d.mime()))
                     .header(HttpHeaders.CONTENT_DISPOSITION,
                             (inline ? "inline" : "attachment") + "; filename*=UTF-8''" + encoded)
                     // R-09：HTML 预览沙箱，防存储型 XSS
@@ -88,6 +87,17 @@ public class AgentFileController {
                         .body(("{\"code\":\"" + e.getCode() + "\",\"msg\":\"" + e.getMessage()
                                 + "\",\"data\":null,\"success\":false}").getBytes(StandardCharsets.UTF_8))))
                 .subscribeOn(Schedulers.boundedElastic());
+    }
+
+    /** BUG-42：文本类响应必须显式 charset=UTF-8——无参 text/* 浏览器按 ISO-8859-1 渲染致中文乱码。 */
+    private MediaType withUtf8ForTextual(String mime) {
+        if (mime == null) {
+            return MediaType.APPLICATION_OCTET_STREAM;
+        }
+        String m = mime.toLowerCase();
+        boolean textual = m.startsWith("text/") || m.contains("json") || m.contains("xml") || m.contains("javascript");
+        MediaType base = MediaType.parseMediaType(m);
+        return textual ? new MediaType(base, StandardCharsets.UTF_8) : base;
     }
 
     @DeleteMapping("/{id}")
