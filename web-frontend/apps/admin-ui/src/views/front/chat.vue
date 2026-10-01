@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { storeToRefs } from 'pinia';
 import { useAgentStore, useChatStore } from '@phoenix/chat-shared';
 import type { Agent as ChatAgent, ChatSession } from '@phoenix/chat-shared';
-import { Expand, Plus } from '@element-plus/icons-vue';
+import { Expand, FolderOpened, Plus } from '@element-plus/icons-vue';
 import { ElButton, ElIcon, ElTooltip } from 'element-plus';
 
 import { getAgentListApi } from '#/api/front/agent';
@@ -15,6 +15,7 @@ import AgentListPanel from './components/AgentListPanel.vue';
 import ChatHistoryPanel from './components/ChatHistoryPanel.vue';
 import ChatMessages from './components/ChatMessages.vue';
 import ChatFilesPanel from './components/ChatFilesPanel.vue';
+const filesPanelRef = ref<InstanceType<typeof ChatFilesPanel> | null>(null);
 import ChatComposer from './components/ChatComposer.vue';
 import { apiChatTransport } from './api-transport';
 
@@ -230,6 +231,11 @@ init();
               <el-icon><Expand /></el-icon>
             </button>
           </el-tooltip>
+          <el-tooltip content="本会话文件" placement="bottom" :show-after="300">
+            <button type="button" class="collapsed-bar__btn" @click="filesPanelRef?.open()">
+              <el-icon><FolderOpened /></el-icon>
+            </button>
+          </el-tooltip>
           <el-tooltip content="开启新对话" placement="bottom" :show-after="300">
             <button
               type="button"
@@ -241,10 +247,10 @@ init();
           </el-tooltip>
         </div>
       </div>
-      <div class="chat-layout__messages" style="position: relative">
+      <div class="chat-layout__messages">
         <ChatMessages />
-        <ChatFilesPanel />
       </div>
+      <ChatFilesPanel ref="filesPanelRef" />
       <div class="chat-layout__composer">
         <ChatComposer />
       </div>

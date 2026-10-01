@@ -5,8 +5,8 @@
  */
 import { storeToRefs } from '@vben/stores';
 import { useChatStore } from '@phoenix/chat-shared';
-import { ElButton, ElIcon, ElMessage, ElMessageBox, ElTag, ElTooltip } from 'element-plus';
-import { Document, Download, Delete, View, FolderOpened } from '@element-plus/icons-vue';
+import { ElButton, ElDrawer, ElIcon, ElMessage, ElMessageBox, ElTooltip } from 'element-plus';
+import { Document, Download, Delete, View } from '@element-plus/icons-vue';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 import {
@@ -24,7 +24,9 @@ const { activeSessionId: chatStoreSessionId } = storeToRefs(chat);
 /** admin 运行页显式传入；前台聊天页缺省用 chat store 的当前会话 */
 const activeSessionId = computed(() => props.sessionId ?? chatStoreSessionId.value ?? null);
 
-const open = ref(false);
+const drawerVisible = ref(false);
+function openDrawer() { drawerVisible.value = true; refresh(); }
+defineExpose({ open: openDrawer });
 const loading = ref(false);
 const files = ref<AgentFileItem[]>([]);
 
@@ -101,98 +103,45 @@ async function onDelete(f: AgentFileItem) {
 </script>
 
 <template>
-  <div class="files-panel" :class="{ 'files-panel--open': open }">
-    <button class="files-panel__tab" type="button" @click="open = !open">
-      <ElIcon><FolderOpened /></ElIcon>
-      <span v-if="files.length" class="files-panel__badge">{{ files.length }}</span>
-    </button>
-    <div v-show="open" class="files-panel__body">
-      <div class="files-panel__head">
-        <span>本会话文件</span>
-        <ElButton size="small" text :loading="loading" @click="refresh(false)">刷新</ElButton>
+  <ElDrawer
+    v-model="drawerVisible"
+    :append-to-body="true"
+    direction="rtl"
+    size="340px"
+    title="本会话文件"
+  >
+    <div v-if="loading && !files.length" class="files-panel__empty">加载中…</div>
+    <div v-else-if="!files.length" class="files-panel__empty">
+      暂无产物文件<br />
+      <small>智能体写出的文件会在回复结束后出现在这里</small>
+    </div>
+    <div v-for="f in files" :key="f.id" class="files-panel__row">
+      <ElIcon class="files-panel__icon"><Document /></ElIcon>
+      <div class="files-panel__meta">
+        <div class="files-panel__name" :title="f.fileName">{{ f.fileName }}</div>
+        <div class="files-panel__sub">{{ fmtSize(f.sizeBytes) }} · {{ f.source }}</div>
       </div>
-      <div v-if="!files.length" class="files-panel__empty">
-        暂无产物文件<br />
-        <small>智能体写出的文件会在回复结束后出现在这里</small>
-      </div>
-      <div v-for="f in files" :key="f.id" class="files-panel__row">
-        <ElIcon class="files-panel__icon"><Document /></ElIcon>
-        <div class="files-panel__meta">
-          <div class="files-panel__name" :title="f.fileName">{{ f.fileName }}</div>
-          <div class="files-panel__sub">
-            {{ fmtSize(f.sizeBytes) }} · {{ f.source }}
-            <ElTag v-if="f.source === 'scan'" size="small" type="info" effect="plain">扫描</ElTag>
-          </div>
-        </div>
-        <div class="files-panel__ops">
-          <ElTooltip v-if="previewable(f)" content="预览" placement="top">
-            <ElButton size="small" text @click="onPreview(f)"><ElIcon><View /></ElIcon></ElButton>
-          </ElTooltip>
-          <ElTooltip content="下载" placement="top">
-            <ElButton size="small" text @click="onDownload(f)"><ElIcon><Download /></ElIcon></ElButton>
-          </ElTooltip>
-          <ElTooltip content="删除" placement="top">
-            <ElButton size="small" text @click="onDelete(f)"><ElIcon><Delete /></ElIcon></ElButton>
-          </ElTooltip>
-        </div>
+      <div class="files-panel__ops">
+        <ElTooltip v-if="previewable(f)" content="预览" placement="top">
+          <ElButton size="small" text @click="onPreview(f)"><ElIcon><View /></ElIcon></ElButton>
+        </ElTooltip>
+        <ElTooltip content="下载" placement="top">
+          <ElButton size="small" text @click="onDownload(f)"><ElIcon><Download /></ElIcon></ElButton>
+        </ElTooltip>
+        <ElTooltip content="删除" placement="top">
+          <ElButton size="small" text @click="onDelete(f)"><ElIcon><Delete /></ElIcon></ElButton>
+        </ElTooltip>
       </div>
     </div>
-  </div>
+    <template #footer>
+      <ElButton size="small" :loading="loading" @click="refresh(false)">刷新</ElButton>
+    </template>
+  </ElDrawer>
 </template>
 
 <style scoped>
-.files-panel {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  bottom: 8px;
-  z-index: 20;
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  pointer-events: none;
-}
-.files-panel__tab {
-  pointer-events: auto;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 6px 10px;
-  cursor: pointer;
-  background: #fff;
-  border: 1px solid var(--el-border-color-light, #dcdfe6);
-  border-radius: 8px;
-}
-.files-panel__badge {
-  min-width: 18px;
-  font-size: 12px;
-  color: #fff;
-  text-align: center;
-  background: var(--el-color-primary, #409eff);
-  border-radius: 9px;
-  padding: 0 5px;
-}
-.files-panel__body {
-  pointer-events: auto;
-  width: 300px;
-  max-width: 80vw;
-  max-height: 100%;
-  overflow-y: auto;
-  padding: 10px 12px;
-  background: #fff;
-  border: 1px solid var(--el-border-color-light, #dcdfe6);
-  border-radius: 10px;
-  box-shadow: 0 4px 16px rgb(0 0 0 / 8%);
-}
-.files-panel__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
-  font-weight: 600;
-}
 .files-panel__empty {
-  padding: 18px 0;
+  padding: 28px 0;
   font-size: 13px;
   color: #909399;
   text-align: center;

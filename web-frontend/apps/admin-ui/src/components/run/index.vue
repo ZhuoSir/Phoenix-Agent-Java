@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import ChatFilesPanel from '#/views/front/components/ChatFilesPanel.vue';
+const filesPanelRef = ref<InstanceType<typeof ChatFilesPanel> | null>(null);
 import { notifyFilesChanged } from '#/api/core/agentFiles';
 import type { Agent } from '#/api/core/agent';
 import type { ChatMessage, ChatSession } from '#/api/core/chat';
@@ -35,7 +36,7 @@ import {
   ElSwitch,
   ElTooltip,
 } from 'element-plus';
-import {
+import { FolderOpened,
   ArrowDown,
   CircleClose,
   Close,
@@ -1262,8 +1263,7 @@ onMounted(async () => {
               class="empty-state-preset"
             />
           </div>
-          <div v-else class="messages-area" style="position: relative">
-            <ChatFilesPanel :session-id="currentSession?.id ?? null" />
+          <div v-else class="messages-area">
             <div
               v-for="message in currentMessages"
               :key="message.id"
@@ -1454,17 +1454,29 @@ onMounted(async () => {
               @click="inputControlsCollapsed = !inputControlsCollapsed"
             >
               <span class="input-controls-title">更多选项</span>
-              <el-button
-                type="primary"
-                size="small"
-                class="input-controls-toggle-btn"
-                :class="{ collapsed: inputControlsCollapsed }"
-              >
-                <el-icon class="input-controls-toggle-icon"
-                  ><ArrowDown
-                /></el-icon>
-                {{ inputControlsCollapsed ? '展开' : '收起' }}
-              </el-button>
+              <span class="input-controls-actions">
+                <!-- BL-19：@click.stop——header 整行有折叠 click，冒泡会误触发"展开" -->
+                <el-button
+                  size="small"
+                  plain
+                  type="primary"
+                  @click.stop="filesPanelRef?.open()"
+                >
+                  <el-icon style="margin-right: 4px"><FolderOpened /></el-icon>
+                  文件
+                </el-button>
+                <el-button
+                  type="primary"
+                  size="small"
+                  class="input-controls-toggle-btn"
+                  :class="{ collapsed: inputControlsCollapsed }"
+                >
+                  <el-icon class="input-controls-toggle-icon"
+                    ><ArrowDown
+                  /></el-icon>
+                  {{ inputControlsCollapsed ? '展开' : '收起' }}
+                </el-button>
+              </span>
             </div>
             <div v-show="!inputControlsCollapsed" class="input-controls-body">
               <PresetQuestions
@@ -1602,8 +1614,10 @@ onMounted(async () => {
             />
           </div>
         </div>
-      </div>
+    </div>
     </Teleport>
+    <!-- BL-19：抽屉挂 Page 根级（此前误落全屏报告 Teleport 容器内导致正常态不挂载） -->
+    <ChatFilesPanel ref="filesPanelRef" :session-id="currentSession?.id ?? null" />
   </Page>
 </template>
 
@@ -1878,6 +1892,11 @@ onMounted(async () => {
   border-bottom: 1px solid #f0f0f0;
 }
 
+.input-controls-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
 .input-controls-header {
   display: flex;
   align-items: center;
