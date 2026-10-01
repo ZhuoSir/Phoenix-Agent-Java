@@ -1,5 +1,8 @@
 # Changelog: allinone-docker-packaging
 
+## 里程碑改挂（2026-09-30，用户明示）
+- 「拟 v1.2.1」→ **挤入 v1.2.0**（M4 前，v1.2.0 未发布、v1.2.1 未立项，无版本冲突）。按细则：MILESTONE 解冻 + 纳入表登记 + RELEASE-NOTES/UPGRADE 口径补充 + 全链 IMAGE_TAG/命名 v1.2.1→v1.2.0；requirements/plan/tasks 因归属条款变更 bump 至 v1.4.0/v1.1.0/v1.1.0 **待重确认**
+
 ## Implement 全链实测记录（2026-09-30 深夜，本机=验证环境）
 - 网络实况倒逼 thin 构建通路（docker hub/maven/adoptium 不可达，1ms/npm 可达）：jar 复用 host 构建、dist host pnpm 构建、基座 .env 参数化；本机验证借用 ES9 基座（java25 可用，交付默认 temurin alpine）
 - 真实炸点逐一修复并落码：migrator 基线三步曲（R-05 v1.3.0）、python3 启动硬依赖（三分支安装）、自注册智能体首启 NPE（20 种子规避 → BUG-31 登记根治建议）、nginx 健康检查 debian 无 wget、verify [1][2] 误报（脚本自身含前缀 + 锚定假阴性）、save-offline/load-and-run 需 source .env 且 JAVA_OPTS 加引号

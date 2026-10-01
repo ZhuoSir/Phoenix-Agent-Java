@@ -11,7 +11,7 @@ if ! command -v docker >/dev/null 2>&1; then
 fi
 cd "$(dirname "$0")/.."
 [ -f .env ] && . ./.env 2>/dev/null || true
-TAG="${IMAGE_TAG:-v1.2.1}"
+TAG="${IMAGE_TAG:-v1.2.0}"
 JAR_SRC="../phoenix-admin/phoenix-admin-manager/target/phoenix-admin.jar"
 STAGE=.stage; mkdir -p "$STAGE"
 

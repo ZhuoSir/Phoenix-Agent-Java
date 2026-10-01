@@ -1,4 +1,4 @@
-# Phoenix 一键部署交付包（v1.2.1）
+# Phoenix 一键部署交付包（v1.2.0）
 
 compose 编排的多容器交付包：nginx(前端+反代) / backend(Spring Boot) / postgres(pgvector) / redis / 初始化器。
 **仅一个对外端口（默认 9080）**；数据全在 named volumes；镜像不含任何真实密钥与口令。
@@ -14,7 +14,7 @@ sh scripts/verify.sh          # 7 项断言全 PASS 即部署成功
 
 ## 2. 离线部署（隔离网络目标机）
 构建机：`sh scripts/build.sh --amd64 && sh scripts/save-offline.sh`（产出 tar.gz+sha256，约 2~3G）。
-目标机（仅装 docker≥24）：解包本目录 → `sh scripts/load-and-run.sh phoenix-v1.2.1-images.tar.gz`。
+目标机（仅装 docker≥24）：解包本目录 → `sh scripts/load-and-run.sh phoenix-v1.2.0-images.tar.gz`。
 注意：模型 API（dashscope/deepseek）需目标机可出网，否则对话/生成不可用（登录与界面正常）。
 
 ## 3. 首次登录与改密
@@ -27,7 +27,7 @@ sh scripts/verify.sh          # 7 项断言全 PASS 即部署成功
 |---|---|---|
 | PHOENIX_HTTP_PORT | 9080 | 唯一对外端口 |
 | PG_PASSWORD | phoenix | **生产必改**；同时改 compose 内三处引用源（只有此一个入口，改此即全量生效） |
-| IMAGE_TAG | v1.2.1 | backend/frontend 镜像标签 |
+| IMAGE_TAG | v1.2.0 | backend/frontend 镜像标签 |
 | JAVA_OPTS | MaxRAMPercentage=70 | 容器感知堆 |
 高级覆盖（可选）：`SPRING_DATA_REDIS_HOST/JETCACHE_REMOTE_DEFAULT_URI/SPRING_AGENT_*` 等按 Spring relaxed-binding 直接加到 `backend.environment`。
 

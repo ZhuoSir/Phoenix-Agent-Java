@@ -13,7 +13,7 @@ VER="${1:?用法: upgrade.sh <vX.Y.Z>  (需已存在 ../releases/<VER>/sql)}"
 echo "[upgrade] 建议先执行 backup.sh；10 秒后继续（Ctrl-C 取消）"; sleep 10
 docker compose up -d --force-recreate --no-deps migrator
 docker compose pull 2>/dev/null || true
-TAG="${IMAGE_TAG:-v1.2.1}"
+TAG="${IMAGE_TAG:-v1.2.0}"
 docker compose up -d backend nginx
 docker compose up -d --force-recreate --no-deps migrator-post
 docker compose ps

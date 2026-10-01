@@ -45,7 +45,7 @@ services:
     restart: "no"
 
   backend:
-    image: phoenix-backend:${IMAGE_TAG:-v1.2.1}
+    image: phoenix-backend:${IMAGE_TAG:-v1.2.0}
     build:
       context: ..
       dockerfile: docker/Dockerfile.backend
@@ -93,7 +93,7 @@ services:
     restart: "no"
 
   nginx:
-    image: phoenix-frontend:${IMAGE_TAG:-v1.2.1}
+    image: phoenix-frontend:${IMAGE_TAG:-v1.2.0}
     build:
       context: ..
       dockerfile: docker/Dockerfile.frontend
