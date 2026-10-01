@@ -7,9 +7,22 @@ ARG JAVA_BIN=java
 # 基座可能自带非 root 用户(如 ES 镜像)，构建层需 root
 # python3 为 LocalCodePoolExecutorService 启动硬依赖；curl 供 healthcheck。三分支适配 基座发行版(debian/alpine/UBI)
 USER root
-RUN (apt-get update -qq && apt-get install -y -qq --no-install-recommends curl python3 python3-pip && rm -rf /var/lib/apt/lists/*) \
-    || (apk add --no-cache curl python3 py3-pip) \
-    || (microdnf install -y python3 && microdnf clean all)
+# 工具链三件套（BUG-48）：python3+pip 之外，svg→png 转换器(rsvg-convert)与 CJK 字体
+# 预装进镜像——离线交付环境智能体无法自行 pip install，且容器重建即丢
+# 实测(UBI/ES9 基座)：librsvg2 不含 rsvg-convert CLI，但 pip cairosvg 开箱可用（依赖库基座已带）；
+# CJK 字体仓库无包，构建期下载烧入（jsdelivr；构建机需联网——交付物自带字体，离线机免装）
+RUN (apt-get update -qq && apt-get install -y -qq --no-install-recommends curl python3 python3-pip librsvg2-bin fonts-noto-cjk && rm -rf /var/lib/apt/lists/*) \
+    || (apk add --no-cache curl python3 py3-pip librsvg font-noto-cjk) \
+    || (microdnf install -y python3 python3-pip fontconfig cairo && microdnf clean all)
+RUN mkdir -p /usr/share/fonts/cjk \
+    && (curl -fsL --max-time 120 -o /usr/share/fonts/cjk/NotoSansCJKsc-Regular.otf \
+        https://cdn.jsdelivr.net/gh/notofonts/noto-cjk@main/Sans/OTF/SimplifiedChinese/NotoSansCJKsc-Regular.otf \
+        || curl -fsL --max-time 120 -o /usr/share/fonts/cjk/NotoSansCJKsc-Regular.otf \
+        https://mirrors.tuna.tsinghua.edu.cn/github-release/notofonts/noto-cjk/LatestRelease/NotoSansCJKsc-Regular.otf \
+        || echo 'WARN: CJK 字体下载失败（中文渲染将缺字体）') \
+    && (command -v fc-cache >/dev/null && fc-cache -f || true)
+RUN python3 -m pip install --no-cache-dir cairosvg \
+    || echo 'WARN: pip cairosvg 安装失败（svg 转 png 能力降级）'
 ENV JAVA_BIN=${JAVA_BIN} \
     JAVA_OPTS="-XX:MaxRAMPercentage=70 -XX:+UseContainerSupport" \
     TZ=Asia/Shanghai \

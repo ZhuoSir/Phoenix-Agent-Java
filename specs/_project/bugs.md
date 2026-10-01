@@ -59,6 +59,7 @@
 | BUG-45 | 前台聊天页预设问题面板带「添加/删除」管理功能：预设是智能体级共享资源，前台普通用户可增删影响所有人；管理动作应只在 admin 侧 | P2 | 9080 用户实测(2026-10-01) | 已修复(v1.3.0) | v1.3.0 | front/components/PresetQuestions.vue 重写为只读（列表+点击填入），增删逻辑与 UI 全删；⚠️ 遗留（用户拍板 2026-10-01）：add/delete API 暂不做角色限制，随 BL-05 账号体系统一一并解决（现强做易误伤 admin 自身操作） |
 | BUG-46 | harness 事件面缺失致"执行一半戛然而止+输出消失"：①ExceedMaxItersEvent 未被映射，工具迭代超限静默终止（agent25 svg转png 实测触发）；②AgentResultEvent 承载的最终 Msg 被丢弃，无增量文本的轮次回吐全丢；③前端流循环遇服务端/代理断流（无 end 帧）不触发 onComplete，已生成内容不落库；④ToolResult*/ModelCall* 事件刷 WARN 噪音 | P1 | 9080 用户实测+复现(2026-10-01) | 已修复(v1.3.0) | v1.3.0 | 后端：ExceedMaxIters→⚠️可见警告帧；AgentResult→按轮内 textDeltaSeen 状态兜底补发内容；生命周期事件静默；前端：reader done 未收到 end 帧时兜底 onComplete 保存。复现验证：同 prompt 重现时警告入流、Unhandled WARN 从刷屏降至 1；快轮 end 帧居末 PASS |
 | BUG-47 | 【勘误版】原诊断（EventSource 无法带 token 头）系过时误判——BUG-40 改造时该侧栏已重写为 fetch+phoenix-token 头+重试；真实噪音源=登出残留页 localStorage 清空后仍每 3s 空 token 重连触发 NotLoginException（近 15m 已随页面更新归零实证） | P3 | BUG-46 排查连带发现(2026-10-01) | 已修复(v1.3.0) | v1.3.0 | 加固两处：无 token 时不发请求改 15s 慢轮询；连续 3 次 401 停止重连自动静默。教训入规范：登记 bug 前必须重读现状代码，不得沿用早期会话印象 |
+| BUG-48 | 交付镜像缺智能体工具链：UBI/ES9 分支只装 python3 无 pip，且无任何 svg→png 转换器与 CJK 字体（librsvg2 在该基座不含 rsvg-convert CLI）——智能体做图转码时被迫自装工具，烧光迭代触发 ExceedMaxIters（用户实测 gantt svg→png 半途中断的直接推手） | P1 | 9080 用户实测+排查(2026-10-01) | 已修复(v1.3.0) | v1.3.0 | Dockerfile.backend 三基座分支统一补 python3-pip；UBI 分支加 fontconfig+cairo；构建期下载 NotoSansCJKsc 烧入（jsdelivr/清华源双兜底）；pip 装 cairosvg。E2E 实证：agent30 write_file svg→shell cairosvg→test.png 双文件自动入面板 |
 ---
 
 ## 明细留档（历史证据，只增不删）

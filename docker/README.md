@@ -63,3 +63,7 @@ sh scripts/verify.sh          # 7 项断言全 PASS 即部署成功
 - 首启顺序建议：**装完先在管理端录入模型密钥与默认标记，再发起首次对话/生成**（首启会按当时库内配置构建智能体，直改库注入密钥后需 `docker compose restart backend` 刷新缓存）
 
 - **IMAGE_TAG 纪律**：改 `.env` 的 IMAGE_TAG 后必须显式 `docker compose up -d backend nginx`；compose 会按 .env 静默重建不一致服务，漏配将把服务打回旧镜像（2026-10-01 实测踩坑，verify 可抓获）
+
+## 镜像内智能体工具链（v1.3.0 起）
+
+后端镜像预装 python3 + pip + cairosvg + Noto Sans CJK 字体（svg→png 等图形转换开箱可用）。字体在**构建期**从 jsdelivr/清华源下载烧入镜像——构建机需联网，交付离线机免装。
