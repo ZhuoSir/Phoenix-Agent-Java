@@ -14,6 +14,7 @@ import { getAgentSessionsApi } from '#/api/front/chat';
 import AgentListPanel from './components/AgentListPanel.vue';
 import ChatHistoryPanel from './components/ChatHistoryPanel.vue';
 import ChatMessages from './components/ChatMessages.vue';
+import ChatFilesPanel from './components/ChatFilesPanel.vue';
 import ChatComposer from './components/ChatComposer.vue';
 import { apiChatTransport } from './api-transport';
 
@@ -240,8 +241,9 @@ init();
           </el-tooltip>
         </div>
       </div>
-      <div class="chat-layout__messages">
+      <div class="chat-layout__messages" style="position: relative">
         <ChatMessages />
+        <ChatFilesPanel />
       </div>
       <div class="chat-layout__composer">
         <ChatComposer />
