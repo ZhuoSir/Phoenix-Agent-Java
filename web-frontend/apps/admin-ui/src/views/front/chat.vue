@@ -186,7 +186,7 @@ init();
   </div>
   <div v-else class="chat-layout">
     <aside class="chat-layout__history" :class="{'hidden': chatHistoryPanelCollapsed}">
-      <ChatHistoryPanel ref="chatHistoryPanelRef" @collapse="handleCloseChatHistoryPanel"/>
+      <ChatHistoryPanel ref="chatHistoryPanelRef" @collapse="handleCloseChatHistoryPanel" @open-files="filesPanelRef?.open()"/>
     </aside>
 
     <section class="chat-layout__main relative">
