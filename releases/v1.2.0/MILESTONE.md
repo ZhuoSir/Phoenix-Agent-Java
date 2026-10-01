@@ -49,8 +49,8 @@
 - [x] 配置汇总 `config/changes.md`（6 个新增代码默认键 + #7 EMBEDDING 数据变更含参考 SQL）
 - [x] `RELEASE-NOTES.md`（新增/变更/修复 19 条/已知问题/包含 spec）
 - [x] `UPGRADE.md` + 回滚步骤（含验证清单与 4 条注意事项）
-- [ ] 演练环境走通 UPGRADE.md
-- [ ] `checklist.md` 全勾 → tag
+- [x] 演练环境走通 UPGRADE.md（交付栈实测留档，见 checklist 勾注）
+- [x] `checklist.md` 全勾 → tag v1.2.0 已打
 
 ## 备注与风险
 1. **M2 冻结记录（2026-09-30）**：三项前置全过——① 3/3 spec 已合并 main；② 各 spec tasks 全勾、证据齐（agent-config-ai-generate 走查+AC 汇总见其 artifacts.md，其余两 spec 早已满足）；③ 计划内 P0/P1 全部「已验证」：BUG-01（09-30 用户委托空库全序复验，六文件零报错+幂等+回滚断言全过）、BUG-20（09-30 用户走查覆盖复现步骤）、BUG-22/23/30（用户复测）。冻结后新需求默认进下一里程碑。

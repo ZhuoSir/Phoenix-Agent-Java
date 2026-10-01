@@ -14,10 +14,10 @@
 
 ## 发布
 - [x] 4/4 spec 已合并 main（merge b2a5e4c），mvn package exit=0、前端 build exit=0、交付镜像已运行验证
-- [ ] git tag -a v1.2.0 已打（message 含 RELEASE-NOTES 摘要 + spec 清单）
-- [ ] 项目根 CHANGELOG.md 已追加 v1.2.0 条目（来源 = MILESTONE 升级项表）
-- [ ] bugs.md 本版本「已验证」批量转「已发布(v1.2.0)」+ 日期
-- [ ] releases/v1.2.0/ 全部产物随 tag 进 main
+- [x] git tag -a v1.2.0 已打（annotated，含 spec 清单与升级件路径；本 tag 即重打后的终版）
+- [x] 项目根 CHANGELOG.md 已建档并含 v1.2.0 条目（来源 = MILESTONE 升级项表）
+- [x] bugs.md 已批量转「已发布(v1.2.0) 2026-10-01」（5 条复验项）+ 21 条随版发布注记
+- [x] releases/v1.2.0/ 全部产物已在 main 且包含于本 tag
 
 > 备注（M3 预校验，2026-09-30）：汇总集已在临时库做过「基线+01~05 全序 errors=0、断言、逆序回滚全 0」——
 > 该记录不满足"演练"标准（未含制品部署/启服/真实流量验证），演练项仍须真做。
