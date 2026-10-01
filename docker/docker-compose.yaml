@@ -58,6 +58,9 @@ services:
       SPRING_DATASOURCE_PASSWORD: ${PG_PASSWORD:-phoenix}
       SPRING_DATA_REDIS_HOST: redis
       JETCACHE_REMOTE_DEFAULT_URI: redis://@redis:6379/8
+      # BL-19：会话产物与文件登记根（uploads 卷内，随卷备份；workspace 经扫描器捕获）
+      PHOENIX_AGENT_WORKSPACE_ROOT: /app/uploads/agent-workspace
+      PHOENIX_AGENT_FILES_ROOT: /app/uploads
       JAVA_OPTS: ${JAVA_OPTS:--XX:MaxRAMPercentage=70 -XX:+UseContainerSupport}
       TZ: Asia/Shanghai
     volumes:
