@@ -129,11 +129,23 @@ public class DynamicModelFactory {
     }
 
     /**
+     * BUG-37：Spring AI 底层 HTTP 栈会宣告支持 brotli（Accept-Encoding: …, br）但无 br 解码器，
+     * deepseek(CloudFront/ELB) 命中 br 时响应体无法解码 → JSON 截断/空内容/EOF（间歇、按 CDN 节点分布）。
+     * 统一钉死 identity，由本侧显式控制编码协商；qwen(DashScope) 等兼容端点同样安全。
+     */
+    private static RestClient.Builder noBrotli(RestClient.Builder builder) {
+        return builder.requestInterceptor((request, body, execution) -> {
+            request.getHeaders().set("Accept-Encoding", "identity");
+            return execution.execute(request, body);
+        });
+    }
+
+    /**
      * 获取带代理的 RestClient.Builder（同步），支持 Basic 认证
      */
     private RestClient.Builder getProxiedRestClientBuilder(ModelConfigDTO config) {
         if (config.getProxyEnabled() == null || !config.getProxyEnabled()) {
-            return RestClient.builder();
+            return noBrotli(RestClient.builder());
         }
 
         // 打印同步代理日志
@@ -153,7 +165,7 @@ public class DynamicModelFactory {
                 .setDefaultCredentialsProvider(credsProvider)
                 .build();
 
-        return RestClient.builder().requestFactory(new HttpComponentsClientHttpRequestFactory(httpClient));
+        return noBrotli(RestClient.builder().requestFactory(new HttpComponentsClientHttpRequestFactory(httpClient)));
     }
 
     /**

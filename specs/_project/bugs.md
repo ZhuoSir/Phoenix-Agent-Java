@@ -46,6 +46,7 @@
 | BUG-34 | `GET /api/model-config/list` 响应体返回**明文 apiKey**（全局接口行为，非 docker 包引入） | P2 | 交付包验证接口巡检出 | 新建 | - | v1.2.1 修复=list 出口 sk-****尾4 脱敏 + 脱敏值按 id 回源（update 既有 **** 守护）+ 测试日志不落真实 key；前端编辑态提示语；**实测** 列表全脱敏、脱敏回传测试连接成功 |
 | BUG-35 | 模型管理 maxTokens/temperature 从未传给 harness 对话请求（HarnessModelRegistry 两处 builder 缺 generateOptions），长回复被服务端默认上限截半（用户实测"开画执行到一半不执行"） | P1 | 9080 用户实测(2026-10-01) | 已修复(v1.2.0) | v1.2.0 | Spec: 20260930_allinone-docker-packaging 会话暴露；修复=两处 builder 补 GenerateOptions(maxTokens,temperature)；实测 400 行数到完（fix 前同类 14K 字符断在半句） |
 | BUG-36 | 模型管理表单 max_tokens 硬编码上限 10000，用户无法为高上限模型配置 | P3 | 交付包验收期用户反馈(20261001) | 已修复(v1.2.0) | v1.2.0 | Spec: 20260930_allinone-docker-packaging 连带；`modelconf/index.vue` 去 :max 与校验 max（后端/库表本无限制） |
+| BUG-37 | Spring AI 底层 HTTP 栈宣告支持 brotli（Accept-Encoding: …, br）但无 br 解码器，deepseek(CloudFront) 命中 br 时响应体解不出 → 连接测试/生成 JSON EOF、空内容（间歇，按 CDN 节点分布；curl 不带 br 故正常） | P1 | 交付包 deepseek 连接测试复现(2026-10-01) | 已修复(v1.2.1) | v1.2.1 | Spec: 20260930_allinone-docker-packaging；修复=`DynamicModelFactory.noBrotli()` 对所有 OpenAI 兼容 RestClient（含代理分支）钉死 `Accept-Encoding: identity`；实测 deepseek×3 + qwen 连接测试全过、双项生成 21s 四段齐全。亦为 BUG-22/23/32 间歇截断的总根因 |
 
 ---
 
@@ -253,6 +254,14 @@
 - **现象**：高上限模型无法配置更大值
 - **根因**：前端两处硬编码（校验 max:10_000 + ElInputNumber :max），后端/库表本无限制
 - **修复**：去上限纯手填（min 100 保留），提示语补 token 语义与"超模型上限按模型截断"说明
+
+### BUG-37 brotli 协商导致 deepseek 响应体解不出（连接测试/生成间歇失败总根因）
+- **现象**：点 deepseek「测试连接」报「连接测试失败: Error while extracting response for type [ChatCompletion]」；生成侧早前偶发空内容/JSON 截断（BUG-22/23/32 同源）
+- **根因**：Spring AI 的 RestClient 请求头带 `Accept-Encoding: gzip, x-gzip, deflate, br`，其中 br(brotli) 客户端并不能解码；deepseek 经 CloudFront/ELB 会择优回 `content-encoding: br` → 响应体无法解码 → Jackson 读到的是截断/乱码 → EOF
+- **取证**：nc 抓出站请求头含 `br`；带同头 curl deepseek 返回 `content-encoding: br`（HTTP/2）；hc5 直连不带 br 则 200 正常
+- **修复**：`DynamicModelFactory.noBrotli(RestClient.Builder)` 用 requestInterceptor 将出站 `Accept-Encoding` 统一置 `identity`（chat/embedding/audio 全分支，含代理分支）
+- **验证**：部署 v1.2.1-dev 镜像后 deepseek 连接测试连续 3/3 + qwen 1/1 全过；双项生成 21s 成功、描述 68 字 + 四段提示词 592 字
+- **注**：identity 关闭压缩，OpenAI 补全响应体本就小（KB 级），对带宽无实质影响
 
 ## 工作区遗留状态（非缺陷，处置需确认）
 - `RulesHarnessAgent.java` 有**未提交实验改动**（开 shell + LocalFilesystemSpec），已编译进 `.mvn-home`；还原：`git checkout -- phoenix-agent/phoenix-agent-core/src/main/java/com/phoenix/agent/harness/agent/rules/RulesHarnessAgent.java` 后重新 install
