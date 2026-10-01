@@ -82,7 +82,9 @@ function refreshGrid() {
 }
 
 function onToggleStatus(row: any) {
-  const isEnabled = row.status === 1;
+  // 组(group)域语义：0=启用、1=禁用（后端 GroupInfoServiceImpl:37 只认 0 为有效组）。
+  // ⚠️ 与账号(account)域相反（account 的 1=启用）——双账号体系历史包袱，见 BL-05，勿"顺手统一"。
+  const isEnabled = Number(row.status) === 0;
   ElMessageBox.confirm(
     `确定要${isEnabled ? '禁用' : '启用'}组 "${row.name}" 吗？`,
     isEnabled ? '禁用' : '启用',
