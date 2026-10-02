@@ -1305,6 +1305,14 @@ onMounted(async () => {
                   : ''
               "
             >
+              <!-- thinking-display T-04：历史回显（metadata.thinking 解析后挂此） -->
+              <ThinkingBlock
+                v-if="message.role === 'assistant' && (message as any).thinking"
+                :content="(message as any).thinking"
+                :duration-ms="(message as any).thinkingMs"
+                :has-content="true"
+                :streaming="false"
+              />
               <div
                 v-if="message.messageType === 'html'"
                 v-html="message.content"

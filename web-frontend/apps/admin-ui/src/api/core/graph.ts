@@ -335,6 +335,8 @@ export function streamHarnessChat(
               needConfirm: parsed.needConfirm || false,
               toolCalls: parsed.toolCalls || undefined,
               buttons: parsed.buttons || undefined,
+              // thinking-display T-04 修复：字段白名单曾漏透 thinking，admin 思考通道的断点在此
+              thinking: parsed.thinking || undefined,
             };
             await onMessage(nodeResponse);
           } catch {
