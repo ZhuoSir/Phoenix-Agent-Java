@@ -1,5 +1,9 @@
 # Changelog: detached-stream
 
+## Plan v0.2.0（2026-10-02）两处专拍入册
+- A-01 修正经用户拍板采纳：轮次缓冲=进程内 Sinks（Redis 预铺否决，真多实例需求另立单）
+- P6 经用户拍板：一轮一约束=拒绝+可停止提示，不建排队层
+
 ## Plan v0.1.0（2026-10-02）初稿
 - 核心：TurnManager 自持订阅+replay sink；P1-P8 决策（P2 全量重放否 offset、P3 落库移交、P4 显式 cancel、P5 confirm 并轮、P6 一轮一约束、P7 A′ 服务端优先、P8 落库通道二选一）
 - **A-01 修正式提案**：Redis 缓冲→进程内 Sinks（单实例+重启可丢已声明）；风险4条如实（内存闸/连发变拒绝/写放大/中段起）；零 DDL
