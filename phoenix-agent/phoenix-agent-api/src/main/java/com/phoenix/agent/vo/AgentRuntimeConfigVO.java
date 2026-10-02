@@ -30,5 +30,8 @@ public class AgentRuntimeConfigVO implements Serializable {
 
     private Long datasourceId;
 
+    /** 工具迭代上限（1~100；null=框架默认） */
+    private Integer maxIterations;
+
     private String filesystemPolicy;
 }

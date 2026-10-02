@@ -15,6 +15,11 @@ public final class AgentRuntimeConstant {
     public static final int MIN_KNOWLEDGE_TOP_K = 1;
 
     /** 知识库检索召回条数上限（防 context 爆炸，plan 风险节） */
+    /** 工具迭代上限合法区间（runtime-max-iterations R-03） */
+    public static final int MIN_TOOL_ITERATIONS = 1;
+
+    public static final int MAX_TOOL_ITERATIONS = 100;
+
     public static final int MAX_KNOWLEDGE_TOP_K = 50;
 
     /** 知识库检索相似度阈值默认值（= 原 RulesRagTool 写死值） */

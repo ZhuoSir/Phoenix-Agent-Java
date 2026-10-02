@@ -1,5 +1,6 @@
 package com.phoenix.agent.harness.factory;
 
+import com.phoenix.agent.constant.AgentRuntimeConstant;
 import com.phoenix.agent.enums.FilesystemPolicyEnm;
 import com.phoenix.agent.harness.middleware.StopOnAllDeniedMiddleware;
 import com.phoenix.agent.harness.skill.AgentScopedSkillRepository;
@@ -131,6 +132,12 @@ public class HarnessAgentFactory {
             builder.disableMemoryTools().disableMemoryHooks();
         }
 
+        // runtime-max-iterations R-02：仅配置存在且合法时注入；否则不触框架默认（行为零变化）
+        Integer maxIters = config.getMaxIterations();
+        if (maxIters != null && maxIters >= AgentRuntimeConstant.MIN_TOOL_ITERATIONS
+                && maxIters <= AgentRuntimeConstant.MAX_TOOL_ITERATIONS) {
+            builder.maxIters(maxIters);
+        }
         HarnessAgent built = builder.build();
         String summary = describe(agent, config, bundle.toolNames());
         log.info("对话智能体构建完成: {}", summary);

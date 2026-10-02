@@ -50,6 +50,7 @@ const config = ref<AgentRuntimeConfig>({
   dbDeepAnalysisEnabled: false,
   datasourceId: null,
   filesystemPolicy: 'local',
+  maxIterations: null,
 });
 
 const dbToolOn = computed(
@@ -190,6 +191,24 @@ onMounted(load);
                 <ElOption label="本地沙箱（支持 shell 与脚本类技能）" value="local" />
                 <ElOption label="远程存储（多实例共享，不支持 shell）" value="remote" />
               </ElSelect>
+            </div>
+          </ElCol>
+          <ElCol :span="12">
+            <div class="mb-4">
+              <label class="mb-2 block text-sm font-medium text-gray-700">
+                工具迭代上限（1~100）
+              </label>
+              <ElInputNumber
+                v-model="config.maxIterations"
+                :min="1"
+                :max="100"
+                class="w-full"
+                placeholder="留空=系统默认"
+              />
+              <p class="mt-1 text-xs text-gray-400">
+                按模型推理轮次计（单轮可并行多个工具调用）；复杂任务（多文件产出、图形绘制/转换）建议
+                20~40；留空沿用系统默认
+              </p>
             </div>
           </ElCol>
         </ElRow>

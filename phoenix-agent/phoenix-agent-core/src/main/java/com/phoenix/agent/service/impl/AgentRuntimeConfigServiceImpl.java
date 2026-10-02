@@ -93,6 +93,15 @@ public class AgentRuntimeConfigServiceImpl implements AgentRuntimeConfigService 
                 + ": 相似度阈值取值 0~1",
                 AgentRuntimeErrorCodeEnm.CONFIG_KNOWLEDGE_PARAM_INVALID.getCode());
         }
+        // runtime-max-iterations R-03：保存侧区间校验（运行侧另有区间容错回退）
+        if (target.getMaxIterations() != null
+            && (target.getMaxIterations() < AgentRuntimeConstant.MIN_TOOL_ITERATIONS
+                || target.getMaxIterations() > AgentRuntimeConstant.MAX_TOOL_ITERATIONS)) {
+            return ReturnVo.fail(AgentRuntimeErrorCodeEnm.CONFIG_ITERATIONS_INVALID.getMsg()
+                + ": 取值 " + AgentRuntimeConstant.MIN_TOOL_ITERATIONS + "~"
+                + AgentRuntimeConstant.MAX_TOOL_ITERATIONS + " 或留空（沿用系统默认）",
+                AgentRuntimeErrorCodeEnm.CONFIG_ITERATIONS_INVALID.getCode());
+        }
         if (StringUtils.hasText(target.getFilesystemPolicy())
             && !isValidPolicy(target.getFilesystemPolicy())) {
             return ReturnVo.fail(AgentRuntimeErrorCodeEnm.CONFIG_POLICY_INVALID.getMsg(),
@@ -131,6 +140,8 @@ public class AgentRuntimeConfigServiceImpl implements AgentRuntimeConfigService 
         if (dto.getKnowledgeEnabled() != null) {
             config.setKnowledgeEnabled(toSmallint(dto.getKnowledgeEnabled()));
         }
+        // 全量保存语义：UI 留空=null → 清除配置回退默认（R-01"留空"可持久）
+        config.setMaxIterations(dto.getMaxIterations());
         if (dto.getKnowledgeTopK() != null) {
             config.setKnowledgeTopK(dto.getKnowledgeTopK());
         }
@@ -170,6 +181,7 @@ public class AgentRuntimeConfigServiceImpl implements AgentRuntimeConfigService 
         vo.setDbQueryEnabled(false);
         vo.setDbDeepAnalysisEnabled(false);
         vo.setFilesystemPolicy(FilesystemPolicyEnm.LOCAL.getCode());
+        vo.setMaxIterations(null); // 默认=不注入，框架值兜底（R-02）
         return vo;
     }
 
@@ -189,6 +201,7 @@ public class AgentRuntimeConfigServiceImpl implements AgentRuntimeConfigService 
         vo.setDbDeepAnalysisEnabled(isOn(config.getDbDeepAnalysisEnabled()));
         vo.setDatasourceId(config.getDatasourceId());
         vo.setFilesystemPolicy(config.getFilesystemPolicy());
+        vo.setMaxIterations(config.getMaxIterations());
         return vo;
     }
 
