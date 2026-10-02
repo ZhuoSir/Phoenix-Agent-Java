@@ -44,11 +44,11 @@
   验收标准: 两点全过
 ## 5. 验证与收口组
 
-- [ ] T-08 前台 HITL confirm 链路验证关账（R-05）：planMode 触发确认 → 前台按钮 → /api/front/harness/confirm → 并轮续跑
+- [x] T-08 前台 HITL confirm 链路验证关账（R-05）：planMode 触发确认 → 前台按钮 → /api/front/harness/confirm → 并轮续跑
   关联: R-05 | 依赖: T-01（错误码无关但同域回归顺带）
   验证方式: 浏览器实操或 curl 帧序证据；通过→台账「已修复(注随 BL-22 治愈)」；不通→就地修复同标准复验
   验收标准: 确认-续跑端到端一次绿
-- [ ] T-09 批次收口：全部 AC 留证、completion/artifacts（test.yml 归 config 类升级件说明）、BUG 台账十单终态核对（AC-03 零「新建」残留）、MILESTONE 推进、合并汇报
+- [x] T-09 批次收口：全部 AC 留证、completion/artifacts（test.yml 归 config 类升级件说明）、BUG 台账十单终态核对（AC-03 零「新建」残留）、MILESTONE 推进、合并汇报
   关联: 全部 | 依赖: T-01~T-08
   验收标准: 台账开放数=0（除批准不修复）；verify 全绿
 

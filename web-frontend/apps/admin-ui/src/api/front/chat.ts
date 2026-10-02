@@ -248,6 +248,8 @@ export interface FrontHarnessChatRequest {
 export interface FrontHarnessConfirmRequest {
   sessionId: string;
   agentSn: string;
+  /** BUG-11(T-08)：库配置智能体 sn 为空，agentId 主寻址 */
+  agentId?: number | string;
   allowed: boolean;
   suggestedRules?: any[];
 }

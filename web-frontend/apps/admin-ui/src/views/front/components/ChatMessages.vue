@@ -79,8 +79,8 @@ async function handleConfirmAction(
   if (confirming.value) return;
   confirming.value = true;
   const metadata = msg.metadata || {};
-  const { sessionId: confirmSessionId, agentSn } = metadata;
-  if (!confirmSessionId || !agentSn) {
+  const { sessionId: confirmSessionId, agentSn, agentId } = metadata;
+  if (!confirmSessionId || (!agentSn && !agentId)) {
     confirming.value = false;
     return;
   }
@@ -114,7 +114,7 @@ async function handleConfirmAction(
 
   try {
     await confirmFrontHarnessChat(
-      { sessionId: confirmSessionId, agentSn, allowed },
+      { sessionId: confirmSessionId, agentSn, agentId, allowed },
       (response) => {
         if (response.error) return;
         if (!response.text) return;

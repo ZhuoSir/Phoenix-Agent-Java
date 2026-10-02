@@ -1,5 +1,10 @@
 # Changelog: fix-bug-batch
 
+## Implement T-08~T-09（2026-10-02）批次关账
+- T-08 揪出真断点并修复：前台 confirm 走 sn-only 重载（库配置 sn 空→必挂）+ payload 无 agentId + ChatMessages 空 sn 早退——三处修齐；端到端复验：chat needConfirm(1) → confirm 2494帧 end×2 无500 → 行单行 done len=800 → 前台确认产物落盘 ✓
+- 插曲：验证号 status 语义踩坑（1=启用，传 0 被禁用）
+- T-09 十单终态：9 已修复(v1.4.0) + BUG-04 不修复(批准) + BUG-24③延期注记；台账本批「新建」残留=0；探针账号/会话/文件/planMode 全清
+
 ## Implement T-06~T-07（2026-10-02）
 - T-06 取消令牌+节点守卫：StreamCancellation 注册表 + NodeBeanUtil 单点守卫 + GraphServiceImpl 三钩子；实测取消链完整（subscribe→disconnected→Stopping→cleaned→后续零活动）；注：现图引擎下 dispose 即断链，节点守卫为兜底保险与语义显式化（③硬中断按批准记技术债）；过程插曲：Docker VM 盘满 Redis MISCONF→prune 8G+容器误清重建
 - T-07 模型类型三分（对话/嵌入/音频）；vite dev 端口 loadEnv VITE_PORT 实测 5777 ✓
