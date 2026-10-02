@@ -69,7 +69,7 @@
 | BUG-55 | 长工具任务 SSE 被代理掐死：模型/工具阶段可现 >5 分钟完全静默（实测 13:30:39 png 已产出后下一跳模型调用静默 5m19s），nginx `proxy_read_timeout 300s` 到点斩流（access log 110 upstream timed out）→ 无 end 帧/不落库/不扫描，用户端表现为"一直没执行完"；且 SSE 无心跳、模型调用零日志静默根因不可追 | P1 | 9080 用户实测+nginx取证(2026-10-02) | 已发布(v1.3.0) | v1.3.0 | 三件套：①SseSupport 心跳封装，5 个 SSE 端点 15s 无数据注入 ":ping" comment 帧（前端解析器天然忽略，旧客户端零扰）②nginx /api /platform 读超时 300s→900s 双保险 ③ModelCall 起止 INFO 留痕；实测：强制 25s 静默窗口出现 2 帧 ping、end/agentFiles 帧齐、产物登记正常。内容丢失的彻底消灭属 BL-22（已立项） |
 | BUG-56 | 登出后 500 信封（用户二报，真身换人）：交付 nginx regex `^/(platform|auth)` 吞了前端登录页**路由** `/auth/login`——登出成功→浏览器整页导航 GET /auth/login→被代理到后端(仅POST)→405→data 域兜底包成 {data,message,success} 500；BUG-54 幂等修复经核实均在位（登出 API 本身 200） | P2 | 9080 用户实测(2026-10-02) | 已修复(v1.4.0) | v1.4.0 | nginx exact location `= /auth/login` `/auth/register` 回落 SPA index.html（exact 优先级最高，POST API 不受影响）；实测导航200+SPA、登出API/组API/verify 11项全绿。教训：代理裸域 regex 必须给同前缀的 SPA 路由留豁免（verify 宜补导航断言） |
 | BUG-57 | 刷新后回答样式偶发丢失（渲染层）：BL-22 落库移交后服务端行存**原始 markdown**，而历史装载沿用旧启发式「内容含 <xxx> 即视为已渲染 HTML 跳过转译」（旧前端存 HTML 时代遗产）——凡回答内嵌 SVG/HTML/代码块样式整体丢光走 v-else 裸文本；纯 markdown 行不受影响故"偶发"。前台与 admin 双端同患 | P2 | 9080 用户实测(2026-10-02) | 已修复(v1.4.0) | - | 服务端行（metadata 含 turnId）无条件 markdown 转译（marked 本就正确处理内嵌 HTML）；旧行启发式保留兼容历史数据；双端各修一处 |\n---
-
+| BUG-58 | 前台每次右侧切换智能体都自动新建一个（临时）会话并强占选中——侧栏堆「新会话」垃圾条目、打断"回到该智能体上次会话"的预期。用户要求：不自动建；落未选择会话默认页或该智能体既有会话 | P3 | 9080 用户实测(2026-10-02) | 已修复(v1.4.0) | - | selectAgent 无既有会话分支 createSession→activeSessionId=null；惰性建会话链（composer 首发才建）原样可用；有会话则照旧进最近一条 |\n
 ## 明细留档（历史证据，只增不删）
 
 ### BUG-01 `all_schema.sql` 缺 5 个序列 → 全新环境导入必失败

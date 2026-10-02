@@ -139,7 +139,9 @@ async function init() {
       chatStore.messagesByS = { ...chatStore.messagesByS, [existing.id]: [] };
     }
   } else {
-    chatStore.createSession(agentId);
+    // BUG-58：切换智能体不再自动建会话——落到「未选择会话」默认页；
+    // 用户真正发消息时 composer 会按需惰性建会话（ChatComposer:80），体验不断链
+    chatStore.activeSessionId = null;
   }
 }
 
