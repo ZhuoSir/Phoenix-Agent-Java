@@ -34,6 +34,6 @@
   验证方式: 浏览器实操由用户验收（AC-01/03 剧本）；curl 面先行验证 join 帧序与直播帧序一致
   验收标准: 刷新重进自动续看；点停止真停；关页真续跑
 
-- [ ] T-06 回归与收口：AC-01~06 全项留证（AC-06 用短超时配置键演练）；10min 默认值回归出厂；verify 全绿+（宜补 join/cancel 断言各一）；completion/artifacts（零 DDL 声明）/changelog；MILESTONE v1.4.0 状态推进；backlog BL-22 关单；BUG-53 关单（根治达成，A′ 保留兜底口径记注）
+- [x] T-06 回归与收口：AC-01~06 全项留证（AC-06 用短超时配置键演练）；10min 默认值回归出厂；verify 全绿+（宜补 join/cancel 断言各一）；completion/artifacts（零 DDL 声明）/changelog；MILESTONE v1.4.0 状态推进；backlog BL-22 关单；BUG-53 关单（根治达成，A′ 保留兜底口径记注）
   关联: 全部 | 依赖: T-01~T-05
   验收标准: 六 AC 红绿如实；两单（BL-22/BUG-53）台账闭环有据

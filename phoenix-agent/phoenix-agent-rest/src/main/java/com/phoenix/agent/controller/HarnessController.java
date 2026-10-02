@@ -55,6 +55,8 @@ public class HarnessController {
             Map<String, Object> eventMap = new LinkedHashMap<>();
             eventMap.put("content", "");
             eventMap.put("end", false);
+            // detached-stream 收口补洞：admin confirm 流同步 thinking 通道（原缺，与 chat 流对齐）
+            output.state().value("thinking_text", String.class).ifPresent(th -> eventMap.put("thinking", th));
             if (output instanceof StreamingOutput<?> streamingOutput && streamingOutput.chunk() != null) {
                 eventMap.put("content", streamingOutput.chunk());
             }
