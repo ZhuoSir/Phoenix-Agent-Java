@@ -227,7 +227,7 @@ function handleKeydown(event: KeyboardEvent) {
     position: relative;
     display: flex;
     flex-direction: column;
-    max-width: calc(var(--pc-chat-content-width) - 68px);
+    max-width: var(--pc-chat-content-width); /* thinking/composer 视觉对齐：与消息内容区同宽 */
     margin: 0 auto;
     background: hsl(var(--background));
     border: 1px solid hsl(var(--border));
@@ -317,7 +317,7 @@ function handleKeydown(event: KeyboardEvent) {
 
   &__preset {
     position: relative;
-    max-width: calc(var(--pc-chat-content-width) - 68px);
+    max-width: var(--pc-chat-content-width); /* thinking/composer 视觉对齐：与消息内容区同宽 */
     margin: 0 auto 10px;
   }
 
