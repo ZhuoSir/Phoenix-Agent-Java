@@ -1,5 +1,8 @@
 # Changelog: runtime-max-iterations
 
+## 合并（2026-10-02）
+- 用户「合并」→ 本分支（含 BUG-54/55）并入 main，分支删除；不发版随 v1.3.0 统一指令
+
 ## 同分支夹带（2026-10-02 下午）：BUG-55 SSE 心跳+超时三件套（用户"做吧"批准，直接在本分支实施）
 - SseSupport(agent-core) 15s comment 心跳包 5 端点；nginx 读超时 900s×2；[model-call] 留痕
 - 过程自纠三处：wrap 脚本括号错位×2、nginx 注释误用 //、测试 grep 假阴性（Spring 写 ":ping" 无空格）
