@@ -1,5 +1,20 @@
 <script setup lang="ts">
 import ChatFilesPanel from '#/views/front/components/ChatFilesPanel.vue';
+import ThinkingBlock from '#/views/front/components/ThinkingBlock.vue';
+
+// thinking-display T-04：admin 运行页思考累加器（与会话绑定，流式实时可见 + 报告保存携带 metadata）
+const thinkingMap = reactive(new Map<string, { ms: number; start: number; text: string }>());
+function getThinkingTrack(sid: string) {
+  let t = thinkingMap.get(sid);
+  if (!t) { t = { text: '', ms: 0, start: 0 }; thinkingMap.set(sid, t); }
+  return t;
+}
+function thinkingMetaOf(sid: string): string | undefined {
+  const t = thinkingMap.get(sid);
+  if (!t || !t.text) return undefined;
+  const clipped = t.text.length > 65_536 ? `${t.text.slice(0, 65_536)}…（已截断）` : t.text;
+  return JSON.stringify({ thinking: clipped, thinkingMs: t.ms });
+}
 const filesPanelRef = ref<InstanceType<typeof ChatFilesPanel> | null>(null);
 import { notifyFilesChanged } from '#/api/core/agentFiles';
 import type { Agent } from '#/api/core/agent';
@@ -288,6 +303,13 @@ async function selectSession(session: ChatSession | null) {
     }
     syncStateToView(session.id, { isStreaming, nodeBlocks });
     currentMessages.value = await getSessionMessagesApi(session.id);
+    // thinking-display R-05：历史 metadata 解析思考（旧行无键静默）
+    for (const m of currentMessages.value as any[]) {
+      try {
+        const md = typeof m.metadata === 'string' ? JSON.parse(m.metadata) : m.metadata;
+        if (md && typeof md.thinking === 'string') { m.thinking = md.thinking; m.thinkingMs = md.thinkingMs; }
+      } catch { /* 无 metadata 或非 JSON */ }
+    }
     await nextTick();
     scrollToBottom();
   } catch {
@@ -308,6 +330,7 @@ async function sendMessage() {
   const needsTitle =
     !currentSession.value.title || currentSession.value.title === '新会话';
   const sessionId = currentSession.value.id;
+  thinkingMap.set(sessionId, { text: '', ms: 0, start: 0 }); // 新一轮思考轨迹重置
 
   const userMessage: ChatMessage = {
     sessionId,
@@ -544,6 +567,13 @@ async function sendGraphRequest(request: GraphRequest, rejectedPlan: boolean) {
         async (response: GraphNodeResponse) => {
           // BL-19：本轮产物登记事件 → 刷新文件面板（admin 运行页）
           if ((response as any).agentFiles) notifyFilesChanged();
+          // thinking-display R-01：思考增量独立累加（严禁进 nodeBlocks 正文）
+          if ((response as any).thinking) {
+            const t = getThinkingTrack(sessionId);
+            if (!t.start) t.start = Date.now();
+            t.text += (response as any).thinking;
+            if (!t.ms) t.ms = Date.now() - t.start;
+          }
           if (response.error) {
             ElMessage.error(`处理错误: ${response.text}`);
             return;
@@ -739,7 +769,8 @@ async function sendGraphRequest(request: GraphRequest, rejectedPlan: boolean) {
           role: 'assistant',
           content: sessionState.htmlReportContent,
           messageType: 'html-report',
-        };
+          metadata: thinkingMetaOf(sessionId), // thinking-display R-05
+        } as any;
         try {
           await saveMessageApi(sessionId, htmlReportMessage);
           if (currentSession.value?.id === sessionId) {
@@ -754,7 +785,8 @@ async function sendGraphRequest(request: GraphRequest, rejectedPlan: boolean) {
           role: 'assistant',
           content: sessionState.markdownReportContent,
           messageType: 'markdown-report',
-        };
+          metadata: thinkingMetaOf(sessionId), // thinking-display R-05
+        } as any;
         try {
           await saveMessageApi(sessionId, markdownMessage);
           if (currentSession.value?.id === sessionId) {
@@ -1370,6 +1402,13 @@ onMounted(async () => {
             </div>
 
             <div v-if="isStreaming || nodeBlocks.length > 0" class="streaming-response">
+              <ThinkingBlock
+                v-if="currentSession && thinkingMap.get(currentSession.id)?.text"
+                :content="thinkingMap.get(currentSession.id)!.text"
+                :duration-ms="thinkingMap.get(currentSession.id)?.ms"
+                :has-content="nodeBlocks.length > 0"
+                :streaming="isStreaming"
+              />
               <div class="agent-response-container">
                 <template v-for="(nodeBlock, index) in nodeBlocks" :key="index">
                   <div
