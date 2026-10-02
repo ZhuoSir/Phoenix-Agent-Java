@@ -1,5 +1,12 @@
 # Changelog: fix-bug-batch
 
+## Implement 后浏览器复测轮（2026-10-02 晚）——确认气泡与信号式重构
+- 用户实操报"确认气泡空"：根因两层——计划模式全文走思考通道正文空 + harness-confirm 模板正文渲染历史注释。修复：模板恢复渲染 + transport 空正文兜底展示计划文本（4000字截断+「执行计划（待确认）」标）
+- 用户报 admin 确认流 `not iterable` 连刷：架构级病灶——BL-22 等待期原流保开，但双端 confirm 仍在"二开消费流"竞态。重构为**信号式**：confirm 只发放行 POST（响应体即取消），原流续播（admin confirmHarnessSignalApi / 前台 confirmFrontHarnessSignal；旧二开 handler 整体移除，TS 213 反低于基线）
+- 信号式实证：放行#1 后原流 702→940 帧、思考 1365→1974 增长、join 重连回放 1142 帧 ✓
+- 新边界立单 BUG-59（计划模式两段式确认 resume 缺陷，框架侧，待处置）；双 end 帧小疵登记待修
+- 演练现场全清（sig*/t08* 会话、产物、planMode、验证账号）
+
 ## Implement T-08~T-09（2026-10-02）批次关账
 - T-08 揪出真断点并修复：前台 confirm 走 sn-only 重载（库配置 sn 空→必挂）+ payload 无 agentId + ChatMessages 空 sn 早退——三处修齐；端到端复验：chat needConfirm(1) → confirm 2494帧 end×2 无500 → 行单行 done len=800 → 前台确认产物落盘 ✓
 - 插曲：验证号 status 语义踩坑（1=启用，传 0 被禁用）

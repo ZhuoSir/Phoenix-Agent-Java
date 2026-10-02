@@ -70,6 +70,7 @@
 | BUG-56 | 登出后 500 信封（用户二报，真身换人）：交付 nginx regex `^/(platform|auth)` 吞了前端登录页**路由** `/auth/login`——登出成功→浏览器整页导航 GET /auth/login→被代理到后端(仅POST)→405→data 域兜底包成 {data,message,success} 500；BUG-54 幂等修复经核实均在位（登出 API 本身 200） | P2 | 9080 用户实测(2026-10-02) | 已修复(v1.4.0) | v1.4.0 | nginx exact location `= /auth/login` `/auth/register` 回落 SPA index.html（exact 优先级最高，POST API 不受影响）；实测导航200+SPA、登出API/组API/verify 11项全绿。教训：代理裸域 regex 必须给同前缀的 SPA 路由留豁免（verify 宜补导航断言） |
 | BUG-57 | 刷新后回答样式偶发丢失（渲染层）：BL-22 落库移交后服务端行存**原始 markdown**，而历史装载沿用旧启发式「内容含 <xxx> 即视为已渲染 HTML 跳过转译」（旧前端存 HTML 时代遗产）——凡回答内嵌 SVG/HTML/代码块样式整体丢光走 v-else 裸文本；纯 markdown 行不受影响故"偶发"。前台与 admin 双端同患 | P2 | 9080 用户实测(2026-10-02) | 已修复(v1.4.0) | - | 服务端行（metadata 含 turnId）无条件 markdown 转译（marked 本就正确处理内嵌 HTML）；旧行启发式保留兼容历史数据；双端各修一处 |\n---
 | BUG-58 | 前台每次右侧切换智能体都自动新建一个（临时）会话并强占选中——侧栏堆「新会话」垃圾条目、打断"回到该智能体上次会话"的预期。用户要求：不自动建；落未选择会话默认页或该智能体既有会话 | P3 | 9080 用户实测(2026-10-02) | 已修复(v1.4.0) | - **v2 真身**：右侧面板 AgentListPanel.handlePick 自带「找不到名为新会话就强制建」逻辑（首修只改了 chat.vue selectAgent 另一链路，用户复测仍现）——改为进该智能体最近一条既有会话否则清选中落默认页；composer 惰性建链不动。教训：同一交互多入口必须清点全部调用方（BUG-47 同族） |\n
+| BUG-59 | 计划模式两段式确认：第二次 confirm 放行后 AgentScope resume 对 plan_exit 工具自动生成 error 结果并 RequestStopEvent，轮次挂起至看门狗 10min 超时定稿（无脏数据/无双行/超时兜底有效）。单段确认（shell 类危险操作）全链正常（T-08 实证 done+产物）。BL-22 信号架构本身已验证无涉 | P3 | 9080 演练取证(2026-10-02) | 新建 | - | 待处置方向：查 AgentScope 原生二次确认 resume 用法或 plan 模式确认合并为单段；挂账不急修 |
 ## 明细留档（历史证据，只增不删）
 
 ### BUG-01 `all_schema.sql` 缺 5 个序列 → 全新环境导入必失败
