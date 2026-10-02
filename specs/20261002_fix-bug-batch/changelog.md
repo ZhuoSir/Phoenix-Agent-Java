@@ -1,5 +1,10 @@
 # Changelog: fix-bug-batch
 
+## Implement T-04（2026-10-02）问答联合向量化
+- DocumentConverterUtil QA 口径=question+\n+answer（答案空退化问句）；re-embed 端点+知识库面板「重刷向量」按钮（确认框+计数回执）
+- 矩阵B实测：新条目向量 content=联合文本 ✓；重刷×2 幂等向量行数恒 1 ✓；DOCUMENT 分支零触碰 ✓；列名笔误 kb_id→knowledge_base_id 自纠
+- **业务域口径修正（如实）**：现场证实 BusinessKnowledge 为「名词/说明/同义词」结构，不存在共享 QA 转换器——Q&A 时"统一生效"的担忧对象不存在，业务侧实际零影响（比批准范围更小，不越权）
+
 ## Implement T-01~T-03（2026-10-02）
 - T-01 登录码值 23009（发现为历史半修：文案已对码未改）+ 建号双层密码校验；矩阵A 四断言全绿（登录23009/改密对面23007/空密拒绝101/正常通路）；过程插曲：compose 标签被 && 链断裂卡旧镜像，追因后修复
 - T-02 核实即关账：缺陷对象（未挂仓的 HumanInTheLoop 旧路径）已被技能体系重构取代，现场无残留
