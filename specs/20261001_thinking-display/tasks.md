@@ -30,6 +30,6 @@
 
 ## 3. 收口
 
-- [ ] T-05 E2E 与收口：AC-01~05 留证 artifacts（含风险1 判定：真机独白是否仍进 content——若属模型行为，如实回写并停手回报）；HITL/agentFiles/文件面板回归；completion/artifacts/changelog/backlog BL-21 销账/MILESTONE 推进
+- [x] T-05 E2E 与收口：AC-01~05 留证 artifacts（含风险1 判定：真机独白是否仍进 content——若属模型行为，如实回写并停手回报）；HITL/agentFiles/文件面板回归；completion/artifacts/changelog/backlog BL-21 销账/MILESTONE 推进
   关联: 全部 | 依赖: T-01~T-04
   验收标准: 五 AC 红绿如实标注（部分达成注明）；风险1 有实测结论；verify 11/10 项无回归

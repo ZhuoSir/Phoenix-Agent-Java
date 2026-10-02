@@ -1,5 +1,10 @@
 # Changelog: thinking-display
 
+## Implement 收口（2026-10-01）——T-01~T-05 全勾
+- 三通道实测全绿：thinking 独立键（70~733 帧样本）/正文零独白/agentFiles→end 帧序不变/HITL 未触及
+- 风险1 判定解除：英文独白确属思考通道（分流后绝迹）
+- 待用户：浏览器验收两页折叠交互与刷新回显 → 合并
+
 ## 三重确认闭环（2026-10-01）确认人: 陈卓
 - tasks v1.0.0 已确认（用户「确认任务」）；三门全绿 → 开分支 feature/thinking-display，进入 Implement
 
