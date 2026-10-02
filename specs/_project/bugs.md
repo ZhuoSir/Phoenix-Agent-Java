@@ -63,6 +63,8 @@
 | BUG-49 | QA/FAQ 知识召回只返回**问题文本**不含答案：向量 content=question（注释明示 answer 放关系库）但检索工具（KnowledgeRetrievalTool/RulesRagTool）不回表取 answer——QA 知识事实上不可用 | P2 | knowledge-base T-10 E2E(2026-10-01) | 已修复(v1.3.0) | v1.3.0 | 存量设计缺口（非 knowledge-base 引入，DOCUMENT 类型不受影响）；修法候选：工具命中后按 agentKnowledgeId 回表拼 question+answer 返回；处置与优先级待用户拍板 |
 | BUG-50 | 知识库管理页 ElDialog 组件漏 import——未注册组件被当未知标签裸渲染，新建/编辑弹窗的名称描述表单裸露在列表底部且常显 | P3 | 9080 用户实测(2026-10-01) | 已修复(v1.3.0) | v1.3.0 | 补 ElDialog import；教训：element-plus 组件全部显式 import 后应过一遍「模板用到的组件名 ⊆ import 列表」自查（本次 ElDialog/ElDrawer 一对照即穿） |
 | BUG-51 | 知识库页「知识管理」抽屉切换不同库时列表不刷新：AgentKnowledgeConfig 无 props watch（原为智能体抽屉静态组件），复用实例残留上一库数据——两库点开内容相同 | P3 | 9080 用户实测(2026-10-01) | 已修复(v1.3.0) | v1.3.0 | 抽屉内容挂 :key="activeKb.id" 强制随库重建；后端双维查询分库正确性 curl kb1/kb2 同步实证 |
+| BUG-52 | thinking-display T-04 自引入：admin graph.ts streamHarnessChat 的 nodeResponse 字段白名单未透 thinking，admin 运行页思考区永不出现（用户实测"啥都没看到"；curl 证据：nginx 只有 admin 通道流量而前端补丁生效处在前台链路）——排查中途另澄清：用户测试页为 admin 运行页，前台链路本身完好未证伪 | P2 | 9080 用户实测(2026-10-02) | 已修复(v1.3.0) | v1.3.0 | dispatch 补 thinking 字段；同笔补历史消息 ThinkingBlock 回显 | 
+| BUG-53 | 流式回答期间刷新页面：已生成内容整轮丢失且不继续生成——助手消息仅在前端 onComplete 落库、执行随 SSE 连接取消被 Reactor 静默放弃（实测证据：12:32 会话仅存 user 行无 assistant 行）。处置方向已定：**A′ 前端快照止血 + B 服务端脱离执行（BL-22）共同保底**，三接缝设计（回显去重/落库所有权移交 upsert/停止语义独立化）见 BL-22 注记；A′ 原型已趟过插入点（stash 中） | P2 | 9080 用户实测(2026-10-02) | 新建 | - | 修复挂 BL-22 立项排期，目标版本待定 |
 ---
 
 ## 明细留档（历史证据，只增不删）

@@ -306,6 +306,8 @@ export function streamFrontHarnessChat(
               needConfirm: parsed.needConfirm || false,
               toolCalls: parsed.toolCalls || undefined,
               buttons: parsed.buttons || undefined,
+              // thinking-display R-01：思考增量独立通道（旧帧无此键=undefined）
+              thinking: parsed.thinking || undefined,
             };
             await onMessage(nodeResponse);
           } catch {

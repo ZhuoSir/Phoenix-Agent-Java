@@ -42,6 +42,16 @@ function uid(): string {
 }
 
 function toStoreMessage(api: any): ChatMessage {
+  // thinking-display R-05：历史消息 metadata.thinking 回显（旧行无键=undefined 静默）
+  let thinking: string | undefined;
+  let thinkingMs: number | undefined;
+  try {
+    const md = typeof api.metadata === 'string' ? JSON.parse(api.metadata) : api.metadata;
+    if (md && typeof md.thinking === 'string') {
+      thinking = md.thinking;
+      thinkingMs = typeof md.thinkingMs === 'number' ? md.thinkingMs : undefined;
+    }
+  } catch { /* metadata 非 JSON 或为空：按无思考处理（R-04） */ }
   return {
     id: String(api.id ?? `${Date.now()}-${Math.random()}`),
     role: (api.role === 'user' ? 'user' : 'assistant') as 'assistant' | 'user',
@@ -49,6 +59,8 @@ function toStoreMessage(api: any): ChatMessage {
     createdAt: api.createTime ? new Date(api.createTime).getTime() : Date.now(),
     messageType: api.messageType ?? 'text',
     metadata: api.metadata,
+    thinking,
+    thinkingMs,
   };
 }
 
@@ -284,7 +296,7 @@ export const apiChatTransport: ChatTransport = {
   async send(
     payload: SendPayload,
     signal?: AbortSignal,
-    onProgress?: (text: string) => void,
+    onProgress?: (text: string, thinking?: string) => void,
     onNodeMessage?: (message: ChatMessage) => void,
   ): Promise<ChatMessage> {
     let { sessionId, content, agentId } = payload;
@@ -325,6 +337,9 @@ export const apiChatTransport: ChatTransport = {
     const reply = await new Promise<ChatMessage>((resolve, reject) => {
       if (isHarness) {
         let fullText = '';
+        let thinkingBuf = '';
+        let thinkingStart = 0;
+        let thinkingMs = 0;
         let abortRequested = false;
 
         const onAbort = () => {
@@ -366,9 +381,17 @@ export const apiChatTransport: ChatTransport = {
               });
               return;
             }
+            const th = (response as any).thinking;
+            if (th) {
+              if (!thinkingBuf) thinkingStart = Date.now();
+              thinkingBuf += th;
+            }
             if (response.text) {
               fullText += response.text;
-              onProgress?.(markdownToHtml(fullText));
+            }
+            if (th || response.text) {
+              if (thinkingBuf && !thinkingMs) thinkingMs = Date.now() - thinkingStart;
+              onProgress?.(markdownToHtml(fullText), thinkingBuf || undefined);
             }
           },
           async (error) => {
@@ -382,11 +405,20 @@ export const apiChatTransport: ChatTransport = {
 
             const text = fullText || '已处理完成';
             const html = markdownToHtml(text);
+            // R-06：持久化前 64KB 截头（流式观感不受影响）
+            const persistedThinking = thinkingBuf
+              ? (thinkingBuf.length > 65536
+                ? `${thinkingBuf.slice(0, 65536)}…（已截断）`
+                : thinkingBuf)
+              : undefined;
             const assistantMessage: any = {
               sessionId,
               role: 'assistant',
               content: html,
               messageType: 'text',
+              metadata: persistedThinking
+                ? JSON.stringify({ thinking: persistedThinking, thinkingMs })
+                : undefined,
             };
             try {
               await saveMessageApi(sessionId, assistantMessage);
@@ -400,7 +432,9 @@ export const apiChatTransport: ChatTransport = {
               content: html,
               createdAt: Date.now(),
               messageType: 'text',
-            });
+              thinking: thinkingBuf || undefined,
+              thinkingMs: thinkingMs || undefined,
+            } as any);
           },
         );
 
@@ -742,7 +776,7 @@ export async function handleHarnessConfirm(
   agentSn: string,
   allowed: boolean,
   onNodeMessage?: (message: ChatMessage) => void,
-  onProgress?: (text: string) => void,
+  onProgress?: (text: string, thinking?: string) => void,
 ): Promise<string> {
   let currentNodeName: string | null = null;
   let currentBlockIndex = -1;

@@ -35,7 +35,7 @@ export interface ChatTransport {
   send(
     payload: SendPayload,
     signal?: AbortSignal,
-    onProgress?: (text: string) => void,
+    onProgress?: (text: string, thinking?: string) => void,
     onNodeMessage?: OnNodeMessage,
   ): Promise<ChatMessage>;
 }

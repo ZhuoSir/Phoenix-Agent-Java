@@ -280,7 +280,11 @@ public class HarnessChatServiceImpl implements HarnessChatService {
         }
         // 2b. 思考内容增量事件（DeepSeek-R1 等深度思考模型）
         if (event.getType() == AgentEventType.THINKING_BLOCK_DELTA && event instanceof ThinkingBlockDeltaEvent thinkingEvent) {
-            return new StreamingOutput<>(thinkingEvent.getDelta(), "harness_agent", "harness", new OverAllState(data));
+            // thinking-display R-01：思考增量不再伪装成正文 chunk——经 thinking_text 状态键走
+            // 独立通道，由 mapper 透出 eventMap.thinking；content 从此只含回答正文
+            Map<String, Object> thinkingData = new HashMap<>();
+            thinkingData.put("thinking_text", thinkingEvent.getDelta());
+            return NodeOutput.of("harness_agent", "harness", new OverAllState(thinkingData), null);
         }
         // 3. 结束事件
         if (event.getType() == AgentEventType.AGENT_END) {

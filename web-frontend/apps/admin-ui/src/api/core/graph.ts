@@ -15,6 +15,8 @@ export interface ConfirmButton {
 }
 
 export interface GraphNodeResponse {
+  /** 思考增量（thinking-display R-01，独立于 text 正文通道） */
+  thinking?: string;
   agentId: string;
   threadId: string;
   nodeName: string;
@@ -333,6 +335,8 @@ export function streamHarnessChat(
               needConfirm: parsed.needConfirm || false,
               toolCalls: parsed.toolCalls || undefined,
               buttons: parsed.buttons || undefined,
+              // thinking-display T-04 修复：字段白名单曾漏透 thinking，admin 思考通道的断点在此
+              thinking: parsed.thinking || undefined,
             };
             await onMessage(nodeResponse);
           } catch {

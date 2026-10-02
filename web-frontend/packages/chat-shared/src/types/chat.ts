@@ -12,6 +12,10 @@ export interface ChatMessage {
   messageType?: string;
   /** 消息附加元数据 */
   metadata?: any;
+  /** 深度思考全文（thinking-display R-02；持久于 metadata.thinking） */
+  thinking?: string;
+  /** 思考耗时毫秒 */
+  thinkingMs?: number;
 }
 
 export interface ChatSession {
