@@ -1,5 +1,8 @@
 # Changelog: detached-stream
 
+## v1.0.0 tasks（2026-10-02）确认人: 陈卓
+- **第③关通过（三重确认门全绿）**→ Implement 启动：分支 feature/detached-stream
+
 ## Tasks v0.1.0（2026-10-02）草稿
 - 两期六任务：T-01 A′ 先行（按 P7 改造）→ T-02 TurnManager → T-03 双域端点(+join/cancel/confirm 并轮) → T-04 落库所有权移交（单行状态流转）→ T-05 前端追流/真停止/P6 提示 → T-06 六 AC 回归 + BL-22/BUG-53 双单关账
 - 超时/帧闸走配置键（出厂 600s/2000，演练短值）；admin 历史缺口顺带闭合如实记
