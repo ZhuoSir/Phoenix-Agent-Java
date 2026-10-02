@@ -42,12 +42,12 @@
 
 ## 4. 前端
 
-- [ ] T-07 知识库页：views/knowledge-base/index.vue（列表/新建/编辑/删除保护提示/组标签）+ 条目面板复用改造（AgentKnowledgeConfig→kbId 参数化）+ 路由注册
+- [x] T-07 知识库页：views/knowledge-base/index.vue（列表/新建/编辑/删除保护提示/组标签）+ 条目面板复用改造（AgentKnowledgeConfig→kbId 参数化）+ 路由注册
   关联: R-02,03,04,05,06 | 依赖: T-02, T-05
   验证方式: 浏览器实操（用户）+ vue-tsc 改动零新增 + build；菜单种子在库后侧栏出现「知识库」
   验收标准: 与智能体管理同级；条目面板功能对齐旧 tab 体验
 
-- [ ] T-08 智能体抽屉「知识库绑定」多选（置灰+原因 tooltip）+ 组管理页「分配知识库」dialog（抄 assign-agent 同构）
+- [x] T-08 智能体抽屉「知识库绑定」多选（置灰+原因 tooltip）+ 组管理页「分配知识库」dialog（抄 assign-agent 同构）
   关联: R-11,13,14 | 依赖: T-03, T-04
   验证方式: 浏览器实操：绑定候选/置灰/保存回显；组页分配联动；知识配置旧 tab 移除
   验收标准: 抽屉不再可编辑条目内容（R-11）
