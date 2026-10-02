@@ -1,5 +1,11 @@
 # Changelog: runtime-max-iterations
 
+## Tasks v0.1.0（2026-10-02）草稿
+- T-01~T-05；T-02 内嵌语义探针（plan 风险1 定标）；前置声明：等 thinking-display 合并后另开分支
+
+## v1.0.0 plan（2026-10-02）确认人: 陈卓
+- **第②关通过**（用户「确认方案」，P1~P3 与两风险接受）→ Phase 3 tasks 草稿（本 spec 走标准三关，tasks 亦单独确认）
+
 ## Plan v0.1.0（2026-10-02）初稿
 - V1.3.0_03 加列；工厂区间注入；警告文案生效值重读配置（P3 反射与事件夹带均否）；UI ElInputNumber 钳 1~100
 - 风险1：maxIters 精确语义待 T 件探针定文案；风险3：实施分支待 thinking-display 合并后另开
