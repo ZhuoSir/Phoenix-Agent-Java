@@ -4,6 +4,7 @@ import { storeToRefs } from 'pinia';
 import { useAgentStore, useChatStore } from '@phoenix/chat-shared';
 import { ElMessage } from 'element-plus';
 import ReportMessage from './report/ReportMessage.vue';
+import ThinkingBlock from './ThinkingBlock.vue';
 import type { ResultData } from '#/api/core/resultSet';
 import ResultSetDisplay from '#/components/run/ResultSetDisplay.vue';
 import { confirmFrontHarnessChat } from '#/api/front/chat';

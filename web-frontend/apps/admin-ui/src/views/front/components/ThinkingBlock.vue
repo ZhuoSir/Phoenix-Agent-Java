@@ -28,9 +28,8 @@ const seconds = computed(() => {
 <template>
   <div v-if="content" class="thinking">
     <button class="thinking__head" type="button" @click="expanded = !expanded">
-      <span class="thinking__icon">🧠</span>
-      <span v-if="streaming" class="thinking__label thinking__label--live">深度思考中…</span>
-      <span v-else class="thinking__label">已深度思考{{ seconds ? `（${seconds}）` : '' }}</span>
+      <span v-if="streaming" class="thinking__dots"><i /><i /><i /></span>
+      <span class="thinking__label">{{ streaming ? 'Thinking…' : 'Think Done' }}{{ !streaming && seconds ? ` · ${seconds}` : '' }}</span>
       <span class="thinking__caret">{{ expanded ? '▾' : '▸' }}</span>
     </button>
     <div v-show="expanded" class="thinking__body">{{ content }}</div>
@@ -40,9 +39,10 @@ const seconds = computed(() => {
 <style scoped>
 .thinking {
   margin-bottom: 8px;
+  border: 1px solid #eef0f4;
+  border-left: 3px solid #c6d4f7;
   border-radius: 8px;
-  background: #f7f8fa;
-  border: 1px solid #eceef2;
+  background: #fafbfc;
 }
 .thinking__head {
   display: flex;
@@ -57,16 +57,34 @@ const seconds = computed(() => {
   border: none;
   text-align: left;
 }
-.thinking__label--live { color: #6b7bff; }
-.thinking__caret { margin-left: auto; font-size: 11px; }
+.thinking__label { font-weight: 500; letter-spacing: 0.2px; }
+.thinking__caret { margin-left: auto; font-size: 11px; color: #c0c4cc; }
 .thinking__body {
   max-height: 180px;
   padding: 2px 12px 10px;
   overflow-y: auto;
   font-size: 12px;
-  line-height: 1.6;
+  line-height: 1.7;
   color: #9aa1ad;
   white-space: pre-wrap;
   word-break: break-word;
+}
+.thinking__dots {
+  display: inline-flex;
+  gap: 3px;
+  align-items: center;
+}
+.thinking__dots i {
+  width: 4px;
+  height: 4px;
+  background: #9db6f0;
+  border-radius: 50%;
+  animation: thinking-bounce 1s infinite ease-in-out;
+}
+.thinking__dots i:nth-child(2) { animation-delay: 0.15s; }
+.thinking__dots i:nth-child(3) { animation-delay: 0.3s; }
+@keyframes thinking-bounce {
+  0%, 100% { transform: translateY(0); opacity: 0.55; }
+  50% { transform: translateY(-3px); opacity: 1; }
 }
 </style>

@@ -1,5 +1,13 @@
 # Changelog: thinking-display
 
+## 验收期修复两轮（2026-10-02）
+- 用户实测「思考区不出现」双断点定位：①graph.ts dispatch 白名单漏透 thinking（登记 BUG-52）
+  ②ChatMessages import 锚点失配致注册缺失（T-02 自引入，任务完成度回修不另立单；与 BUG-50 同族，
+  教训三连：import 必须断言锚点、未注册组件运行时无警、vite/vue-tsc 均拦不住）
+- 三探针（transport/store/render）运行时定位法记入方法论：静态核不果时以最小日志切链路
+- UI 按用户反馈：文案「🧠 深度思考中…」→ Thinking（完成态 Thinking · Ns），样式并入站内灰调
+  （浅底 + 左侧竖线区分），admin/chat 同组件单点生效
+
 ## Implement 收口（2026-10-01）——T-01~T-05 全勾
 - 三通道实测全绿：thinking 独立键（70~733 帧样本）/正文零独白/agentFiles→end 帧序不变/HITL 未触及
 - 风险1 判定解除：英文独白确属思考通道（分流后绝迹）
