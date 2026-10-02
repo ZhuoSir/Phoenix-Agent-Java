@@ -35,10 +35,10 @@ public class HarnessFrontController {
     private final HarnessChatService harnessChatService;
 
     @PostMapping(value = "/confirm", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public Flux<Map<String, Object>> confirm(@RequestBody ConfirmRequest confirmRequest) {
+    public Flux<org.springframework.http.codec.ServerSentEvent<Map<String, Object>>> confirm(@RequestBody ConfirmRequest confirmRequest) {
         String userId = StpUtil.getLoginIdAsString();
         confirmRequest.setUserId(userId);
-        return harnessChatService.confirmStream(confirmRequest.getAgentSn(), confirmRequest).map(output -> {
+        return com.phoenix.agent.harness.sse.SseSupport.withHeartbeat(harnessChatService.confirmStream(confirmRequest.getAgentSn(), confirmRequest).map(output -> {
             Map<String, Object> eventMap = new LinkedHashMap<>();
             eventMap.put("content", "");
             eventMap.put("end", false);
@@ -63,14 +63,14 @@ public class HarnessFrontController {
                 eventMap.put("end", true);
             }
             return eventMap;
-        });
+        }));
     }
 
     @PostMapping(value = "/chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public Flux<Map<String, Object>> harnessChat(@RequestBody HarnessRequest  harnessRequest) {
+    public Flux<org.springframework.http.codec.ServerSentEvent<Map<String, Object>>> harnessChat(@RequestBody HarnessRequest  harnessRequest) {
         String userId = StpUtil.getLoginIdAsString();
         HarnessRequest request = HarnessRequest.builder().userId(userId).sessionId(harnessRequest.getSessionId()).message(harnessRequest.getMessage()).build();
-        return harnessChatService.stream(harnessRequest.getHarnessSn(), request)
+        return com.phoenix.agent.harness.sse.SseSupport.withHeartbeat(harnessChatService.stream(harnessRequest.getHarnessSn(), request)
                 .map(output -> {
                     Map<String, Object> eventMap = new LinkedHashMap<>();
                     eventMap.put("content", "");
@@ -109,7 +109,7 @@ public class HarnessFrontController {
                         }
                     });
                     return eventMap;
-                });
+                }));
     }
 
 }

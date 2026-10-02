@@ -1,5 +1,10 @@
 # Changelog: runtime-max-iterations
 
+## 同分支夹带（2026-10-02 下午）：BUG-55 SSE 心跳+超时三件套（用户"做吧"批准，直接在本分支实施）
+- SseSupport(agent-core) 15s comment 心跳包 5 端点；nginx 读超时 900s×2；[model-call] 留痕
+- 过程自纠三处：wrap 脚本括号错位×2、nginx 注释误用 //、测试 grep 假阴性（Spring 写 ":ping" 无空格）
+- 实测：25s 静默窗口 2 帧 ping 注入 ✓ end/agentFiles/登记全通；测试数据全清
+
 ## Implement 收口补丁（2026-10-02 同日）——「留空清除」两处真缺陷修复
 - ①VO 缺 maxIterations 字段：保存实际已落库但 GET 回显恒 None（曾致误判），补字段+映射
 - ②MyBatis-Flex update(entity) 忽略 null → PUT 空体无法清除已设值（前记「留空清除 ✓」当时为**假阳性**，

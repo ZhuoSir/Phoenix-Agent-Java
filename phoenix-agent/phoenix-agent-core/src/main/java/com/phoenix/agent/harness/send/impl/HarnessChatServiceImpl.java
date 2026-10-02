@@ -278,8 +278,11 @@ public class HarnessChatServiceImpl implements HarnessChatService {
             }
             return NodeOutput.of("harness_agent", "harness", new OverAllState(new HashMap<>()), null);
         }
-        // 工具/模型生命周期事件：不上屏、不打 WARN（降噪）
+        // 工具/模型生命周期事件：不上屏；ModelCall 起止留 INFO（BUG-55 静默根因追踪）
         String simple = event.getClass().getSimpleName();
+        if (simple.startsWith("ModelCall")) {
+            log.info("[model-call] {} sessionId={} @{}", simple, sessionId, System.currentTimeMillis());
+        }
         if (simple.startsWith("ToolResult") || simple.startsWith("ToolCall") || simple.startsWith("ModelCall")) {
             return NodeOutput.of("harness_agent", "harness", new OverAllState(new HashMap<>()), null);
         }

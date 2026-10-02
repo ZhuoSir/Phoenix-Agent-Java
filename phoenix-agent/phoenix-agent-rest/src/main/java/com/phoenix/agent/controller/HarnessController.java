@@ -6,6 +6,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.phoenix.agent.harness.request.ConfirmRequest;
 import com.phoenix.agent.harness.request.HarnessRequest;
 import com.phoenix.agent.controller.support.HarnessEventMapper;
+import com.phoenix.agent.harness.sse.SseSupport;
+import org.springframework.http.codec.ServerSentEvent;
 import com.phoenix.agent.harness.send.HarnessChatService;
 import com.phoenix.privilege.entity.PrivilegeUser;
 import io.agentscope.core.event.AgentEvent;
@@ -41,10 +43,10 @@ public class HarnessController {
 
 
     @PostMapping(value = "/confirm", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public Flux<Map<String, Object>> confirm(@RequestBody ConfirmRequest confirmRequest) {
+    public Flux<ServerSentEvent<Map<String, Object>>> confirm(@RequestBody ConfirmRequest confirmRequest) {
         String userId = StpUtil.getLoginIdAsString();
         confirmRequest.setUserId(userId);
-        return harnessChatService.confirmStream(confirmRequest).map(output -> {
+        return SseSupport.withHeartbeat(harnessChatService.confirmStream(confirmRequest).map(output -> {
             Map<String, Object> eventMap = new LinkedHashMap<>();
             eventMap.put("content", "");
             eventMap.put("end", false);
@@ -84,7 +86,7 @@ public class HarnessController {
                 eventMap.put("end", true);
             }
             return eventMap;
-        });
+        }));
     }
 
     /**
@@ -92,7 +94,7 @@ public class HarnessController {
      * 传 harnessSn 为存量兼容路径，二者都传时 agentId 优先。
      */
     @PostMapping(value = "/chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public Flux<Map<String, Object>> harnessChat(@RequestBody HarnessRequest  harnessRequest) {
+    public Flux<ServerSentEvent<Map<String, Object>>> harnessChat(@RequestBody HarnessRequest  harnessRequest) {
         String userId = StpUtil.getLoginIdAsString();
         HarnessRequest request = HarnessRequest.builder().userId(userId).sessionId(harnessRequest.getSessionId())
                 .message(harnessRequest.getMessage())
@@ -100,8 +102,8 @@ public class HarnessController {
                 .agentId(harnessRequest.getAgentId())
                 .enabledSkillIds(harnessRequest.getEnabledSkillIds())
                 .build();
-        return harnessChatService.stream(request)
-                .map(HarnessEventMapper::toEventMap);
+        return SseSupport.withHeartbeat(harnessChatService.stream(request)
+                .map(HarnessEventMapper::toEventMap));
     }
 
 
