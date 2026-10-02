@@ -402,6 +402,20 @@ export function streamHarnessChat(
   };
 }
 
+/** BL-22 架构修正：确认只发放行信号——原 chat 流在等待期保持打开并续播，禁止二开消费流 */
+export async function confirmHarnessSignalApi(sessionId: string, agentId: number | string | null, allowed: boolean): Promise<void> {
+  const token = localStorage.getItem('phoenix-token') || '';
+  try {
+    const resp = await fetch('/api/admin/harness/confirm', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'phoenix-token': token },
+      body: JSON.stringify({ sessionId, agentId, allowed }),
+    });
+    // 服务端返回的是本 attach 视图的 SSE——立即取消，数据由原流承接
+    await resp.body?.cancel().catch(() => {});
+  } catch { /* 放行失败由原流超时兜底 */ }
+}
+
 export async function confirmHarnessChat(
   request: HarnessConfirmRequest,
   onMessage?: (response: GraphNodeResponse) => Promise<void>,
@@ -441,6 +455,8 @@ export async function confirmHarnessChat(
           nodeName: 'Harness',
           textType: TextType.MARK_DOWN,
           text: parsed.content || '',
+          // thinking-display/BL-22：确认流同键透传思考增量
+          thinking: parsed.thinking || undefined,
           error: false,
           complete: false,
         };

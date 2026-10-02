@@ -444,10 +444,16 @@ export const apiChatTransport: ChatTransport = {
             // BL-19：本轮产物登记成功（轮末扫描事件），刷新文件面板
             if ((response as any).agentFiles) notifyFilesChanged();
             if (response.needConfirm && response.buttons) {
+              // 计划模式常把计划全文走思考通道（正文空）——确认气泡兜底展示计划，让"确认什么"可见
+              const confirmHtml = (fullText || '').trim()
+                ? markdownToHtml(fullText)
+                : thinkingBuf
+                  ? `<p style="margin:0 0 6px;color:#8a919f;font-size:12px">执行计划（待确认）</p>${markdownToHtml(thinkingBuf.slice(0, 4000))}`
+                  : '';
               onNodeMessage?.({
                 id: uid(),
                 role: 'assistant',
-                content: markdownToHtml(fullText || ''),
+                content: confirmHtml,
                 createdAt: Date.now(),
                 messageType: 'harness-confirm',
                 metadata: {

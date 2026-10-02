@@ -198,6 +198,8 @@ public class HarnessTurnManager {
 
         final AtomicBoolean sinkDone = new AtomicBoolean(false);
 
+        volatile boolean endForwarded = false;
+
         final long startedAt = System.currentTimeMillis();
 
         volatile Long messageId;
@@ -258,6 +260,7 @@ public class HarnessTurnManager {
                 }
                 sink.emitNext(frame, Sinks.EmitFailureHandler.busyLooping(Duration.ofMillis(100)));
                 if (isEnd) {
+                    endForwarded = true; // 双 end 修复：透传过真 end 不再补发合成帧
                     finish(STATUS_DONE, null);
                 }
             }
@@ -327,7 +330,7 @@ public class HarnessTurnManager {
                     log.error("[turn] 定稿落库失败 session={} id={}", sessionId, messageId, e);
                 }
             }
-            if (!status.equals(STATUS_CANCELLED)) {
+            if (!status.equals(STATUS_CANCELLED) && !endForwarded) {
                 try {
                     Map<String, Object> end = new LinkedHashMap<>();
                     end.put("content", "");

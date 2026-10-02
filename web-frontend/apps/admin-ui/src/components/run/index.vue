@@ -66,7 +66,7 @@ import { FolderOpened,
 } from '@element-plus/icons-vue';
 
 import {
-  confirmHarnessChat,
+  confirmHarnessSignalApi,
   createSessionApi,
   getAgentApi,
   getSessionMessagesApi,
@@ -1050,52 +1050,20 @@ function scrollToBottom() {
   });
 }
 
-let harnessConfirmChunkIndex = -1;
 
 async function handleHarnessButtonClick(btn: ConfirmButton) {
   const allowed = btn.action === 'confirm';
   showHarnessConfirm.value = false;
-  harnessConfirmChunkIndex = -1;
   isStreaming.value = true;
   try {
-    await confirmHarnessChat(
-      {
-        sessionId: pendingConfirmSessionId.value,
-        agentId: pendingConfirmAgentId.value,
-        allowed,
-      },
-      async (response) => {
-        console.log('[handleHarnessButtonClick] response text:', response.text);
-        if (harnessConfirmChunkIndex < 0) {
-          nodeBlocks.value = [...nodeBlocks.value, [response]];
-          harnessConfirmChunkIndex = nodeBlocks.value.length - 1;
-        } else {
-          const block = [...nodeBlocks.value[harnessConfirmChunkIndex]!, response];
-          const blocks = [...nodeBlocks.value];
-          blocks[harnessConfirmChunkIndex] = block;
-          nodeBlocks.value = blocks;
-        }
-        if (autoScroll.value) scrollToBottom();
-      },
-      async () => {
-        if (harnessConfirmChunkIndex >= 0) {
-          const confirmBlock = nodeBlocks.value[harnessConfirmChunkIndex];
-          if (confirmBlock) {
-            const nodeHtml = generateNodeHtml(confirmBlock);
-            const aiMessage: ChatMessage = {
-              sessionId: pendingConfirmSessionId.value,
-              role: 'assistant',
-              content: nodeHtml,
-              messageType: 'html',
-            };
-            await saveMessageApi(pendingConfirmSessionId.value, aiMessage);
-          }
-        }
-        harnessConfirmChunkIndex = -1;
-        isStreaming.value = false;
-      },
+    await confirmHarnessSignalApi(
+      pendingConfirmSessionId.value,
+      pendingConfirmAgentId.value,
+      allowed,
     );
-  } catch (error: any) {
+    // 原流继续（isStreaming 由其 onComplete 收尾）；此处不再二开流消费
+    isStreaming.value = true;
+      } catch (error: any) {
     ElMessage.error(`操作失败: ${error.message}`);
   }
 }

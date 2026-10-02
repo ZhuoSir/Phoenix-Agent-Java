@@ -7,7 +7,7 @@ import ReportMessage from './report/ReportMessage.vue';
 import ThinkingBlock from './ThinkingBlock.vue';
 import type { ResultData } from '#/api/core/resultSet';
 import ResultSetDisplay from '#/components/run/ResultSetDisplay.vue';
-import { confirmFrontHarnessChat } from '#/api/front/chat';
+import { confirmFrontHarnessSignal } from '#/api/front/chat';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 
@@ -85,91 +85,14 @@ async function handleConfirmAction(
     return;
   }
 
-  // 移除确认/取消按钮消息和原 transport.send 的流式占位消息
-  // confirm API 返回的内容会包含确认前的上下文文本，因此无需保留原消息
-  let allMsgs = (chat.messagesByS[confirmSessionId] ?? []).filter(
-    (m: any) => m.id !== msg.id && !m.streaming,
-  );
-  chat.messagesByS = { ...chat.messagesByS, [confirmSessionId]: [...allMsgs] };
-
+  // BL-22 架构修正：确认/取消只发放行信号——原 send 流在等待期保持打开并续播，
+  // 不再二开消费流（历史上 confirm 响应含确认前全文导致需要删占位重建，现无此必要）
   const allowed = btn.action === 'confirm';
-  let streamMsgId: string | null = null;
-  let fullText = '';
-
-  if (allowed) {
-    streamMsgId = uid();
-    const msgs = chat.messagesByS[confirmSessionId] ?? [];
-    msgs.push({
-      id: streamMsgId,
-      role: 'assistant',
-      content: '',
-      createdAt: Date.now(),
-      streaming: true,
-    });
-    chat.messagesByS = {
-      ...chat.messagesByS,
-      [confirmSessionId]: [...msgs],
-    };
-  }
-
   try {
-    await confirmFrontHarnessChat(
-      { sessionId: confirmSessionId, agentSn, agentId, allowed },
-      (response) => {
-        if (response.error) return;
-        if (!response.text) return;
-
-        fullText += response.text;
-        const msgs = chat.messagesByS[confirmSessionId] ?? [];
-
-        if (!streamMsgId) {
-          streamMsgId = uid();
-          msgs.push({
-            id: streamMsgId,
-            role: 'assistant',
-            content: '',
-            createdAt: Date.now(),
-            streaming: true,
-          });
-        }
-
-        const idx = msgs.findIndex((m: any) => m.id === streamMsgId);
-        if (idx >= 0) {
-          msgs[idx] = { ...msgs[idx], content: markdownToHtml(fullText) };
-          chat.messagesByS = {
-            ...chat.messagesByS,
-            [confirmSessionId]: [...msgs],
-          };
-        }
-      },
-      async () => {
-        if (!streamMsgId) return;
-        const msgs = chat.messagesByS[confirmSessionId] ?? [];
-        const idx = msgs.findIndex((m: any) => m.id === streamMsgId);
-        if (idx >= 0) {
-          const content = markdownToHtml(fullText);
-          msgs[idx] = { ...msgs[idx], content, streaming: false };
-          chat.messagesByS = {
-            ...chat.messagesByS,
-            [confirmSessionId]: [...msgs],
-          };
-          /* detached-stream T-05：confirm 并轮回同轮，服务端定稿（R-05）——此处落库退役 */
-        }
-      },
-    );
+    (msg as any).metadata = { ...metadata, buttons: [], decided: allowed ? 'confirmed' : 'cancelled' };
+    await confirmFrontHarnessSignal({ sessionId: confirmSessionId, agentSn, agentId, allowed });
   } catch (error: any) {
-    if (streamMsgId) {
-      const msgs = chat.messagesByS[confirmSessionId] ?? [];
-      const idx = msgs.findIndex((m: any) => m.id === streamMsgId);
-      if (idx >= 0) {
-        msgs[idx] = { ...msgs[idx], content: `操作失败: ${error.message}`, streaming: false };
-        chat.messagesByS = {
-          ...chat.messagesByS,
-          [confirmSessionId]: [...msgs],
-        };
-      }
-    }
-    ElMessage.error(`操作失败: ${error.message}`);
+    ElMessage.error(`操作失败: ${error?.message ?? error}`);
   } finally {
     confirming.value = false;
   }
@@ -235,11 +158,11 @@ async function handleConfirmAction(
             v-else-if="(msg as any).messageType === 'harness-confirm'"
             class="chat-message__confirm"
           >
-<!--            <div
+            <div
               v-if="msg.content"
               class="chat-message__confirm-text"
               v-html="renderMessage(msg)"
-            ></div>-->
+            ></div>
             <div class="chat-message__confirm-buttons">
               <button
                 v-for="(btn, bidx) in (msg as any).metadata?.buttons || []"

@@ -362,6 +362,22 @@ export function streamFrontHarnessChat(
   };
 }
 
+/** BL-22 架构修正：前台确认同样只发放行信号，原 send 流续播 */
+export async function confirmFrontHarnessSignal(request: FrontHarnessConfirmRequest): Promise<void> {
+  try {
+    const resp = await fetch(`${API_BASE_URL}/front/harness/confirm`, {
+      method: 'POST',
+      headers: {
+        'phoenix-token': getAuthToken(),
+        'Content-Type': 'application/json',
+        Accept: 'text/event-stream',
+      },
+      body: JSON.stringify(request),
+    });
+    await resp.body?.cancel().catch(() => {});
+  } catch { /* ignore */ }
+}
+
 export async function confirmFrontHarnessChat(
   request: FrontHarnessConfirmRequest,
   onMessage?: (response: GraphNodeResponse) => Promise<void>,
