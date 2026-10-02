@@ -17,6 +17,7 @@ function thinkingMetaOf(sid: string): string | undefined {
 }
 const filesPanelRef = ref<InstanceType<typeof ChatFilesPanel> | null>(null);
 import { notifyFilesChanged } from '#/api/core/agentFiles';
+import { forceClearStreamSnapshot, readStreamSnapshot, saveStreamSnapshot } from '#/utils/stream-snapshot';
 import type { Agent } from '#/api/core/agent';
 import type { ChatMessage, ChatSession } from '#/api/core/chat';
 import type {
@@ -26,6 +27,7 @@ import type {
   GraphRequest,
   HarnessChatRequest,
 } from '#/api/core/graph';
+import { harnessTurnStatusApi } from '#/api/core/graph';
 import type {
   ResultData,
   ResultSetData,
@@ -107,6 +109,7 @@ declare global {
 }
 
 interface SessionRuntimeState {
+    snapText?: string;
   isStreaming: boolean;
   nodeBlocks: GraphNodeResponse[][];
   closeStream: (() => void) | null;
@@ -303,12 +306,52 @@ async function selectSession(session: ChatSession | null) {
     }
     syncStateToView(session.id, { isStreaming, nodeBlocks });
     currentMessages.value = await getSessionMessagesApi(session.id);
+    // detached-stream T-05：admin 进行中的轮次 → 5s 轮询增量视图（完成自动收敛）
+    void (async () => {
+      try {
+        if (!(await harnessTurnStatusApi(session.id))) return;
+        const tick = async () => {
+          try {
+            currentMessages.value = await getSessionMessagesApi(session.id);
+          } catch { /* 忽略单次 */ }
+          try {
+            if (await harnessTurnStatusApi(session.id)) setTimeout(tick, 5000);
+          } catch { /* 停 */ }
+        };
+        setTimeout(tick, 5000);
+      } catch { /* ignore */ }
+    })();
     // thinking-display R-05：历史 metadata 解析思考（旧行无键静默）
     for (const m of currentMessages.value as any[]) {
       try {
         const md = typeof m.metadata === 'string' ? JSON.parse(m.metadata) : m.metadata;
         if (md && typeof md.thinking === 'string') { m.thinking = md.thinking; m.thinkingMs = md.thinkingMs; }
       } catch { /* 无 metadata 或非 JSON */ }
+      // BUG-57：admin 历史的服务端行同样是原始 markdown——装载时转 html
+      for (const m of currentMessages.value as any[]) {
+        if (m.role === 'assistant' && !m.messageType && /"turnId"/.test(String(m.metadata ?? ''))) {
+          m.content = markdownToHtml(String(m.content ?? ''));
+          m.messageType = 'html';
+        }
+      }
+      // BUG-53 A′：刷新中断快照回显（本地气泡，不落库）
+      const snap = readStreamSnapshot(session.id);
+      if (snap) {
+        forceClearStreamSnapshot(session.id);
+        const lastM = currentMessages.value[currentMessages.value.length - 1] as any;
+        const gen = !!lastM && lastM.role === 'assistant' && String(lastM.metadata ?? '').includes('generating');
+        if ((!lastM || lastM.role === 'user') && !gen) {
+          currentMessages.value.push({
+            id: `snap-${snap.ts}`,
+            role: 'assistant',
+            content: snap.contentHtml,
+            createdAt: snap.ts,
+            messageType: 'text',
+            metadata: { interrupted: true },
+            thinking: snap.thinking,
+          } as any);
+        }
+      }
     }
     await nextTick();
     scrollToBottom();
@@ -567,6 +610,10 @@ async function sendGraphRequest(request: GraphRequest, rejectedPlan: boolean) {
         async (response: GraphNodeResponse) => {
           // BL-19：本轮产物登记事件 → 刷新文件面板（admin 运行页）
           if ((response as any).agentFiles) notifyFilesChanged();
+          if ((response as any).text) {
+            sessionState.snapText = (sessionState.snapText || '') + String((response as any).text);
+            saveStreamSnapshot(sessionId, sessionState.snapText, getThinkingTrack(sessionId).text || undefined);
+          }
           // thinking-display R-01：思考增量独立累加（严禁进 nodeBlocks 正文）
           if ((response as any).thinking) {
             const t = getThinkingTrack(sessionId);
@@ -1313,6 +1360,12 @@ onMounted(async () => {
                 :has-content="true"
                 :streaming="false"
               />
+              <div
+                v-if="(message as any).metadata && (message as any).metadata.interrupted"
+                class="run-interrupted-tip"
+              >
+                ⚠ 输出在页面刷新时中断，以下为已生成部分
+              </div>
               <div
                 v-if="message.messageType === 'html'"
                 v-html="message.content"
@@ -2288,5 +2341,14 @@ onMounted(async () => {
   .result-set-table td {
     padding: 6px 8px;
   }
+}
+.run-interrupted-tip {
+  margin: 4px 0 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  color: #b8860b;
+  background: #fdf6ec;
+  border: 1px solid #faecd8;
+  border-radius: 6px;
 }
 </style>

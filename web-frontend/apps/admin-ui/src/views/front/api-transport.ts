@@ -1,4 +1,5 @@
 import { notifyFilesChanged } from '#/api/core/agentFiles';
+import { forceClearStreamSnapshot, readStreamSnapshot, saveStreamSnapshot } from '#/utils/stream-snapshot';
 import type {
   ChatMessage,
   ChatSession,
@@ -245,7 +246,11 @@ export const apiChatTransport: ChatTransport = {
       if (
         msg.role === 'assistant' &&
         msg.messageType === 'text' &&
-        !/<[a-z][\s\S]*>/i.test(msg.content)
+        (
+          // BUG-57：TurnManager 行存原始 markdown——含 <svg>/<html> 代码块也须渲染
+          //（旧启发式为「前端已存 HTML 行」设计，对新行误伤致样式整体丢失）
+          !/<[a-z][\s\S]*>/i.test(msg.content) || /"turnId"/.test(String((msg as any).metadata ?? ''))
+        )
       ) {
         msg.content = markdownToHtml(msg.content);
         msg.messageType = 'html';
@@ -266,6 +271,25 @@ export const apiChatTransport: ChatTransport = {
         }
       } catch {
         // ignore parse errors
+      }
+    }
+    // BUG-53 A′：中断快照回显（本地气泡不落库；服务端已有 assistant 尾行则丢弃快照防重复）
+    const snap = readStreamSnapshot(sessionId);
+    if (snap) {
+      forceClearStreamSnapshot(sessionId);
+      const lastMsg = messages[messages.length - 1];
+      // P7（detached-stream R-09）：尾行是 generating 中的服务端消息 → 本地快照让位
+      const gen = !!lastMsg && lastMsg.role === 'assistant' && String((lastMsg as any).metadata ?? '').includes('generating');
+      if ((!lastMsg || lastMsg.role === 'user') && !gen) {
+        messages.push({
+          id: `snap-${snap.ts}`,
+          role: 'assistant',
+          content: snap.contentHtml,
+          createdAt: snap.ts,
+          messageType: 'html',
+          metadata: { interrupted: true },
+          thinking: snap.thinking,
+        } as any);
       }
     }
     return messages;
@@ -293,6 +317,58 @@ export const apiChatTransport: ChatTransport = {
     await renameSessionApi(sessionId, title);
   },
 
+  async joinActiveTurn(
+    sessionId: string,
+    onProgress?: (text: string, thinking?: string) => void,
+    onDone?: () => void,
+  ): Promise<boolean> {
+    const token = localStorage.getItem('phoenix-token') || '';
+    let active = false;
+    try {
+      const r = await fetch(`/platform/harness/turn/status?sessionId=${encodeURIComponent(sessionId)}`, { headers: { 'phoenix-token': token } });
+      active = ((await r.json()) as any)?.data === true;
+    } catch {
+      return false;
+    }
+    if (!active) return false;
+    let textBuf = '';
+    let thinkBuf = '';
+    (async () => {
+      try {
+        const resp = await fetch(`/platform/harness/turn/stream?sessionId=${encodeURIComponent(sessionId)}`, { headers: { 'phoenix-token': token, Accept: 'text/event-stream' } });
+        const reader = resp.body?.getReader();
+        if (!reader) throw new Error('no body');
+        const dec = new TextDecoder();
+        let pnd = '';
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          pnd += dec.decode(value, { stream: true });
+          const ls = pnd.split('\n');
+          pnd = ls.pop() ?? '';
+          for (const ln of ls) {
+            if (!ln.startsWith('data:')) continue;
+            let p: any;
+            try { p = JSON.parse(ln.slice(5)); } catch { continue; }
+            if (p.content) textBuf += String(p.content);
+            if (p.thinking) thinkBuf += String(p.thinking);
+            if (p.content || p.thinking) onProgress?.(markdownToHtml(textBuf), thinkBuf || undefined);
+            if (p.end) { onDone?.(); return; }
+          }
+        }
+        onDone?.();
+      } catch {
+        onDone?.();
+      }
+    })();
+    return true;
+  },
+  async cancelTurn(sessionId: string): Promise<void> {
+    try {
+      await fetch(`/platform/harness/turn/cancel?sessionId=${encodeURIComponent(sessionId)}`, { method: 'POST', headers: { 'phoenix-token': localStorage.getItem('phoenix-token') || '' } });
+    } catch { /* ignore */ }
+  },
+
   async send(
     payload: SendPayload,
     signal?: AbortSignal,
@@ -300,6 +376,7 @@ export const apiChatTransport: ChatTransport = {
     onNodeMessage?: (message: ChatMessage) => void,
   ): Promise<ChatMessage> {
     let { sessionId, content, agentId } = payload;
+    forceClearStreamSnapshot(sessionId); // 新一轮开始，清旧快照（BUG-53 A′）
 
     if (!agentId) {
       const chatStore = useChatStore();
@@ -391,7 +468,10 @@ export const apiChatTransport: ChatTransport = {
             }
             if (th || response.text) {
               if (thinkingBuf && !thinkingMs) thinkingMs = Date.now() - thinkingStart;
-              onProgress?.(markdownToHtml(fullText), thinkingBuf || undefined);
+              const htmlNow = markdownToHtml(fullText);
+              // BUG-53 A′：节流快照，刷新后由 store 回显
+              if (htmlNow || thinkingBuf) saveStreamSnapshot(sessionId, htmlNow, thinkingBuf || undefined);
+              onProgress?.(htmlNow, thinkingBuf || undefined);
             }
           },
           async (error) => {
@@ -401,30 +481,13 @@ export const apiChatTransport: ChatTransport = {
           },
           async () => {
             signal?.removeEventListener('abort', onAbort);
+            forceClearStreamSnapshot(sessionId); // 正常收尾，快照作废（BUG-53）
             if (abortRequested) return;
 
             const text = fullText || '已处理完成';
             const html = markdownToHtml(text);
-            // R-06：持久化前 64KB 截头（流式观感不受影响）
-            const persistedThinking = thinkingBuf
-              ? (thinkingBuf.length > 65536
-                ? `${thinkingBuf.slice(0, 65536)}…（已截断）`
-                : thinkingBuf)
-              : undefined;
-            const assistantMessage: any = {
-              sessionId,
-              role: 'assistant',
-              content: html,
-              messageType: 'text',
-              metadata: persistedThinking
-                ? JSON.stringify({ thinking: persistedThinking, thinkingMs })
-                : undefined,
-            };
-            try {
-              await saveMessageApi(sessionId, assistantMessage);
-            } catch {
-              /* ignore */
-            }
+            /* detached-stream T-05：助手行由服务端 TurnManager 开轮即插、5s 增量、终定稿
+               （R-05 落库所有权移交）——前端 onComplete 保存退役 */
 
             resolve({
               id: uid(),

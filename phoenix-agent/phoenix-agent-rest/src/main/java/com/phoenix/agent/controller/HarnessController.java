@@ -29,6 +29,8 @@ import java.util.List;
 import java.util.Map;
 
 import static com.phoenix.privilege.constant.CommonConstant.LOGIN_USER_INFO;
+import com.phoenix.tools.vo.ReturnVo;
+import org.springframework.web.bind.annotation.RequestParam;
 
 /**
  * @author burce.liu
@@ -41,15 +43,20 @@ import static com.phoenix.privilege.constant.CommonConstant.LOGIN_USER_INFO;
 public class HarnessController {
     private final HarnessChatService harnessChatService;
 
+    private final com.phoenix.agent.harness.turn.HarnessTurnManager turnManager;
+
 
     @PostMapping(value = "/confirm", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<ServerSentEvent<Map<String, Object>>> confirm(@RequestBody ConfirmRequest confirmRequest) {
         String userId = StpUtil.getLoginIdAsString();
         confirmRequest.setUserId(userId);
-        return SseSupport.withHeartbeat(harnessChatService.confirmStream(confirmRequest).map(output -> {
+        return SseSupport.withHeartbeat(turnManager.confirmOrResume(confirmRequest.getSessionId(),
+                () -> harnessChatService.confirmStream(confirmRequest).map(output -> {
             Map<String, Object> eventMap = new LinkedHashMap<>();
             eventMap.put("content", "");
             eventMap.put("end", false);
+            // detached-stream 收口补洞：admin confirm 流同步 thinking 通道（原缺，与 chat 流对齐）
+            output.state().value("thinking_text", String.class).ifPresent(th -> eventMap.put("thinking", th));
             if (output instanceof StreamingOutput<?> streamingOutput && streamingOutput.chunk() != null) {
                 eventMap.put("content", streamingOutput.chunk());
             }
@@ -86,7 +93,25 @@ public class HarnessController {
                 eventMap.put("end", true);
             }
             return eventMap;
-        }));
+        }))); 
+    }
+
+    /** 断线续传（detached-stream T-03）：追流 join——重放全帧+live */
+    @GetMapping(value = "/turn/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<ServerSentEvent<Map<String, Object>>> turnJoin(@RequestParam String sessionId) {
+        return SseSupport.withHeartbeat(turnManager.join(sessionId));
+    }
+
+    /** 会话是否有进行中轮次 */
+    @GetMapping("/turn/status")
+    public ReturnVo<Boolean> turnStatus(@RequestParam String sessionId) {
+        return ReturnVo.ok(turnManager.hasActive(sessionId));
+    }
+
+    /** 显式停止（R-06：断≠停，停止走这里） */
+    @PostMapping("/turn/cancel")
+    public ReturnVo<Boolean> turnCancel(@RequestParam String sessionId) {
+        return ReturnVo.ok(turnManager.cancel(sessionId));
     }
 
     /**
@@ -102,8 +127,8 @@ public class HarnessController {
                 .agentId(harnessRequest.getAgentId())
                 .enabledSkillIds(harnessRequest.getEnabledSkillIds())
                 .build();
-        return SseSupport.withHeartbeat(harnessChatService.stream(request)
-                .map(HarnessEventMapper::toEventMap));
+        return SseSupport.withHeartbeat(turnManager.openOrReject(harnessRequest.getSessionId(),
+                () -> harnessChatService.stream(request).map(HarnessEventMapper::toEventMap)));
     }
 
 

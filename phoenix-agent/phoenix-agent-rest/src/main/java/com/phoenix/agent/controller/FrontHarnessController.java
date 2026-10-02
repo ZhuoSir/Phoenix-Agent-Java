@@ -39,6 +39,10 @@ public class FrontHarnessController {
 
     private final HarnessChatService harnessChatService;
 
+    private final com.phoenix.agent.harness.turn.HarnessTurnManager turnManager;
+
+    private final com.phoenix.data.mapper.ChatSessionMapper chatSessionMapper;
+
     /** 当前账号在某智能体下可见可用的技能（前台技能区数据源） */
     @GetMapping("/account-info/getMySkills")
     public ReturnVo<List<SkillListVO>> getMySkills(@RequestParam Long agentId) {
@@ -82,6 +86,35 @@ public class FrontHarnessController {
             .enabledSkillIds(body.getEnabledSkillIds())
             .skillScopeHint(frontSkillAccessService.buildScopeHint(accountId, agentId))
             .build();
-        return SseSupport.withHeartbeat(harnessChatService.stream(request).map(HarnessEventMapper::toEventMap));
+        return SseSupport.withHeartbeat(turnManager.openOrReject(body.getSessionId(),
+                () -> harnessChatService.stream(request).map(HarnessEventMapper::toEventMap)));
+    }
+
+    /** 断线续传 T-03：前台追流（属主校验） */
+    @GetMapping(value = "/harness/turn/stream", produces = org.springframework.http.MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<org.springframework.http.codec.ServerSentEvent<Map<String, Object>>> turnJoin(@RequestParam String sessionId) {
+        if (!ownsSession(StpUtil.getLoginIdAsString(), sessionId)) {
+            Map<String, Object> err = new java.util.LinkedHashMap<>();
+            err.put("content", "");
+            err.put("end", true);
+            return Flux.just(org.springframework.http.codec.ServerSentEvent.builder(err).build());
+        }
+        return com.phoenix.agent.harness.sse.SseSupport.withHeartbeat(turnManager.join(sessionId));
+    }
+
+    @GetMapping("/harness/turn/status")
+    public ReturnVo<Boolean> turnStatus(@RequestParam String sessionId) {
+        return ReturnVo.ok(ownsSession(StpUtil.getLoginIdAsString(), sessionId) && turnManager.hasActive(sessionId));
+    }
+
+    @PostMapping("/harness/turn/cancel")
+    public ReturnVo<Boolean> turnCancel(@RequestParam String sessionId) {
+        boolean mine = ownsSession(StpUtil.getLoginIdAsString(), sessionId);
+        return ReturnVo.ok(mine && turnManager.cancel(sessionId));
+    }
+
+    private boolean ownsSession(String accountId, String sessionId) {
+        com.phoenix.data.entity.ChatSession s = chatSessionMapper.selectOneById(sessionId);
+        return s != null && accountId.equals(s.getUserId());
     }
 }

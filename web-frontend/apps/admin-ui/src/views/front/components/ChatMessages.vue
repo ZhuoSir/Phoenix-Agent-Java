@@ -8,7 +8,6 @@ import ThinkingBlock from './ThinkingBlock.vue';
 import type { ResultData } from '#/api/core/resultSet';
 import ResultSetDisplay from '#/components/run/ResultSetDisplay.vue';
 import { confirmFrontHarnessChat } from '#/api/front/chat';
-import { saveMessageApi } from '#/api';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 
@@ -154,16 +153,7 @@ async function handleConfirmAction(
             ...chat.messagesByS,
             [confirmSessionId]: [...msgs],
           };
-          try {
-            await saveMessageApi(confirmSessionId, {
-              sessionId: confirmSessionId,
-              role: 'assistant',
-              content,
-              messageType: 'text',
-            } as any);
-          } catch {
-            /* ignore */
-          }
+          /* detached-stream T-05：confirm 并轮回同轮，服务端定稿（R-05）——此处落库退役 */
         }
       },
     );
@@ -206,6 +196,12 @@ async function handleConfirmAction(
         </div>
 
         <div class="chat-message__content">
+          <div
+            v-if="(msg as any).metadata && (msg as any).metadata.interrupted"
+            class="chat-message__interrupted"
+          >
+            ⚠ 输出在页面刷新时中断，以下为已生成部分
+          </div>
           <!-- thinking-display T-02：思考区（正文首字到达/完成后自动折叠，点击回看） -->
           <ThinkingBlock
             v-if="msg.role === 'assistant' && (msg as any).thinking"
@@ -881,4 +877,13 @@ async function handleConfirmAction(
   border-radius: 4px;
 }
 
+.chat-message__interrupted {
+  margin-bottom: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  color: #b8860b;
+  background: #fdf6ec;
+  border: 1px solid #faecd8;
+  border-radius: 6px;
+}
 </style>

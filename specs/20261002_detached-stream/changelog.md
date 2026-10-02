@@ -1,5 +1,29 @@
 # Changelog: detached-stream
 
+## Implement T-01（2026-10-02）A′ 一期上线
+- stash 原型复活；修复原型遗留：send 签名被插坏（语法错，构建期才暴露）、readStreamSnapshot 漏 import（esbuild 不查→tsc 抓到）
+- P7 守卫双端预埋（尾行 generating→快照让位），B 上线自动生效
+- build=0，TS=215 基线，前端 rc10 部署 verify 全绿；浏览器刷新生效验证属用户实操（AC 剧本见 tasks）
+
+## Implement T-02~T-05（2026-10-02）B 主体落地，六演练全绿
+- HarnessTurnManager（自持订阅/replay sink 帧闸/watchdog/5s flusher/单行 upsert/HITL end 抑制并轮）+ 双域 join/cancel/status 端点 + 前端自动追流与真停止 + 前端保存退役（harness 路径）+ admin 5s 轮询
+- compose 三配置键出厂 600s/5s/2000；verify 新增 [14]（12 断言）
+- **六演练**：断后 continue 至 done·join 225帧+end·cancel 行 cancelled·P6 拒绝文案·断线轮文件照常登记(R-04 铁证)·20s 超时定稿标注；乱 token 401
+- 过程自纠：docker PATH 断链×2、graph.ts 锚点 async 失配假成功、启动清扫 jsonb 语法重写、metadata 伪 generating 行辨析
+- 待办：AC-04 HITL 断线确认回归 + T-01/T-05 浏览器实操（用户）；T-06 收口未勾
+
+## Implement 收口后缺陷（2026-10-02）BUG-57
+- 落库所有权移交的连锁反应：历史装载的旧 HTML 启发式对新 raw-markdown 行误伤（含标签即跳过转译）→ 双端样式偶发丢失；按「服务端行无条件转译、旧行保留启发式」修复
+- 教训入册：持久化内容形态变更（HTML→markdown）必须同批清点所有读取端启发式
+
+## Implement T-06（2026-10-02）AC 全绿收口
+- 用户浏览器复验 AC-01（修复双气泡后）/AC-03 通过；服务端演练 AC-02/04/05/06 与 P6 全过（留证 artifacts）
+- 收口补洞：admin confirm 流 thinking 通道对齐；演练脚本 confirm 缺 agentId 勘正记录
+- BL-22 与 BUG-53 台账同步关闭（A′ 保留为秒级窗口兜底口径注记）
+
+## v1.0.0 tasks（2026-10-02）确认人: 陈卓
+- **第③关通过（三重确认门全绿）**→ Implement 启动：分支 feature/detached-stream
+
 ## Tasks v0.1.0（2026-10-02）草稿
 - 两期六任务：T-01 A′ 先行（按 P7 改造）→ T-02 TurnManager → T-03 双域端点(+join/cancel/confirm 并轮) → T-04 落库所有权移交（单行状态流转）→ T-05 前端追流/真停止/P6 提示 → T-06 六 AC 回归 + BL-22/BUG-53 双单关账
 - 超时/帧闸走配置键（出厂 600s/2000，演练短值）；admin 历史缺口顺带闭合如实记
