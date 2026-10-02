@@ -60,17 +60,24 @@ export const useChatStore = defineStore('phoenix-chat-shared/chat', () => {
       messagesByS.value = { ...messagesByS.value, [sessionId]: list };
       // detached-stream T-05：服务端进行中的轮次 → 自动追流（P7：本地快照已在 transport 层让位）
       if (!sendingSessions.value.has(sessionId) && transport.joinActiveTurn) {
-        const phId = `join-${Date.now()}`;
         let attached = false;
         try {
           attached = await transport.joinActiveTurn(
             sessionId,
             (text, thinking) => {
+              // AC-01 修复：服务端开轮即有增量助手行——join 原地更新最后一条助手消息，绝不新建气泡（防双显）
               const arr = messagesByS.value[sessionId] ?? [];
-              const i2 = arr.findIndex((m) => m.id === phId);
-              const base = (i2 >= 0 ? arr[i2] : { id: phId, role: 'assistant', content: '', createdAt: Date.now(), streaming: true }) as any;
+              let i2 = -1;
+              for (let k = arr.length - 1; k >= 0; k--) {
+                if (arr[k]?.role === 'assistant') { i2 = k; break; }
+              }
+              if (i2 < 0) {
+                arr.push({ id: `join-${Date.now()}`, role: 'assistant', content: '', createdAt: Date.now(), streaming: true } as any);
+                i2 = arr.length - 1;
+              }
+              const base = arr[i2] as any;
               const upd = { ...base, content: text || base.content, thinking: thinking ?? base.thinking, streaming: true } as any;
-              if (i2 >= 0) arr[i2] = upd; else arr.push(upd);
+              arr[i2] = upd;
               messagesByS.value = { ...messagesByS.value, [sessionId]: [...arr] };
             },
             () => {
