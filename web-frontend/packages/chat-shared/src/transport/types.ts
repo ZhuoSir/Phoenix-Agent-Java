@@ -20,6 +20,10 @@ export type OnNodeMessage = (message: ChatMessage) => void;
 
 /** 会话与消息相关接口 */
 export interface ChatTransport {
+  /** detached-stream T-05：若服务端该会话有进行中轮次则追流（重放+live），返回是否附加成功 */
+  joinActiveTurn?(sessionId: string, onProgress: (text: string, thinking?: string) => void, onDone: () => void): Promise<boolean>;
+  /** detached-stream R-06：显式停止（断≠停） */
+  cancelTurn?(sessionId: string): Promise<void>;
   listSessions(): Promise<ChatSession[]>;
   listMessages(sessionId: string): Promise<ChatMessage[]>;
   /** 新建会话，返回会话对象 */

@@ -5,6 +5,13 @@
 - P7 守卫双端预埋（尾行 generating→快照让位），B 上线自动生效
 - build=0，TS=215 基线，前端 rc10 部署 verify 全绿；浏览器刷新生效验证属用户实操（AC 剧本见 tasks）
 
+## Implement T-02~T-05（2026-10-02）B 主体落地，六演练全绿
+- HarnessTurnManager（自持订阅/replay sink 帧闸/watchdog/5s flusher/单行 upsert/HITL end 抑制并轮）+ 双域 join/cancel/status 端点 + 前端自动追流与真停止 + 前端保存退役（harness 路径）+ admin 5s 轮询
+- compose 三配置键出厂 600s/5s/2000；verify 新增 [14]（12 断言）
+- **六演练**：断后 continue 至 done·join 225帧+end·cancel 行 cancelled·P6 拒绝文案·断线轮文件照常登记(R-04 铁证)·20s 超时定稿标注；乱 token 401
+- 过程自纠：docker PATH 断链×2、graph.ts 锚点 async 失配假成功、启动清扫 jsonb 语法重写、metadata 伪 generating 行辨析
+- 待办：AC-04 HITL 断线确认回归 + T-01/T-05 浏览器实操（用户）；T-06 收口未勾
+
 ## v1.0.0 tasks（2026-10-02）确认人: 陈卓
 - **第③关通过（三重确认门全绿）**→ Implement 启动：分支 feature/detached-stream
 

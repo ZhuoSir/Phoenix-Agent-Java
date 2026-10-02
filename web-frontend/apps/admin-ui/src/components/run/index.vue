@@ -27,6 +27,7 @@ import type {
   GraphRequest,
   HarnessChatRequest,
 } from '#/api/core/graph';
+import { harnessTurnStatusApi } from '#/api/core/graph';
 import type {
   ResultData,
   ResultSetData,
@@ -305,6 +306,21 @@ async function selectSession(session: ChatSession | null) {
     }
     syncStateToView(session.id, { isStreaming, nodeBlocks });
     currentMessages.value = await getSessionMessagesApi(session.id);
+    // detached-stream T-05：admin 进行中的轮次 → 5s 轮询增量视图（完成自动收敛）
+    void (async () => {
+      try {
+        if (!(await harnessTurnStatusApi(session.id))) return;
+        const tick = async () => {
+          try {
+            currentMessages.value = await getSessionMessagesApi(session.id);
+          } catch { /* 忽略单次 */ }
+          try {
+            if (await harnessTurnStatusApi(session.id)) setTimeout(tick, 5000);
+          } catch { /* 停 */ }
+        };
+        setTimeout(tick, 5000);
+      } catch { /* ignore */ }
+    })();
     // thinking-display R-05：历史 metadata 解析思考（旧行无键静默）
     for (const m of currentMessages.value as any[]) {
       try {

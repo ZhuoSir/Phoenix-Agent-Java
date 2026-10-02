@@ -58,6 +58,35 @@ export const useChatStore = defineStore('phoenix-chat-shared/chat', () => {
     try {
       const list = await transport.listMessages(sessionId);
       messagesByS.value = { ...messagesByS.value, [sessionId]: list };
+      // detached-stream T-05：服务端进行中的轮次 → 自动追流（P7：本地快照已在 transport 层让位）
+      if (!sendingSessions.value.has(sessionId) && transport.joinActiveTurn) {
+        const phId = `join-${Date.now()}`;
+        let attached = false;
+        try {
+          attached = await transport.joinActiveTurn(
+            sessionId,
+            (text, thinking) => {
+              const arr = messagesByS.value[sessionId] ?? [];
+              const i2 = arr.findIndex((m) => m.id === phId);
+              const base = (i2 >= 0 ? arr[i2] : { id: phId, role: 'assistant', content: '', createdAt: Date.now(), streaming: true }) as any;
+              const upd = { ...base, content: text || base.content, thinking: thinking ?? base.thinking, streaming: true } as any;
+              if (i2 >= 0) arr[i2] = upd; else arr.push(upd);
+              messagesByS.value = { ...messagesByS.value, [sessionId]: [...arr] };
+            },
+            () => {
+              const s2 = new Set(sendingSessions.value);
+              s2.delete(sessionId);
+              sendingSessions.value = s2;
+              void loadMessages(sessionId, true);
+            },
+          );
+        } catch {
+          attached = false;
+        }
+        if (attached) {
+          sendingSessions.value = new Set(sendingSessions.value).add(sessionId);
+        }
+      }
     } finally {
       loadingMessages.value = false;
     }
@@ -262,6 +291,8 @@ export const useChatStore = defineStore('phoenix-chat-shared/chat', () => {
 
   function stopSending(sessionId?: string) {
     if (sessionId) {
+      // detached-stream R-06：显式停止走服务端（断≠停）
+      void transport.cancelTurn?.(sessionId);
       abortControllers.get(sessionId)?.abort();
     } else {
       for (const ac of abortControllers.values()) {

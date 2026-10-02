@@ -8,7 +8,6 @@ import ThinkingBlock from './ThinkingBlock.vue';
 import type { ResultData } from '#/api/core/resultSet';
 import ResultSetDisplay from '#/components/run/ResultSetDisplay.vue';
 import { confirmFrontHarnessChat } from '#/api/front/chat';
-import { saveMessageApi } from '#/api';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 
@@ -154,16 +153,7 @@ async function handleConfirmAction(
             ...chat.messagesByS,
             [confirmSessionId]: [...msgs],
           };
-          try {
-            await saveMessageApi(confirmSessionId, {
-              sessionId: confirmSessionId,
-              role: 'assistant',
-              content,
-              messageType: 'text',
-            } as any);
-          } catch {
-            /* ignore */
-          }
+          /* detached-stream T-05：confirm 并轮回同轮，服务端定稿（R-05）——此处落库退役 */
         }
       },
     );

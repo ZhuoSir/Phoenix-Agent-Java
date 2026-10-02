@@ -282,6 +282,24 @@ export function streamSearch(
   };
 }
 
+/** detached-stream T-05：admin 域轮次状态/取消 */
+export async function harnessTurnStatusApi(sessionId: string): Promise<boolean> {
+  const token = localStorage.getItem('phoenix-token') || '';
+  try {
+    const resp = await fetch(`/api/admin/harness/turn/status?sessionId=${encodeURIComponent(sessionId)}`, { headers: { 'phoenix-token': token } });
+    return ((await resp.json()) as any)?.data === true;
+  } catch {
+    return false;
+  }
+}
+
+export async function harnessTurnCancelApi(sessionId: string): Promise<void> {
+  const token = localStorage.getItem('phoenix-token') || '';
+  try {
+    await fetch(`/api/admin/harness/turn/cancel?sessionId=${encodeURIComponent(sessionId)}`, { method: 'POST', headers: { 'phoenix-token': token } });
+  } catch { /* ignore */ }
+}
+
 export function streamHarnessChat(
   request: HarnessChatRequest,
   onMessage: (response: GraphNodeResponse) => Promise<void>,
