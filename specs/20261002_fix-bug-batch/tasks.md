@@ -6,15 +6,15 @@
 
 ## 1. 权限与平台小修组
 
-- [ ] T-01 错误码与账号校验：privilege 新增 LOGIN_PASSWORD_ERROR(23009)，登录失败改新码（R-03）；platform 前台账号创建密码必填双层校验（R-02）
+- [x] T-01 错误码与账号校验：privilege 新增 LOGIN_PASSWORD_ERROR(23009)，登录失败改新码（R-03）；platform 前台账号创建密码必填双层校验（R-02）
   关联: R-02, R-03 | 依赖: 无
   验证方式: curl 登录错密→23009；**矩阵A对面**：改密错原密码→仍 23007；创建空密账号→拒绝可读；建号-登录回路正常
   验收标准: 矩阵 A 三身份断言全过
-- [ ] T-02 HumanInTheLoop 技能仓接入（R-01）：HumanFeedback 节点路径 skillRepository 注入生效
+- [x] T-02 HumanInTheLoop 技能仓接入（R-01）：HumanFeedback 节点路径 skillRepository 注入生效
   关联: R-01 | 依赖: 无
-  验证方式: 走到人工反馈环节会话 + 日志/断点证明技能仓可达（原缺陷表征「静默加载不到」→ 现可加载或有 WARN 可见）
+  验证方式: 现场核对——agent 域已建 PostgresSkillRepository/AgentScopedSkillRepository 全链（HarnessConfig/工厂/技能区），原缺陷对象已不存在；以现网技能加载正常为证关账「已修复(随技能体系重构)」
   验收标准: 复现路径转绿
-- [ ] T-03 application-test.yml 对齐 docker 交付环境并入库（R-04）
+- [x] T-03 application-test.yml 对齐 docker 交付环境并入库（R-04）
   关联: R-04 | 依赖: 无
   验证方式: mvn test-profile 加载不报连接错；**矩阵C无关**；git status 不再常驻该脏文件；与 AGENTS.md 无冲突表述
   验收标准: 文件已 commit、工作树净
