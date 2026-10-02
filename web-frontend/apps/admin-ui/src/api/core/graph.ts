@@ -15,6 +15,8 @@ export interface ConfirmButton {
 }
 
 export interface GraphNodeResponse {
+  /** 思考增量（thinking-display R-01，独立于 text 正文通道） */
+  thinking?: string;
   agentId: string;
   threadId: string;
   nodeName: string;

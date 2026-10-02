@@ -205,6 +205,14 @@ async function handleConfirmAction(
         </div>
 
         <div class="chat-message__content">
+          <!-- thinking-display T-02：思考区（正文首字到达/完成后自动折叠，点击回看） -->
+          <ThinkingBlock
+            v-if="msg.role === 'assistant' && (msg as any).thinking"
+            :content="(msg as any).thinking"
+            :streaming="!!msg.streaming"
+            :has-content="!!msg.content"
+            :duration-ms="(msg as any).thinkingMs"
+          />
           <div
             v-if="(msg as any).messageType === 'html'"
             class="chat-message__html"

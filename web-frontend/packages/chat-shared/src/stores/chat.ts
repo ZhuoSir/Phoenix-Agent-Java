@@ -160,7 +160,7 @@ export const useChatStore = defineStore('phoenix-chat-shared/chat', () => {
     let streamMsgId: string | null = null;
 
     // 报告文本流式回调：创建/更新占位消息
-    function updateStreamMessage(text: string) {
+    function updateStreamMessage(text: string, thinking?: string) {
       const msgs = messagesByS.value[sessionId] ?? [];
       if (!streamMsgId) {
         streamMsgId = `stream-${Date.now()}`;
@@ -174,7 +174,7 @@ export const useChatStore = defineStore('phoenix-chat-shared/chat', () => {
       }
       const idx = msgs.findIndex((m) => m.id === streamMsgId);
       if (idx >= 0) {
-        msgs[idx] = { ...msgs[idx]!, content: text };
+        msgs[idx] = { ...msgs[idx]!, content: text, thinking: thinking || msgs[idx]!.thinking };
         messagesByS.value = { ...messagesByS.value, [sessionId]: [...msgs] };
       }
     }
@@ -198,8 +198,8 @@ export const useChatStore = defineStore('phoenix-chat-shared/chat', () => {
       const reply = await transport.send(
         { sessionId, content: trimmed, agentId: currentSession?.agentId },
         ac.signal,
-        (text: string) => {
-          updateStreamMessage(text);
+        (text: string, thinking?: string) => {
+          updateStreamMessage(text, thinking);
         },
         (nodeMsg) => {
           onNodeMessage(nodeMsg);
