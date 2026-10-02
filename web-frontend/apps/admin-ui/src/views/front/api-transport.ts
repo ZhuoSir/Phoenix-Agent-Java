@@ -1,4 +1,5 @@
 import { notifyFilesChanged } from '#/api/core/agentFiles';
+import { forceClearStreamSnapshot, readStreamSnapshot, saveStreamSnapshot } from '#/utils/stream-snapshot';
 import type {
   ChatMessage,
   ChatSession,
@@ -268,6 +269,25 @@ export const apiChatTransport: ChatTransport = {
         // ignore parse errors
       }
     }
+    // BUG-53 A′：中断快照回显（本地气泡不落库；服务端已有 assistant 尾行则丢弃快照防重复）
+    const snap = readStreamSnapshot(sessionId);
+    if (snap) {
+      forceClearStreamSnapshot(sessionId);
+      const lastMsg = messages[messages.length - 1];
+      // P7（detached-stream R-09）：尾行是 generating 中的服务端消息 → 本地快照让位
+      const gen = !!lastMsg && lastMsg.role === 'assistant' && String((lastMsg as any).metadata ?? '').includes('generating');
+      if ((!lastMsg || lastMsg.role === 'user') && !gen) {
+        messages.push({
+          id: `snap-${snap.ts}`,
+          role: 'assistant',
+          content: snap.contentHtml,
+          createdAt: snap.ts,
+          messageType: 'html',
+          metadata: { interrupted: true },
+          thinking: snap.thinking,
+        } as any);
+      }
+    }
     return messages;
   },
 
@@ -300,6 +320,7 @@ export const apiChatTransport: ChatTransport = {
     onNodeMessage?: (message: ChatMessage) => void,
   ): Promise<ChatMessage> {
     let { sessionId, content, agentId } = payload;
+    forceClearStreamSnapshot(sessionId); // 新一轮开始，清旧快照（BUG-53 A′）
 
     if (!agentId) {
       const chatStore = useChatStore();
@@ -391,7 +412,10 @@ export const apiChatTransport: ChatTransport = {
             }
             if (th || response.text) {
               if (thinkingBuf && !thinkingMs) thinkingMs = Date.now() - thinkingStart;
-              onProgress?.(markdownToHtml(fullText), thinkingBuf || undefined);
+              const htmlNow = markdownToHtml(fullText);
+              // BUG-53 A′：节流快照，刷新后由 store 回显
+              if (htmlNow || thinkingBuf) saveStreamSnapshot(sessionId, htmlNow, thinkingBuf || undefined);
+              onProgress?.(htmlNow, thinkingBuf || undefined);
             }
           },
           async (error) => {
@@ -401,6 +425,7 @@ export const apiChatTransport: ChatTransport = {
           },
           async () => {
             signal?.removeEventListener('abort', onAbort);
+            forceClearStreamSnapshot(sessionId); // 正常收尾，快照作废（BUG-53）
             if (abortRequested) return;
 
             const text = fullText || '已处理完成';

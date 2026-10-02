@@ -1,5 +1,10 @@
 # Changelog: detached-stream
 
+## Implement T-01（2026-10-02）A′ 一期上线
+- stash 原型复活；修复原型遗留：send 签名被插坏（语法错，构建期才暴露）、readStreamSnapshot 漏 import（esbuild 不查→tsc 抓到）
+- P7 守卫双端预埋（尾行 generating→快照让位），B 上线自动生效
+- build=0，TS=215 基线，前端 rc10 部署 verify 全绿；浏览器刷新生效验证属用户实操（AC 剧本见 tasks）
+
 ## v1.0.0 tasks（2026-10-02）确认人: 陈卓
 - **第③关通过（三重确认门全绿）**→ Implement 启动：分支 feature/detached-stream
 
