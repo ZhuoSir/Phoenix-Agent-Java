@@ -12,6 +12,10 @@
 - 过程自纠：docker PATH 断链×2、graph.ts 锚点 async 失配假成功、启动清扫 jsonb 语法重写、metadata 伪 generating 行辨析
 - 待办：AC-04 HITL 断线确认回归 + T-01/T-05 浏览器实操（用户）；T-06 收口未勾
 
+## Implement 收口后缺陷（2026-10-02）BUG-57
+- 落库所有权移交的连锁反应：历史装载的旧 HTML 启发式对新 raw-markdown 行误伤（含标签即跳过转译）→ 双端样式偶发丢失；按「服务端行无条件转译、旧行保留启发式」修复
+- 教训入册：持久化内容形态变更（HTML→markdown）必须同批清点所有读取端启发式
+
 ## Implement T-06（2026-10-02）AC 全绿收口
 - 用户浏览器复验 AC-01（修复双气泡后）/AC-03 通过；服务端演练 AC-02/04/05/06 与 P6 全过（留证 artifacts）
 - 收口补洞：admin confirm 流 thinking 通道对齐；演练脚本 confirm 缺 agentId 勘正记录

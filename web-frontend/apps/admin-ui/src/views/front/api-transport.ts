@@ -246,7 +246,11 @@ export const apiChatTransport: ChatTransport = {
       if (
         msg.role === 'assistant' &&
         msg.messageType === 'text' &&
-        !/<[a-z][\s\S]*>/i.test(msg.content)
+        (
+          // BUG-57：TurnManager 行存原始 markdown——含 <svg>/<html> 代码块也须渲染
+          //（旧启发式为「前端已存 HTML 行」设计，对新行误伤致样式整体丢失）
+          !/<[a-z][\s\S]*>/i.test(msg.content) || /"turnId"/.test(String((msg as any).metadata ?? ''))
+        )
       ) {
         msg.content = markdownToHtml(msg.content);
         msg.messageType = 'html';

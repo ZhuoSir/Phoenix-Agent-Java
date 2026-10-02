@@ -327,6 +327,13 @@ async function selectSession(session: ChatSession | null) {
         const md = typeof m.metadata === 'string' ? JSON.parse(m.metadata) : m.metadata;
         if (md && typeof md.thinking === 'string') { m.thinking = md.thinking; m.thinkingMs = md.thinkingMs; }
       } catch { /* 无 metadata 或非 JSON */ }
+      // BUG-57：admin 历史的服务端行同样是原始 markdown——装载时转 html
+      for (const m of currentMessages.value as any[]) {
+        if (m.role === 'assistant' && !m.messageType && /"turnId"/.test(String(m.metadata ?? ''))) {
+          m.content = markdownToHtml(String(m.content ?? ''));
+          m.messageType = 'html';
+        }
+      }
       // BUG-53 A′：刷新中断快照回显（本地气泡，不落库）
       const snap = readStreamSnapshot(session.id);
       if (snap) {
