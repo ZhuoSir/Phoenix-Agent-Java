@@ -7,4 +7,4 @@ T-01 A′ 一期快照 · T-02 TurnManager（自持订阅/replay/看门狗/flush
 - 无。HITL 浏览器侧按钮重现为既有渲染通道，用户可按 artifacts 剧本复验。
 
 ## 合并
-待用户口令（feature/detached-stream，分支含 T-01~T-06 全量）。
+已合并 main（2026-10-02 用户「合并吧」）。验收期三修（双气泡/BUG-57/confirm 通道）随分支同入。
