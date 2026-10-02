@@ -253,7 +253,9 @@ export const apiChatTransport: ChatTransport = {
         )
       ) {
         msg.content = markdownToHtml(msg.content);
-        msg.messageType = 'html';
+        // BUG-57 v2：不再改 'html'——.chat-message__html 无任何 CSS（裸分支）。
+        // 转译后保持 'text' 走 v-else 的 .chat-message__text--markdown，与直播/旧行同一条装修好的路
+
       }
     }
     // Restore threadId from last assistant message's metadata
