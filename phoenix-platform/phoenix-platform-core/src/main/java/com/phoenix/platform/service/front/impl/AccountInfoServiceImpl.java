@@ -189,7 +189,12 @@ public class AccountInfoServiceImpl extends ServiceImpl<AccountInfoMapper, Accou
 
     @Override
     public ReturnVo<Void> logout() {
-        StpUtil.logout();
+        // BUG-54：同后台口径，登出幂等
+        try {
+            StpUtil.logout();
+        }
+        catch (Exception ignored) { // NOSONAR
+        }
         return ReturnVo.ok(LoginConstant.LOGOUT_SUCCESS);
     }
 
