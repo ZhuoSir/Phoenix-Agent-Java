@@ -56,13 +56,14 @@ async function handlePick(id: string) {
   } finally {
     chat.loadingSessions = false;
   }
-  const newSession = chat.sessions.find(
-    (s) => s.agentId === id && s.title === '新会话',
-  );
-  if (newSession) {
-    await chat.switchSession(newSession.id);
+  // BUG-58 真身：右侧切换不再"没有名为新会话就强制建一个"——
+  // 有该智能体既有会话则进最近一条（服务端按更新时间倒序，首条即最近），否则落未选择默认页；
+  // 发送时 composer 惰性建会话的链保持不动
+  const first = chat.sessions.find((s) => s.agentId === id);
+  if (first) {
+    await chat.switchSession(first.id);
   } else {
-    await chat.createSession(id);
+    chat.activeSessionId = null;
   }
 }
 
