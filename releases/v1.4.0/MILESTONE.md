@@ -10,6 +10,8 @@
 | specs/20261002_detached-stream | v0.1.0 | Specify中（待三重确认） | 待定 | 待定 | 断线续传：服务端脱离式执行+重进会话追流（BL-22） |
 
 ## 二、汇总进度（M3/M4 勾选）
+| （缺陷）nginx 登录页路由豁免（BUG-56） | - | 已修复(v1.4.0) 待发 | - | - | 登出后 500 真身：代理 regex 吞 SPA 路由 |
+
 - [ ] M2 范围冻结
 - [ ] M3 汇总（SQL/config/RELEASE-NOTES/UPGRADE/checklist）
 - [ ] M4 发布（演练+tag）
