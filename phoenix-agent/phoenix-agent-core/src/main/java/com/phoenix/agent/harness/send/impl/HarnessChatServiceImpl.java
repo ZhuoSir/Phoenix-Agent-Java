@@ -28,6 +28,7 @@ import io.agentscope.core.event.ThinkingBlockEndEvent;
 import io.agentscope.core.message.Msg;
 import io.agentscope.core.message.UserMessage;
 import io.agentscope.harness.agent.HarnessAgent;
+import lombok.extern.slf4j.Slf4j;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
@@ -37,6 +38,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class HarnessChatServiceImpl implements HarnessChatService {
@@ -45,6 +47,7 @@ public class HarnessChatServiceImpl implements HarnessChatService {
     private final HitlCacheService hitlCacheService;
     private final SkillExplicitInjectionService skillExplicitInjectionService;
     private final WorkspaceArtifactScanner workspaceArtifactScanner;
+    private final com.phoenix.agent.service.AgentRuntimeConfigService agentRuntimeConfigService;
 
     @Override
     public Mono<Msg> call(String sn, HarnessRequest request) {
@@ -113,9 +116,10 @@ public class HarnessChatServiceImpl implements HarnessChatService {
         }
         // 技能全文经 RuntimeContext 交给 ExplicitSkillMiddleware 注入系统提示（plan v1.1.0 决策4）
         java.util.concurrent.atomic.AtomicBoolean textDeltaSeen = new java.util.concurrent.atomic.AtomicBoolean(false);
+        final Integer effMaxIters = resolveEffectiveMaxIters(request.getAgentId());
         Flux<NodeOutput> body = harnessAgent
             .streamEvents(buildUserMessage(request), buildRuntimeContext(request, injection.block()))
-            .map(event -> toNodeOutput(event, sessionId, textDeltaSeen));
+            .map(event -> toNodeOutput(event, sessionId, textDeltaSeen, effMaxIters));
         // BL-19：轮末扫 workspace 产物。END 帧从 body 中剥离、在扫描事件之后统一补发——
         // 否则 agentFiles 落在 end=true 之后，前端（按 end 收尾）收不到，还会多渲染一个空消息框。
         java.time.Instant turnStart = java.time.Instant.now();
@@ -130,6 +134,20 @@ public class HarnessChatServiceImpl implements HarnessChatService {
         leadData.put("loaded_skills", String.join(",", injection.skillNames()));
         return Flux.concat(Flux.just(NodeOutput.of("harness_agent", "harness", new OverAllState(leadData), null)), core,
                 filesTail, endFrame);
+    }
+
+    /** 生效上限：配置值或 null（=框架默认，文案省略数字）。DB 轻查询，每轮一次。 */
+    private Integer resolveEffectiveMaxIters(Long agentId) {
+        if (agentId == null) {
+            return null;
+        }
+        try {
+            return agentRuntimeConfigService.resolve(agentId).getMaxIterations();
+        }
+        catch (Exception e) {
+            log.warn("读取迭代上限配置失败（忽略，按默认文案）: {}", e.toString());
+            return null;
+        }
     }
 
     private Flux<NodeOutput> artifactsTail(HarnessRequest request, java.time.Instant turnStart) {
@@ -233,18 +251,17 @@ public class HarnessChatServiceImpl implements HarnessChatService {
                 .build();
         java.util.concurrent.atomic.AtomicBoolean textDeltaSeen = new java.util.concurrent.atomic.AtomicBoolean(false);
         return harnessAgent.streamEvents(confirmMsg, RuntimeContext.builder().userId(request.getUserId()).sessionId(request.getSessionId()).build())
-                .map(event -> toNodeOutput(event, request.getSessionId(), textDeltaSeen));
-    }
-
-    private NodeOutput toNodeOutput(AgentEvent event, String sessionId) {
-        return toNodeOutput(event, sessionId, new java.util.concurrent.atomic.AtomicBoolean(true));
+                .map(event -> toNodeOutput(event, request.getSessionId(), textDeltaSeen,
+                    resolveEffectiveMaxIters(null)));
     }
 
     private NodeOutput toNodeOutput(AgentEvent event, String sessionId,
-            java.util.concurrent.atomic.AtomicBoolean textDeltaSeen) {
+            java.util.concurrent.atomic.AtomicBoolean textDeltaSeen, Integer effMaxIters) {
         // BUG-46：超限终止必须可见（此前被 mapper 吞掉，表现为"执行一半戛然而止"）
         if (event instanceof io.agentscope.core.event.ExceedMaxItersEvent) {
-            String warn = "\n\n⚠️ 已达到最大迭代次数，本轮任务被中断（工具调用次数超限）。可重试，或将任务拆成更小步骤。";
+            // runtime-max-iterations R-04：带上生效值；未配置省略数字（A-04，不猜框架默认）
+            String warn = "\n\n⚠️ 已达到最大迭代次数" + (effMaxIters != null ? "（" + effMaxIters + "）" : "")
+                    + "，本轮任务被中断（工具调用次数超限）。可在「运行时配置」调高「工具迭代上限」或重试、拆分任务。";
             Map<String, Object> wd = new HashMap<>();
             return new StreamingOutput<>(warn, "harness_agent", "harness", new OverAllState(wd));
         }
@@ -261,8 +278,11 @@ public class HarnessChatServiceImpl implements HarnessChatService {
             }
             return NodeOutput.of("harness_agent", "harness", new OverAllState(new HashMap<>()), null);
         }
-        // 工具/模型生命周期事件：不上屏、不打 WARN（降噪）
+        // 工具/模型生命周期事件：不上屏；ModelCall 起止留 INFO（BUG-55 静默根因追踪）
         String simple = event.getClass().getSimpleName();
+        if (simple.startsWith("ModelCall")) {
+            log.info("[model-call] {} sessionId={} @{}", simple, sessionId, System.currentTimeMillis());
+        }
         if (simple.startsWith("ToolResult") || simple.startsWith("ToolCall") || simple.startsWith("ModelCall")) {
             return NodeOutput.of("harness_agent", "harness", new OverAllState(new HashMap<>()), null);
         }

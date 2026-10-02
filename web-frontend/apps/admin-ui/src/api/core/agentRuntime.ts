@@ -10,6 +10,8 @@ export interface AgentRuntimeConfig {
   knowledgeEnabled?: boolean;
   /** 知识库检索召回条数 1~50 */
   knowledgeTopK?: number;
+  /** 工具迭代上限 1~100；null/undefined=系统默认（runtime-max-iterations） */
+  maxIterations?: null | number;
   /** 知识库检索相似度阈值 0~1 */
   knowledgeSimilarityThreshold?: number;
   dbQueryEnabled?: boolean;

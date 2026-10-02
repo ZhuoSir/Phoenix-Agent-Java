@@ -54,6 +54,9 @@ public class AgentRuntimeConfig implements Serializable {
     /** 文件系统策略，见 FilesystemPolicyEnm */
     private String filesystemPolicy = "local";
 
+    /** 单轮内工具迭代上限（1~100）；null=框架默认（runtime-max-iterations R-01） */
+    private Integer maxIterations;
+
     private String creator;
 
     private Date createTime = new Date();

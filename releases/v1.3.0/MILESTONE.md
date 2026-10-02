@@ -7,6 +7,7 @@
 | spec | spec版本 | 状态 | SQL件 | 配置项 | 备注 |
 |---|---|---|---|---|---|
 | specs/20261001_thinking-display | v1.0.0 | 开发中（feature/thinking-display，实现完成待验收） | 1 | 2 | 思考/正文分离展示（metadata 持久，零 DDL） |
+| specs/20261002_runtime-max-iterations | v1.0.0 | 实现完成待验收（feature/runtime-max-iterations；A/B 对照实证） | 2 | 3 | 工具迭代上限按智能体可配；升级件 V1.3.0_03 |
 | specs/20261001_knowledge-base | v1.0.0 | **已合并 main（2026-10-01 验收通过；BUG-50/51 随版修）** | 2 | 3 | 独立知识库模块（含组授权）；升级件 V1.3.0_02 |
 | specs/20261001_agent-session-files | v1.1.0 | **已合并 main（2026-10-01 验收通过；随附验收期缺陷批 BUG-40~48）** | 1 | 3 | 会话文件面板；workspace-root 配置化随附 |
 

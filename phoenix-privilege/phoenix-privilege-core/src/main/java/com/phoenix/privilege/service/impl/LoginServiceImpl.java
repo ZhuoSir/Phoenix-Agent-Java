@@ -98,7 +98,13 @@ public class LoginServiceImpl implements LoginService {
 
 	@Override
 	public ReturnVo<Void> logout() {
-		StpUtil.logout();
+		// BUG-54：登出幂等——token 失效/重复登出时 StpUtil.logout() 抛 NotLogin 不应冒 500，
+		// 无登录态本就是登出想要的终态
+		try {
+			StpUtil.logout();
+		}
+		catch (Exception ignored) { // NOSONAR
+		}
 		return ReturnVo.ok(LoginConstant.LOGOUT_SUCCESS);
 	}
 

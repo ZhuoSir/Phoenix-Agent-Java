@@ -40,4 +40,7 @@ public class AgentRuntimeConfigDTO implements Serializable {
 
     /** 文件系统策略，见 FilesystemPolicyEnm（local/remote） */
     private String filesystemPolicy;
+
+    /** 工具迭代上限（1~100；不传=维持现状） */
+    private Integer maxIterations;
 }

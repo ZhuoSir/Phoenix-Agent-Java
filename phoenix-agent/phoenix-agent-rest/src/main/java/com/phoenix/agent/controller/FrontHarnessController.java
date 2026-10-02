@@ -16,6 +16,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import com.phoenix.agent.harness.sse.SseSupport;
+import org.springframework.http.codec.ServerSentEvent;
 import reactor.core.publisher.Flux;
 
 import java.util.List;
@@ -46,7 +48,7 @@ public class FrontHarnessController {
 
     /** 前台 harness 对话（SSE） */
     @PostMapping(value = "/harness/chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public Flux<Map<String, Object>> chat(@RequestBody HarnessRequest body) {
+    public Flux<ServerSentEvent<Map<String, Object>>> chat(@RequestBody HarnessRequest body) {
         String accountId = StpUtil.getLoginIdAsString();
         Long agentId = body.getAgentId();
         // 1) 智能体对本账号可见（组-智能体授权）——只判可见性，不要求 sn：
@@ -56,7 +58,7 @@ public class FrontHarnessController {
             Map<String, Object> err = new java.util.LinkedHashMap<>();
             err.put("content", visible.getMsg());
             err.put("end", true);
-            return Flux.just(err);
+            return Flux.just(org.springframework.http.codec.ServerSentEvent.builder(err).build());
         }
         // 存量自注册智能体才有 sn，仅作兼容字段
         String agentSn = frontSkillAccessService.resolveVisibleAgentSn(accountId, agentId).getData();
@@ -67,7 +69,7 @@ public class FrontHarnessController {
             Map<String, Object> err = new java.util.LinkedHashMap<>();
             err.put("content", access.getMsg());
             err.put("end", true);
-            return Flux.just(err);
+            return Flux.just(org.springframework.http.codec.ServerSentEvent.builder(err).build());
         }
         // 3) 组装请求：前台身份 + 技能范围约束提示（自主模式缝隙缓解）
         //    R-08：统一以 agentId 寻址（内部走运行时注册表）；harnessSn 仅作存量兼容兜底字段
@@ -80,6 +82,6 @@ public class FrontHarnessController {
             .enabledSkillIds(body.getEnabledSkillIds())
             .skillScopeHint(frontSkillAccessService.buildScopeHint(accountId, agentId))
             .build();
-        return harnessChatService.stream(request).map(HarnessEventMapper::toEventMap);
+        return SseSupport.withHeartbeat(harnessChatService.stream(request).map(HarnessEventMapper::toEventMap));
     }
 }
