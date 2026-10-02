@@ -1,4 +1,4 @@
-> 版本: v0.1.0 | 状态: 草稿（待确认） | 更新: 2026-10-01 | 确认人: | 确认日期:
+> 版本: v1.0.0 | 状态: 已确认 | 更新: 2026-10-01 | 确认人: 陈卓 | 确认日期: 2026-10-01
 
 # 任务清单：思考/正文分离（thinking-display）
 
@@ -6,7 +6,7 @@
 
 ## 1. 后端分流
 
-- [ ] T-01 事件层双通道：toNodeOutput 思考分支改挂 `thinking_text` 状态键（不再产 chunk）；HarnessEventMapper 透出 `eventMap.thinking`，content 从此只含正文
+- [x] T-01 事件层双通道：toNodeOutput 思考分支改挂 `thinking_text` 状态键（不再产 chunk）；HarnessEventMapper 透出 `eventMap.thinking`，content 从此只含正文
   关联: R-01, R-07 | 依赖: 无
   验证方式: 部署后 curl SSE 用思考型模型提推理题→帧含 thinking 键且末帧 content 无独白混杂（特征词比对）；非思考模型回归：无 thinking 键、正文如常；THINKING 事件不触发时后端日志零异常
   验收标准: 三链路（front/admin/API）共用 mapper 一处生效；旧键 content 语义不破坏

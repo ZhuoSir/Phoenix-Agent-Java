@@ -40,6 +40,8 @@ public final class HarnessEventMapper {
         output.state().value("loaded_skills", String.class).ifPresent(skills -> eventMap.put("loadedSkills", skills));
         // BL-19：本轮新产物文件（JSON 数组字符串），前端收到即刷新文件面板；旧客户端忽略该键无副作用
         output.state().value("agent_files", String.class).ifPresent(filesJson -> eventMap.put("agentFiles", filesJson));
+        // thinking-display R-01：思考增量独立键（旧客户端只读 content，天然无感）
+        output.state().value("thinking_text", String.class).ifPresent(t -> eventMap.put("thinking", t));
         output.state().value("agent_event", AgentEvent.class).ifPresent(event -> {
             if (event instanceof RequireUserConfirmEvent confirmEvent) {
                 eventMap.put("needConfirm", true);
