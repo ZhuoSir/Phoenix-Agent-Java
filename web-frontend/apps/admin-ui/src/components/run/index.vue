@@ -329,7 +329,7 @@ async function selectSession(session: ChatSession | null) {
       } catch { /* 无 metadata 或非 JSON */ }
       // BUG-57：admin 历史的服务端行同样是原始 markdown——装载时转 html
       for (const m of currentMessages.value as any[]) {
-        if (m.role === 'assistant' && !m.messageType && /"turnId"/.test(String(m.metadata ?? ''))) {
+        if (m.role === 'assistant' && (!m.messageType || m.messageType === 'text') && /"turnId"/.test(String(m.metadata ?? ''))) {
           m.content = markdownToHtml(String(m.content ?? ''));
           m.messageType = 'html';
         }
