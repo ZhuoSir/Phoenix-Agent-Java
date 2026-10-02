@@ -1,13 +1,20 @@
 import { fileURLToPath, URL } from 'node:url';
 
+import { loadEnv } from 'vite';
+
 import { defineConfig } from '@vben/vite-config';
 
 import ElementPlus from 'unplugin-element-plus/vite';
 
 const targetUrl = 'http://localhost:8066';
+// BUG-25(T-07)：dev 端口取 .env.development 的 VITE_PORT（5777），不再被 vite 默认 5173 顶替
+const localEnv = loadEnv('development', process.cwd(), '');
 export default defineConfig(async () => {
   return {
     application: {},
+    vite: {
+      server: { port: Number(localEnv.VITE_PORT || 5173) },
+    },
     vite: {
       resolve: {
         alias: {

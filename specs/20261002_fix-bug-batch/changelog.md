@@ -1,5 +1,9 @@
 # Changelog: fix-bug-batch
 
+## Implement T-06~T-07（2026-10-02）
+- T-06 取消令牌+节点守卫：StreamCancellation 注册表 + NodeBeanUtil 单点守卫 + GraphServiceImpl 三钩子；实测取消链完整（subscribe→disconnected→Stopping→cleaned→后续零活动）；注：现图引擎下 dispose 即断链，节点守卫为兜底保险与语义显式化（③硬中断按批准记技术债）；过程插曲：Docker VM 盘满 Redis MISCONF→prune 8G+容器误清重建
+- T-07 模型类型三分（对话/嵌入/音频）；vite dev 端口 loadEnv VITE_PORT 实测 5777 ✓
+
 ## Implement T-05（2026-10-02）删除级联+孤儿清理
 - AgentServiceImpl.deleteById 级联五表（runtime/skill/group 软删，kbase/datasource 绑定物理删——表无软删列的事实形态）；级联失败不阻断删除（catch+warn）
 - **事实订正**：tbl_data_agent 无软删列（删除=物理）→ 矩阵D「软删」表述对本体不适用，孤儿判定改为存在性；ops 脚本（spec/sql/04，注释级干跑清单+幂等 UPDATE/DELETE），现网执行 0 错、孤儿终验 0
