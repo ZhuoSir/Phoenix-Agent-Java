@@ -17,3 +17,5 @@
 - [ ] M2 范围冻结
 - [ ] M3 汇总（SQL/config/RELEASE-NOTES/UPGRADE/checklist）
 - [ ] M4 发布（演练+tag）
+
+> 运维数据脚本（非 schema 件）：specs/20261002_fix-bug-batch/sql/04_orphan_cleanup_ops.sql（BUG-14 存量孤儿清理，幂等）——M3 汇总时并入 UPGRADE 操作段

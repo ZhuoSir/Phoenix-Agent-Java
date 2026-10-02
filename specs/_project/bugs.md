@@ -24,7 +24,7 @@
 | BUG-11 | 前台 HITL 确认接口缺失，前端调用必然 404 | P2 | spec Implement中(20260927_dynamic-agent-types) | 新建 | - | 原 B-11 |
 | BUG-12 | SqlSecurityValidator 子串匹配误杀只读查询（`create_time` 等） | P2 | spec Implement中(20260927_dynamic-agent-types T-08) | 已修复(v1.2.0) | v1.2.0 | 原 B-12; jshell 8 例验证 |
 | BUG-13 | EMBEDDING 模型测试恒 404（base_url 多带 `/v1` + 模型名不被兼容模式支持） | P2 | 对话中(2026-09-27) | 已修复(v1.2.0) | v1.2.0 | 原 B-13; 配置修正 + 实测矩阵 |
-| BUG-14 | 删除智能体残留孤儿数据（运行配置/技能绑定/组授权） | P2 | spec Implement中(20260927_dynamic-agent-types T-16) | 新建 | - | 原 B-14; 本次孤儿行已手工清理 |
+| BUG-14 | 删除智能体残留孤儿数据（运行配置/技能绑定/组授权） | P2 | spec Implement中(20260927_dynamic-agent-types T-16) | 已修复(v1.4.0) | - | 原 B-14; 本次孤儿行已手工清理 |
 | BUG-15 | 智能体列表关键字搜索在 PG 下 500（`CONCAT` 参数类型不可推断） | P2 | spec Implement中(20260927_dynamic-agent-types T-16) | 已修复(v1.2.0) | v1.2.0 | 原 B-15; commit 00eb0ff |
 | BUG-16 | 三张 Spring AI 向量表缺主键 → `ON CONFLICT` 插入必失败 | P2 | spec Implement中(20260927_dynamic-agent-types T-13) | 已修复(v1.2.0) | v1.2.0 | 原 B-16; commit c0fe1b9（基线 + 运行库双修） |
 | BUG-17 | 图链路在非 HTTP 调用方取 Sa-Token 登录态直接抛异常 | P2 | spec Implement中(20260927_dynamic-agent-types T-09) | 已修复(v1.2.0) | v1.2.0 | 原 B-17; commit e74e7ec |
