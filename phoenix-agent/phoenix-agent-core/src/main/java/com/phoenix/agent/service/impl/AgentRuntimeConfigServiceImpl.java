@@ -122,6 +122,11 @@ public class AgentRuntimeConfigServiceImpl implements AgentRuntimeConfigService 
             existing.setUpdateTime(now);
             agentRuntimeConfigMapper.update(existing);
         }
+        // R-01「留空」持久：flex update(entity) 忽略 null 无法清除——UpdateChain 定向强写该列（含 null）
+        com.mybatisflex.core.update.UpdateChain.of(agentRuntimeConfigMapper)
+            .set(AgentRuntimeConfig::getMaxIterations, target.getMaxIterations())
+            .where(AgentRuntimeConfig::getAgentId).eq(agentId)
+            .update();
         log.info("对话智能体运行配置已保存, agentId={}, 工具数={}, datasourceId={}", agentId, toolCount,
             target.getDatasourceId());
         return ReturnVo.ok(true);

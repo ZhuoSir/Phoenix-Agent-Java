@@ -1,5 +1,11 @@
 # Changelog: runtime-max-iterations
 
+## Implement 收口补丁（2026-10-02 同日）——「留空清除」两处真缺陷修复
+- ①VO 缺 maxIterations 字段：保存实际已落库但 GET 回显恒 None（曾致误判），补字段+映射
+- ②MyBatis-Flex update(entity) 忽略 null → PUT 空体无法清除已设值（前记「留空清除 ✓」当时为**假阳性**，
+  系误读 None 回显）；UpdateChain 定向强写该列后真复测：设 40→GET 40→空体清→GET None、DB NULL 双证
+- 教训：null 语义字段禁用 update(entity) 单通道；「留空=清除」类需求必测 设值→清除 完整回路
+
 ## Implement 收口（2026-10-02）——T-01~T-05 全勾
 - A/B 对照铁证：上限 2 半程断+文案带（2）；上限 40 完整跑完；四态校验+留空清除全过
 - **语义定标**：maxIters=模型推理轮次（单轮可并行多工具）——UI/警告文案按此表述
