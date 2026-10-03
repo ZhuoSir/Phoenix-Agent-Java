@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- 国内网络默认：Maven 中央仓走阿里云（multistage 构建 ARG MAVEN_SETTINGS 默认值）。
-     海外/内网仓场景：docker build --build-arg MAVEN_SETTINGS=docker/maven/settings.xml 覆盖 -->
+     海外/内网仓场景：docker build 传 build-arg MAVEN_SETTINGS=docker/maven/settings.xml 覆盖。
+     注意：XML 注释内禁止连续双横线（BUG-62 教训），参数写法避开两个减号连排 -->
 <settings>
   <mirrors>
     <mirror>
