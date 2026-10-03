@@ -1,5 +1,27 @@
 # Changelog: docker-auto-pipeline
 
+## T-02+T-03 完成（2026-10-03）八跑收敛+三连测全绿
+- T-02：t02a(1.08GB)+t02b 五镜像版(1.4GB) 双包出货；证据=Hub直连0/国内源13处/解包sha全对/manifest JSON自检/--overseas接线干跑(官方名+default settings✓,断网exit1预期内)/失败输出格式五跑实证；amd64 按 tasks v1.1.0 降级口径(薄组装已实证)
+- T-03：**九步真装全绿 exit=0 仅39秒**(镜像本地时)——IMAGE_TAG v1.3.0→t02b 升级分支实测过；幂等重跑 9/9 步全跳+栈不抖；篡改拒装点名 BAD: docs/INSTALL.md exit=1；栈取证:4容器healthy+9180登录出token+迁移台账9行(五镜像payload+替身migrator全链成立)
+- 替身记账：postgres:16-alpine=postgres:latest tag(用户裁决"假设源完成")，演练毕删除；t02c(升级演练"新版")打包中
+
+## tasks v1.1.0（2026-10-03）—— 验证口径调整，用户裁决+确认
+- 用户裁决「源可以假设完成，验证整体流程，没必要真拉，最后还要删除」→ 网络重验证项统一延真机：T-02 amd64 第二包降级（薄组装已实证）/T-04 引擎真装延真机/T-06 断网真跑延真机/T-09 六项改「本机四项真跑+两项延真机」；T-07 伪靶机改本机 t02a→t02b 真实升级（方法替换非降级）
+- 原则：代码一行不少写；替身镜像（postgres:latest→16-alpine tag）仅准演练环境、用后删除、如实记账
+- 过程注记：首次编辑因默写锚点（v0.1.0 vs 实文 v1.0.0）被 assert 拦截零污染——L-01 v2 规则首次实战生效
+
+## plan v1.0.1 已确认（2026-10-03）—— 重确认②通过，恢复 Implement
+- 用户「确认」；五镜像 payload 方案生效；package.sh 改造 → t02b 重打 → 九步全链真装三连测 → amd64 交叉包
+
+## plan v1.0.1 待重确认（2026-10-03，铁律6 触发）
+- T-03 mac 真装演练：步骤1-5 全绿（含 sha 拒装被 hotfix 的 install.sh——完整性体系立功），步骤6 compose up 失败暴露 **payload 缺基础运行时三件镜像**（redis/pgvector/postgres-client）——R-06 离线不成立的设计缺口，开发机全绿假象纯因本地有缓存
+- 停编回改：plan §1.1/§1.2 补五镜像打包+ref 分型（非 library 前缀），v1.0.0→v1.0.1 待重确认；amd64 缺陷包后台跑已中止
+
+## T-01 完成（2026-10-03）lib/common.sh 基座库
+- 交付：common.sh 119 行（日志 stderr+落盘/九步状态机/mirror 竞速/sha256 双平台/收据卡/资源探测，全 phx_ 前缀 bash3.2 契约）+ selftest.sh 22 断言
+- 验证：mac bash 3.2.57 → 22/22 exit=0；ubuntu 容器 bash 5.1.16 → 21过/0败/1环境跳过(无python3,活口子测已在mac覆盖)；shellcheck 0.11.0（用户本机自装,选项c）common.sh 零告警、selftest 清理后零告警
+- **selftest 抓到 2 个真 bug**：①mirror 判活 curl 失败输出 000 与 ||echo 000 拼接成 000000 死口误判活口 ②phx_log 走 stdout 污染命令替换返回值通道——均修复复测绿
+
 ## tasks v1.0.0（2026-10-03）—— 确认③通过，三重门全绿
 - 用户「确认」；tasks v0.1.0→v1.0.0 已确认（陈卓）
 - 三重确认自检：requirements v1.0.0 已确认(陈卓) / plan v1.0.0 已确认(陈卓) / tasks v1.0.0 已确认(陈卓)——进入 Phase 4 Implement

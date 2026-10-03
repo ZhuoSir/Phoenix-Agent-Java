@@ -1,6 +1,6 @@
 # Plan: docker-auto-pipeline
 
-> 版本: v1.0.0 | 状态: 已确认 | 确认人: 陈卓 | 确认日期: 2026-10-03 | 更新: 2026-10-03
+> 版本: v1.0.1 | 状态: 已确认 | 确认人: 陈卓 | 确认日期: 2026-10-03 | 更新: 2026-10-03（v1.0.0 确认同日；v1.0.1 PATCH=payload 五镜像化，重确认 2026-10-03）
 > 规范路由（.specrc.yml）：code-backend=global（Java 规范不适用 shell——跟随 docker/scripts 周边风格）；code-frontend=none；api-design/database 不涉（无新接口无库表）；git-workflow=global（版本分支 v1.5.0 制式）
 
 ## 〇、坑核对（lessons.md 全部 12 条 active 逐条过）
@@ -40,7 +40,7 @@ docker/scripts/package.sh ──▶ phoenix-<ver>-<arch>.tar.gz ──▶ instal
 phoenix-<ver>-<arch>/
 ├── manifest.json          # 版本/git描述/arch/构建时间/文件清单+sha256/引擎最低版本
 ├── SHA256SUMS
-├── images/phoenix-images.tar      # docker save 双镜像单 tar
+├── images/phoenix-images.tar      # docker save 五镜像单 tar：phoenix 双侧 + 基础运行时三件（redis:7-alpine / pgvector/pgvector:pg16 / postgres:16-alpine，compose 默认引用；目标机零拉取=R-06 离线成立的前提）
 ├── deploy/                        # compose 运行资产（从仓库拷贝，非软链）
 │   ├── docker-compose.yaml  ├── init/  ├── sql/  ├── releases/  ├── nginx/
 │   └── verify.sh
@@ -55,7 +55,8 @@ phoenix-<ver>-<arch>/
 
 ### 1.2 package.sh（构建机）
 - 参数：`--arch amd64|arm64`（默认=本机）、`--version <v>`（默认 `git describe --tags` 去 v 前缀）、`--overseas`、`--with-engine-debs`、`--mirror <前缀>`（默认读 `docker/scripts/mirrors.list` 竞速选优）
-- 步骤：环境自检（docker/buildx/磁盘余量）→ mirror 可达性竞速选优 → `docker buildx build --platform linux/<arch>` 双侧 multistage（`--build-arg MAVEN_SETTINGS/NPM_REGISTRY` 按 --overseas 切换）→ tag `phoenix-{backend,frontend}:<ver>` → save → 组装 payload → 生成 manifest+SHA256SUMS → tar.gz → **自校验**（临时目录解包→sha256sum -c 全量→manifest 复算）→ 输出包路径+体积+sha
+- 步骤：环境自检（docker/buildx/磁盘余量）→ mirror 可达性竞速选优 → 双侧 multistage 编译（native，工件提取）→ 目标架构薄组装 → **基础运行时三件按目标架构备齐（mirror pull+retag 裸名；架构不符本地缓存强制重拉）** → save 五镜像一 tar → 组装 payload → 生成 manifest+SHA256SUMS → tar.gz → **自校验** → 输出包路径+体积+sha
+- （v1.0.1 补）基础三件清单以 compose 默认引用为准：`redis:7-alpine`、`pgvector/pgvector:pg16`、`postgres:16-alpine`；非 library 镜像 mirror 前缀不带 `/library/`（ref 分型）
 - 失败语义：任一步非零即退，stderr 打「[package] 步骤 N/M 失败：<原因>，日志 <路径>」（L-02/L-03）
 
 ### 1.3 install.sh（Linux/mac，bash 3.2 兼容）
@@ -135,6 +136,9 @@ phoenix-<ver>-<arch>/
 | install.ps1 | 语法/逻辑评审+状态机路径桩测；**真机=用户办公室 Server 2022（今日支援轮那台）** | 真机全链由用户执行、agent 收日志判定（L-11：真实环境实测） |
 | 升级/幂等 | 同包重跑+改密 .env 保留验证 | R-07 两场景 |
 | 回归 | 开发栈（phoenix-release）全程不受扰 | verify 13/13 |
+
+## 变更记录
+- **v1.0.1（2026-10-03，Implement 期发现，铁律6 停编回改）**：T-03 mac 真装演练第 6 步 compose up 失败暴露 payload 设计缺口——包内只有 phoenix 双侧镜像，基础运行时三件（redis/pgvector/postgres-client）未打包，目标机 compose 必拉 Hub（离线 R-06 不成立；开发机验证全绿纯因本地恰有缓存——演练价值自证）。补全 §1.1 payload 清单与 §1.2 save 步骤为五镜像；PG_PASSWORD 弱默认值问题随演练记录（.env.example 注释已警示，install 生成路径用随机密码，预置路径尊重用户文件——不改）。同轮演练正面战果：步骤1-5 全绿、sha 拒装 hotfix 篡改文件（完整性体系首战即立功）。
 
 ## 七、任务预告（Phase 3 细化）
 T-01 lib/common.sh 基座（日志/状态机/探活/收据函数）→ T-02 package.sh → T-03 install.sh 九步主链 → T-04 引擎自动安装模块（apt/yum/deb离线）→ T-05 install.ps1+WSL2 → T-06 离线降级与 --with-engine-debs → T-07 幂等升级专项 → T-08 文档套件+旧脚本定位注记 → T-09 实测矩阵（mac/Linux伪靶机/开发栈回归）→ T-10 台账收尾（Windows 真机移交用户）。

@@ -1,0 +1,3 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- 海外/官方源直连（package.sh 的 overseas 开关用）：无 mirror，Maven Central 直连。注释内禁双横线（BUG-62） -->
+<settings/>
