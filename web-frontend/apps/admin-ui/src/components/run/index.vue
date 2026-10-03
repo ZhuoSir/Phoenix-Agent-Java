@@ -305,14 +305,14 @@ async function selectSession(session: ChatSession | null) {
       return;
     }
     syncStateToView(session.id, { isStreaming, nodeBlocks });
-    currentMessages.value = await getSessionMessagesApi(session.id);
+    currentMessages.value = applyServerRowRender(await getSessionMessagesApi(session.id) as any[]) as any;
     // detached-stream T-05：admin 进行中的轮次 → 5s 轮询增量视图（完成自动收敛）
     void (async () => {
       try {
         if (!(await harnessTurnStatusApi(session.id))) return;
         const tick = async () => {
           try {
-            currentMessages.value = await getSessionMessagesApi(session.id);
+            currentMessages.value = applyServerRowRender(await getSessionMessagesApi(session.id) as any[]) as any;
           } catch { /* 忽略单次 */ }
           try {
             if (await harnessTurnStatusApi(session.id)) setTimeout(tick, 5000);
@@ -327,13 +327,8 @@ async function selectSession(session: ChatSession | null) {
         const md = typeof m.metadata === 'string' ? JSON.parse(m.metadata) : m.metadata;
         if (md && typeof md.thinking === 'string') { m.thinking = md.thinking; m.thinkingMs = md.thinkingMs; }
       } catch { /* 无 metadata 或非 JSON */ }
-      // BUG-57：admin 历史的服务端行同样是原始 markdown——装载时转 html
-      for (const m of currentMessages.value as any[]) {
-        if (m.role === 'assistant' && (!m.messageType || m.messageType === 'text') && /"turnId"/.test(String(m.metadata ?? ''))) {
-          m.content = markdownToHtml(String(m.content ?? ''));
-          m.messageType = 'html';
-        }
-      }
+      // BUG-57：服务端行装载转 html（与轮询共用）
+      applyServerRowRender(currentMessages.value as any[]);
       // BUG-53 A′：刷新中断快照回显（本地气泡，不落库）
       const snap = readStreamSnapshot(session.id);
       if (snap) {
@@ -884,6 +879,17 @@ async function sendGraphRequest(request: GraphRequest, rejectedPlan: boolean) {
       isStreaming.value = false;
     }
   }
+}
+
+// BUG-57 完整修复：服务端行装载统一过这道转换（selectSession 首载与轮询刷新共用）
+function applyServerRowRender(list: any[]) {
+  for (const m of list) {
+    if (m.role === 'assistant' && (!m.messageType || m.messageType === 'text') && /"turnId"/.test(String(m.metadata ?? ''))) {
+      m.content = markdownToHtml(String(m.content ?? ''));
+      m.messageType = 'html';
+    }
+  }
+  return list;
 }
 
 function formatMessageContent(message: ChatMessage): string {
