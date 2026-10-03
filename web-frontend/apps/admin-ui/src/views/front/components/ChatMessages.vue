@@ -160,6 +160,10 @@ async function handleConfirmAction(
             v-else-if="(msg as any).messageType === 'harness-confirm'"
             class="chat-message__confirm"
           >
+            <div class="chat-message__confirm-head">
+              <span class="chat-message__confirm-dot"></span>
+              需要你的确认后才会继续执行
+            </div>
             <div
               v-if="msg.content"
               class="chat-message__confirm-text"
@@ -550,20 +554,62 @@ async function handleConfirmAction(
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 10px 14px;
-  background: hsl(var(--warning)/0.5);
-  border-radius: 10px;
+  padding: 14px 16px;
+  background: #fff;
+  border: 1px solid #e4e7ed;
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 3%);
+}
+
+.chat-message__confirm-head {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 500;
+  color: #8a919f;
+}
+
+.chat-message__confirm-dot {
+  width: 7px;
+  height: 7px;
+  background: #e6a23c;
+  border-radius: 50%;
+  box-shadow: 0 0 0 3px rgb(230 162 60 / 15%);
+  animation: confirm-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes confirm-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
 }
 
 .chat-message__confirm-text {
-  font-size: 14px;
-  line-height: 1.65;
-  color: hsl(var(--foreground));
+  max-height: 260px;
+  padding-top: 10px;
+  overflow-y: auto;
+  font-size: 13px;
+  line-height: 1.7;
+  color: #4b5563;
+  border-top: 1px solid #f0f2f5;
 }
+
+.chat-message__confirm-text :deep(p) { margin: 0 0 6px; }
+.chat-message__confirm-text :deep(p:last-child) { margin-bottom: 0; }
+.chat-message__confirm-text :deep(ul), .chat-message__confirm-text :deep(ol) { padding-left: 18px; margin: 6px 0; }
+.chat-message__confirm-text :deep(li) { margin: 2px 0; }
+.chat-message__confirm-text :deep(h1), .chat-message__confirm-text :deep(h2), .chat-message__confirm-text :deep(h3) { margin: 10px 0 6px; font-size: 14px; font-weight: 600; }
+.chat-message__confirm-text :deep(code) { padding: 1px 5px; font-family: SFMono-Regular, Consolas, Menlo, monospace; font-size: 12px; color: #476582; background: #f0f4f8; border-radius: 4px; }
+.chat-message__confirm-text :deep(pre) { padding: 10px 12px; margin: 6px 0; overflow-x: auto; background: #f6f8fa; border: 1px solid #e1e4e8; border-radius: 6px; }
+.chat-message__confirm-text :deep(pre code) { padding: 0; color: inherit; background: none; }
+.chat-message__confirm-text :deep(table) { width: 100%; margin: 6px 0; font-size: 12px; border-collapse: collapse; }
+.chat-message__confirm-text :deep(th), .chat-message__confirm-text :deep(td) { padding: 4px 8px; text-align: left; border: 1px solid #e0e0e0; }
+.chat-message__confirm-text :deep(th) { font-weight: 600; background: #f5f7fa; }
 
 .chat-message__confirm-buttons {
   display: flex;
   gap: 8px;
+  justify-content: flex-end;
 }
 
 .chat-message__confirm-btn {
@@ -571,18 +617,17 @@ async function handleConfirmAction(
   align-items: center;
   justify-content: center;
   height: 32px;
-  padding: 0 16px;
+  padding: 0 18px;
   font-family: inherit;
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
-  border: none;
-  border-radius: 6px;
-  transition: opacity 0.15s ease;
+  border-radius: 8px;
+  transition: all 0.15s ease;
 }
 
 .chat-message__confirm-btn:hover {
-  opacity: 0.85;
+  opacity: 0.88;
 }
 
 .chat-message__confirm-btn:disabled {
@@ -593,11 +638,21 @@ async function handleConfirmAction(
 .chat-message__confirm-btn--primary {
   color: #fff;
   background: hsl(var(--primary));
+  border: 1px solid transparent;
+  box-shadow: 0 1px 3px hsl(var(--primary) / 30%);
 }
 
 .chat-message__confirm-btn--danger {
-  color: #fff;
-  background: #f56c6c;
+  color: #5c6470;
+  background: #fff;
+  border: 1px solid #dcdfe6;
+}
+
+.chat-message__confirm-btn--danger:hover {
+  color: #409eff;
+  background: #f7f9ff;
+  border-color: #c6d4f7;
+  opacity: 1;
 }
 
 @keyframes pc-dots {
