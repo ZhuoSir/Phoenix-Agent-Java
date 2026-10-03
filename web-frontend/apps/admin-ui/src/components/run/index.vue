@@ -884,7 +884,9 @@ async function sendGraphRequest(request: GraphRequest, rejectedPlan: boolean) {
 // BUG-57 完整修复：服务端行装载统一过这道转换（selectSession 首载与轮询刷新共用）
 function applyServerRowRender(list: any[]) {
   for (const m of list) {
-    if (m.role === 'assistant' && (!m.messageType || m.messageType === 'text') && /"turnId"/.test(String(m.metadata ?? ''))) {
+    const mdRaw = m.metadata;
+    const metaStr = typeof mdRaw === 'string' ? mdRaw : JSON.stringify(mdRaw ?? {});
+    if (m.role === 'assistant' && (!m.messageType || m.messageType === 'text') && metaStr.includes('turnId')) {
       m.content = markdownToHtml(String(m.content ?? ''));
       m.messageType = 'html';
     }

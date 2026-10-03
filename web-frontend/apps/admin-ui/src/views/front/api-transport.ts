@@ -249,7 +249,9 @@ export const apiChatTransport: ChatTransport = {
         (
           // BUG-57：TurnManager 行存原始 markdown——含 <svg>/<html> 代码块也须渲染
           //（旧启发式为「前端已存 HTML 行」设计，对新行误伤致样式整体丢失）
-          !/<[a-z][\s\S]*>/i.test(msg.content) || /"turnId"/.test(String((msg as any).metadata ?? ''))
+          !/<[a-z][\s\S]*>/i.test(msg.content)
+          // BUG-57 三发：API 的 metadata 有 string/object 双形态——统一序列化后判定
+          || JSON.stringify((msg as any).metadata ?? {}).includes('turnId')
         )
       ) {
         msg.content = markdownToHtml(msg.content);
