@@ -1,5 +1,9 @@
 # Changelog: docker-auto-pipeline
 
+## plan v1.0.1 待重确认（2026-10-03，铁律6 触发）
+- T-03 mac 真装演练：步骤1-5 全绿（含 sha 拒装被 hotfix 的 install.sh——完整性体系立功），步骤6 compose up 失败暴露 **payload 缺基础运行时三件镜像**（redis/pgvector/postgres-client）——R-06 离线不成立的设计缺口，开发机全绿假象纯因本地有缓存
+- 停编回改：plan §1.1/§1.2 补五镜像打包+ref 分型（非 library 前缀），v1.0.0→v1.0.1 待重确认；amd64 缺陷包后台跑已中止
+
 ## T-01 完成（2026-10-03）lib/common.sh 基座库
 - 交付：common.sh 119 行（日志 stderr+落盘/九步状态机/mirror 竞速/sha256 双平台/收据卡/资源探测，全 phx_ 前缀 bash3.2 契约）+ selftest.sh 22 断言
 - 验证：mac bash 3.2.57 → 22/22 exit=0；ubuntu 容器 bash 5.1.16 → 21过/0败/1环境跳过(无python3,活口子测已在mac覆盖)；shellcheck 0.11.0（用户本机自装,选项c）common.sh 零告警、selftest 清理后零告警
