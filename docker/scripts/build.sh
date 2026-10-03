@@ -1,4 +1,5 @@
 #!/bin/sh
+# 【定位注记(docker-auto-pipeline Q3 决议)】手工链脚本——保留兼容；日常一键交付请用 package.sh(打包)+install.sh/install.ps1(安装)
 # Phoenix 镜像构建。默认 thin 模式（plan D7 应急通道=本机实测通路）：
 #   host 产出 jar/dist → docker/.stage → 薄镜像组装（构建零外网依赖）
 # --multistage：容器内多阶段（交付机可出网时用）
