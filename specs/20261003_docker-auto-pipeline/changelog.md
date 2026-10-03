@@ -1,5 +1,8 @@
 # Changelog: docker-auto-pipeline
 
+## plan v1.0.1 已确认（2026-10-03）—— 重确认②通过，恢复 Implement
+- 用户「确认」；五镜像 payload 方案生效；package.sh 改造 → t02b 重打 → 九步全链真装三连测 → amd64 交叉包
+
 ## plan v1.0.1 待重确认（2026-10-03，铁律6 触发）
 - T-03 mac 真装演练：步骤1-5 全绿（含 sha 拒装被 hotfix 的 install.sh——完整性体系立功），步骤6 compose up 失败暴露 **payload 缺基础运行时三件镜像**（redis/pgvector/postgres-client）——R-06 离线不成立的设计缺口，开发机全绿假象纯因本地有缓存
 - 停编回改：plan §1.1/§1.2 补五镜像打包+ref 分型（非 library 前缀），v1.0.0→v1.0.1 待重确认；amd64 缺陷包后台跑已中止

@@ -44,11 +44,15 @@ mkdir -p "$OUTDIR"
 WORK="$OUTDIR/.work-$PKGNAME"
 phx_log INFO "打包开始: $PKGNAME (native=$NATIVE overseas=$OVERSEAS) 日志=$PHX_LOG_FILE"
 
-# ref(): library 镜像加 mirror 前缀（--overseas/手工 mirror 时直通）
+# ref()/ref_any(): 镜像加 mirror 前缀（--overseas/手工 mirror 时直通）
 # MP=探活 URL(带 scheme, curl 用)；MPH=镜像引用前缀(必须无 scheme——docker 拒收 https:// 开头的 stage name，首跑真抓)
+# ref=library 官方镜像；ref_any=分型（含 / 的第三方镜像不加 /library/，plan v1.0.1）
 MP=""; MPH=""
 ref() { if [ -n "$MPH" ]; then echo "$MPH/library/$1"; else echo "$1"; fi; }
+ref_any() { case "$1" in */*) if [ -n "$MPH" ]; then echo "$MPH/$1"; else echo "$1"; fi;; *) ref "$1";; esac; }
 mph_from() { MPH="${1#https://}"; MPH="${MPH#http://}"; MPH="${MPH%/}"; }
+# 基础运行时三件（compose 默认引用；plan v1.0.1 五镜像化——T-03 演练实证的 R-06 缺口）
+BASE_IMGS="redis:7-alpine pgvector/pgvector:pg16 postgres:16-alpine"
 
 # 设计规则（二跑教训）：步骤1/2 为探测/产值步——每次必跑，不入状态机；
 # 状态机只记昂贵且幂等的副作用步（3编译/4组装/5payload/6tar/7自校验/8收据）
@@ -100,7 +104,7 @@ phx_step 3 $TOTAL "容器内编译 jar+dist（native，产物架构无关）" &&
   phx_step_mark 3
 }
 
-phx_step 4 $TOTAL "组装双侧镜像（--platform linux/$ARCH）" && {
+phx_step 4 $TOTAL "组装双侧镜像 + 基础运行时三件备齐（--platform linux/$ARCH）" && {
   mkdir -p "$REPO/docker/.stage"
   cp "$WORK/artifacts/phoenix-admin.jar" "$REPO/docker/.stage/phoenix-admin.jar"
   rm -rf "$REPO/docker/.stage/dist" && cp -r "$WORK/artifacts/dist" "$REPO/docker/.stage/dist"
@@ -116,6 +120,18 @@ phx_step 4 $TOTAL "组装双侧镜像（--platform linux/$ARCH）" && {
   FARCH=$(docker image inspect "phoenix-frontend:$VERSION" --format '{{.Architecture}}')
   [ "$BARCH" = "$ARCH" ] && [ "$FARCH" = "$ARCH" ] \
     || phx_fail 4 $TOTAL "架构核验不符（期望 $ARCH 实得 backend=$BARCH frontend=$FARCH）"
+  # 基础三件：本地缓存架构不符即按目标架构重拉（mirror 前缀 pull + retag 回裸名，compose 零改动）
+  for img in $BASE_IMGS; do
+    CURA=$(docker image inspect "$img" --format '{{.Architecture}}' 2>/dev/null || echo none)
+    if [ "$CURA" != "$ARCH" ]; then
+      SRC=$(ref_any "$img")
+      phx_log INFO "基础镜像备齐: $img ($SRC, linux/$ARCH)"
+      docker pull --platform "linux/$ARCH" "$SRC" >>"$PHX_LOG_FILE" 2>&1 || phx_fail 4 $TOTAL "基础镜像拉取失败: $img（源 $SRC；可 --mirror 换源或 --overseas）"
+      if [ "$SRC" != "$img" ]; then docker tag "$SRC" "$img"; fi
+    else
+      phx_log INFO "基础镜像已在（$img, $ARCH）"
+    fi
+  done
   phx_step_mark 4
 }
 
@@ -146,12 +162,15 @@ phx_step 5 $TOTAL "payload 组装（deploy 资产+脚本+manifest+SHA256SUMS）"
 4. `sh scripts/verify.sh` 全 PASS 即成；浏览器开 `http://localhost:9080`（admin/123456，首登改密）
 DOCEOF
   fi
-  docker save "phoenix-backend:$VERSION" "phoenix-frontend:$VERSION" > "$PAY/images/phoenix-images.tar" \
-    || phx_fail 5 $TOTAL "docker save 失败"
+  # shellcheck disable=SC2086
+  docker save "phoenix-backend:$VERSION" "phoenix-frontend:$VERSION" $BASE_IMGS > "$PAY/images/phoenix-images.tar" \
+    || phx_fail 5 $TOTAL "docker save 失败（五镜像）"
   GITDESC=$(git -C "$REPO" describe --tags --always 2>/dev/null || echo unknown)
   GITHASH=$(git -C "$REPO" rev-parse --short HEAD 2>/dev/null || echo unknown)
-  printf '{\n  "product": "Phoenix-Agent-Java",\n  "version": "%s",\n  "arch": "%s",\n  "git": "%s (%s)",\n  "built_at": "%s",\n  "engine_min": "20.10",\n  "images": ["phoenix-backend:%s", "phoenix-frontend:%s"]\n}\n' \
-    "$VERSION" "$ARCH" "$GITDESC" "$GITHASH" "$(date '+%F %T')" "$VERSION" "$VERSION" > "$PAY/manifest.json"
+  IMGLIST="phoenix-backend:$VERSION, phoenix-frontend:$VERSION"
+  for img in $BASE_IMGS; do IMGLIST="$IMGLIST, $img"; done
+  printf '{\n  "product": "Phoenix-Agent-Java",\n  "version": "%s",\n  "arch": "%s",\n  "git": "%s (%s)",\n  "built_at": "%s",\n  "engine_min": "20.10",\n  "images": [%s]\n}\n' \
+    "$VERSION" "$ARCH" "$GITDESC" "$GITHASH" "$(date '+%F %T')" "$(echo "$IMGLIST" | sed 's/\([^,]*\)/"\1"/g')" > "$PAY/manifest.json"
   # SHA256SUMS（两段式：清单先落盘再逐一算，无管道读写竞态；相对路径兼容 phx_sha_check_dir）
   ( cd "$PAY" && find . -type f ! -name SHA256SUMS | sed 's|^\./||' | sort > "$WORK/.filelist" )
   ( cd "$PAY" && while read -r f; do
