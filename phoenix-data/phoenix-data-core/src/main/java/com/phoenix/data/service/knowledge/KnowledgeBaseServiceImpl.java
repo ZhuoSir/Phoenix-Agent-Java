@@ -7,7 +7,14 @@ import com.phoenix.data.dto.knowledge.kb.KnowledgeBaseCreateDTO;
 import com.phoenix.data.dto.knowledge.kb.KnowledgeBaseQueryDTO;
 import com.phoenix.data.dto.knowledge.kb.KnowledgeBaseUpdateDTO;
 import com.phoenix.data.entity.KnowledgeBase;
+import com.phoenix.data.entity.AgentKnowledge;
+import com.phoenix.data.mapper.AgentKnowledgeMapper;
 import com.phoenix.data.mapper.KnowledgeBaseMapper;
+import com.mybatisflex.core.query.QueryWrapper;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import com.phoenix.data.vo.KnowledgeBaseVO;
 import com.phoenix.data.vo.PageResult;
 import lombok.AllArgsConstructor;
@@ -26,6 +33,10 @@ import java.util.List;
 public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
 
     private final KnowledgeBaseMapper knowledgeBaseMapper;
+
+    private final AgentKnowledgeMapper agentKnowledgeMapper;
+
+    private final AgentKnowledgeResourceManager agentKnowledgeResourceManager;
 
     @Override
     public KnowledgeBaseVO create(KnowledgeBaseCreateDTO dto, String operator) {
@@ -102,6 +113,34 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
         result.setPageSize((int) page.getPageSize());
         result.setTotalPages((int) page.getTotalPage());
         return result;
+    }
+
+    @Override
+    public Map<String, Object> reEmbedKnowledgeBase(Long id) {
+        KnowledgeBase kb = knowledgeBaseMapper.selectOneById(id);
+        if (kb == null) {
+            throw new IllegalArgumentException("知识库不存在: " + id);
+        }
+        List<AgentKnowledge> items = agentKnowledgeMapper.selectListByQuery(QueryWrapper.create()
+            .where("knowledge_base_id = ?", id).and("type in ('QA','FAQ')").and("is_deleted = 0"));
+        int ok = 0;
+        List<String> failed = new ArrayList<>();
+        for (AgentKnowledge item : items) {
+            try {
+                // doEmbedingToVectorStore = 先删该条目旧向量再按新文本嵌入（天然幂等原语）
+                agentKnowledgeResourceManager.doEmbedingToVectorStore(item);
+                ok++;
+            }
+            catch (Exception e) {
+                failed.add(String.valueOf(item.getId()));
+                log.warn("重刷向量失败 kb={} item={}: {}", id, item.getId(), e.toString());
+            }
+        }
+        Map<String, Object> r = new LinkedHashMap<>();
+        r.put("total", items.size());
+        r.put("success", ok);
+        r.put("failed", failed);
+        return r;
     }
 
     @Override

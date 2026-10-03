@@ -22,5 +22,8 @@ public interface KnowledgeBaseService {
 
     PageResult<KnowledgeBaseVO> queryByConditionsWithPage(KnowledgeBaseQueryDTO query);
 
+    /** BUG-18(T-04)：按库重刷 QA/FAQ 联合向量（幂等，DOCUMENT 不在范围） */
+    java.util.Map<String, Object> reEmbedKnowledgeBase(Long id);
+
     KnowledgeBaseVO detail(Long id);
 }

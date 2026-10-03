@@ -306,6 +306,10 @@ public class AccountInfoServiceImpl extends ServiceImpl<AccountInfoMapper, Accou
     @Override
     @Transactional(rollbackFor = Exception.class)
     public boolean save(AccountInfo entity) {
+        // BUG-03(T-01) 服务端兜底：新增且密码空白直接拒绝（controller 已拦，此为 API 直写防线）
+        if (entity.getId() == null && StrUtil.isBlank(entity.getPassword())) {
+            throw new IllegalArgumentException("账号密码不能为空");
+        }
         if (StrUtil.isNotBlank(entity.getPassword())) {
             entity.setPassword(SecureUtil.md5(PlatformConstant.PASSWORD_SALT + entity.getPassword()));
         }

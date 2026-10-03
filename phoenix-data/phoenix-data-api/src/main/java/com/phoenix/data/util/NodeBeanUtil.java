@@ -35,7 +35,15 @@ public class NodeBeanUtil {
 	 * @return 异步NodeAction实例
 	 */
 	public <T extends NodeAction> AsyncNodeAction getNodeBeanAsync(Class<T> clazz) {
-		return AsyncNodeAction.node_async(getNodeBean(clazz));
+		NodeAction raw = getNodeBean(clazz);
+		// BUG-24(T-06)：唯一节点工厂处包协作式取消守卫——每节点入口查 threadId 取消标志
+		NodeAction guarded = state -> {
+			String threadId = state.value(com.phoenix.data.constant.Constant.TRACE_THREAD_ID)
+				.map(String::valueOf).orElse("");
+			StreamCancellation.checkOrThrow(threadId);
+			return raw.apply(state);
+		};
+		return AsyncNodeAction.node_async(guarded);
 	}
 
 	/**

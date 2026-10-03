@@ -11,9 +11,11 @@
 | specs/20261002_detached-stream | v1.0.0 | **已合并 main（2026-10-02）** | 3 | 0 | 断线续传：TurnManager+join/cancel+落库移交+HITL 并轮；零 DDL，配置三键 | | 待定 | 待定 | 断线续传：服务端脱离式执行+重进会话追流（BL-22） |
 
 ## 二、汇总进度（M3/M4 勾选）
-| specs/20261002_fix-bug-batch | v1.0.0 plan已确认 | Tasks待第③关 | 待定 | 待定 | 开放缺陷清仓 11 单（含 BUG-18 问答联合向量化） |
+| specs/20261002_fix-bug-batch | v1.0.0 | 开发完成待合并（十单终态：9修+1批准不修复+1延期注记） | 待定 | 待定 | 开放缺陷清仓（BUG-02/03/05/08/11/14/18/21/24/25 修 + BUG-04 批准不修复；零 DDL，运维脚本 04） |
 | （缺陷）nginx 登录页路由豁免（BUG-56） | - | 已修复(v1.4.0) 待发 | - | - | 登出后 500 真身：代理 regex 吞 SPA 路由 |
 
 - [ ] M2 范围冻结
 - [ ] M3 汇总（SQL/config/RELEASE-NOTES/UPGRADE/checklist）
 - [ ] M4 发布（演练+tag）
+
+> 运维数据脚本（非 schema 件）：specs/20261002_fix-bug-batch/sql/04_orphan_cleanup_ops.sql（BUG-14 存量孤儿清理，幂等）——M3 汇总时并入 UPGRADE 操作段

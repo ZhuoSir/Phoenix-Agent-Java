@@ -123,6 +123,8 @@ public class GraphServiceImpl implements GraphService {
             graphRequest.setThreadId(UUID.randomUUID().toString());
         }
         String threadId = graphRequest.getThreadId();
+        // BUG-24(T-06)：协作式取消登记——新一轮流开始（幂等重置标志）
+        com.phoenix.data.util.StreamCancellation.register(threadId);
         // 创建或获取 StreamContext
         StreamContext context = streamContextMap.computeIfAbsent(threadId, k -> new StreamContext());
         context.setSink(sink);
@@ -144,6 +146,8 @@ public class GraphServiceImpl implements GraphService {
             return;
         }
         log.info("Stopping stream processing for threadId: {}", threadId);
+        // BUG-24(T-06)：先立取消旗——图执行在下一节点入口自查早停（断≠硬中断在跑调用，③档技术债）
+        com.phoenix.data.util.StreamCancellation.markCancelled(threadId);
         multiTurnContextManager.discardPending(threadId);
         StreamContext context = streamContextMap.remove(threadId);
         if (context != null) {
@@ -308,6 +312,8 @@ public class GraphServiceImpl implements GraphService {
     private void handleStreamError(String agentId, String threadId, Throwable error) {
         log.error("Error in stream processing for threadId: {}: ", threadId, error);
         StreamContext context = streamContextMap.remove(threadId);
+        // BUG-24(T-06)：错误终局注销取消登记
+        com.phoenix.data.util.StreamCancellation.unregister(threadId);
         if (context != null && !context.isCleaned()) {
             // 结束 Langfuse span（失败）
             if (context.getSpan() != null) {
@@ -335,6 +341,8 @@ public class GraphServiceImpl implements GraphService {
         log.info("Stream processing completed successfully for threadId: {}", threadId);
         multiTurnContextManager.finishTurn(threadId);
         StreamContext context = streamContextMap.remove(threadId);
+        // BUG-24(T-06)：自然收尾注销取消登记（防注册表泄漏）
+        com.phoenix.data.util.StreamCancellation.unregister(threadId);
         if (context != null && !context.isCleaned()) {
             // 结束 Langfuse span（成功）
             if (context.getSpan() != null) {

@@ -172,6 +172,26 @@ public class AgentServiceImpl extends ServiceImpl<AgentMapper, Agent> implements
 			// Delete agent record from database
 			getMapper().deleteById(id);
 
+			// BUG-14(T-05)：删除级联——运行配置/技能绑定/组授权软删，库绑定与数据源绑定物理删
+			// （矩阵D对面承诺：chat_session/message/agent_file 属审计域不级联）
+			try {
+				int n1 = com.mybatisflex.core.row.Db.updateBySql(
+					"UPDATE tbl_data_agent_runtime_config SET del_flag = 1 WHERE agent_id = ? AND del_flag = 0", id);
+				int n2 = com.mybatisflex.core.row.Db.updateBySql(
+					"UPDATE tbl_data_agent_skill_info SET del_flag = 1 WHERE agent_id = ? AND del_flag = 0", id);
+				int n3 = com.mybatisflex.core.row.Db.updateBySql(
+					"UPDATE tbl_platform_group_agent_info SET del_flag = 1 WHERE agent_id = ? AND del_flag = 0",
+					String.valueOf(id)); // 平台列 varchar，String 化（PG 无 varchar=bigint）
+				int n4 = com.mybatisflex.core.row.Db.updateBySql(
+					"DELETE FROM tbl_data_agent_kbase_bind WHERE agent_id = ?", id);
+				int n5 = com.mybatisflex.core.row.Db.updateBySql(
+					"DELETE FROM tbl_data_agent_datasource WHERE agent_id = ?", id);
+				log.info("BUG-14 级联清理 agent={}: runtime={} skill={} group={} kbase={} ds={}", id, n1, n2, n3, n4, n5);
+			}
+			catch (Exception ce) {
+				log.warn("BUG-14 级联清理失败（不影响智能体删除）agent={}: {}", id, ce.toString());
+			}
+
 			// Also clean up the agent's vector data
 			if (agentVectorStoreService != null) {
 				try {

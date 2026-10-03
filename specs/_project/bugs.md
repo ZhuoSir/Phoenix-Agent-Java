@@ -12,30 +12,30 @@
 | 编号 | 标题 | 严重度 | 发现于 | 状态 | 修复版本 | 关联 |
 |---|---|---|---|---|---|---|
 | BUG-01 | `all_schema.sql` 缺 5 个序列 → 全新环境导入必失败 | P1 | 本地部署(2026-09-27) | 已发布(v1.2.0) 2026-10-01 | v1.2.0 | 原 B-01; commit 34877da；已合并 main(c90071d)；09-30 用户委托 agent 复验（复现步骤全过，明细见文末） |
-| BUG-02 | HumanInTheLoop 未挂 skillRepository，技能静默加载不到 | P1 | 本地部署(2026-09-27) | 新建 | - | 原 B-02; 一行修复 |
-| BUG-03 | 前台账号创建时密码无必填校验 → 制造永久无法登录的死账号 | P2 | 本地部署排障(2026-09-27) | 新建 | - | 原 B-03 |
-| BUG-04 | 双账号体系：两张表、状态语义相反、密码互不相通 | P2 | 本地部署排障(2026-09-27) | 新建 | - | 原 B-04; 设计问题，建议立项/不修复**待用户批准** |
-| BUG-05 | 登录密码错误返回了「原密码错误」的错误码（23007） | P2 | 本地部署排障(2026-09-27) | 新建 | - | 原 B-05; 一行修复 |
+| BUG-02 | HumanInTheLoop 未挂 skillRepository，技能静默加载不到 | P1 | 本地部署(2026-09-27) | 新建 | 已修复(v1.4.0) | 原 B-02; 一行修复 | | T-02 核实原缺陷对象（未挂仓旧路径）已随技能体系重构消亡，现网技能加载正常
+| BUG-03 | 前台账号创建时密码无必填校验 → 制造永久无法登录的死账号 | P2 | 本地部署排障(2026-09-27) | 新建 | 已修复(v1.4.0) | 原 B-03 | | T-01 controller+service 双层密码必填
+| BUG-04 | 双账号体系：两张表、状态语义相反、密码互不相通 | P2 | 本地部署排障(2026-09-27) | 新建 | 不修复(技术债;批准:陈卓 2026-10-02) | 原 B-04; 设计问题，建议立项/不修复**待用户批准** | | 双账号系现状产品形态（privilege=管理员/platform=终端用户），合并属架构级改造收益不明（batch Q1 拍板）
+| BUG-05 | 登录密码错误返回了「原密码错误」的错误码（23007） | P2 | 本地部署排障(2026-09-27) | 新建 | 已修复(v1.4.0) | 原 B-05; 一行修复 | | T-01 码值 PASSWORD_ERROR(23009) 归位，改密 23007 对面零变化
 | BUG-06 | 技能无管理入口且技能池全局共享（缺失功能 + 死配置） | P3 | 本地部署(2026-09-27) | 已修复(v1.2.0) | v1.2.0 | 原 B-06; Spec: 20260927_agent-skill-management（`phoenix.agent.skillPath` 仍是死配置） |
 | BUG-07 | harness 的 shell 能力与远程文件系统硬绑互斥、无配置开关 | P3 | 本地部署(2026-09-27) | 已修复(v1.2.0) | v1.2.0 | 原 B-07; Spec: 20260927_dynamic-agent-types T-05（filesystem_policy 配置化，remote 自动关 shell） |
-| BUG-08 | `application-test.yml` 与实际部署环境不一致（密码/他人机器路径/与 AGENTS.md 冲突） | P3 | init体检(2026-09-27) | 新建 | - | 原 B-08 |
+| BUG-08 | `application-test.yml` 与实际部署环境不一致（密码/他人机器路径/与 AGENTS.md 冲突） | P3 | init体检(2026-09-27) | 新建 | 已修复(v1.4.0) | 原 B-08 | | T-03 对齐 docker 环境入库，常驻脏文件清零
 | BUG-09 | 前台与 harness 智能体无对话通道（前端指向不存在的端点） | P2 | spec Implement中(20260927_agent-skill-management) | 已修复(v1.2.0) | v1.2.0 | 原 B-09; Spec: 20260927_agent-skill-management T-11/T-14 |
 | BUG-10 | 后台新建智能体 type 为空、且无类型选择入口（harness 无法后台创建） | P2 | 对话中(2026-09-27) | 已修复(v1.2.0) | v1.2.0 | 原 B-10; Spec: 20260927_dynamic-agent-types T-04/T-14（存量自注册类保留属 BL-03，非缺陷） |
-| BUG-11 | 前台 HITL 确认接口缺失，前端调用必然 404 | P2 | spec Implement中(20260927_dynamic-agent-types) | 新建 | - | 原 B-11 |
+| BUG-11 | 前台 HITL 确认接口缺失，前端调用必然 404 | P2 | spec Implement中(20260927_dynamic-agent-types) | 新建 | 已修复(v1.4.0) | 原 B-11 | | T-08 真身：前台 confirm 误走 sn-only 重载致库配置智能体必挂——改双寻址重载+payload 带 agentId；前台端到端复验（confirm 2494帧、行单行done、确认产物生成）
 | BUG-12 | SqlSecurityValidator 子串匹配误杀只读查询（`create_time` 等） | P2 | spec Implement中(20260927_dynamic-agent-types T-08) | 已修复(v1.2.0) | v1.2.0 | 原 B-12; jshell 8 例验证 |
 | BUG-13 | EMBEDDING 模型测试恒 404（base_url 多带 `/v1` + 模型名不被兼容模式支持） | P2 | 对话中(2026-09-27) | 已修复(v1.2.0) | v1.2.0 | 原 B-13; 配置修正 + 实测矩阵 |
-| BUG-14 | 删除智能体残留孤儿数据（运行配置/技能绑定/组授权） | P2 | spec Implement中(20260927_dynamic-agent-types T-16) | 新建 | - | 原 B-14; 本次孤儿行已手工清理 |
+| BUG-14 | 删除智能体残留孤儿数据（运行配置/技能绑定/组授权） | P2 | spec Implement中(20260927_dynamic-agent-types T-16) | 已修复(v1.4.0) | - | 原 B-14; 本次孤儿行已手工清理 |
 | BUG-15 | 智能体列表关键字搜索在 PG 下 500（`CONCAT` 参数类型不可推断） | P2 | spec Implement中(20260927_dynamic-agent-types T-16) | 已修复(v1.2.0) | v1.2.0 | 原 B-15; commit 00eb0ff |
 | BUG-16 | 三张 Spring AI 向量表缺主键 → `ON CONFLICT` 插入必失败 | P2 | spec Implement中(20260927_dynamic-agent-types T-13) | 已修复(v1.2.0) | v1.2.0 | 原 B-16; commit c0fe1b9（基线 + 运行库双修） |
 | BUG-17 | 图链路在非 HTTP 调用方取 Sa-Token 登录态直接抛异常 | P2 | spec Implement中(20260927_dynamic-agent-types T-09) | 已修复(v1.2.0) | v1.2.0 | 原 B-17; commit e74e7ec |
-| BUG-18 | QA/FAQ 类型知识只向量化「问题」，答案不参与检索 | P2 | spec Implement中(20260927_dynamic-agent-types T-16) | 新建 | - | 原 B-18; 需产品定口径 |
+| BUG-18 | QA/FAQ 类型知识只向量化「问题」，答案不参与检索 | P2 | spec Implement中(20260927_dynamic-agent-types T-16) | 已修复(v1.4.0) | - | 原 B-18; 需产品定口径 |
 | BUG-19 | harness 对话入参缺失时返回 500（应给明确错误码） | P3 | spec Implement中(20260927_dynamic-agent-types T-11) | 已修复(v1.2.0) | v1.2.0 | 原 B-19; commit dc9b333 |
 | BUG-20 | 启用模型会把同类型其他模型一并置为启用（SQL 与注释相反） | P1 | spec Implement中(20260927_agent-config-ai-generate T-02) | 已发布(v1.2.0) 2026-10-01 | v1.2.0 | 原 B-20; commit b8f728a（启用改多值集合，方法已删）；已随 merge c90071d 合并 main |
-| BUG-21 | 模型管理「模型类型」列把 AUDIO 显示成「嵌入模型」 | P3 | 对话中(2026-09-27) | 新建 | - | `views/modelconf/index.vue:458`（三类型都能设默认后才暴露） |
+| BUG-21 | 模型管理「模型类型」列把 AUDIO 显示成「嵌入模型」 | P3 | 对话中(2026-09-27) | 新建 | 已修复(v1.4.0) | `views/modelconf/index.vue:458`（三类型都能设默认后才暴露） | | T-07 三分 map（对话/嵌入/音频）
 | BUG-22 | AI 生成「描述」返回整段 JSON（用户实测） | P2 | 对话中(2026-09-27) | 已发布(v1.2.0) 2026-10-01 | v1.2.0 | Spec: 20260927_agent-config-ai-generate; commit edd9ad9；已合并 main(c90071d)；用户复测确认(09-30) |
 | BUG-23 | 生成超时 60s 切断**已成功**的调用（实测耗时 45~70s） | P2 | spec Implement中(20260927_agent-config-ai-generate T-09) | 已发布(v1.2.0) 2026-10-01 | v1.2.0 | 同 commit edd9ad9（缓解：90s 且可配置）；已随 merge c90071d 合并 main |
-| BUG-24 | 响应式超时无法中断底层阻塞调用（超时后仍在消耗 token） | P3 | spec Implement中(20260927_agent-config-ai-generate T-09) | 新建 | - | plan 风险⑦已接受该限制，建议转技术债 |
-| BUG-25 | 前端 dev 命令未按 `.env.development` 的 `VITE_PORT` 起端口（5777 起成 5173） | P3 | 对话中(2026-09-27) | 新建 | - | 临时规避：启动加 `--port 5777` |
+| BUG-24 | 响应式超时无法中断底层阻塞调用（超时后仍在消耗 token） | P3 | spec Implement中(20260927_agent-config-ai-generate T-09) | 新建 | 已修复(v1.4.0) | plan 风险⑦已接受该限制，建议转技术债 | | T-06 ①取消令牌+②节点入口守卫（Q3 批准档）；断链后零后续活动实测；③底层硬中断=已延期(v1.4.0→技术债，收益边际，批准:陈卓)
+| BUG-25 | 前端 dev 命令未按 `.env.development` 的 `VITE_PORT` 起端口（5777 起成 5173） | P3 | 对话中(2026-09-27) | 新建 | 已修复(v1.4.0) | 临时规避：启动加 `--port 5777` | | T-07 vite loadEnv VITE_PORT，实测 dev 起 5777
 | BUG-26 | 技能上传前端未带 multipart 头 → 上传 HTTP 415 | P3 | spec Implement中(20260927_agent-skill-management) | 已修复(v1.2.0) | v1.2.0 | `api/core/skill.ts:80` 补 `Content-Type: multipart/form-data` |
 | BUG-27 | 技能 ZIP 校验报错信息误导（真实规则是「条目须有根目录」） | P3 | spec Implement中(20260927_agent-skill-management) | 已修复(v1.2.0) | v1.2.0 | 新增 `SkillZipSanitizer`（剥 `__MACOSX/`、`.DS_Store`、`._*`，统一包一层合成根） |
 | BUG-28 | `ReturnVo.ok(String)` 命中 msg 重载 → 误把 data 当 msg 传出 | P3 | spec Implement中(20260927_agent-skill-management) | 已修复(v1.2.0) | v1.2.0 | `phoenix-tool/.../ReturnVo.java:84`；改用两参 `ok(msg, data)` |
@@ -68,8 +68,11 @@
 | BUG-54 | 登出报错「服务器内部错误」：前后域 logout 裸调 StpUtil.logout()，token 已失效场景（重复登出/过期后被前端最后调/乱 token）抛 NotLoginException 冒 500 信封——/api/privilege/auth/* 在过滤器排除名单内，直达 service 无兜底。注：早前 logout 500 曾归因旧包双前缀（BUG-39 现场），本单是**残留的服务端非幂等真身** | P3 | 9080 用户实测(2026-10-02) | 已发布(v1.3.0) | v1.3.0 | 后台 privilege + 平台 platform 两域登出幂等化（无登录态=登出终态，静默吞 NotLogin）；四态 curl 全回退出成功 |
 | BUG-55 | 长工具任务 SSE 被代理掐死：模型/工具阶段可现 >5 分钟完全静默（实测 13:30:39 png 已产出后下一跳模型调用静默 5m19s），nginx `proxy_read_timeout 300s` 到点斩流（access log 110 upstream timed out）→ 无 end 帧/不落库/不扫描，用户端表现为"一直没执行完"；且 SSE 无心跳、模型调用零日志静默根因不可追 | P1 | 9080 用户实测+nginx取证(2026-10-02) | 已发布(v1.3.0) | v1.3.0 | 三件套：①SseSupport 心跳封装，5 个 SSE 端点 15s 无数据注入 ":ping" comment 帧（前端解析器天然忽略，旧客户端零扰）②nginx /api /platform 读超时 300s→900s 双保险 ③ModelCall 起止 INFO 留痕；实测：强制 25s 静默窗口出现 2 帧 ping、end/agentFiles 帧齐、产物登记正常。内容丢失的彻底消灭属 BL-22（已立项） |
 | BUG-56 | 登出后 500 信封（用户二报，真身换人）：交付 nginx regex `^/(platform|auth)` 吞了前端登录页**路由** `/auth/login`——登出成功→浏览器整页导航 GET /auth/login→被代理到后端(仅POST)→405→data 域兜底包成 {data,message,success} 500；BUG-54 幂等修复经核实均在位（登出 API 本身 200） | P2 | 9080 用户实测(2026-10-02) | 已修复(v1.4.0) | v1.4.0 | nginx exact location `= /auth/login` `/auth/register` 回落 SPA index.html（exact 优先级最高，POST API 不受影响）；实测导航200+SPA、登出API/组API/verify 11项全绿。教训：代理裸域 regex 必须给同前缀的 SPA 路由留豁免（verify 宜补导航断言） |
-| BUG-57 | 刷新后回答样式偶发丢失（渲染层）：BL-22 落库移交后服务端行存**原始 markdown**，而历史装载沿用旧启发式「内容含 <xxx> 即视为已渲染 HTML 跳过转译」（旧前端存 HTML 时代遗产）——凡回答内嵌 SVG/HTML/代码块样式整体丢光走 v-else 裸文本；纯 markdown 行不受影响故"偶发"。前台与 admin 双端同患 | P2 | 9080 用户实测(2026-10-02) | 已修复(v1.4.0) | - | 服务端行（metadata 含 turnId）无条件 markdown 转译（marked 本就正确处理内嵌 HTML）；旧行启发式保留兼容历史数据；双端各修一处 |\n---
+| BUG-57 | 刷新后回答样式偶发丢失（渲染层）：BL-22 落库移交后服务端行存**原始 markdown**，而历史装载沿用旧启发式「内容含 <xxx> 即视为已渲染 HTML 跳过转译」（旧前端存 HTML 时代遗产）——凡回答内嵌 SVG/HTML/代码块样式整体丢光走 v-else 裸文本；纯 markdown 行不受影响故"偶发"。前台与 admin 双端同患 | P2 | 9080 用户实测(2026-10-02) | 已修复(v1.4.0) | - | 服务端行（metadata 含 turnId）无条件 markdown 转译（marked 本就正确处理内嵌 HTML）；旧行启发式保留兼容历史数据；双端各修一处 |\n---；三装载点（首载/轮询/重选）统一 applyServerRowRender，轮询口漏改为二发根因已闭合 ；**四发=真终端病灶**：admin 对 markdown 元素 CSS 为 0 条（转换一直是好的，标题/表格/代码全浏览器默认样式）→ 补 .message :deep 一族对齐前台观感 |
 | BUG-58 | 前台每次右侧切换智能体都自动新建一个（临时）会话并强占选中——侧栏堆「新会话」垃圾条目、打断"回到该智能体上次会话"的预期。用户要求：不自动建；落未选择会话默认页或该智能体既有会话 | P3 | 9080 用户实测(2026-10-02) | 已修复(v1.4.0) | - **v2 真身**：右侧面板 AgentListPanel.handlePick 自带「找不到名为新会话就强制建」逻辑（首修只改了 chat.vue selectAgent 另一链路，用户复测仍现）——改为进该智能体最近一条既有会话否则清选中落默认页；composer 惰性建链不动。教训：同一交互多入口必须清点全部调用方（BUG-47 同族） |\n
+| BUG-59 | 计划模式两段式确认：第二次 confirm 放行后 AgentScope resume 对 plan_exit 工具自动生成 error 结果并 RequestStopEvent，轮次挂起至看门狗 10min 超时定稿（无脏数据/无双行/超时兜底有效）。单段确认（shell 类危险操作）全链正常（T-08 实证 done+产物）。BL-22 信号架构本身已验证无涉 | P3 | 9080 演练取证(2026-10-02) | 已修复(v1.4.0) | - | 待处置方向：查 AgentScope 原生二次确认 resume 用法或 plan 模式确认合并为单段；挂账不急修；**根治**：确认放行时显式调框架公开 API exitPlanMode（此前缺失=模型困在 plan 阶段只思考不执行，2/3 无正文的真身）+ 续跑文案断言已退出计划模式；2/2 演练全绿（正文定稿+产物落盘+exitPlanMode 日志）。框架 maybePatchPendingToolCalls 先于 applyConfirmResults 的顺序缺陷已留档（上游问题，现方案绕过）。**二发（2026-10-03）**：isPlanModeActive(ctx) 误报 false 致 exitPlanMode 被静默跳过（会话 fcca0457：模型独白 19.7K 字"Let's go"后零工具零正文）——改无条件调用+查询态留痕日志；curl 演练复验 done/739字/产物落盘。另揪出记忆污染：MEMORY.md 被模型写入"交付到 workspace root"错误惯例（历史误会的自我强化），已消毒+根目录散文件清理+写入正确惯例 |
+| BUG-60 | 会话文件面板「模型明明生成/复用了文件却看不到」：①登记去重 storeKey(相对路径+大小) 是**全局**维度——旧会话登记过的文件被新会话复用/覆写后永不再现（用户实测：模型执行落盘+正文报告完成，面板只有 PLAN.md）②二级根因：tbl_data_chat_session.create_time **95/95 全空**（创建路径从未写入），补扫窗口回退 EPOCH 一度灌洪 18 条历史文件（已清理含物理副本） | P2 | 9080 用户实测(2026-10-03) | 已修复(v1.4.0) | - | 去重改按会话维度；补扫窗口收窄至会话创建时间（缺失则跳过补扫，轮末扫描兜底）；createSession 补写时间戳+存量 95 行按首条消息回填；实测：用户会话补扫后恰好 3 文件（weekly×2+PLAN），旧会话不受扰 |
+| BUG-61 | 前台刷新追流「卡死」：join 重放把上千历史帧一瞬灌入，每帧触发全量 markdownToHtml+Vue 渲染，主线程饱和假死（服务端该轮实际正常完成 done/1551字）。直播路径帧速受网络节流无此问题，纯追流风暴 | P2 | 9080 用户实测(2026-10-03) | 已修复(v1.4.0) | - | join onProgress 150ms 节流合并（end/收尾强制终渲染）；顺带清理两条死会话 pending_confirm 残留键 |
 ## 明细留档（历史证据，只增不删）
 
 ### BUG-01 `all_schema.sql` 缺 5 个序列 → 全新环境导入必失败

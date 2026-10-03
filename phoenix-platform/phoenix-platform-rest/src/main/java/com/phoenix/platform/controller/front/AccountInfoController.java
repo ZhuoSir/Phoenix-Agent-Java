@@ -78,6 +78,10 @@ public class AccountInfoController {
 
     @PostMapping
     public ReturnVo<Boolean> save(@RequestBody AccountInfo accountInfo) {
+        // BUG-03(T-01)：密码必填——缺它建的是永久登不上的死账号
+        if (accountInfo.getPassword() == null || accountInfo.getPassword().isBlank()) {
+            return ReturnVo.fail("账号密码不能为空");
+        }
         accountInfo.setCreator(StpUtil.getLoginId().toString());
         return ReturnVo.ok(accountInfoService.save(accountInfo));
     }

@@ -131,8 +131,11 @@ public class DocumentConverterUtil {
 	 * @return 文档对象
 	 */
 	public static Document convertQaFaqKnowledgeToDocument(AgentKnowledge knowledge) {
-		// 使用question作为Document的content字段
-		String content = knowledge.getQuestion();
+		// BUG-18(T-04)：「问+答」联合向量化——答案关键词参与语义召回（旧口径仅 question）；
+		// 答案为空/异常短退化为 question，保持向后兼容。表回链路（BUG-49）不变，答案以行表为准。
+		String question = knowledge.getQuestion() == null ? "" : knowledge.getQuestion();
+		String answer = knowledge.getContent(); // QA/FAQ 的答案存 content 列
+		String content = (answer == null || answer.isBlank()) ? question : question + "\n" + answer;
 		Map<String, Object> metadata = new HashMap<>();
 		// answer和isRecall经常变更的放到关系数据库
 		// kb 条目无归属 agent：哨兵"0"保持键存在（addDocuments 一致性断言）；AGENT_KNOWLEDGE 召回自 T-06

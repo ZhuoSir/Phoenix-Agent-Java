@@ -87,6 +87,7 @@ public class HarnessTurnManager {
     public Flux<Map<String, Object>> openOrReject(String sessionId, Supplier<Flux<Map<String, Object>>> source) {
         Turn probe = turns.get(sessionId);
         if (probe != null) {
+            log.info("[turn] 拒绝新开（P6 一轮一约束）session={}", sessionId);
             Map<String, Object> rej = new LinkedHashMap<>();
             rej.put("content", "\n⚠️ 上一轮仍在生成中（可点击「停止」后重试）。");
             rej.put("end", true);
@@ -111,8 +112,10 @@ public class HarnessTurnManager {
     public Flux<Map<String, Object>> confirmOrResume(String sessionId, Supplier<Flux<Map<String, Object>>> source) {
         Turn turn = turns.get(sessionId);
         if (turn == null) {
+            log.warn("[turn] confirm 时轮次已不在（超时/取消/重启），按新轮处理 session={}", sessionId);
             return openOrReject(sessionId, source);
         }
+        log.info("[turn] confirm 并轮回原轮 session={} turnId={}", sessionId, turn.turnId);
         turn.awaitingConfirm.set(false);
         turn.wireConfirm(source.get());
         return turn.sink.asFlux();
@@ -198,6 +201,8 @@ public class HarnessTurnManager {
 
         final AtomicBoolean sinkDone = new AtomicBoolean(false);
 
+        volatile boolean endForwarded = false;
+
         final long startedAt = System.currentTimeMillis();
 
         volatile Long messageId;
@@ -258,6 +263,7 @@ public class HarnessTurnManager {
                 }
                 sink.emitNext(frame, Sinks.EmitFailureHandler.busyLooping(Duration.ofMillis(100)));
                 if (isEnd) {
+                    endForwarded = true; // 双 end 修复：透传过真 end 不再补发合成帧
                     finish(STATUS_DONE, null);
                 }
             }
@@ -312,6 +318,10 @@ public class HarnessTurnManager {
             if (status.equals(STATUS_TIMEOUT) || status.equals(STATUS_CANCELLED)) {
                 content.append(suffix == null ? "" : suffix);
             }
+            // 模型偶发「工具全执行完但跳过收尾正文」（BUG-59 三报）：诚实注记兜底，不让用户面对空气泡
+            if (status.equals(STATUS_DONE) && content.length() == 0 && thinking.length() > 0) {
+                content.append("ℹ️ 本轮已完成工具执行但未输出正文总结（产物见文件面板）。如需说明请追问。");
+            }
             if (messageId != null) {
                 try {
                     ChatMessage row = new ChatMessage();
@@ -327,7 +337,7 @@ public class HarnessTurnManager {
                     log.error("[turn] 定稿落库失败 session={} id={}", sessionId, messageId, e);
                 }
             }
-            if (!status.equals(STATUS_CANCELLED)) {
+            if (!status.equals(STATUS_CANCELLED) && !endForwarded) {
                 try {
                     Map<String, Object> end = new LinkedHashMap<>();
                     end.put("content", "");

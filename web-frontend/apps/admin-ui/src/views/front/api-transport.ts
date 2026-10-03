@@ -249,7 +249,9 @@ export const apiChatTransport: ChatTransport = {
         (
           // BUG-57：TurnManager 行存原始 markdown——含 <svg>/<html> 代码块也须渲染
           //（旧启发式为「前端已存 HTML 行」设计，对新行误伤致样式整体丢失）
-          !/<[a-z][\s\S]*>/i.test(msg.content) || /"turnId"/.test(String((msg as any).metadata ?? ''))
+          !/<[a-z][\s\S]*>/i.test(msg.content)
+          // BUG-57 三发：API 的 metadata 有 string/object 双形态——统一序列化后判定
+          || JSON.stringify((msg as any).metadata ?? {}).includes('turnId')
         )
       ) {
         msg.content = markdownToHtml(msg.content);
@@ -335,6 +337,18 @@ export const apiChatTransport: ChatTransport = {
     if (!active) return false;
     let textBuf = '';
     let thinkBuf = '';
+    // BUG-61：追流重放是帧风暴（千帧一瞬灌入），每帧全量 markdown 渲染会打死主线程——150ms 节流合并
+    let lastPush = 0;
+    let pushTimer: ReturnType<typeof setTimeout> | null = null;
+    const pushNow = () => {
+      lastPush = Date.now();
+      onProgress?.(markdownToHtml(textBuf), thinkBuf || undefined);
+    };
+    const pushThrottled = () => {
+      const now = Date.now();
+      if (now - lastPush >= 150) { pushNow(); }
+      else if (!pushTimer) { pushTimer = setTimeout(() => { pushTimer = null; pushNow(); }, 150); }
+    };
     (async () => {
       try {
         const resp = await fetch(`/platform/harness/turn/stream?sessionId=${encodeURIComponent(sessionId)}`, { headers: { 'phoenix-token': token, Accept: 'text/event-stream' } });
@@ -354,10 +368,12 @@ export const apiChatTransport: ChatTransport = {
             try { p = JSON.parse(ln.slice(5)); } catch { continue; }
             if (p.content) textBuf += String(p.content);
             if (p.thinking) thinkBuf += String(p.thinking);
-            if (p.content || p.thinking) onProgress?.(markdownToHtml(textBuf), thinkBuf || undefined);
-            if (p.end) { onDone?.(); return; }
+            if (p.content || p.thinking) pushThrottled();
+            if (p.end) { if (pushTimer) { clearTimeout(pushTimer); pushTimer = null; } pushNow(); onDone?.(); return; }
           }
         }
+        if (pushTimer) { clearTimeout(pushTimer); pushTimer = null; }
+        pushNow();
         onDone?.();
       } catch {
         onDone?.();
@@ -444,10 +460,30 @@ export const apiChatTransport: ChatTransport = {
             // BL-19：本轮产物登记成功（轮末扫描事件），刷新文件面板
             if ((response as any).agentFiles) notifyFilesChanged();
             if (response.needConfirm && response.buttons) {
+              // 确认卡内容三级取源：正文 > 工具调用提炼（plan_exit.summary/待执行命令）> 思考流兜底
+              // ——用户要确认的是"要做什么"，不是模型内心独白（用户反馈：原始思考无意义）
+              const tcList = ((response as any).toolCalls || []) as any[];
+              const distilled = tcList
+                .map((t) => {
+                  const inp = (t?.input || {}) as Record<string, any>;
+                  if (typeof inp.summary === 'string' && inp.summary.trim()) return inp.summary.trim();
+                  if (typeof inp.command === 'string' && inp.command.trim()) return `将执行命令：\`${inp.command.trim()}\``;
+                  if (typeof inp.path === 'string' && t?.name) return `将操作文件：\`${inp.path}\`（${t.name}）`;
+                  return t?.name ? `将调用工具：${t.name}` : '';
+                })
+                .filter(Boolean)
+                .join('\n\n');
+              const confirmHtml = (fullText || '').trim()
+                ? markdownToHtml(fullText)
+                : distilled
+                  ? `<p style="margin:0 0 6px;color:#8a919f;font-size:12px">待确认的执行计划</p>${markdownToHtml(distilled.slice(0, 4000))}`
+                  : thinkingBuf
+                    ? `<p style="margin:0 0 6px;color:#8a919f;font-size:12px">模型思考摘要（待确认）</p>${markdownToHtml(thinkingBuf.slice(-1200))}`
+                    : '';
               onNodeMessage?.({
                 id: uid(),
                 role: 'assistant',
-                content: markdownToHtml(fullText || ''),
+                content: confirmHtml,
                 createdAt: Date.now(),
                 messageType: 'harness-confirm',
                 metadata: {

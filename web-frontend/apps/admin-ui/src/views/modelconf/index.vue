@@ -454,7 +454,7 @@ onMounted(loadConfigs);
                   :type="scope.row.modelType === 'CHAT' ? 'primary' : 'success'"
                   size="small"
                 >
-                  {{ scope.row.modelType === 'CHAT' ? '对话模型' : '嵌入模型' }}
+                  {{ scope.row.modelType === 'CHAT' ? '对话模型' : (scope.row.modelType === 'EMBEDDING' ? '嵌入模型' : (scope.row.modelType === 'AUDIO' ? '音频模型' : scope.row.modelType)) }}
                 </ElTag>
               </template>
               <template v-else-if="col.slot === 'path'">
