@@ -8,6 +8,11 @@ ARG MAVEN_SETTINGS=docker/maven/settings.aliyun.xml
 COPY ${MAVEN_SETTINGS} /root/.m2/settings.xml
 RUN mvn -q package -DskipTests -Dspring-javaformat.skip=true -pl phoenix-admin/phoenix-admin-manager -am
 
+# package.sh 工件提取阶段（docker-auto-pipeline T-02）：编译产物架构无关，
+# native 编译一次 → 任意目标架构薄组装；默认构建目标仍为末阶段 run（身份①不变）
+FROM build AS jar
+RUN mkdir -p /out && cp phoenix-admin/phoenix-admin-manager/target/phoenix-admin.jar /out/phoenix-admin.jar
+
 FROM eclipse-temurin:21-jre-jammy AS run
 RUN apt-get update && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/* \

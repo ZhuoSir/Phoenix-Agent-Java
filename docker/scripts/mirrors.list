@@ -1,0 +1,5 @@
+# Phoenix 打包/安装镜像加速候选源（package.sh 竞速探活选优；一行一个，# 注释）
+# 第三方服务稳定性看天——失稳时增删此表即可，脚本零改动
+https://docker.1ms.run
+https://docker.m.daocloud.io
+https://dockerproxy.net
