@@ -1,5 +1,9 @@
 # Changelog: docker-auto-pipeline
 
+## plan v0.1.0（2026-10-03）
+- Phase 2 方案落盘：纯脚本流水线（package.sh/install.sh/install.ps1+lib/common.sh，零新工具链）；payload 布局定稿；九步安装状态机（幂等+断点续传一套机制）；国内源三件套（mirrors.list 竞速/阿里云 Maven/npmmirror+--overseas 开关）；坑核对 12 条过 11 相交（L-10 无）；共享面身份矩阵 6 对象全枚举；被否案 7 条；风险 6 条；测试策略含 mac 真跑/ubuntu 伪靶机/Windows 真机移交用户
+- 状态：草稿（第二重确认门待过）
+
 ## v1.0.0（2026-10-03）—— 确认①通过
 - 用户「确认」（确认人沿用陈卓默认，未异议）；requirements v0.2.0→v1.0.0 已确认；进入 Phase 2 Plan
 
