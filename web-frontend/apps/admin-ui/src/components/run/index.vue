@@ -1505,6 +1505,12 @@ onMounted(async () => {
                       />
                     </div>
                   </div>
+                  <!-- 流式 markdown（harness）与历史同款 md-card，输出中/完成后视觉统一 -->
+                  <div
+                    v-else-if="firstNode(nodeBlock)?.textType === 'MARK_DOWN'"
+                    class="md-card"
+                    v-html="markdownToHtml(getMarkdownContentFromNode(nodeBlock))"
+                  ></div>
                   <div v-else v-html="generateNodeHtml(nodeBlock)"></div>
                 </template>
               </div>
