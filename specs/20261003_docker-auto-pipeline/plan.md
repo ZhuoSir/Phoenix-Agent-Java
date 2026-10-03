@@ -1,6 +1,6 @@
 # Plan: docker-auto-pipeline
 
-> 版本: v0.1.0 | 状态: 草稿 | 更新: 2026-10-03
+> 版本: v1.0.0 | 状态: 已确认 | 确认人: 陈卓 | 确认日期: 2026-10-03 | 更新: 2026-10-03
 > 规范路由（.specrc.yml）：code-backend=global（Java 规范不适用 shell——跟随 docker/scripts 周边风格）；code-frontend=none；api-design/database 不涉（无新接口无库表）；git-workflow=global（版本分支 v1.5.0 制式）
 
 ## 〇、坑核对（lessons.md 全部 12 条 active 逐条过）
