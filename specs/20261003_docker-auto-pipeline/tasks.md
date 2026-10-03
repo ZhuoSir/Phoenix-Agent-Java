@@ -4,7 +4,7 @@
 
 ## 组 1：基座与打包（构建机侧）
 
-- [ ] T-01 编写 `docker/scripts/lib/common.sh` 基座库：带时间戳日志（tee 落盘+控制台）、九步状态机（`.phoenix-install.state` 完成位读写/断点续接）、mirror 竞速探活（curl -m 8 逐个试 /v2/）、收据卡渲染函数、失败退出函数（步骤号+日志路径）
+- [x] T-01 编写 `docker/scripts/lib/common.sh` 基座库：带时间戳日志（tee 落盘+控制台）、九步状态机（`.phoenix-install.state` 完成位读写/断点续接）、mirror 竞速探活（curl -m 8 逐个试 /v2/）、收据卡渲染函数、失败退出函数（步骤号+日志路径）
   关联: R-01, R-02, R-09
   依赖: 无
   验证方式: `selftest.sh` 驱动全函数单测（状态机写读/断点续接/失败输出格式断言）；`shellcheck` 过；**用 mac 系统自带 `/bin/bash`（3.2）实跑 selftest**（L-05 兼容性硬证）

@@ -1,5 +1,10 @@
 # Changelog: docker-auto-pipeline
 
+## T-01 完成（2026-10-03）lib/common.sh 基座库
+- 交付：common.sh 119 行（日志 stderr+落盘/九步状态机/mirror 竞速/sha256 双平台/收据卡/资源探测，全 phx_ 前缀 bash3.2 契约）+ selftest.sh 22 断言
+- 验证：mac bash 3.2.57 → 22/22 exit=0；ubuntu 容器 bash 5.1.16 → 21过/0败/1环境跳过(无python3,活口子测已在mac覆盖)；shellcheck 0.11.0（用户本机自装,选项c）common.sh 零告警、selftest 清理后零告警
+- **selftest 抓到 2 个真 bug**：①mirror 判活 curl 失败输出 000 与 ||echo 000 拼接成 000000 死口误判活口 ②phx_log 走 stdout 污染命令替换返回值通道——均修复复测绿
+
 ## tasks v1.0.0（2026-10-03）—— 确认③通过，三重门全绿
 - 用户「确认」；tasks v0.1.0→v1.0.0 已确认（陈卓）
 - 三重确认自检：requirements v1.0.0 已确认(陈卓) / plan v1.0.0 已确认(陈卓) / tasks v1.0.0 已确认(陈卓)——进入 Phase 4 Implement
