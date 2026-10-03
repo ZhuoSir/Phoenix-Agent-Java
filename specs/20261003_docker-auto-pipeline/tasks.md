@@ -1,6 +1,6 @@
 # Tasks: docker-auto-pipeline
 
-> 版本: v1.0.0 | 状态: 已确认 | 确认人: 陈卓 | 确认日期: 2026-10-03 | 更新: 2026-10-03
+> 版本: v1.1.0 | 状态: 已确认 | 确认人: 陈卓 | 确认日期: 2026-10-03 | 更新: 2026-10-03（v1.0.0 确认同日；v1.1.0=验证口径调整「网络重验证项延真机」，用户裁决+确认 2026-10-03）
 
 ## 组 1：基座与打包（构建机侧）
 
@@ -13,7 +13,7 @@
 - [ ] T-02 编写 `docker/scripts/package.sh`：环境自检（docker/buildx/磁盘余量≥镜像×2.5）→ mirror 竞速 → buildx 双侧 multistage（--platform linux/<arch>，MAVEN_SETTINGS/NPM_REGISTRY 随 --overseas 切换）→ save → payload 组装（deploy/bin/docs/engine 可选）→ manifest.json+SHA256SUMS → tar.gz → 解包自校验
   关联: R-01, R-02, R-03, R-08
   依赖: T-01
-  验证方式: 本 mac 实出 arm64 包（全程日志核对：maven.aliyun.com / npmmirror / mirror 前缀出现、registry-1.docker.io 零直连）；`--arch amd64` 跨出第二包；两包分别解包 `sha256sum -c` 全对；`--overseas` 干跑核对 build-arg 切换；故意断一步（改坏 mirror 列表）验证失败输出格式「步骤 N/M+日志路径」
+  验证方式: 本 mac 实出 arm64 包（全程日志核对：maven.aliyun.com / npmmirror / mirror 前缀出现、registry-1.docker.io 零直连）；解包 `sha256sum -c` 全对；`--overseas` 干跑核对 build-arg 切换；故意断一步验证失败输出格式。【v1.1.0 调整】amd64 第二包降级：跨架构薄组装已实证（v1.4.0-dev amd64 backend 构建成功），基础三件 amd64 拉取属网络行为→延至首个真实 amd64 目标机；替身镜像仅准演练环境使用并如实记账
   验收标准: 双架构包产出且自校验通过；manifest 含版本/git描述/arch/构建时间/文件清单+sha256/引擎最低版本；构建机无需 JDK/Node（which 核查留证）
 
 ## 组 2：安装主链（目标机侧）
@@ -27,7 +27,7 @@
 - [ ] T-04 实现引擎自动安装模块（install.sh 第②步 Linux 分支）：os-release 发行版识别（Ubuntu 20/22/24、Debian 11/12、CentOS/RHEL 8/9 系）→ apt/yum 国内源替换（备份原 sources）→ docker-ce+compose plugin 安装 → 装后 `docker info` 复核；不在支持列表的发行版→降级打印指引退出
   关联: R-02, R-04
   依赖: T-03
-  验证方式: `docker run --privileged ubuntu:22.04` 伪靶机（dinD 前置装好）从零引擎真装到九步全绿；centos 系以 stream9 容器同法；不支持发行版（alpine）验证降级输出
+  验证方式:【v1.1.0 调整→延真机】引擎安装路径（get.docker --mirror Aliyun / deb 离线 / 降级指引）代码评审+分支桩测在本机做；真实装引擎验证延至首台 Linux 真机或 Server 2022 WSL（安装时必然真跑此路径，日志回传即验证）
   验收标准: Ubuntu/CentOS 伪靶机全链绿；降级分支输出 OFFLINE-ENGINE.md 指引且退出码 1；apt 源替换有备份文件留证
 
 - [ ] T-05 编写 `install.ps1`（Windows WSL2 路线）：管理员检查 → 既有引擎 OSType=windows 拒绝+解释 → WSL2 探测/功能启用（dism 两 feature + wsl --install Ubuntu-22.04 --no-launch）→ 重启提示+状态文件续接 → 包拷入 WSL → `wsl bash install.sh --from-wsl` → Windows 侧收据（localhost 地址；旧 Win10 netsh 端口转发代执行）；嵌套虚拟化不可用如实停住
@@ -39,7 +39,7 @@
 - [ ] T-06 离线降级与 `--with-engine-debs`：package.sh 可选打入 Ubuntu 22.04 amd64 引擎 deb 组（apt download 于对应容器内）；install.sh 断网检测（mirror 与官方源全不可达）→ engine/ 有 deb 则 dpkg 本地装全链继续，无则打印指引退出 1
   关联: R-06
   依赖: T-04
-  验证方式: 伪靶机 `--network none` + debs 包全链真跑（引擎本地装起）；同靶机无 debs 验证降级退出；deb 组清单与体积入 manifest
+  验证方式:【v1.1.0 调整→延真机】--offline 分支逻辑桩测（无 deb 降级退出/有 deb dpkg 路径）本机做；断网全链真跑延至真机阶段；deb 组清单与体积入 manifest 照做
   验收标准: 断网两场景（有 debs 成功/无 debs 体面退出）实测通过；--with-engine-debs 包体积增量 ~100MB 量级如实在文档标注
 
 ## 组 3：文档与收口
@@ -47,7 +47,7 @@
 - [ ] T-07 幂等升级专项加固：跨版本升级路径验证（旧 .env 保留+新增键提示合并+migrator 增量自动执行+数据卷保留）；同版本重装=无损修复
   关联: R-07
   依赖: T-03, T-04
-  验证方式: 伪靶机先装「上一版模拟包」（改 manifest 版本号的同构包）再装本版包，验证数据行保留（预置标记行）+ .env 原密码生效 + verify 绿
+  验证方式:【v1.1.0 方法替换，非降级】本机以 t02a→t02b 为新旧两版真跑升级：预置标记数据行→装旧版→写入标记→装新版→验数据保留/原密码生效/migrator 增量/verify 绿
   验收标准: 升级后预置数据可查、密码未变、收据卡显示新版本；重装修复场景全绿
 
 - [ ] T-08 文档套件：payload docs/（INSTALL.md 五平台速查、OFFLINE-ENGINE.md 断网装引擎、RECEIPT-SAMPLE.md）+ 仓库侧 README/UPGRADE 指路新流水线 + build.sh/save-offline/load-and-run 头部注释标注「手工链，日常用 package/install」（Q3 决议：保留不删）
@@ -59,7 +59,7 @@
 - [ ] T-09 实测矩阵收口 + 共享面回归（身份矩阵对面断言）：①mac 全链复跑 ②ubuntu 伪靶机全链复跑 ③断网变体复跑 ④**开发栈（phoenix-release）verify 复跑 13/13 绿**（compose.yaml/verify.sh 未受扰证据）⑤build.sh --multistage 参数干跑核对（Dockerfile ARG 兼容证据）⑥旧 load-and-run 对新 tar 内 images.tar 可用性抽测
   关联: 全部 R（回归面）
   依赖: T-02, T-03, T-04, T-05, T-06, T-07, T-08
-  验证方式: 六项全真跑，输出全量留档 changelog（L-07：双侧取证）
+  验证方式:【v1.1.0 调整】本机四项真跑：①mac 全链复跑 ④开发栈 verify 13/13 回归 ⑤build.sh --multistage 干跑核对 ⑥旧 load-and-run 对新 tar 抽测；②伪靶机 ③断网变体延真机阶段，输出全量留档 changelog（L-07 双侧取证）
   验收标准: 六项全绿；任何一项红→回对应任务修复后全矩阵重跑
 
 - [ ] T-10 台账收尾：completion.md/artifacts.md 生成；MILESTONE v1.5.0 需求表状态与件数更新；Windows 真机验收移交包+指引给用户（Server 2022），真机日志回收后 bugs/lessons 记账；spec changelog 收口
