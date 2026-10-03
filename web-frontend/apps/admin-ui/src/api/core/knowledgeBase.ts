@@ -70,6 +70,14 @@ export async function groupKbasesApi(groupId: string) {
   return r.data ?? [];
 }
 
+/** BUG-18(T-04)：按库重刷 QA/FAQ「问+答」联合向量（幂等，可反复执行） */
+export async function kbReEmbedApi(kbaseId: number) {
+  return requestClient.post<{ success: boolean; message?: string; data?: { total: number; success: number; failed: string[] } }>(
+    `/api/knowledge-base/${kbaseId}/re-embed`,
+    {},
+  );
+}
+
 export async function kbaseGroupsApi(kbaseId: number) {
   const r = await requestClient.get<{ data: string[] }>(
     `/platform/group-kbase/kbase/${kbaseId}/groups`, { responseReturn: 'body' },

@@ -28,7 +28,7 @@ import java.util.stream.Stream;
  * **不落盘**，本扫描器不覆盖——该范围调整经需求方追认后 R-02 由 materialize 通道兜底。
  *
  * <p>排除清单：会话转录（*.jsonl/sessions.json）、内部索引（.index/）、任务标记（_sweep.marker）、
- * 半写文件（mtime<2s 跳过下轮再采）。storeKey=相对路径+大小 去重（同名文件被覆盖会再登记一次，
+ * 半写文件（mtime<2s 跳过下轮再采）。storeKey=相对路径+大小 按会话维度去重（BUG-60；同名文件被覆盖会再登记一次，
  * 内容变了就该被看到）。
  */
 @Slf4j
@@ -152,7 +152,7 @@ public class WorkspaceArtifactScanner {
             long size = Files.size(file);
             String relFromRoot = root.relativize(file).toString().replace('\\', '/');
             String storeKey = relFromRoot + ":" + size;
-            if (agentFileService instanceof AgentFileServiceImpl impl && impl.existsByStoreKey(storeKey)) {
+            if (agentFileService instanceof AgentFileServiceImpl impl && impl.existsByStoreKey(sessionId, storeKey)) {
                 return;
             }
             byte[] content = Files.readAllBytes(file);

@@ -140,13 +140,15 @@ public class AgentFileServiceImpl implements AgentFileService {
         log.info("会话文件逻辑删除: id={}, by={}", fileId, requesterUserId);
     }
 
-    /** 同 storeKey 是否已登记（scan 兜底去重用）。 */
-    public boolean existsByStoreKey(String storeKey) {
+    /** 同会话同 storeKey 是否已登记（BUG-60：去重按会话维度——旧会话登记过的文件被本会话
+     复用/覆写时必须重新可见；全量补扫窗口已收窄到会话创建时间，不会灌入历史文件）。 */
+    public boolean existsByStoreKey(String sessionId, String storeKey) {
         if (storeKey == null || storeKey.isBlank()) {
             return false;
         }
         return QueryChain.of(agentFileMapper)
                 .eq(AgentFile::getStoreKey, storeKey)
+                .eq(AgentFile::getSessionId, sessionId)
                 .eq(AgentFile::getDelFlag, 0)
                 .count() > 0;
     }

@@ -66,7 +66,7 @@ import { FolderOpened,
 } from '@element-plus/icons-vue';
 
 import {
-  confirmHarnessChat,
+  confirmHarnessSignalApi,
   createSessionApi,
   getAgentApi,
   getSessionMessagesApi,
@@ -215,6 +215,8 @@ const chatContainer = ref<HTMLElement | null>(null);
 const showHumanFeedback = ref(false);
 const showHarnessConfirm = ref(false);
 const pendingConfirmButtons = ref<ConfirmButton[]>([]);
+// BUG-58 后续体验修：admin 确认条无正文区——计划文本（思考通道）在此呈现，用户看得见"确认什么"
+const pendingConfirmPlanHtml = ref('');
 const pendingConfirmSessionId = ref('');
 const pendingConfirmAgentId = ref<number>(0);
 const lastRequest = ref<GraphRequest | null>(null);
@@ -305,14 +307,14 @@ async function selectSession(session: ChatSession | null) {
       return;
     }
     syncStateToView(session.id, { isStreaming, nodeBlocks });
-    currentMessages.value = await getSessionMessagesApi(session.id);
+    currentMessages.value = applyServerRowRender(await getSessionMessagesApi(session.id) as any[]) as any;
     // detached-stream T-05：admin 进行中的轮次 → 5s 轮询增量视图（完成自动收敛）
     void (async () => {
       try {
         if (!(await harnessTurnStatusApi(session.id))) return;
         const tick = async () => {
           try {
-            currentMessages.value = await getSessionMessagesApi(session.id);
+            currentMessages.value = applyServerRowRender(await getSessionMessagesApi(session.id) as any[]) as any;
           } catch { /* 忽略单次 */ }
           try {
             if (await harnessTurnStatusApi(session.id)) setTimeout(tick, 5000);
@@ -327,13 +329,8 @@ async function selectSession(session: ChatSession | null) {
         const md = typeof m.metadata === 'string' ? JSON.parse(m.metadata) : m.metadata;
         if (md && typeof md.thinking === 'string') { m.thinking = md.thinking; m.thinkingMs = md.thinkingMs; }
       } catch { /* 无 metadata 或非 JSON */ }
-      // BUG-57：admin 历史的服务端行同样是原始 markdown——装载时转 html
-      for (const m of currentMessages.value as any[]) {
-        if (m.role === 'assistant' && (!m.messageType || m.messageType === 'text') && /"turnId"/.test(String(m.metadata ?? ''))) {
-          m.content = markdownToHtml(String(m.content ?? ''));
-          m.messageType = 'html';
-        }
-      }
+      // BUG-57：服务端行装载转 html（与轮询共用）
+      applyServerRowRender(currentMessages.value as any[]);
       // BUG-53 A′：刷新中断快照回显（本地气泡，不落库）
       const snap = readStreamSnapshot(session.id);
       if (snap) {
@@ -427,6 +424,9 @@ async function sendGraphRequest(request: GraphRequest, rejectedPlan: boolean) {
       node: GraphNodeResponse[],
     ): Promise<void> => {
       if (!node || node.length === 0) return;
+      // BL-22 R-05：harness 轮次由服务端 TurnManager 落库（单行 markdown），客户端保存退役防双泡；
+      // graph(NL2SQL) 流不经 TurnManager，保存链路维持原样
+      if (agent.value.type === 'harness') return;
 
       const first = node[0]!;
       if (first.textType === TextType.RESULT_SET) {
@@ -782,6 +782,22 @@ async function sendGraphRequest(request: GraphRequest, rejectedPlan: boolean) {
       if (response.needConfirm && response.buttons && response.buttons.length > 0) {
         showHarnessConfirm.value = true;
         pendingConfirmButtons.value = response.buttons;
+        // 确认条内容三级取源：正文 > 工具调用提炼(plan_exit.summary/命令) > 思考流兜底
+        const tcList = ((response as any).toolCalls || []) as any[];
+        const distilled = tcList
+          .map((t: any) => {
+            const inp = (t?.input || {}) as Record<string, any>;
+            if (typeof inp.summary === 'string' && inp.summary.trim()) return inp.summary.trim();
+            if (typeof inp.command === 'string' && inp.command.trim()) return `将执行命令：\`${inp.command.trim()}\``;
+            if (typeof inp.path === 'string' && t?.name) return `将操作文件：\`${inp.path}\`（${t.name}）`;
+            return t?.name ? `将调用工具：${t.name}` : '';
+          })
+          .filter(Boolean)
+          .join('\n\n');
+        const planSrc = getThinkingTrack(String(response.threadId ?? '')).text || '';
+        const bodySrc = sessionState.nodeBlocks.flat().map((n: any) => n.text || '').join('');
+        const pickSrc = bodySrc.trim() ? bodySrc : distilled || planSrc.slice(-1200);
+        pendingConfirmPlanHtml.value = pickSrc ? markdownToHtml(pickSrc.slice(0, 4000)) : '';
         pendingConfirmSessionId.value = response.threadId;
         pendingConfirmAgentId.value = Number(response.agentId);
       }
@@ -884,6 +900,19 @@ async function sendGraphRequest(request: GraphRequest, rejectedPlan: boolean) {
       isStreaming.value = false;
     }
   }
+}
+
+// BUG-57 完整修复：服务端行装载统一过这道转换（selectSession 首载与轮询刷新共用）
+function applyServerRowRender(list: any[]) {
+  for (const m of list) {
+    const mdRaw = m.metadata;
+    const metaStr = typeof mdRaw === 'string' ? mdRaw : JSON.stringify(mdRaw ?? {});
+    if (m.role === 'assistant' && (!m.messageType || m.messageType === 'text') && metaStr.includes('turnId')) {
+      m.content = markdownToHtml(String(m.content ?? ''));
+      m.messageType = 'md-card'; // 专属分支：全宽卡片；'html' 留给 legacy generateNodeHtml 行原样渲染
+    }
+  }
+  return list;
 }
 
 function formatMessageContent(message: ChatMessage): string {
@@ -1050,52 +1079,21 @@ function scrollToBottom() {
   });
 }
 
-let harnessConfirmChunkIndex = -1;
 
 async function handleHarnessButtonClick(btn: ConfirmButton) {
   const allowed = btn.action === 'confirm';
   showHarnessConfirm.value = false;
-  harnessConfirmChunkIndex = -1;
+  pendingConfirmPlanHtml.value = '';
   isStreaming.value = true;
   try {
-    await confirmHarnessChat(
-      {
-        sessionId: pendingConfirmSessionId.value,
-        agentId: pendingConfirmAgentId.value,
-        allowed,
-      },
-      async (response) => {
-        console.log('[handleHarnessButtonClick] response text:', response.text);
-        if (harnessConfirmChunkIndex < 0) {
-          nodeBlocks.value = [...nodeBlocks.value, [response]];
-          harnessConfirmChunkIndex = nodeBlocks.value.length - 1;
-        } else {
-          const block = [...nodeBlocks.value[harnessConfirmChunkIndex]!, response];
-          const blocks = [...nodeBlocks.value];
-          blocks[harnessConfirmChunkIndex] = block;
-          nodeBlocks.value = blocks;
-        }
-        if (autoScroll.value) scrollToBottom();
-      },
-      async () => {
-        if (harnessConfirmChunkIndex >= 0) {
-          const confirmBlock = nodeBlocks.value[harnessConfirmChunkIndex];
-          if (confirmBlock) {
-            const nodeHtml = generateNodeHtml(confirmBlock);
-            const aiMessage: ChatMessage = {
-              sessionId: pendingConfirmSessionId.value,
-              role: 'assistant',
-              content: nodeHtml,
-              messageType: 'html',
-            };
-            await saveMessageApi(pendingConfirmSessionId.value, aiMessage);
-          }
-        }
-        harnessConfirmChunkIndex = -1;
-        isStreaming.value = false;
-      },
+    await confirmHarnessSignalApi(
+      pendingConfirmSessionId.value,
+      pendingConfirmAgentId.value,
+      allowed,
     );
-  } catch (error: any) {
+    // 原流继续（isStreaming 由其 onComplete 收尾）；此处不再二开流消费
+    isStreaming.value = true;
+      } catch (error: any) {
     ElMessage.error(`操作失败: ${error.message}`);
   }
 }
@@ -1352,14 +1350,6 @@ onMounted(async () => {
                   : ''
               "
             >
-              <!-- thinking-display T-04：历史回显（metadata.thinking 解析后挂此） -->
-              <ThinkingBlock
-                v-if="message.role === 'assistant' && (message as any).thinking"
-                :content="(message as any).thinking"
-                :duration-ms="(message as any).thinkingMs"
-                :has-content="true"
-                :streaming="false"
-              />
               <div
                 v-if="(message as any).metadata && (message as any).metadata.interrupted"
                 class="run-interrupted-tip"
@@ -1370,6 +1360,17 @@ onMounted(async () => {
                 v-if="message.messageType === 'html'"
                 v-html="message.content"
               ></div>
+              <!-- 服务端 markdown 行专属：全宽卡片（think 上 / 回复下，同列合并） -->
+              <div v-else-if="message.messageType === 'md-card'" class="md-response">
+                <ThinkingBlock
+                  v-if="(message as any).thinking"
+                  :content="(message as any).thinking"
+                  :duration-ms="(message as any).thinkingMs"
+                  :has-content="true"
+                  :streaming="false"
+                />
+                <div class="md-card" v-html="message.content"></div>
+              </div>
               <div
                 v-else-if="message.messageType === 'result-set'"
                 class="result-set-message"
@@ -1454,6 +1455,13 @@ onMounted(async () => {
                   </el-avatar>
                 </div>
                 <div class="message-content">
+                  <ThinkingBlock
+                    v-if="message.role === 'assistant' && (message as any).thinking"
+                    :content="(message as any).thinking"
+                    :duration-ms="(message as any).thinkingMs"
+                    :has-content="true"
+                    :streaming="false"
+                  />
                   <div
                     class="message-text"
                     v-html="formatMessageContent(message)"
@@ -1510,6 +1518,12 @@ onMounted(async () => {
                       />
                     </div>
                   </div>
+                  <!-- 流式 markdown（harness）与历史同款 md-card，输出中/完成后视觉统一 -->
+                  <div
+                    v-else-if="firstNode(nodeBlock)?.textType === 'MARK_DOWN'"
+                    class="md-card"
+                    v-html="markdownToHtml(getMarkdownContentFromNode(nodeBlock))"
+                  ></div>
                   <div v-else v-html="generateNodeHtml(nodeBlock)"></div>
                 </template>
               </div>
@@ -1535,6 +1549,11 @@ onMounted(async () => {
             <el-icon><WarningFilled /></el-icon>
             <span>请确认操作</span>
           </div>
+          <div
+            v-if="pendingConfirmPlanHtml"
+            class="harness-confirm-plan"
+            v-html="pendingConfirmPlanHtml"
+          ></div>
           <div class="harness-confirm-actions">
             <el-button
               v-for="(btn, idx) in pendingConfirmButtons"
@@ -1792,9 +1811,64 @@ onMounted(async () => {
 }
 
 .message-content {
+  display: flex;
   flex: 1;
+  flex-direction: column;
+  gap: 8px;
   min-width: 0;
 }
+
+.message-content :deep(.thinking) {
+  margin-bottom: 0;
+}
+
+.md-response {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.md-response :deep(.thinking) {
+  margin-bottom: 0;
+}
+
+.md-card {
+  width: 100%;
+  padding: 14px 18px;
+  font-size: 14px;
+  line-height: 1.65;
+  color: #303133;
+  word-break: break-word;
+  background: #fff;
+  border: 1px solid #e8e8e8;
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 3%);
+}
+
+/* 前台聊天页同源排版（GitHub 风），保证两端观感一致 */
+.md-card :deep(p) { margin: 0 0 8px; }
+.md-card :deep(p:last-child) { margin-bottom: 0; }
+.md-card :deep(h1), .md-card :deep(h2), .md-card :deep(h3), .md-card :deep(h4) { margin: 16px 0 8px; font-weight: 600; line-height: 1.3; }
+.md-card :deep(h1:first-child), .md-card :deep(h2:first-child), .md-card :deep(h3:first-child) { margin-top: 0; }
+.md-card :deep(h1) { font-size: 18px; }
+.md-card :deep(h2) { font-size: 16px; padding-bottom: 4px; border-bottom: 1px solid #f0f2f5; }
+.md-card :deep(h3) { font-size: 15px; }
+.md-card :deep(h4) { font-size: 14px; }
+.md-card :deep(ul), .md-card :deep(ol) { padding-left: 20px; margin: 8px 0; }
+.md-card :deep(li) { margin: 4px 0; }
+.md-card :deep(pre) { padding: 12px; margin: 8px 0; overflow-x: auto; background: #f6f8fa; border: 1px solid #e1e4e8; border-radius: 6px; }
+.md-card :deep(code) { font-family: SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace; font-size: 13px; line-height: 1.45; }
+.md-card :deep(pre code) { padding: 0; background: transparent; border: none; }
+.md-card :deep(code:not(pre code)) { padding: 2px 6px; color: #476582; background: #f0f4f8; border-radius: 4px; }
+.md-card :deep(blockquote) { padding: 4px 12px; margin: 8px 0; color: #606266; border-left: 4px solid #409eff; }
+.md-card :deep(table) { width: 100%; margin: 8px 0; font-size: 13px; border-collapse: collapse; }
+.md-card :deep(th), .md-card :deep(td) { padding: 6px 10px; text-align: left; border: 1px solid #e0e0e0; }
+.md-card :deep(th) { font-weight: 600; background: #f5f7fa; }
+.md-card :deep(tr:nth-child(even)) { background: #fafafa; }
+.md-card :deep(img) { max-width: 100%; border-radius: 6px; }
+.md-card :deep(a) { color: #409eff; text-decoration: none; }
+.md-card :deep(hr) { margin: 12px 0; border: none; border-top: 1px solid #eceef2; }
 
 .message-text {
   padding: 12px 16px;
@@ -2349,6 +2423,17 @@ onMounted(async () => {
   color: #b8860b;
   background: #fdf6ec;
   border: 1px solid #faecd8;
+  border-radius: 6px;
+}
+.harness-confirm-plan {
+  max-height: 220px;
+  margin: 4px 0 8px;
+  padding: 6px 10px;
+  overflow-y: auto;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #5c6470;
+  background: #fff;
   border-radius: 6px;
 }
 </style>

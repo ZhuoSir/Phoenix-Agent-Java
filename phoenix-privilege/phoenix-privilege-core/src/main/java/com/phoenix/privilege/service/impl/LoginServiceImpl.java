@@ -67,8 +67,9 @@ public class LoginServiceImpl implements LoginService {
 			}
 			String hashedPassword = SecureUtil.md5(LoginConstant.PASSWORD_SALT + loginDTO.getPassword());
 			if (!hashedPassword.equals(user.getPassword())) {
+				// BUG-05(T-01)：登录错密码误用改密语义码 23007——文案对码值错的历史半修，纠正为 23009
 				return ReturnVo.fail(AuthErrorCode.PASSWORD_ERROR.getMessage(),
-						AuthErrorCode.OLD_PASSWORD_ERROR.getCode());
+						AuthErrorCode.PASSWORD_ERROR.getCode());
 			}
 			StpUtil.login(user.getId());
 			List<PrivilegeAcl> acls = privilegeAclService.getByUserId(user.getId());

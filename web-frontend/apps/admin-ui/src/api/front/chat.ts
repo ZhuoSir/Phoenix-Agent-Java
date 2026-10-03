@@ -248,6 +248,8 @@ export interface FrontHarnessChatRequest {
 export interface FrontHarnessConfirmRequest {
   sessionId: string;
   agentSn: string;
+  /** BUG-11(T-08)：库配置智能体 sn 为空，agentId 主寻址 */
+  agentId?: number | string;
   allowed: boolean;
   suggestedRules?: any[];
 }
@@ -358,6 +360,22 @@ export function streamFrontHarnessChat(
   return () => {
     controller.abort();
   };
+}
+
+/** BL-22 架构修正：前台确认同样只发放行信号，原 send 流续播 */
+export async function confirmFrontHarnessSignal(request: FrontHarnessConfirmRequest): Promise<void> {
+  try {
+    const resp = await fetch(`${API_BASE_URL}/front/harness/confirm`, {
+      method: 'POST',
+      headers: {
+        'phoenix-token': getAuthToken(),
+        'Content-Type': 'application/json',
+        Accept: 'text/event-stream',
+      },
+      body: JSON.stringify(request),
+    });
+    await resp.body?.cancel().catch(() => {});
+  } catch { /* ignore */ }
 }
 
 export async function confirmFrontHarnessChat(

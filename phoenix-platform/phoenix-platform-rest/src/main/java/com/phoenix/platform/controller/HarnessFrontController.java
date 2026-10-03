@@ -41,7 +41,7 @@ public class HarnessFrontController {
         String userId = StpUtil.getLoginIdAsString();
         confirmRequest.setUserId(userId);
         return com.phoenix.agent.harness.sse.SseSupport.withHeartbeat(turnManager.confirmOrResume(confirmRequest.getSessionId(),
-            () -> harnessChatService.confirmStream(confirmRequest.getAgentSn(), confirmRequest).map(output -> {
+            () -> harnessChatService.confirmStream(confirmRequest).map(output -> {
             Map<String, Object> eventMap = new LinkedHashMap<>();
             eventMap.put("content", "");
             eventMap.put("end", false);

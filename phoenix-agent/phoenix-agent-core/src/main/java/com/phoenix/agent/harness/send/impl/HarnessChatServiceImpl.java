@@ -244,9 +244,39 @@ public class HarnessChatServiceImpl implements HarnessChatService {
                 pendingConfirm.getToolCalls().get(0),
                 request.isAllowed() ? request.getSuggestedRules() : null
         );
+        // BUG-59 根治步骤：批准时显式退出计划模式（框架公开 API）。此前缺失导致模型续跑时
+        // 仍认为自己处于 plan 阶段——只输出"请退出计划模式"而不执行工具（用户实测 2/3 无正文的真身）。
+        RuntimeContext planCtx = RuntimeContext.builder().userId(request.getUserId())
+                .sessionId(request.getSessionId()).build();
+        if (request.isAllowed()) {
+            // BUG-59 二发：isPlanModeActive(ctx) 会误报 false（会话 fcca0457 实测：笼还在、查询说不在，
+            // 模型"Let's go"后零工具零正文）——改为无条件 exitPlanMode（已退出时为无害 no-op）
+            boolean wasActive = false;
+            try {
+                wasActive = harnessAgent.isPlanModeActive(planCtx);
+            }
+            catch (Exception ignored) {
+            }
+            try {
+                harnessAgent.exitPlanMode(planCtx);
+                log.info("[hitl] 计划已批准，已退出计划模式 session={} (查询态={})", request.getSessionId(), wasActive);
+            }
+            catch (Exception e) {
+                log.warn("[hitl] exitPlanMode 失败（继续续跑）session={}: {}", request.getSessionId(), e.toString());
+            }
+        }
+        // BUG-59 缓解：框架 resume 时 maybePatchPendingToolCalls 先于 applyConfirmResults 执行，
+        // plan 模式的 plan_exit 块无 ASKING 豁免会被自动置错——确认元数据可能迟到失效。
+        // 文案改为强指令，保证模型即便看到 plan_exit 报错也继续执行并产出正文。
+        String confirmText = request.isAllowed()
+                ? "用户已批准该计划，系统已退出计划模式，你现在处于执行阶段。请立即直接调用工具执行计划中的剩余步骤，"
+                        + "全部完成后必须用正文输出执行总结（即使只有一句话也必须输出，禁止只调用工具不说话就结束）。"
+                        + "忽略此前计划提交工具的报错（系统已代为处理），"
+                        + "不要再请求确认或等待任何批准，不要只在思考中输出而不产出正文。"
+                : "用户拒绝了本次操作。请停止该操作，并用正文简要询问用户的替代意图。";
         UserMessage confirmMsg = UserMessage.builder()
                 .name("system")
-                .textContent("User confirmed, continue.")
+                .textContent(confirmText)
                 .metadata(Map.of(Msg.METADATA_CONFIRM_RESULTS, List.of(result)))
                 .build();
         java.util.concurrent.atomic.AtomicBoolean textDeltaSeen = new java.util.concurrent.atomic.AtomicBoolean(false);

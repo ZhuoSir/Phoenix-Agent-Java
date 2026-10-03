@@ -33,8 +33,38 @@ import {
   updateAgentKnowledgeApi,
   updateKnowledgeRecallStatusApi,
 } from '#/api';
+import { kbReEmbedApi } from '#/api/core/knowledgeBase';
 
 defineOptions({ name: 'AgentKnowledgeConfig' });
+
+const reEmbedding = ref(false);
+
+async function handleReEmbed() {
+  if (props.kbId == null) return;
+  try {
+    await ElMessageBox.confirm(
+      '将对本知识库全部 QA/FAQ 条目按「问+答」联合口径重新生成向量（幂等，可中途失败重跑）。继续？',
+      '重刷向量',
+      { type: 'warning' },
+    );
+  } catch {
+    return;
+  }
+  reEmbedding.value = true;
+  try {
+    const r = await kbReEmbedApi(props.kbId);
+    const d = (r as any)?.data ?? r;
+    const total = d?.total ?? 0;
+    const okc = d?.success ?? 0;
+    const failed = (d?.failed || []).length;
+    ElMessage[failed ? 'warning' : 'success'](`重刷完成：${okc}/${total}${failed ? `，失败 ${failed} 条` : ''}`);
+    loadKnowledgeList();
+  } catch (e: any) {
+    ElMessage.error(`重刷失败：${e?.message || e}`);
+  } finally {
+    reEmbedding.value = false;
+  }
+}
 
 const props = defineProps<{ agentId?: number; kbId?: number }>();
 // knowledge-base T-07：作用域双维——kbId 优先（知识库页复用），agentId 仅旧入口兼容
@@ -265,6 +295,13 @@ onMounted(loadKnowledgeList);
           title="重新拉取列表与向量化状态"
           @click="loadKnowledgeList"
         >刷新</ElButton>
+        <ElButton
+          v-if="kbId != null"
+          size="small"
+          :loading="reEmbedding"
+          title="按「问+答」联合口径重嵌本库全部 QA/FAQ 向量（幂等，耗时随条目数增长）"
+          @click="handleReEmbed"
+        >重刷向量</ElButton>
         <ElInput
           v-model="searchKeyword"
           placeholder="搜索知识标题..."

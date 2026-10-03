@@ -50,6 +50,12 @@ public class KnowledgeBaseController {
 		}
 	}
 
+	/** BUG-18(T-04)：按库重刷 QA/FAQ 联合向量（幂等） */
+	@PostMapping("/{id}/re-embed")
+	public ApiResponse<java.util.Map<String, Object>> reEmbed(@PathVariable Long id) {
+		return ApiResponse.success("重刷完成", knowledgeBaseService.reEmbedKnowledgeBase(id));
+	}
+
 	@GetMapping("/{id}")
 	public ApiResponse<KnowledgeBaseVO> detail(@PathVariable("id") Long id) {
 		try {

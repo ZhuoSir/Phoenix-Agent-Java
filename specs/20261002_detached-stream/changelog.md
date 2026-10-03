@@ -15,6 +15,30 @@
 ## 合并（2026-10-02）
 - 用户「合并吧」→ feature/detached-stream 10 提交（T-01~T-06+三修复+补漏）并入 main；v1.4.0 首单入账；不发版
 
+## 验收期修复补记（2026-10-03 早）
+- admin 双泡根除：saveNodeMessage 按 agent.type 分流，harness 客户端保存退役（R-05 收口，graph 流保留）；存量 6 行重复 html 行清理（同会话有 turnId 行才删，报告类型无涉）
+- admin 气泡合并卡：ThinkingBlock 从 v-for 根部移入 .message-content（think 上/回复下/同一气泡列对齐），content 纵排 gap 8px，thinking 灰卡+蓝竖线 vs 白底回复泡样式区分保留
+- BUG-57 全链终验（用户实测「有样式了」）：裸 div 分支气泡化 + :deep 规则入 scoped 块（全局块中 :deep 为非法选择器——教训入册）
+
+## BUG-59 二发（2026-10-03）isPlanModeActive 误报
+- 用户实测「只思考不执行无输出」：模型独白 19.7K 字（尾部"Let's go"）后零工具零正文；无 [hitl] 日志 → isPlanModeActive 误报 false 静默跳过 exitPlanMode（笼还在）
+- 修复：批准即无条件 exitPlanMode（no-op 安全）+ 查询态入日志；演练复验 done/739字/产物✓
+- 连带发现并处置：agent MEMORY.md 被写入「交付到 workspace root」错误惯例（BUG-60 时代误会的自我强化，b59v3.md 双写再现）——记忆消毒+根目录散文件×4清理+正确惯例写入
+
+## BUG-61 追流重放风暴（2026-10-03）
+- 用户浏览器实测「刷新中途卡死」：服务端 done 无恙，前端 join 重放千帧×全量渲染饱和主线程——150ms 节流合并修复（P2 追流性能条款落实）；死会话 pending_confirm 键×2 清理
+
+## BUG-60 文件面板复用不可见（2026-10-03）
+- 用户追证推翻我初判（"复用旧文件属正常"）：模型本轮确实覆写落盘，真身=全局 storeKey 去重吞掉跨会话重现 + create_time 95/95 全空致窗口失效灌洪
+- 修复四件套：会话维度去重 / 窗口=会话创建时间(缺失跳过) / createSession 补时间戳 / 存量回填+灌洪 18 条清理（含物理副本）
+- 终验：用户会话 scan 后恰好 3 文件、旧会话不受扰
+
+## BUG-59 根治记（2026-10-03）
+- 用户实测「计划确认后正式回复没了（3 次仅 1 次有内容）」→ 字节码取证：框架 maybePatchPendingToolCalls(offset46) 先于 applyConfirmResults(offset153)，plan_exit 无 ASKING 豁免被自动置错；且确认链路从未调 exitPlanMode → 模型困在 plan 阶段
+- 修复：confirmStream 批准分支显式 harnessAgent.exitPlanMode(RuntimeContext)（公开 API）+ 续跑文案断言「已退出计划模式，立即执行」
+- 验证：2/2 全绿（确认帧→放行→done 正文 171/336 字→产物 2 文件→exitPlanMode 日志×2）；此前成功率 1/3
+- 演练脚本教训：confirm POST 的 curl -m 3 掐太早请求未达控制器（-m 15 正常），非链路问题
+
 ## Implement 收口后缺陷（2026-10-02）BUG-57
 - 落库所有权移交的连锁反应：历史装载的旧 HTML 启发式对新 raw-markdown 行误伤（含标签即跳过转译）→ 双端样式偶发丢失；按「服务端行无条件转译、旧行保留启发式」修复
 - 教训入册：持久化内容形态变更（HTML→markdown）必须同批清点所有读取端启发式

@@ -56,9 +56,16 @@ public class AgentFileController {
             if (scan) {
                 ChatSession session = chatSessionMapper.selectOneById(sessionId);
                 if (session != null && userId.equals(session.getUserId())) {
-                    workspaceArtifactScanner.scanAndRegister(
-                            session.getAgentId() == null ? null : session.getAgentId().longValue(),
-                            null, userId, sessionId, java.time.Instant.EPOCH);
+                    // BUG-60：全量补扫窗口收窄到会话创建时间（配合按会话去重，
+                    // 既收得回本会话所有轮次产物，又不把用户历史文件灌进新会话）
+                    if (session.getCreateTime() != null) {
+                        java.time.Instant windowStart =
+                                session.getCreateTime().atZone(java.time.ZoneId.systemDefault()).toInstant();
+                        workspaceArtifactScanner.scanAndRegister(
+                                session.getAgentId() == null ? null : session.getAgentId().longValue(),
+                                null, userId, sessionId, windowStart);
+                    }
+                    // create_time 缺失（历史行）：跳过全量补扫防灌洪，轮末扫描已兜底本会话产物
                 }
             }
             return ReturnVo.ok("操作成功!", agentFileService.listBySession(sessionId, userId));

@@ -3,6 +3,19 @@
 本项目版本记录。语义化版本 + 里程碑制（细则：bryanchen-spec skill / releases/ 目录）。
 tag 之前无正式发版记录，历史 1.1.x 分支线（phoenix-1.1.1-release / 1.1.2-dev）未打过 tag，不追溯。
 
+## [v1.4.0] - 2026-10-03
+### 新增
+- 断线续传/流恢复（BL-22）：关页面≠杀任务——服务端脱离式执行、5s 增量落库单行 upsert、重进自动追流（150ms 节流防风暴）、显式停止接口、HITL 断线暂存并轮回原轮、10min 兜底时限、一轮一约束
+- 计划模式确认体验：确认卡三级取源显示提炼计划（plan summary/待执行命令，不再展示原始思考）+ 白卡新设计 + 点击整卡移除；批准即退出计划模式真执行（BUG-59 根治链）
+- 知识库 QA/FAQ「问+答」联合向量化 + 按库幂等重刷（面板按钮 + POST /api/knowledge-base/{id}/re-embed）
+- 智能体删除级联五表 + 存量孤儿清理运维脚本
+### 修复（16）
+BUG-56 登出500(nginx方法分流) / BUG-57 admin渲染四连修+md-card体系 / BUG-58 切智能体乱建会话 / BUG-11 前台confirm 404真身 / BUG-59 计划确认三连修 / BUG-60 文件面板复用不可见(会话维度去重+create_time回填95行) / BUG-61 追流重放风暴 / BUG-24 取消令牌+节点早停 / BUG-02 核账关闭 / BUG-03 建号密码校验 / BUG-05 登录码23009 / BUG-08 test.yml对齐 / BUG-14 删除孤儿 / BUG-18 问答联合向量 / BUG-21 模型类型列 / BUG-25 dev端口5777
+### 不修复/延期（批准）
+BUG-04 双账号体系（不修复，批准:陈卓）；BUG-24③ 底层硬中断（延期技术债）
+### 交付
+零 DDL；compose 三运维键（TURN_TIMEOUT/FLUSH/BUFFER）；nginx /auth 方法分流随镜像；multistage 国内源默认化（阿里云 Maven + npmmirror）；verify 13 断言；UPGRADE 含 Windows-WSL2 路线
+
 ## [v1.3.0] - 2026-10-02
 ### 新增
 - 会话文件面板（BL-19）：智能体产物自动登记，聊天页 📁 抽屉列表/下载/预览(CSP)/删除，SSE 实时事件，50MB+属主鉴权，产物随 uploads 卷持久
