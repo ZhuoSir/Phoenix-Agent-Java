@@ -45,8 +45,10 @@ WORK="$OUTDIR/.work-$PKGNAME"
 phx_log INFO "打包开始: $PKGNAME (native=$NATIVE overseas=$OVERSEAS) 日志=$PHX_LOG_FILE"
 
 # ref(): library 镜像加 mirror 前缀（--overseas/手工 mirror 时直通）
-MP=""
-ref() { if [ -n "$MP" ]; then echo "$MP/library/$1"; else echo "$1"; fi; }
+# MP=探活 URL(带 scheme, curl 用)；MPH=镜像引用前缀(必须无 scheme——docker 拒收 https:// 开头的 stage name，首跑真抓)
+MP=""; MPH=""
+ref() { if [ -n "$MPH" ]; then echo "$MPH/library/$1"; else echo "$1"; fi; }
+mph_from() { MPH="${1#https://}"; MPH="${MPH#http://}"; MPH="${MPH%/}"; }
 
 phx_step 1 $TOTAL "环境自检" && {
   phx_require_cmd docker || phx_fail 1 $TOTAL "缺 docker CLI"
@@ -58,13 +60,14 @@ phx_step 1 $TOTAL "环境自检" && {
 
 phx_step 2 $TOTAL "镜像源选优" && {
   if [ "$OVERSEAS" -eq 1 ]; then
-    MP=""; phx_log INFO "--overseas：全走官方源"
+    MP=""; MPH=""; phx_log INFO "--overseas：全走官方源"
   elif [ -n "$MIRROR" ]; then
-    MP="${MIRROR%/}"; phx_log INFO "手工指定 mirror: $MP"
+    MP="${MIRROR%/}"; mph_from "$MP"; phx_log INFO "手工指定 mirror: $MP (镜像前缀 $MPH)"
   else
     CANDS=$(grep -v '^#' "$HERE/mirrors.list" | grep -v '^[[:space:]]*$' | tr '\n' ' ')
     # shellcheck disable=SC2086
     MP=$(phx_mirror_pick $CANDS) || phx_fail 2 $TOTAL "候选 mirror 全不可达（mirrors.list）；可 --mirror 手工指定或 --overseas"
+    mph_from "$MP"
   fi
   phx_step_mark 2
 }
