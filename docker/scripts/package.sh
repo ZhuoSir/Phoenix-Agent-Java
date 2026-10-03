@@ -167,10 +167,11 @@ DOCEOF
     || phx_fail 5 $TOTAL "docker save 失败（五镜像）"
   GITDESC=$(git -C "$REPO" describe --tags --always 2>/dev/null || echo unknown)
   GITHASH=$(git -C "$REPO" rev-parse --short HEAD 2>/dev/null || echo unknown)
-  IMGLIST="phoenix-backend:$VERSION, phoenix-frontend:$VERSION"
-  for img in $BASE_IMGS; do IMGLIST="$IMGLIST, $img"; done
+  IMGJSON="\"phoenix-backend:$VERSION\", \"phoenix-frontend:$VERSION\""
+  for img in $BASE_IMGS; do IMGJSON="$IMGJSON, \"$img\""; done
   printf '{\n  "product": "Phoenix-Agent-Java",\n  "version": "%s",\n  "arch": "%s",\n  "git": "%s (%s)",\n  "built_at": "%s",\n  "engine_min": "20.10",\n  "images": [%s]\n}\n' \
-    "$VERSION" "$ARCH" "$GITDESC" "$GITHASH" "$(date '+%F %T')" "$(echo "$IMGLIST" | sed 's/\([^,]*\)/"\1"/g')" > "$PAY/manifest.json"
+    "$VERSION" "$ARCH" "$GITDESC" "$GITHASH" "$(date '+%F %T')" "$IMGJSON" > "$PAY/manifest.json"
+  python3 -c "import json;json.load(open('$PAY/manifest.json'))" 2>/dev/null || phx_log WARN "manifest.json 未过 JSON 解析自检（目标机无 python3 不影响安装，仅记录）"
   # SHA256SUMS（两段式：清单先落盘再逐一算，无管道读写竞态；相对路径兼容 phx_sha_check_dir）
   ( cd "$PAY" && find . -type f ! -name SHA256SUMS | sed 's|^\./||' | sort > "$WORK/.filelist" )
   ( cd "$PAY" && while read -r f; do
