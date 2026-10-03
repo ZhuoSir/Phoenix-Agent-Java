@@ -50,15 +50,16 @@ MP=""; MPH=""
 ref() { if [ -n "$MPH" ]; then echo "$MPH/library/$1"; else echo "$1"; fi; }
 mph_from() { MPH="${1#https://}"; MPH="${MPH#http://}"; MPH="${MPH%/}"; }
 
-phx_step 1 $TOTAL "环境自检" && {
-  phx_require_cmd docker || phx_fail 1 $TOTAL "缺 docker CLI"
-  docker info >/dev/null 2>&1 || phx_fail 1 $TOTAL "docker daemon 不可达"
-  phx_disk_ok "$OUTDIR" 10000 || phx_fail 1 $TOTAL "$OUTDIR 可用空间不足 10GB"
-  [ -n "$NATIVE" ] || phx_log WARN "非常见架构 uname=$NATIVE，编译阶段将不加 --platform"
-  phx_step_mark 1
-}
+# 设计规则（二跑教训）：步骤1/2 为探测/产值步——每次必跑，不入状态机；
+# 状态机只记昂贵且幂等的副作用步（3编译/4组装/5payload/6tar/7自校验/8收据）
+phx_log INFO "====> 步骤 1/$TOTAL: 环境自检"
+phx_require_cmd docker || phx_fail 1 $TOTAL "缺 docker CLI"
+docker info >/dev/null 2>&1 || phx_fail 1 $TOTAL "docker daemon 不可达"
+phx_disk_ok "$OUTDIR" 10000 || phx_fail 1 $TOTAL "$OUTDIR 可用空间不足 10GB"
+[ -n "$NATIVE" ] || phx_log WARN "非常见架构 uname=$NATIVE，编译阶段将不加 --platform"
 
-phx_step 2 $TOTAL "镜像源选优" && {
+phx_log INFO "====> 步骤 2/$TOTAL: 镜像源选优"
+if true; then
   if [ "$OVERSEAS" -eq 1 ]; then
     MP=""; MPH=""; phx_log INFO "--overseas：全走官方源"
   elif [ -n "$MIRROR" ]; then
@@ -69,8 +70,7 @@ phx_step 2 $TOTAL "镜像源选优" && {
     MP=$(phx_mirror_pick $CANDS) || phx_fail 2 $TOTAL "候选 mirror 全不可达（mirrors.list）；可 --mirror 手工指定或 --overseas"
     mph_from "$MP"
   fi
-  phx_step_mark 2
-}
+fi
 
 phx_step 3 $TOTAL "容器内编译 jar+dist（native，产物架构无关）" && {
   rm -rf "$WORK/artifacts" && mkdir -p "$WORK/artifacts"
