@@ -12,12 +12,13 @@ LIB="$PAYLOAD/docker/scripts/lib/common.sh"
 . "$LIB"
 
 TOTAL=9
-TIMEOUT=300; PROJECT=phoenix; OFFLINE=0
+TIMEOUT=300; PROJECT=phoenix; OFFLINE=0; ENV_FROM=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --timeout) TIMEOUT="$2"; shift 2;;
     --project) PROJECT="$2"; shift 2;;
     --offline) OFFLINE=1; shift;;
+    --env-from) ENV_FROM="$2"; shift 2;;   # 升级标准姿势：承接旧安装 docker/.env（密码/端口不漂移）
     --from-wsl) shift;;   # install.ps1 传入：语义与 Linux 相同（引擎装在 WSL Ubuntu 内）
     -h|--help) grep '^#' "$0" | head -5; exit 0;;
     *) echo "未知参数: $1" >&2; exit 2;;
@@ -106,6 +107,11 @@ phx_step 4 $TOTAL "镜像 load" && {
 
 phx_step 5 $TOTAL ".env 生成/保留" && {
   ENVF="$PAYLOAD/docker/.env"
+  if [ ! -f "$ENVF" ] && [ -n "$ENV_FROM" ]; then
+    [ -f "$ENV_FROM" ] || phx_fail 5 $TOTAL "--env-from 指向的文件不存在: $ENV_FROM"
+    cp "$ENV_FROM" "$ENVF" && chmod 600 "$ENVF"
+    phx_log INFO ".env 自旧安装承接（--env-from $ENV_FROM）"
+  fi
   if [ -f "$ENVF" ]; then
     # R-07 保留原值，但 IMAGE_TAG 必须跟随包版本（升级主键——否则旧 tag 起旧镜像，测试前自检抓出的真缺陷）
     CUR=$(grep '^IMAGE_TAG=' "$ENVF" | head -1 | cut -d= -f2 | awk '{print $1}')
