@@ -249,11 +249,17 @@ public class HarnessChatServiceImpl implements HarnessChatService {
         RuntimeContext planCtx = RuntimeContext.builder().userId(request.getUserId())
                 .sessionId(request.getSessionId()).build();
         if (request.isAllowed()) {
+            // BUG-59 二发：isPlanModeActive(ctx) 会误报 false（会话 fcca0457 实测：笼还在、查询说不在，
+            // 模型"Let's go"后零工具零正文）——改为无条件 exitPlanMode（已退出时为无害 no-op）
+            boolean wasActive = false;
             try {
-                if (harnessAgent.isPlanModeActive(planCtx)) {
-                    harnessAgent.exitPlanMode(planCtx);
-                    log.info("[hitl] 计划已批准，已退出计划模式 session={}", request.getSessionId());
-                }
+                wasActive = harnessAgent.isPlanModeActive(planCtx);
+            }
+            catch (Exception ignored) {
+            }
+            try {
+                harnessAgent.exitPlanMode(planCtx);
+                log.info("[hitl] 计划已批准，已退出计划模式 session={} (查询态={})", request.getSessionId(), wasActive);
             }
             catch (Exception e) {
                 log.warn("[hitl] exitPlanMode 失败（继续续跑）session={}: {}", request.getSessionId(), e.toString());

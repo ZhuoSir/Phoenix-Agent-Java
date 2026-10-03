@@ -20,6 +20,11 @@
 - admin 气泡合并卡：ThinkingBlock 从 v-for 根部移入 .message-content（think 上/回复下/同一气泡列对齐），content 纵排 gap 8px，thinking 灰卡+蓝竖线 vs 白底回复泡样式区分保留
 - BUG-57 全链终验（用户实测「有样式了」）：裸 div 分支气泡化 + :deep 规则入 scoped 块（全局块中 :deep 为非法选择器——教训入册）
 
+## BUG-59 二发（2026-10-03）isPlanModeActive 误报
+- 用户实测「只思考不执行无输出」：模型独白 19.7K 字（尾部"Let's go"）后零工具零正文；无 [hitl] 日志 → isPlanModeActive 误报 false 静默跳过 exitPlanMode（笼还在）
+- 修复：批准即无条件 exitPlanMode（no-op 安全）+ 查询态入日志；演练复验 done/739字/产物✓
+- 连带发现并处置：agent MEMORY.md 被写入「交付到 workspace root」错误惯例（BUG-60 时代误会的自我强化，b59v3.md 双写再现）——记忆消毒+根目录散文件×4清理+正确惯例写入
+
 ## BUG-61 追流重放风暴（2026-10-03）
 - 用户浏览器实测「刷新中途卡死」：服务端 done 无恙，前端 join 重放千帧×全量渲染饱和主线程——150ms 节流合并修复（P2 追流性能条款落实）；死会话 pending_confirm 键×2 清理
 
