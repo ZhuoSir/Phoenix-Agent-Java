@@ -64,6 +64,9 @@ public class ChatSessionServiceImpl extends ServiceImpl<ChatSessionMapper, ChatS
 	public ChatSession createSession(Integer agentId, String title, String userId) {
 		String sessionId = UUID.randomUUID().toString();
 		ChatSession session = new ChatSession(sessionId, agentId, title != null ? title : "新会话", "active", userId);
+		// BUG-60：create_time 从未写入（存量 95/95 全空）——文件补扫窗口等多处依赖它
+		session.setCreateTime(java.time.LocalDateTime.now());
+		session.setUpdateTime(session.getCreateTime());
 		getMapper().insert(session);
 		log.info("Created new chat session: {} for agent: {}", sessionId, agentId);
 		return session;

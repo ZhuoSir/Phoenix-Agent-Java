@@ -20,6 +20,11 @@
 - admin 气泡合并卡：ThinkingBlock 从 v-for 根部移入 .message-content（think 上/回复下/同一气泡列对齐），content 纵排 gap 8px，thinking 灰卡+蓝竖线 vs 白底回复泡样式区分保留
 - BUG-57 全链终验（用户实测「有样式了」）：裸 div 分支气泡化 + :deep 规则入 scoped 块（全局块中 :deep 为非法选择器——教训入册）
 
+## BUG-60 文件面板复用不可见（2026-10-03）
+- 用户追证推翻我初判（"复用旧文件属正常"）：模型本轮确实覆写落盘，真身=全局 storeKey 去重吞掉跨会话重现 + create_time 95/95 全空致窗口失效灌洪
+- 修复四件套：会话维度去重 / 窗口=会话创建时间(缺失跳过) / createSession 补时间戳 / 存量回填+灌洪 18 条清理（含物理副本）
+- 终验：用户会话 scan 后恰好 3 文件、旧会话不受扰
+
 ## BUG-59 根治记（2026-10-03）
 - 用户实测「计划确认后正式回复没了（3 次仅 1 次有内容）」→ 字节码取证：框架 maybePatchPendingToolCalls(offset46) 先于 applyConfirmResults(offset153)，plan_exit 无 ASKING 豁免被自动置错；且确认链路从未调 exitPlanMode → 模型困在 plan 阶段
 - 修复：confirmStream 批准分支显式 harnessAgent.exitPlanMode(RuntimeContext)（公开 API）+ 续跑文案断言「已退出计划模式，立即执行」
