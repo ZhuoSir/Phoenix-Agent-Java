@@ -15,7 +15,7 @@
 | （缺陷）nginx 登录页路由豁免（BUG-56） | - | 已修复(v1.4.0) 待发 | - | - | 登出后 500 真身：代理 regex 吞 SPA 路由 |
 
 - [x] M2 范围冻结（2026-10-03：两 spec 均已合并、任务全勾、验证证据齐、无 P0/P1 未验证单；此后新需求默认进 v1.5.0）
-- [ ] M3 汇总（SQL/config/RELEASE-NOTES/UPGRADE/checklist）
+- [x] M3 汇总（2026-10-03：零 DDL；config 三键+nginx 分流+构建国内源；NOTES/UPGRADE/checklist/运维脚本归位；57 提交交叉核对）
 - [ ] M4 发布（演练+tag）
 
 > 运维数据脚本（非 schema 件）：specs/20261002_fix-bug-batch/sql/04_orphan_cleanup_ops.sql（BUG-14 存量孤儿清理，幂等）——M3 汇总时并入 UPGRADE 操作段
