@@ -215,6 +215,8 @@ const chatContainer = ref<HTMLElement | null>(null);
 const showHumanFeedback = ref(false);
 const showHarnessConfirm = ref(false);
 const pendingConfirmButtons = ref<ConfirmButton[]>([]);
+// BUG-58 后续体验修：admin 确认条无正文区——计划文本（思考通道）在此呈现，用户看得见"确认什么"
+const pendingConfirmPlanHtml = ref('');
 const pendingConfirmSessionId = ref('');
 const pendingConfirmAgentId = ref<number>(0);
 const lastRequest = ref<GraphRequest | null>(null);
@@ -777,6 +779,9 @@ async function sendGraphRequest(request: GraphRequest, rejectedPlan: boolean) {
       if (response.needConfirm && response.buttons && response.buttons.length > 0) {
         showHarnessConfirm.value = true;
         pendingConfirmButtons.value = response.buttons;
+        const planSrc = getThinkingTrack(String(response.threadId ?? '')).text || '';
+        const bodySrc = sessionState.nodeBlocks.flat().map((n: any) => n.text || '').join('');
+        pendingConfirmPlanHtml.value = markdownToHtml((bodySrc.trim() ? bodySrc : planSrc).slice(0, 4000));
         pendingConfirmSessionId.value = response.threadId;
         pendingConfirmAgentId.value = Number(response.agentId);
       }
@@ -1062,6 +1067,7 @@ function scrollToBottom() {
 async function handleHarnessButtonClick(btn: ConfirmButton) {
   const allowed = btn.action === 'confirm';
   showHarnessConfirm.value = false;
+  pendingConfirmPlanHtml.value = '';
   isStreaming.value = true;
   try {
     await confirmHarnessSignalApi(
@@ -1511,6 +1517,11 @@ onMounted(async () => {
             <el-icon><WarningFilled /></el-icon>
             <span>请确认操作</span>
           </div>
+          <div
+            v-if="pendingConfirmPlanHtml"
+            class="harness-confirm-plan"
+            v-html="pendingConfirmPlanHtml"
+          ></div>
           <div class="harness-confirm-actions">
             <el-button
               v-for="(btn, idx) in pendingConfirmButtons"
@@ -2325,6 +2336,17 @@ onMounted(async () => {
   color: #b8860b;
   background: #fdf6ec;
   border: 1px solid #faecd8;
+  border-radius: 6px;
+}
+.harness-confirm-plan {
+  max-height: 220px;
+  margin: 4px 0 8px;
+  padding: 6px 10px;
+  overflow-y: auto;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #5c6470;
+  background: #fff;
   border-radius: 6px;
 }
 </style>
