@@ -896,7 +896,7 @@ function applyServerRowRender(list: any[]) {
     const metaStr = typeof mdRaw === 'string' ? mdRaw : JSON.stringify(mdRaw ?? {});
     if (m.role === 'assistant' && (!m.messageType || m.messageType === 'text') && metaStr.includes('turnId')) {
       m.content = markdownToHtml(String(m.content ?? ''));
-      m.messageType = 'html';
+      m.messageType = 'md-card'; // 专属分支：全宽卡片；'html' 留给 legacy generateNodeHtml 行原样渲染
     }
   }
   return list;
@@ -1343,24 +1343,20 @@ onMounted(async () => {
               >
                 ⚠ 输出在页面刷新时中断，以下为已生成部分
               </div>
-              <!-- BUG-57 真修：html 分支原来是裸 div（无任何容器/样式），服务端 markdown 行转 html 后
-                   全走这里导致"渲染没效果"——现套用与 text 分支一致的消息气泡结构 -->
-              <div v-if="message.messageType === 'html'" :class="['message', message.role]">
-                <div class="message-avatar">
-                  <el-avatar :size="32" style="font-size:16px;font-weight:600;color:#fff;background:#2f6bff">
-                    {{ message.role === 'user' ? '我' : (agent.name?.charAt(0) || 'AI') }}
-                  </el-avatar>
-                </div>
-                <div class="message-content">
-                  <ThinkingBlock
-                    v-if="message.role === 'assistant' && (message as any).thinking"
-                    :content="(message as any).thinking"
-                    :duration-ms="(message as any).thinkingMs"
-                    :has-content="true"
-                    :streaming="false"
-                  />
-                  <div class="message-text" v-html="message.content"></div>
-                </div>
+              <div
+                v-if="message.messageType === 'html'"
+                v-html="message.content"
+              ></div>
+              <!-- 服务端 markdown 行专属：全宽卡片（think 上 / 回复下，同列合并） -->
+              <div v-else-if="message.messageType === 'md-card'" class="md-response">
+                <ThinkingBlock
+                  v-if="(message as any).thinking"
+                  :content="(message as any).thinking"
+                  :duration-ms="(message as any).thinkingMs"
+                  :has-content="true"
+                  :streaming="false"
+                />
+                <div class="md-card" v-html="message.content"></div>
               </div>
               <div
                 v-else-if="message.messageType === 'result-set'"
@@ -1807,6 +1803,26 @@ onMounted(async () => {
   margin-bottom: 0;
 }
 
+.md-response {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.md-response :deep(.thinking) {
+  margin-bottom: 0;
+}
+
+.md-card {
+  width: 100%;
+  padding: 14px 18px;
+  background: #fff;
+  border: 1px solid #e8e8e8;
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 3%);
+}
+
 .message-text {
   padding: 12px 16px;
   line-height: 1.5;
@@ -2086,22 +2102,22 @@ onMounted(async () => {
     flex-direction: column;
   }
 }
-.message :deep(h1), .message :deep(h2), .message :deep(h3) { margin: 10px 0 6px; font-weight: 600; line-height: 1.4; }
-.message :deep(h1) { font-size: 17px; }
-.message :deep(h2) { font-size: 15px; }
-.message :deep(h3) { font-size: 14px; }
-.message :deep(p) { margin: 6px 0; }
-.message :deep(ul), .message :deep(ol) { padding-left: 22px; margin: 6px 0; }
-.message :deep(li) { margin: 2px 0; }
-.message :deep(code) { padding: 1px 5px; font-family: ui-monospace, Menlo, monospace; font-size: 12px; background: #f2f3f5; border-radius: 4px; }
-.message :deep(pre) { padding: 10px 12px; margin: 8px 0; overflow-x: auto; background: #f6f7f8; border-radius: 8px; }
-.message :deep(pre code) { padding: 0; background: none; }
-.message :deep(table) { margin: 8px 0; border-collapse: collapse; font-size: 13px; }
-.message :deep(th), .message :deep(td) { padding: 5px 10px; border: 1px solid #e4e7ed; }
-.message :deep(th) { background: #f5f7fa; }
-.message :deep(blockquote) { margin: 8px 0; padding: 2px 12px; color: #6b7280; border-left: 3px solid #d0d7e2; }
-.message :deep(a) { color: #4a6cf7; text-decoration: none; }
-.message :deep(hr) { margin: 10px 0; border: none; border-top: 1px solid #eceef2; }
+.md-card :deep(h1), .md-card :deep(h2), .md-card :deep(h3) { margin: 10px 0 6px; font-weight: 600; line-height: 1.4; }
+.md-card :deep(h1) { font-size: 17px; }
+.md-card :deep(h2) { font-size: 15px; }
+.md-card :deep(h3) { font-size: 14px; }
+.md-card :deep(p) { margin: 6px 0; }
+.md-card :deep(ul), .md-card :deep(ol) { padding-left: 22px; margin: 6px 0; }
+.md-card :deep(li) { margin: 2px 0; }
+.md-card :deep(code) { padding: 1px 5px; font-family: ui-monospace, Menlo, monospace; font-size: 12px; background: #f2f3f5; border-radius: 4px; }
+.md-card :deep(pre) { padding: 10px 12px; margin: 8px 0; overflow-x: auto; background: #f6f7f8; border-radius: 8px; }
+.md-card :deep(pre code) { padding: 0; background: none; }
+.md-card :deep(table) { margin: 8px 0; border-collapse: collapse; font-size: 13px; }
+.md-card :deep(th), .md-card :deep(td) { padding: 5px 10px; border: 1px solid #e4e7ed; }
+.md-card :deep(th) { background: #f5f7fa; }
+.md-card :deep(blockquote) { margin: 8px 0; padding: 2px 12px; color: #6b7280; border-left: 3px solid #d0d7e2; }
+.md-card :deep(a) { color: #4a6cf7; text-decoration: none; }
+.md-card :deep(hr) { margin: 10px 0; border: none; border-top: 1px solid #eceef2; }
 </style>
 
 <style>
