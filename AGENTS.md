@@ -89,6 +89,7 @@ Multi-module Maven project (Java 21). An NL2SQL state-graph engine built on Spri
 4. 不得声称「测试通过/完成」除非贴出真实命令输出。
 5. Implement 中发现需求/设计缺陷 → 停编码 → 回改文档 → 重新确认。
 
+**项目坑台账 `specs/_project/lessons.md`**（L-xx；Plan 阶段强制核对全部 active 坑）。
 **项目事实以 `specs/_project/profile.md` 为准**（本文件部分条目已过期，见 profile §已知技术债）。
 各领域规范源由项目根 `.specrc.yml` 路由（code-backend/api/database/git/版本→global；code-frontend→none）。
 里程碑与发版：走 skill 的 releases/vX.Y.Z 流程（git 现状有 phoenix-1.1.x-release 痕迹 → 建议 B 档）。
