@@ -87,6 +87,7 @@ public class HarnessTurnManager {
     public Flux<Map<String, Object>> openOrReject(String sessionId, Supplier<Flux<Map<String, Object>>> source) {
         Turn probe = turns.get(sessionId);
         if (probe != null) {
+            log.info("[turn] 拒绝新开（P6 一轮一约束）session={}", sessionId);
             Map<String, Object> rej = new LinkedHashMap<>();
             rej.put("content", "\n⚠️ 上一轮仍在生成中（可点击「停止」后重试）。");
             rej.put("end", true);
@@ -111,8 +112,10 @@ public class HarnessTurnManager {
     public Flux<Map<String, Object>> confirmOrResume(String sessionId, Supplier<Flux<Map<String, Object>>> source) {
         Turn turn = turns.get(sessionId);
         if (turn == null) {
+            log.warn("[turn] confirm 时轮次已不在（超时/取消/重启），按新轮处理 session={}", sessionId);
             return openOrReject(sessionId, source);
         }
+        log.info("[turn] confirm 并轮回原轮 session={} turnId={}", sessionId, turn.turnId);
         turn.awaitingConfirm.set(false);
         turn.wireConfirm(source.get());
         return turn.sink.asFlux();
