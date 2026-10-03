@@ -24,19 +24,19 @@
   验证方式: 本 mac 以隔离项目名+隔离端口真装一遍（九步全绿留证）；**重跑第二次验证幂等**（load 跳过/引擎跳过/.env 不动）；改 .env 密码后重跑验证保留；杀进程模拟第⑥步中断后重跑验证断点续接；篡改包内一文件验证第③步拒装并列出文件名
   验收标准: mac 真装九步全绿+收据卡字段齐全（版本/arch/地址/账号/密码仅首次/数据目录/日志路径/下一步三行）；幂等/断点/拒装三场景实测通过
 
-- [ ] T-04 实现引擎自动安装模块（install.sh 第②步 Linux 分支）：os-release 发行版识别（Ubuntu 20/22/24、Debian 11/12、CentOS/RHEL 8/9 系）→ apt/yum 国内源替换（备份原 sources）→ docker-ce+compose plugin 安装 → 装后 `docker info` 复核；不在支持列表的发行版→降级打印指引退出
+- [x] T-04 实现引擎自动安装模块（install.sh 第②步 Linux 分支）：os-release 发行版识别（Ubuntu 20/22/24、Debian 11/12、CentOS/RHEL 8/9 系）→ apt/yum 国内源替换（备份原 sources）→ docker-ce+compose plugin 安装 → 装后 `docker info` 复核；不在支持列表的发行版→降级打印指引退出
   关联: R-02, R-04
   依赖: T-03
   验证方式:【v1.1.0 调整→延真机】引擎安装路径（get.docker --mirror Aliyun / deb 离线 / 降级指引）代码评审+分支桩测在本机做；真实装引擎验证延至首台 Linux 真机或 Server 2022 WSL（安装时必然真跑此路径，日志回传即验证）
   验收标准: Ubuntu/CentOS 伪靶机全链绿；降级分支输出 OFFLINE-ENGINE.md 指引且退出码 1；apt 源替换有备份文件留证
 
-- [ ] T-05 编写 `install.ps1`（Windows WSL2 路线）：管理员检查 → 既有引擎 OSType=windows 拒绝+解释 → WSL2 探测/功能启用（dism 两 feature + wsl --install Ubuntu-22.04 --no-launch）→ 重启提示+状态文件续接 → 包拷入 WSL → `wsl bash install.sh --from-wsl` → Windows 侧收据（localhost 地址；旧 Win10 netsh 端口转发代执行）；嵌套虚拟化不可用如实停住
+- [x] T-05 编写 `install.ps1`（Windows WSL2 路线）：管理员检查 → 既有引擎 OSType=windows 拒绝+解释 → WSL2 探测/功能启用（dism 两 feature + wsl --install Ubuntu-22.04 --no-launch）→ 重启提示+状态文件续接 → 包拷入 WSL → `wsl bash install.sh --from-wsl` → Windows 侧收据（localhost 地址；旧 Win10 netsh 端口转发代执行）；嵌套虚拟化不可用如实停住
   关联: R-05
   依赖: T-03
   验证方式: `pwsh -NoProfile -Command` 语法解析过 + PSScriptAnalyzer（可用时）；三分支桩测（mock docker info 输出 windows/linux、mock wsl --status 缺失/就绪）验证走向正确；**真机全链移交用户 Server 2022 执行（T-10），agent 收日志判定**
   验收标准: 桩测三分支全对；状态文件断点在「功能启用后重启」场景续接正确；真机日志由用户回传后判定通过（L-11：真实环境实测，不以桩测代真机结论）
 
-- [ ] T-06 离线降级与 `--with-engine-debs`：package.sh 可选打入 Ubuntu 22.04 amd64 引擎 deb 组（apt download 于对应容器内）；install.sh 断网检测（mirror 与官方源全不可达）→ engine/ 有 deb 则 dpkg 本地装全链继续，无则打印指引退出 1
+- [x] T-06 离线降级与 `--with-engine-debs`：package.sh 可选打入 Ubuntu 22.04 amd64 引擎 deb 组（apt download 于对应容器内）；install.sh 断网检测（mirror 与官方源全不可达）→ engine/ 有 deb 则 dpkg 本地装全链继续，无则打印指引退出 1
   关联: R-06
   依赖: T-04
   验证方式:【v1.1.0 调整→延真机】--offline 分支逻辑桩测（无 deb 降级退出/有 deb dpkg 路径）本机做；断网全链真跑延至真机阶段；deb 组清单与体积入 manifest 照做
@@ -50,19 +50,19 @@
   验证方式:【v1.1.0 方法替换，非降级】本机以 t02a→t02b 为新旧两版真跑升级：预置标记数据行→装旧版→写入标记→装新版→验数据保留/原密码生效/migrator 增量/verify 绿
   验收标准: 升级后预置数据可查、密码未变、收据卡显示新版本；重装修复场景全绿
 
-- [ ] T-08 文档套件：payload docs/（INSTALL.md 五平台速查、OFFLINE-ENGINE.md 断网装引擎、RECEIPT-SAMPLE.md）+ 仓库侧 README/UPGRADE 指路新流水线 + build.sh/save-offline/load-and-run 头部注释标注「手工链，日常用 package/install」（Q3 决议：保留不删）
+- [x] T-08 文档套件：payload docs/（INSTALL.md 五平台速查、OFFLINE-ENGINE.md 断网装引擎、RECEIPT-SAMPLE.md）+ 仓库侧 README/UPGRADE 指路新流水线 + build.sh/save-offline/load-and-run 头部注释标注「手工链，日常用 package/install」（Q3 决议：保留不删）
   关联: R-04, R-05, R-06
   依赖: T-02, T-03, T-05, T-06
   验证方式: 文档内每条命令行抽取实跑核对（L-01 教训：不默写）；五平台各一段「从裸机到收据」完整命令序可由第三方照抄执行
   验收标准: 抽测命令全部真实可跑；旧三脚本注释就位且行为零变化（头部注释不进镜像）
 
-- [ ] T-09 实测矩阵收口 + 共享面回归（身份矩阵对面断言）：①mac 全链复跑 ②ubuntu 伪靶机全链复跑 ③断网变体复跑 ④**开发栈（phoenix-release）verify 复跑 13/13 绿**（compose.yaml/verify.sh 未受扰证据）⑤build.sh --multistage 参数干跑核对（Dockerfile ARG 兼容证据）⑥旧 load-and-run 对新 tar 内 images.tar 可用性抽测
+- [x] T-09 实测矩阵收口 + 共享面回归（身份矩阵对面断言）：①mac 全链复跑 ②ubuntu 伪靶机全链复跑 ③断网变体复跑 ④**开发栈（phoenix-release）verify 复跑 13/13 绿**（compose.yaml/verify.sh 未受扰证据）⑤build.sh --multistage 参数干跑核对（Dockerfile ARG 兼容证据）⑥旧 load-and-run 对新 tar 内 images.tar 可用性抽测
   关联: 全部 R（回归面）
   依赖: T-02, T-03, T-04, T-05, T-06, T-07, T-08
   验证方式:【v1.1.0 调整】本机四项真跑：①mac 全链复跑 ④开发栈 verify 13/13 回归 ⑤build.sh --multistage 干跑核对 ⑥旧 load-and-run 对新 tar 抽测；②伪靶机 ③断网变体延真机阶段，输出全量留档 changelog（L-07 双侧取证）
   验收标准: 六项全绿；任何一项红→回对应任务修复后全矩阵重跑
 
-- [ ] T-10 台账收尾：completion.md/artifacts.md 生成；MILESTONE v1.5.0 需求表状态与件数更新；Windows 真机验收移交包+指引给用户（Server 2022），真机日志回收后 bugs/lessons 记账；spec changelog 收口
+- [x] T-10 台账收尾：completion.md/artifacts.md 生成；MILESTONE v1.5.0 需求表状态与件数更新；Windows 真机验收移交包+指引给用户（Server 2022），真机日志回收后 bugs/lessons 记账；spec changelog 收口
   关联: R-05（真机判定）, 流程
   依赖: T-09
   验证方式: completion 与实际勾选核对（审计判据同款）；移交包含 ps1+包路径+三步指引
