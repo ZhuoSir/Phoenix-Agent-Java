@@ -1,5 +1,10 @@
 # Changelog: docker-auto-pipeline
 
+## T-02+T-03 完成（2026-10-03）八跑收敛+三连测全绿
+- T-02：t02a(1.08GB)+t02b 五镜像版(1.4GB) 双包出货；证据=Hub直连0/国内源13处/解包sha全对/manifest JSON自检/--overseas接线干跑(官方名+default settings✓,断网exit1预期内)/失败输出格式五跑实证；amd64 按 tasks v1.1.0 降级口径(薄组装已实证)
+- T-03：**九步真装全绿 exit=0 仅39秒**(镜像本地时)——IMAGE_TAG v1.3.0→t02b 升级分支实测过；幂等重跑 9/9 步全跳+栈不抖；篡改拒装点名 BAD: docs/INSTALL.md exit=1；栈取证:4容器healthy+9180登录出token+迁移台账9行(五镜像payload+替身migrator全链成立)
+- 替身记账：postgres:16-alpine=postgres:latest tag(用户裁决"假设源完成")，演练毕删除；t02c(升级演练"新版")打包中
+
 ## tasks v1.1.0（2026-10-03）—— 验证口径调整，用户裁决+确认
 - 用户裁决「源可以假设完成，验证整体流程，没必要真拉，最后还要删除」→ 网络重验证项统一延真机：T-02 amd64 第二包降级（薄组装已实证）/T-04 引擎真装延真机/T-06 断网真跑延真机/T-09 六项改「本机四项真跑+两项延真机」；T-07 伪靶机改本机 t02a→t02b 真实升级（方法替换非降级）
 - 原则：代码一行不少写；替身镜像（postgres:latest→16-alpine tag）仅准演练环境、用后删除、如实记账

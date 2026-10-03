@@ -10,7 +10,7 @@
   验证方式: `selftest.sh` 驱动全函数单测（状态机写读/断点续接/失败输出格式断言）；`shellcheck` 过；**用 mac 系统自带 `/bin/bash`（3.2）实跑 selftest**（L-05 兼容性硬证）
   验收标准: selftest 全绿于 bash 3.2 与 bash 5.x 双版本；shellcheck 零 error；日志/状态文件落盘位置与 plan §1.3 一致
 
-- [ ] T-02 编写 `docker/scripts/package.sh`：环境自检（docker/buildx/磁盘余量≥镜像×2.5）→ mirror 竞速 → buildx 双侧 multistage（--platform linux/<arch>，MAVEN_SETTINGS/NPM_REGISTRY 随 --overseas 切换）→ save → payload 组装（deploy/bin/docs/engine 可选）→ manifest.json+SHA256SUMS → tar.gz → 解包自校验
+- [x] T-02 编写 `docker/scripts/package.sh`：环境自检（docker/buildx/磁盘余量≥镜像×2.5）→ mirror 竞速 → buildx 双侧 multistage（--platform linux/<arch>，MAVEN_SETTINGS/NPM_REGISTRY 随 --overseas 切换）→ save → payload 组装（deploy/bin/docs/engine 可选）→ manifest.json+SHA256SUMS → tar.gz → 解包自校验
   关联: R-01, R-02, R-03, R-08
   依赖: T-01
   验证方式: 本 mac 实出 arm64 包（全程日志核对：maven.aliyun.com / npmmirror / mirror 前缀出现、registry-1.docker.io 零直连）；解包 `sha256sum -c` 全对；`--overseas` 干跑核对 build-arg 切换；故意断一步验证失败输出格式。【v1.1.0 调整】amd64 第二包降级：跨架构薄组装已实证（v1.4.0-dev amd64 backend 构建成功），基础三件 amd64 拉取属网络行为→延至首个真实 amd64 目标机；替身镜像仅准演练环境使用并如实记账
@@ -18,7 +18,7 @@
 
 ## 组 2：安装主链（目标机侧）
 
-- [ ] T-03 编写 `install.sh` 九步状态机主链（Linux/mac）：探测（OS/arch 对照 manifest 拒装不符/sudo/磁盘/引擎 OSType 读取——windows 即拒/9080 端口预检）→ 引擎段占位（T-04 填充，本任务先做「有引擎→跳过」分支）→ sha 全量校验 → load（digest 比对跳过）→ .env 生成（openssl rand -hex 16、chmod 600、回显一次；已存在保留原值+新键追加提示）→ compose -p phoenix up -d（bin/ 独立 compose 兜底）→ healthy 轮询（5s×300s 可配）→ verify.sh（失败即 install 退 1，Q2 决议）→ 收据卡+RECEIPT 落盘
+- [x] T-03 编写 `install.sh` 九步状态机主链（Linux/mac）：探测（OS/arch 对照 manifest 拒装不符/sudo/磁盘/引擎 OSType 读取——windows 即拒/9080 端口预检）→ 引擎段占位（T-04 填充，本任务先做「有引擎→跳过」分支）→ sha 全量校验 → load（digest 比对跳过）→ .env 生成（openssl rand -hex 16、chmod 600、回显一次；已存在保留原值+新键追加提示）→ compose -p phoenix up -d（bin/ 独立 compose 兜底）→ healthy 轮询（5s×300s 可配）→ verify.sh（失败即 install 退 1，Q2 决议）→ 收据卡+RECEIPT 落盘
   关联: R-04, R-07, R-08, R-09
   依赖: T-01, T-02
   验证方式: 本 mac 以隔离项目名+隔离端口真装一遍（九步全绿留证）；**重跑第二次验证幂等**（load 跳过/引擎跳过/.env 不动）；改 .env 密码后重跑验证保留；杀进程模拟第⑥步中断后重跑验证断点续接；篡改包内一文件验证第③步拒装并列出文件名
