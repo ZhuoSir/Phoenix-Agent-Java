@@ -1817,11 +1817,39 @@ onMounted(async () => {
 .md-card {
   width: 100%;
   padding: 14px 18px;
+  font-size: 14px;
+  line-height: 1.65;
+  color: #303133;
+  word-break: break-word;
   background: #fff;
   border: 1px solid #e8e8e8;
   border-radius: 12px;
   box-shadow: 0 1px 2px rgb(0 0 0 / 3%);
 }
+
+/* 前台聊天页同源排版（GitHub 风），保证两端观感一致 */
+.md-card :deep(p) { margin: 0 0 8px; }
+.md-card :deep(p:last-child) { margin-bottom: 0; }
+.md-card :deep(h1), .md-card :deep(h2), .md-card :deep(h3), .md-card :deep(h4) { margin: 16px 0 8px; font-weight: 600; line-height: 1.3; }
+.md-card :deep(h1:first-child), .md-card :deep(h2:first-child), .md-card :deep(h3:first-child) { margin-top: 0; }
+.md-card :deep(h1) { font-size: 18px; }
+.md-card :deep(h2) { font-size: 16px; padding-bottom: 4px; border-bottom: 1px solid #f0f2f5; }
+.md-card :deep(h3) { font-size: 15px; }
+.md-card :deep(h4) { font-size: 14px; }
+.md-card :deep(ul), .md-card :deep(ol) { padding-left: 20px; margin: 8px 0; }
+.md-card :deep(li) { margin: 4px 0; }
+.md-card :deep(pre) { padding: 12px; margin: 8px 0; overflow-x: auto; background: #f6f8fa; border: 1px solid #e1e4e8; border-radius: 6px; }
+.md-card :deep(code) { font-family: SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace; font-size: 13px; line-height: 1.45; }
+.md-card :deep(pre code) { padding: 0; background: transparent; border: none; }
+.md-card :deep(code:not(pre code)) { padding: 2px 6px; color: #476582; background: #f0f4f8; border-radius: 4px; }
+.md-card :deep(blockquote) { padding: 4px 12px; margin: 8px 0; color: #606266; border-left: 4px solid #409eff; }
+.md-card :deep(table) { width: 100%; margin: 8px 0; font-size: 13px; border-collapse: collapse; }
+.md-card :deep(th), .md-card :deep(td) { padding: 6px 10px; text-align: left; border: 1px solid #e0e0e0; }
+.md-card :deep(th) { font-weight: 600; background: #f5f7fa; }
+.md-card :deep(tr:nth-child(even)) { background: #fafafa; }
+.md-card :deep(img) { max-width: 100%; border-radius: 6px; }
+.md-card :deep(a) { color: #409eff; text-decoration: none; }
+.md-card :deep(hr) { margin: 12px 0; border: none; border-top: 1px solid #eceef2; }
 
 .message-text {
   padding: 12px 16px;
@@ -2102,22 +2130,6 @@ onMounted(async () => {
     flex-direction: column;
   }
 }
-.md-card :deep(h1), .md-card :deep(h2), .md-card :deep(h3) { margin: 10px 0 6px; font-weight: 600; line-height: 1.4; }
-.md-card :deep(h1) { font-size: 17px; }
-.md-card :deep(h2) { font-size: 15px; }
-.md-card :deep(h3) { font-size: 14px; }
-.md-card :deep(p) { margin: 6px 0; }
-.md-card :deep(ul), .md-card :deep(ol) { padding-left: 22px; margin: 6px 0; }
-.md-card :deep(li) { margin: 2px 0; }
-.md-card :deep(code) { padding: 1px 5px; font-family: ui-monospace, Menlo, monospace; font-size: 12px; background: #f2f3f5; border-radius: 4px; }
-.md-card :deep(pre) { padding: 10px 12px; margin: 8px 0; overflow-x: auto; background: #f6f7f8; border-radius: 8px; }
-.md-card :deep(pre code) { padding: 0; background: none; }
-.md-card :deep(table) { margin: 8px 0; border-collapse: collapse; font-size: 13px; }
-.md-card :deep(th), .md-card :deep(td) { padding: 5px 10px; border: 1px solid #e4e7ed; }
-.md-card :deep(th) { background: #f5f7fa; }
-.md-card :deep(blockquote) { margin: 8px 0; padding: 2px 12px; color: #6b7280; border-left: 3px solid #d0d7e2; }
-.md-card :deep(a) { color: #4a6cf7; text-decoration: none; }
-.md-card :deep(hr) { margin: 10px 0; border: none; border-top: 1px solid #eceef2; }
 </style>
 
 <style>
