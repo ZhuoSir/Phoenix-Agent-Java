@@ -2349,4 +2349,20 @@ onMounted(async () => {
   background: #fff;
   border-radius: 6px;
 }
+.message :deep(h1), .message :deep(h2), .message :deep(h3) { margin: 10px 0 6px; font-weight: 600; line-height: 1.4; }
+.message :deep(h1) { font-size: 17px; }
+.message :deep(h2) { font-size: 15px; }
+.message :deep(h3) { font-size: 14px; }
+.message :deep(p) { margin: 6px 0; }
+.message :deep(ul), .message :deep(ol) { padding-left: 22px; margin: 6px 0; }
+.message :deep(li) { margin: 2px 0; }
+.message :deep(code) { padding: 1px 5px; font-family: ui-monospace, Menlo, monospace; font-size: 12px; background: #f2f3f5; border-radius: 4px; }
+.message :deep(pre) { padding: 10px 12px; margin: 8px 0; overflow-x: auto; background: #f6f7f8; border-radius: 8px; }
+.message :deep(pre code) { padding: 0; background: none; }
+.message :deep(table) { margin: 8px 0; border-collapse: collapse; font-size: 13px; }
+.message :deep(th), .message :deep(td) { padding: 5px 10px; border: 1px solid #e4e7ed; }
+.message :deep(th) { background: #f5f7fa; }
+.message :deep(blockquote) { margin: 8px 0; padding: 2px 12px; color: #6b7280; border-left: 3px solid #d0d7e2; }
+.message :deep(a) { color: #4a6cf7; text-decoration: none; }
+.message :deep(hr) { margin: 10px 0; border: none; border-top: 1px solid #eceef2; }
 </style>
