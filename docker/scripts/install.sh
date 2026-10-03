@@ -71,7 +71,8 @@ phx_step 2 $TOTAL "引擎就位" && {
   elif [ "$OFFLINE" -eq 1 ] && [ -d "$PAYLOAD/engine" ] && ls "$PAYLOAD/engine"/*.deb >/dev/null 2>&1; then
     phx_log INFO "离线模式：dpkg 本地安装 engine/*.deb"
     # shellcheck disable=SC2086
-    $SUDO dpkg -i "$PAYLOAD"/engine/*.deb >>"$PHX_LOG_FILE" 2>&1 || phx_fail 2 $TOTAL "deb 本地安装失败（依赖不齐？见日志）"
+    { $SUDO dpkg -i "$PAYLOAD"/engine/*.deb || $SUDO dpkg -i "$PAYLOAD"/engine/*.deb; } >>"$PHX_LOG_FILE" 2>&1 \
+      || phx_fail 2 $TOTAL "deb 本地安装失败（两遍 dpkg 仍依赖不齐？见日志）"
   elif [ "$OFFLINE" -eq 1 ]; then
     phx_fail 2 $TOTAL "离线且无 engine/*.deb——参见 docs/OFFLINE-ENGINE.md 手工装引擎后重跑"
   else

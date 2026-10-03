@@ -178,7 +178,19 @@ DOCEOF
       if command -v sha256sum >/dev/null 2>&1; then H=$(sha256sum "$f" | awk '{print $1}'); else H=$(shasum -a 256 "$f" | awk '{print $1}'); fi
       echo "$H  $f"
     done < "$WORK/.filelist" > "$WORK/.sums" && cp "$WORK/.sums" "$PAY/SHA256SUMS" )
-  [ "$WITH_DEBS" -eq 1 ] && phx_log WARN "--with-engine-debs 属 T-06 交付，本版跳过（如实记账）"
+  if [ "$WITH_DEBS" -eq 1 ]; then
+    phx_log INFO "--with-engine-debs：容器内下载 Ubuntu 22.04 ($ARCH) 引擎离线 deb 组"
+    mkdir -p "$PAY/engine"
+    docker run --rm --platform "linux/$ARCH" -v "$PAY/engine:/debs" "$(ref ubuntu:22.04)" bash -c \
+      'sed -i "s|archive.ubuntu.com|mirrors.aliyun.com|g; s|security.ubuntu.com|mirrors.aliyun.com|g" /etc/apt/sources.list \
+       && apt-get update -qq \
+       && apt-get install -y -qq --download-only -o Dir::Cache::archives=/debs docker.io docker-compose-v2' \
+      >>"$PHX_LOG_FILE" 2>&1 \
+      && [ -n "$(ls "$PAY/engine"/*.deb 2>/dev/null)" ] \
+      || phx_log WARN "engine debs 下载失败/为空——安装侧将按在线或降级路径（不阻塞打包）"
+    DEBSIZE=$(du -sm "$PAY/engine" 2>/dev/null | awk '{print $1}')
+    phx_log INFO "engine debs: ${DEBSIZE:-0}MB（清单已随 SHA256SUMS 入册）"
+  fi
   phx_step_mark 5
 }
 
