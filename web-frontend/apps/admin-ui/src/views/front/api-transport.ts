@@ -460,12 +460,26 @@ export const apiChatTransport: ChatTransport = {
             // BL-19：本轮产物登记成功（轮末扫描事件），刷新文件面板
             if ((response as any).agentFiles) notifyFilesChanged();
             if (response.needConfirm && response.buttons) {
-              // 计划模式常把计划全文走思考通道（正文空）——确认气泡兜底展示计划，让"确认什么"可见
+              // 确认卡内容三级取源：正文 > 工具调用提炼（plan_exit.summary/待执行命令）> 思考流兜底
+              // ——用户要确认的是"要做什么"，不是模型内心独白（用户反馈：原始思考无意义）
+              const tcList = ((response as any).toolCalls || []) as any[];
+              const distilled = tcList
+                .map((t) => {
+                  const inp = (t?.input || {}) as Record<string, any>;
+                  if (typeof inp.summary === 'string' && inp.summary.trim()) return inp.summary.trim();
+                  if (typeof inp.command === 'string' && inp.command.trim()) return `将执行命令：\`${inp.command.trim()}\``;
+                  if (typeof inp.path === 'string' && t?.name) return `将操作文件：\`${inp.path}\`（${t.name}）`;
+                  return t?.name ? `将调用工具：${t.name}` : '';
+                })
+                .filter(Boolean)
+                .join('\n\n');
               const confirmHtml = (fullText || '').trim()
                 ? markdownToHtml(fullText)
-                : thinkingBuf
-                  ? `<p style="margin:0 0 6px;color:#8a919f;font-size:12px">执行计划（待确认）</p>${markdownToHtml(thinkingBuf.slice(0, 4000))}`
-                  : '';
+                : distilled
+                  ? `<p style="margin:0 0 6px;color:#8a919f;font-size:12px">待确认的执行计划</p>${markdownToHtml(distilled.slice(0, 4000))}`
+                  : thinkingBuf
+                    ? `<p style="margin:0 0 6px;color:#8a919f;font-size:12px">模型思考摘要（待确认）</p>${markdownToHtml(thinkingBuf.slice(-1200))}`
+                    : '';
               onNodeMessage?.({
                 id: uid(),
                 role: 'assistant',

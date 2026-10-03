@@ -782,9 +782,22 @@ async function sendGraphRequest(request: GraphRequest, rejectedPlan: boolean) {
       if (response.needConfirm && response.buttons && response.buttons.length > 0) {
         showHarnessConfirm.value = true;
         pendingConfirmButtons.value = response.buttons;
+        // 确认条内容三级取源：正文 > 工具调用提炼(plan_exit.summary/命令) > 思考流兜底
+        const tcList = ((response as any).toolCalls || []) as any[];
+        const distilled = tcList
+          .map((t: any) => {
+            const inp = (t?.input || {}) as Record<string, any>;
+            if (typeof inp.summary === 'string' && inp.summary.trim()) return inp.summary.trim();
+            if (typeof inp.command === 'string' && inp.command.trim()) return `将执行命令：\`${inp.command.trim()}\``;
+            if (typeof inp.path === 'string' && t?.name) return `将操作文件：\`${inp.path}\`（${t.name}）`;
+            return t?.name ? `将调用工具：${t.name}` : '';
+          })
+          .filter(Boolean)
+          .join('\n\n');
         const planSrc = getThinkingTrack(String(response.threadId ?? '')).text || '';
         const bodySrc = sessionState.nodeBlocks.flat().map((n: any) => n.text || '').join('');
-        pendingConfirmPlanHtml.value = markdownToHtml((bodySrc.trim() ? bodySrc : planSrc).slice(0, 4000));
+        const pickSrc = bodySrc.trim() ? bodySrc : distilled || planSrc.slice(-1200);
+        pendingConfirmPlanHtml.value = pickSrc ? markdownToHtml(pickSrc.slice(0, 4000)) : '';
         pendingConfirmSessionId.value = response.threadId;
         pendingConfirmAgentId.value = Number(response.agentId);
       }

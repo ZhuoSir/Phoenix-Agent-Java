@@ -88,8 +88,10 @@ async function handleConfirmAction(
   // BL-22 架构修正：确认/取消只发放行信号——原 send 流在等待期保持打开并续播，
   // 不再二开消费流（历史上 confirm 响应含确认前全文导致需要删占位重建，现无此必要）
   const allowed = btn.action === 'confirm';
+  // 修复"弹窗不下去"：点击即整卡移除（原流占位气泡继续承接后续内容）
+  const remain = (chat.messagesByS[confirmSessionId] ?? []).filter((m: any) => m.id !== msg.id);
+  chat.messagesByS = { ...chat.messagesByS, [confirmSessionId]: [...remain] };
   try {
-    (msg as any).metadata = { ...metadata, buttons: [], decided: allowed ? 'confirmed' : 'cancelled' };
     await confirmFrontHarnessSignal({ sessionId: confirmSessionId, agentSn, agentId, allowed });
   } catch (error: any) {
     ElMessage.error(`操作失败: ${error?.message ?? error}`);
