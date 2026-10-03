@@ -337,6 +337,18 @@ export const apiChatTransport: ChatTransport = {
     if (!active) return false;
     let textBuf = '';
     let thinkBuf = '';
+    // BUG-61：追流重放是帧风暴（千帧一瞬灌入），每帧全量 markdown 渲染会打死主线程——150ms 节流合并
+    let lastPush = 0;
+    let pushTimer: ReturnType<typeof setTimeout> | null = null;
+    const pushNow = () => {
+      lastPush = Date.now();
+      onProgress?.(markdownToHtml(textBuf), thinkBuf || undefined);
+    };
+    const pushThrottled = () => {
+      const now = Date.now();
+      if (now - lastPush >= 150) { pushNow(); }
+      else if (!pushTimer) { pushTimer = setTimeout(() => { pushTimer = null; pushNow(); }, 150); }
+    };
     (async () => {
       try {
         const resp = await fetch(`/platform/harness/turn/stream?sessionId=${encodeURIComponent(sessionId)}`, { headers: { 'phoenix-token': token, Accept: 'text/event-stream' } });
@@ -356,10 +368,12 @@ export const apiChatTransport: ChatTransport = {
             try { p = JSON.parse(ln.slice(5)); } catch { continue; }
             if (p.content) textBuf += String(p.content);
             if (p.thinking) thinkBuf += String(p.thinking);
-            if (p.content || p.thinking) onProgress?.(markdownToHtml(textBuf), thinkBuf || undefined);
-            if (p.end) { onDone?.(); return; }
+            if (p.content || p.thinking) pushThrottled();
+            if (p.end) { if (pushTimer) { clearTimeout(pushTimer); pushTimer = null; } pushNow(); onDone?.(); return; }
           }
         }
+        if (pushTimer) { clearTimeout(pushTimer); pushTimer = null; }
+        pushNow();
         onDone?.();
       } catch {
         onDone?.();
