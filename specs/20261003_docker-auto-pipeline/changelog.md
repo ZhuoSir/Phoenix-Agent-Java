@@ -1,5 +1,8 @@
 # Changelog: docker-auto-pipeline
 
+## v1.0.0（2026-10-03）—— 确认①通过
+- 用户「确认」（确认人沿用陈卓默认，未异议）；requirements v0.2.0→v1.0.0 已确认；进入 Phase 2 Plan
+
 ## v0.2.0（2026-10-03）
 - Q1~Q4 用户裁决全落定（tar.gz / verify 失败退出 / 旧脚本保留兼容 / engine-debs 仅 Ubuntu22.04-x86_64 可选）；Q 区转决议记录；状态 草稿→待确认（第一重确认门待「确认」口令）
 
