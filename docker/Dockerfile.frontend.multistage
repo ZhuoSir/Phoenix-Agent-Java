@@ -3,6 +3,9 @@
 ARG NODE_IMAGE=node:22-bookworm
 ARG NGINX_IMAGE=nginx:latest
 FROM ${NODE_IMAGE} AS build
+# CI=true：构建上下文无 .git（.dockerignore 排除），monorepo 的 prepare 钩子
+# `is-ci || lefthook install` 会因装不了 git hooks 炸掉整个 pnpm install（五跑真抓）
+ENV CI=true
 RUN corepack enable
 WORKDIR /repo
 COPY web-frontend/ ./
