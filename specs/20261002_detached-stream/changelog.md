@@ -15,6 +15,11 @@
 ## 合并（2026-10-02）
 - 用户「合并吧」→ feature/detached-stream 10 提交（T-01~T-06+三修复+补漏）并入 main；v1.4.0 首单入账；不发版
 
+## 验收期修复补记（2026-10-03 早）
+- admin 双泡根除：saveNodeMessage 按 agent.type 分流，harness 客户端保存退役（R-05 收口，graph 流保留）；存量 6 行重复 html 行清理（同会话有 turnId 行才删，报告类型无涉）
+- admin 气泡合并卡：ThinkingBlock 从 v-for 根部移入 .message-content（think 上/回复下/同一气泡列对齐），content 纵排 gap 8px，thinking 灰卡+蓝竖线 vs 白底回复泡样式区分保留
+- BUG-57 全链终验（用户实测「有样式了」）：裸 div 分支气泡化 + :deep 规则入 scoped 块（全局块中 :deep 为非法选择器——教训入册）
+
 ## Implement 收口后缺陷（2026-10-02）BUG-57
 - 落库所有权移交的连锁反应：历史装载的旧 HTML 启发式对新 raw-markdown 行误伤（含标签即跳过转译）→ 双端样式偶发丢失；按「服务端行无条件转译、旧行保留启发式」修复
 - 教训入册：持久化内容形态变更（HTML→markdown）必须同批清点所有读取端启发式

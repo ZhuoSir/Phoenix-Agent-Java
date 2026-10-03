@@ -424,6 +424,9 @@ async function sendGraphRequest(request: GraphRequest, rejectedPlan: boolean) {
       node: GraphNodeResponse[],
     ): Promise<void> => {
       if (!node || node.length === 0) return;
+      // BL-22 R-05：harness 轮次由服务端 TurnManager 落库（单行 markdown），客户端保存退役防双泡；
+      // graph(NL2SQL) 流不经 TurnManager，保存链路维持原样
+      if (agent.value.type === 'harness') return;
 
       const first = node[0]!;
       if (first.textType === TextType.RESULT_SET) {
@@ -1334,24 +1337,31 @@ onMounted(async () => {
                   : ''
               "
             >
-              <!-- thinking-display T-04：历史回显（metadata.thinking 解析后挂此） -->
-              <ThinkingBlock
-                v-if="message.role === 'assistant' && (message as any).thinking"
-                :content="(message as any).thinking"
-                :duration-ms="(message as any).thinkingMs"
-                :has-content="true"
-                :streaming="false"
-              />
               <div
                 v-if="(message as any).metadata && (message as any).metadata.interrupted"
                 class="run-interrupted-tip"
               >
                 ⚠ 输出在页面刷新时中断，以下为已生成部分
               </div>
-              <div
-                v-if="message.messageType === 'html'"
-                v-html="message.content"
-              ></div>
+              <!-- BUG-57 真修：html 分支原来是裸 div（无任何容器/样式），服务端 markdown 行转 html 后
+                   全走这里导致"渲染没效果"——现套用与 text 分支一致的消息气泡结构 -->
+              <div v-if="message.messageType === 'html'" :class="['message', message.role]">
+                <div class="message-avatar">
+                  <el-avatar :size="32" style="font-size:16px;font-weight:600;color:#fff;background:#2f6bff">
+                    {{ message.role === 'user' ? '我' : (agent.name?.charAt(0) || 'AI') }}
+                  </el-avatar>
+                </div>
+                <div class="message-content">
+                  <ThinkingBlock
+                    v-if="message.role === 'assistant' && (message as any).thinking"
+                    :content="(message as any).thinking"
+                    :duration-ms="(message as any).thinkingMs"
+                    :has-content="true"
+                    :streaming="false"
+                  />
+                  <div class="message-text" v-html="message.content"></div>
+                </div>
+              </div>
               <div
                 v-else-if="message.messageType === 'result-set'"
                 class="result-set-message"
@@ -1436,6 +1446,13 @@ onMounted(async () => {
                   </el-avatar>
                 </div>
                 <div class="message-content">
+                  <ThinkingBlock
+                    v-if="message.role === 'assistant' && (message as any).thinking"
+                    :content="(message as any).thinking"
+                    :duration-ms="(message as any).thinkingMs"
+                    :has-content="true"
+                    :streaming="false"
+                  />
                   <div
                     class="message-text"
                     v-html="formatMessageContent(message)"
@@ -1779,8 +1796,15 @@ onMounted(async () => {
 }
 
 .message-content {
+  display: flex;
   flex: 1;
+  flex-direction: column;
+  gap: 8px;
   min-width: 0;
+}
+
+.message-content :deep(.thinking) {
+  margin-bottom: 0;
 }
 
 .message-text {
@@ -2062,6 +2086,22 @@ onMounted(async () => {
     flex-direction: column;
   }
 }
+.message :deep(h1), .message :deep(h2), .message :deep(h3) { margin: 10px 0 6px; font-weight: 600; line-height: 1.4; }
+.message :deep(h1) { font-size: 17px; }
+.message :deep(h2) { font-size: 15px; }
+.message :deep(h3) { font-size: 14px; }
+.message :deep(p) { margin: 6px 0; }
+.message :deep(ul), .message :deep(ol) { padding-left: 22px; margin: 6px 0; }
+.message :deep(li) { margin: 2px 0; }
+.message :deep(code) { padding: 1px 5px; font-family: ui-monospace, Menlo, monospace; font-size: 12px; background: #f2f3f5; border-radius: 4px; }
+.message :deep(pre) { padding: 10px 12px; margin: 8px 0; overflow-x: auto; background: #f6f7f8; border-radius: 8px; }
+.message :deep(pre code) { padding: 0; background: none; }
+.message :deep(table) { margin: 8px 0; border-collapse: collapse; font-size: 13px; }
+.message :deep(th), .message :deep(td) { padding: 5px 10px; border: 1px solid #e4e7ed; }
+.message :deep(th) { background: #f5f7fa; }
+.message :deep(blockquote) { margin: 8px 0; padding: 2px 12px; color: #6b7280; border-left: 3px solid #d0d7e2; }
+.message :deep(a) { color: #4a6cf7; text-decoration: none; }
+.message :deep(hr) { margin: 10px 0; border: none; border-top: 1px solid #eceef2; }
 </style>
 
 <style>
@@ -2349,20 +2389,4 @@ onMounted(async () => {
   background: #fff;
   border-radius: 6px;
 }
-.message :deep(h1), .message :deep(h2), .message :deep(h3) { margin: 10px 0 6px; font-weight: 600; line-height: 1.4; }
-.message :deep(h1) { font-size: 17px; }
-.message :deep(h2) { font-size: 15px; }
-.message :deep(h3) { font-size: 14px; }
-.message :deep(p) { margin: 6px 0; }
-.message :deep(ul), .message :deep(ol) { padding-left: 22px; margin: 6px 0; }
-.message :deep(li) { margin: 2px 0; }
-.message :deep(code) { padding: 1px 5px; font-family: ui-monospace, Menlo, monospace; font-size: 12px; background: #f2f3f5; border-radius: 4px; }
-.message :deep(pre) { padding: 10px 12px; margin: 8px 0; overflow-x: auto; background: #f6f7f8; border-radius: 8px; }
-.message :deep(pre code) { padding: 0; background: none; }
-.message :deep(table) { margin: 8px 0; border-collapse: collapse; font-size: 13px; }
-.message :deep(th), .message :deep(td) { padding: 5px 10px; border: 1px solid #e4e7ed; }
-.message :deep(th) { background: #f5f7fa; }
-.message :deep(blockquote) { margin: 8px 0; padding: 2px 12px; color: #6b7280; border-left: 3px solid #d0d7e2; }
-.message :deep(a) { color: #4a6cf7; text-decoration: none; }
-.message :deep(hr) { margin: 10px 0; border: none; border-top: 1px solid #eceef2; }
 </style>
