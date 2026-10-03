@@ -2,3 +2,5 @@
 backup/
 phoenix-*-images.tar.gz*
 .stage/
+dist/
+*.tar.gz

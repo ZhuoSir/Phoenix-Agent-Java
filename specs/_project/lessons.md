@@ -123,5 +123,15 @@
 - 复发: ×1
 - 关联: Windows Server 2022 部署支援轮、f31c3f2/d0b4552
 
+## L-13 git add 面过宽吞大产物（差点废掉整条分支推送）
+- 分类: 工具链
+- 触发场景: `git add <目录>` 收工提交，目录下混有构建产物
+- 坑: T-06 提交用 `git add docker/`，把 docker/dist 三个测试包（**3.9GB**，单文件超 GitHub 100MB 硬限）整体吞进历史；push 卡死，用户点破才发现。幸而未推出去，filter-branch 重写 30 提交排爆
+- 根因: add 面大于意图面 + 产物目录未 ignore + 提交前不看 staged 清单
+- 防再犯规则: ①构建产物目录（dist/.stage/*.tar.gz/engine debs）**先入 .gitignore 再开写**（本条事后已补 docker/.gitignore）②提交前 `git diff --cached --stat | tail -3` 扫一眼，出现 >1MB 非预期文件立即 `git reset` 重挑③禁止对含产物子树的目录整体 `git add`，逐文件或已 ignore 兜底
+- 状态: active
+- 复发: ×1
+- 关联: docker-auto-pipeline fbb20f7(重写前)；用户抓出
+
 <!-- 去重：记前先 grep "L-" 找同类，同类加复发计数不新开号；
      长度控制：active 超 ~80 条触发季度审，休眠/退休挪到文件尾"冷库"区 -->
