@@ -107,7 +107,14 @@ phx_step 4 $TOTAL "镜像 load" && {
 phx_step 5 $TOTAL ".env 生成/保留" && {
   ENVF="$PAYLOAD/docker/.env"
   if [ -f "$ENVF" ]; then
-    phx_log INFO ".env 已存在——保留原值不覆盖（R-07）"
+    # R-07 保留原值，但 IMAGE_TAG 必须跟随包版本（升级主键——否则旧 tag 起旧镜像，测试前自检抓出的真缺陷）
+    CUR=$(grep '^IMAGE_TAG=' "$ENVF" | head -1 | cut -d= -f2 | awk '{print $1}')
+    if [ "$CUR" != "$VERSION" ]; then
+      sed -i.bak "s|^IMAGE_TAG=.*|IMAGE_TAG=$VERSION|" "$ENVF" && rm -f "$ENVF.bak"
+      phx_log INFO ".env 已存在：IMAGE_TAG $CUR→$VERSION 更新，其余键保留（密码/端口不动）"
+    else
+      phx_log INFO ".env 已存在且 tag 一致——原值全保留（R-07）"
+    fi
   else
     cp "$PAYLOAD/docker/.env.example" "$ENVF"
     if command -v openssl >/dev/null 2>&1; then PGPW=$(openssl rand -hex 16)
