@@ -318,6 +318,10 @@ public class HarnessTurnManager {
             if (status.equals(STATUS_TIMEOUT) || status.equals(STATUS_CANCELLED)) {
                 content.append(suffix == null ? "" : suffix);
             }
+            // 模型偶发「工具全执行完但跳过收尾正文」（BUG-59 三报）：诚实注记兜底，不让用户面对空气泡
+            if (status.equals(STATUS_DONE) && content.length() == 0 && thinking.length() > 0) {
+                content.append("ℹ️ 本轮已完成工具执行但未输出正文总结（产物见文件面板）。如需说明请追问。");
+            }
             if (messageId != null) {
                 try {
                     ChatMessage row = new ChatMessage();

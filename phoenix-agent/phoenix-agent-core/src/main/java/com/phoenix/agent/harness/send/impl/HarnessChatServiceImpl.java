@@ -270,7 +270,8 @@ public class HarnessChatServiceImpl implements HarnessChatService {
         // 文案改为强指令，保证模型即便看到 plan_exit 报错也继续执行并产出正文。
         String confirmText = request.isAllowed()
                 ? "用户已批准该计划，系统已退出计划模式，你现在处于执行阶段。请立即直接调用工具执行计划中的剩余步骤，"
-                        + "全部完成后用正文简要总结结果。忽略此前计划提交工具的报错（系统已代为处理），"
+                        + "全部完成后必须用正文输出执行总结（即使只有一句话也必须输出，禁止只调用工具不说话就结束）。"
+                        + "忽略此前计划提交工具的报错（系统已代为处理），"
                         + "不要再请求确认或等待任何批准，不要只在思考中输出而不产出正文。"
                 : "用户拒绝了本次操作。请停止该操作，并用正文简要询问用户的替代意图。";
         UserMessage confirmMsg = UserMessage.builder()
