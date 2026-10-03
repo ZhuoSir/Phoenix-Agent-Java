@@ -8,9 +8,9 @@
 - 触发场景: python replace / sed / 正则包裹改源码或文档
 - 坑: 锚点差一字（`export async function` vs `export function`）、大小写（`AND a.del_flag` vs `where`）、正则插入点错位（括号插到错误分号）、甚至 `write(c)` 把变量写错成路径字符串**覆盖了 changelog**。历史复发 ≥5 次，多次造成"改了但没生效"的连环排查
 - 根因: 替换不校验命中数，改后不回读
-- 防再犯规则: 每处文本替换必须 `assert s.count(old)==1` 后再 replace；sed 后立即 grep 复核（旧串残留=0、新串计数=预期）；批量替换脚本跑完必须回读目标文件关键行
+- 防再犯规则(回炉v2): 台账/文档编辑**禁止裸 `s.replace`**，一律走带 `assert s.count(old)==1` 的 edit 助手；锚点必须**先读实文再复制**（禁止凭记忆默写——M4 落账「发版」vs 实文「发布（演练+tag）」即默写脱靶）；批量编辑后**逐文件回读**被动过的关键行；commit message 声称的内容必须与 `git show --stat` 实际文件清单核对后才允许提交
 - 状态: active
-- 复发: ×1（建账前历史 ≥5 次，规则自本条起算）
+- 复发: ×2 ⚠（建账当日 M4 落账再犯×2：MILESTONE 裸 replace 表格挤压+M4 漏勾被用户抓出；lessons 自身锚点默写脱靶致 commit message 与内容不符——规则回炉如上）
 - 关联: BUG-57 二发/四发、detached-stream changelog「漏提交找回」
 
 ## L-02 日志截断误导取证，差点冤枉用户

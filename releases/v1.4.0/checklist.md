@@ -5,4 +5,4 @@
 - [x] 全新库全链演练：phoenix_fresh 重放 exit=0 / 台账 9 行 / 表 56 / 零错误，已清库（postgres:16-alpine 本地缺失被 Hub 断连卡住，改用本地 pgvector 镜像当 psql 客户端跑 migrate.sh——L-12 现场应用）
 - [x] 三板斧：用户当日浏览器多轮实测（追流/确认卡/文件面板，验收期补记在案）+ 服务端 curl 演练（2/2 计划确认全绿）；确认卡最新版视觉待用户复核（非阻塞，样式类）
 - [x] bugs.md：16 单翻「已发布(v1.4.0)」
-- [x] 版本分支打 tag v1.4.0 + 根 CHANGELOG + version.md 翻已发布 —— 本笔；「合并 main」「push」待用户口令
+- [x] 版本分支打 tag v1.4.0 + 根 CHANGELOG + version.md 翻已发布 —— 本笔；「合并 main」「push」已完成（2026-10-03 用户「合并 并且 Push」：main=7fcad72 / 分支+tag 三 ref 全同步）
