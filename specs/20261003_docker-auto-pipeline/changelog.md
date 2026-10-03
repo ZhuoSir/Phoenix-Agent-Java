@@ -1,5 +1,8 @@
 # Changelog: docker-auto-pipeline
 
+## 合并（2026-10-03）
+- 用户「合并进1.5.0分支吧」→ feature/docker-auto-pipeline（~22 commits）--no-ff 并入 v1.5.0，分支已删；amd64 正式包不在本机打（用户裁决：直接在 Server 2022 真机试装，走 WSL2 操作单/自建路线，真机日志回传即 T-04/T-05 延期项验证）
+
 ## T-02+T-03 完成（2026-10-03）八跑收敛+三连测全绿
 - T-02：t02a(1.08GB)+t02b 五镜像版(1.4GB) 双包出货；证据=Hub直连0/国内源13处/解包sha全对/manifest JSON自检/--overseas接线干跑(官方名+default settings✓,断网exit1预期内)/失败输出格式五跑实证；amd64 按 tasks v1.1.0 降级口径(薄组装已实证)
 - T-03：**九步真装全绿 exit=0 仅39秒**(镜像本地时)——IMAGE_TAG v1.3.0→t02b 升级分支实测过；幂等重跑 9/9 步全跳+栈不抖；篡改拒装点名 BAD: docs/INSTALL.md exit=1；栈取证:4容器healthy+9180登录出token+迁移台账9行(五镜像payload+替身migrator全链成立)
