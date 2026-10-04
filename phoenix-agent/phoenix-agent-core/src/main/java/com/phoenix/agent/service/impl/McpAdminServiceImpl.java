@@ -188,7 +188,8 @@ public class McpAdminServiceImpl implements McpAdminService {
             mcpServerInfoMapper.update(entity);
             log.info("MCP 配置更新: id={}, name={}, by={}", entity.getId(), entity.getName(), operator);
         }
-        return ReturnVo.ok(entity.getId());
+        // 双参重载防歧义：ok(String) 会命中 ok(msg) 而非 ok(data)——String 型 data 必须走 ok(msg,data)
+        return ReturnVo.ok("保存成功", entity.getId());
     }
 
     @Override
