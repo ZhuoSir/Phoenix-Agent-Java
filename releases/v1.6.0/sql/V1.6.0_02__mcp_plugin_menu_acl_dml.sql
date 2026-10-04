@@ -7,13 +7,9 @@
 -- 回滚: rollback/R1.6.0_02__mcp_plugin_menu_acl_dml.sql
 -- ============================================
 
--- 插件市场三层菜单：插件市场(目录) → 插件管理(目录) → MCP(页面)
+-- 插件管理两层菜单（2026-10-04 用户裁决：市场与管理本质同一，去掉市场层）：插件管理(顶级目录) → MCP(页面)
 INSERT INTO tbl_privilege_module (id, pid, name, url, sn, component, type, order_no, is_show, status, image, create_time, del_flag)
-SELECT md5('phoenix-plugin-market'), '', '插件市场', '/plugin-market', 'PluginMarket', NULL, 0, 17, 1, 1, 'lucide:store', now(), 0
-WHERE NOT EXISTS (SELECT 1 FROM tbl_privilege_module WHERE id = md5('phoenix-plugin-market'));
-
-INSERT INTO tbl_privilege_module (id, pid, name, url, sn, component, type, order_no, is_show, status, image, create_time, del_flag)
-SELECT md5('phoenix-plugin-manage'), md5('phoenix-plugin-market'), '插件管理', '/plugin-market/manage', 'PluginManage', NULL, 0, 0, 1, 1, 'lucide:layout-grid', now(), 0
+SELECT md5('phoenix-plugin-manage'), '', '插件管理', '/plugin-manage', 'PluginManage', NULL, 0, 17, 1, 1, 'lucide:layout-grid', now(), 0
 WHERE NOT EXISTS (SELECT 1 FROM tbl_privilege_module WHERE id = md5('phoenix-plugin-manage'));
 
 INSERT INTO tbl_privilege_module (id, pid, name, url, sn, component, type, order_no, is_show, status, image, create_time, del_flag)
@@ -24,7 +20,7 @@ WHERE NOT EXISTS (SELECT 1 FROM tbl_privilege_module WHERE id = md5('phoenix-plu
 INSERT INTO tbl_privilege_acl (id, release_id, release_sn, system_sn, module_id, module_sn, acl_state, create_time, del_flag)
 SELECT gen_random_uuid()::text, a.release_id, a.release_sn, a.system_sn, m.mid, a.module_sn, a.acl_state, now(), 0
 FROM tbl_privilege_acl a
-CROSS JOIN (VALUES (md5('phoenix-plugin-market')), (md5('phoenix-plugin-manage')), (md5('phoenix-plugin-mcp'))) AS m(mid)
+CROSS JOIN (VALUES (md5('phoenix-plugin-manage')), (md5('phoenix-plugin-mcp'))) AS m(mid)
 WHERE a.module_id = 'f0c0d2d3a7bb452cb5ff98328575b41a'
   AND a.del_flag = 0
   AND NOT EXISTS (

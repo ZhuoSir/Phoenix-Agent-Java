@@ -1,6 +1,7 @@
 # Plan: mcp-client-tools（插件市场 · MCP 统一管理）
 
-> 版本: v1.0.0 | 状态: 已确认 | 确认人: 陈卓 | 确认日期: 2026-10-04 | 更新: 2026-10-04
+> 版本: v1.1.0 | 状态: 待重确认 | 确认人: 陈卓(v1.0.0) | 更新: 2026-10-04
+> v1.0.0→v1.1.0：用户指令去市场层——§1.1 菜单 DML 两件改单件顶级、§1.4 三层改两层；其余不变
 > 规范路由（.specrc.yml）：api-design=global / database=global / code-backend=global / code-frontend=none（跟随周边风格）/ git-workflow=global（v1.6.0 版本分支制）
 
 ## 〇、坑核对（lessons.md 全 14 条 active 逐条过）
@@ -29,7 +30,7 @@
 | `tbl_platform_group_mcp_info` | tbl_platform_group_skill_info | group_id+mcp_id（注意 L：group_agent 的 agent_id 是 varchar 的历史坑——本表列型与模板逐一对齐，BUG-14 级联教训：删除时同步清理） |
 | `tbl_data_agent_mcp_info` | tbl_data_agent_skill_info | agent_id+mcp_id 绑定 |
 
-菜单 DML：「插件市场」顶级 +「插件管理」子级 +「MCP」页（镜像 V1.2.0_02 技能菜单种子写法，含 ACL）。
+菜单 DML：「插件管理」顶级 +「MCP」页两层（镜像 V1.2.0_02 技能菜单种子写法，含 ACL；2026-10-04 用户裁决去市场层）。
 
 ### 1.2 后端（phoenix-agent 模块，与技能同模块同构）
 - `McpAdminService(+Impl)`：CRUD/启停/组授权/绑定管理/删除防悬挂（被绑定则拒删并列出智能体，R-01）——镜像 `SkillAdminServiceImpl`
@@ -47,7 +48,7 @@
 - 产出：spike 报告入 changelog，选定路线+理由，若两路线皆不可行→回 requirements 层重议（铁律6）
 
 ### 1.4 前端（admin-ui，镜像技能管理页结构）
-- 菜单路由三层：插件市场/插件管理/MCP（access.ts glob 自动收录组件）
+- 菜单路由两层：插件管理(顶级)/MCP（access.ts glob 自动收录组件；v1.1.0 用户裁决去市场层）
 - MCP 列表页（搜索分页+状态+授权组数+绑定数）/详情页（只读配置+工具清单+授权组+绑定智能体）/编辑抽屉（表单+测试连接按钮+脱敏回显）
 - 智能体编辑页：MCP 多选绑定块（镜像知识库/技能绑定组件同构）
 - 对话端：零改动（Q3 决议=现有工具轨迹样式，来源标识随工具名带出）

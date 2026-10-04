@@ -1,5 +1,10 @@
 # Changelog: mcp-client-tools
 
+## requirements/plan v1.1.0 待重确认（2026-10-04）——菜单层级修订
+- 用户指令：「插件市场这个目录暂时先去掉，就是插件管理，插件市场和管理本质是一个」→ Q4 决议入档
+- requirements：R-01 顶级菜单改插件管理 / A-6 两层结构 / Q4 决议记录；plan：§1.1 DML 改两层 / §1.4 三层改两层；铁律3 双文档 bump 待重确认
+- V1.6.0_02 DML 同步改写（管理升顶级 pid=''，url /plugin-manage，ACL 两模块）；R1.6.0_02 保留三 id 全删（防御两代形态）；dev 库重放
+
 ## T-07 代码完成+API 级验证全绿（2026-10-04）——UI 走查与 T-06 合并待用户
 - 交付：后端 McpOptionVO/McpBindDTO + options/bound/bind 三端点（覆盖式物理删重建，镜像技能；仅启用可新绑、已绑停用保留）+ AgentServiceImpl 级联 n6（对齐 int nX 风格并入日志行）；前端 mcp.ts 三函数 + AgentMcpConfig.vue（1:1 镜像 AgentSkillConfig）+ 编辑页挂载块
 - 验证：①options=启用池✓ ②bind→bound 回读一致✓ ③新绑停用拒 46103✓/已绑停用保留 100✓ ④**级联实弹三证**：cascade 日志 `mcp=1` + 绑定行 del_flag=1 + agent 行消失（fixture agent 99901）⑤组件 chunk AgentMcpConfig-uyAwyqew.js 入包✓ ⑥typecheck 213=基线 + verify=0 + 夹具全清
