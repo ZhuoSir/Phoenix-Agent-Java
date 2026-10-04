@@ -145,14 +145,19 @@ phx_step 6 $TOTAL "compose up（项目名 $PROJECT）" && {
   phx_step_mark 6
 }
 
-phx_step 7 $TOTAL "等待 healthy（${TIMEOUT}s 上限，5s 轮询——L-08 确定性等待）" && {
+phx_step 7 $TOTAL "等待 migrator 完成 + backend healthy（${TIMEOUT}s 上限，5s 轮询——L-08 确定性等待）" && {
+  # 竞态修复（演练四实证）：backend 不依赖 migrator 完成，Spring 起动可能快过迁移脚本——
+  # 只等 backend healthy 会让 verify 撞上半迁移库（台账0行/表缺）。两个 migrator exited(0) 也是放行条件。
   i=0
   while [ $i -lt "$TIMEOUT" ]; do
     ST=$(docker inspect --format '{{.State.Health.Status}}' "${PROJECT}-backend-1" 2>/dev/null || echo missing)
-    [ "$ST" = "healthy" ] && break
+    M1=$(docker inspect --format '{{.State.ExitCode}}' "${PROJECT}-migrator-1" 2>/dev/null || echo running)
+    M2=$(docker inspect --format '{{.State.ExitCode}}' "${PROJECT}-migrator-post-1" 2>/dev/null || echo running)
+    if [ "$ST" = "healthy" ] && [ "$M1" = "0" ] && [ "$M2" = "0" ]; then break; fi
     i=$((i+5)); sleep 5
   done
   [ "$ST" = "healthy" ] || phx_fail 7 $TOTAL "backend 未在 ${TIMEOUT}s 内 healthy（当前=$ST；docker logs ${PROJECT}-backend-1 看详情）"
+  { [ "$M1" = "0" ] && [ "$M2" = "0" ]; } || phx_fail 7 $TOTAL "migrator 未正常完成（migrator=$M1 migrator-post=$M2；docker logs ${PROJECT}-migrator-1 看详情）"
   phx_step_mark 7
 }
 
