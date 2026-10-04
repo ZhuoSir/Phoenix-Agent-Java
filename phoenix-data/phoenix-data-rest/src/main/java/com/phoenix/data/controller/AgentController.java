@@ -84,10 +84,40 @@ public class AgentController {
      * Publish agent
      */
     @PostMapping("/{id}/publish")
-    public Agent publish(@PathVariable Long id) {
+    public Agent publish(@PathVariable Long id,
+            @org.springframework.web.bind.annotation.RequestBody(required = false) com.phoenix.data.dto.AgentPublishDTO dto) {
         Agent agent = checkAgentExists(id);
+        // agent-publish-group-grant R-01：body 带 groupIds 则发布同时覆盖式授权；无 body=老行为（A-1 向后兼容）
+        if (dto != null && dto.getGroupIds() != null) {
+            agentService.replaceGroupGrants(id, dto.getGroupIds(), currentOperator());
+        }
         agent.setStatus("published");
         return agentService.saveAgent(agent);
+    }
+
+    /** 已授权组回显（R-02 编辑面） */
+    @GetMapping("/{id}/groups")
+    public ReturnVo<java.util.List<String>> getGroups(@PathVariable Long id) {
+        checkAgentExists(id);
+        return ReturnVo.ok(agentService.getGrantGroupIds(id));
+    }
+
+    /** 覆盖式调整授权（R-02；技能 /{id}/groups 同构） */
+    @PutMapping("/{id}/groups")
+    public ReturnVo<Boolean> updateGroups(@PathVariable Long id,
+            @org.springframework.web.bind.annotation.RequestBody com.phoenix.data.dto.AgentPublishDTO dto) {
+        checkAgentExists(id);
+        agentService.replaceGroupGrants(id, dto.getGroupIds(), currentOperator());
+        return ReturnVo.ok(Boolean.TRUE);
+    }
+
+    private String currentOperator() {
+        try {
+            return cn.dev33.satoken.stp.StpUtil.getLoginIdAsString();
+        }
+        catch (Exception e) {
+            return "unknown";
+        }
     }
 
     /**

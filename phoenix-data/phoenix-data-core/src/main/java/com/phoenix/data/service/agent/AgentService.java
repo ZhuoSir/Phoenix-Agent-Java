@@ -69,6 +69,17 @@ public interface AgentService extends IService<Agent> {
 	void deleteById(Long id);
 
 	/**
+	 * 智能体已授权组 id 集（agent-publish-group-grant T-01）。
+	 */
+	java.util.List<String> getGrantGroupIds(Long agentId);
+
+	/**
+	 * 覆盖式重写组授权（物理删后重建，镜像技能 replaceGroupGrants）。
+	 * 目标组不存在抛 ResponseStatusException(BAD_REQUEST)。空列表=清空（新语义即全公开）。
+	 */
+	void replaceGroupGrants(Long agentId, java.util.List<String> groupIds, String operator);
+
+	/**
 	 * 删除 API Key
 	 */
 	Agent deleteApiKey(Long id);
