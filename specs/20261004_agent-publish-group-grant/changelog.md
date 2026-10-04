@@ -1,5 +1,11 @@
 # Changelog: agent-publish-group-grant
 
+## 分支纠偏（2026-10-04）spec 文档迁入正确分支
+- 用户发现工作区看不到本 spec 文件夹——根因：立项~tasks 确认的 7 笔提交顺手落在了 feature/mcp-client-tools（MCP 收尾后未切分支），本 feature 分支基点 v1.6.0 不含它们
+- 修复：`git checkout feature/mcp-client-tools -- specs/20261004_agent-publish-group-grant/` 整目录迁移 + 共享台账（backlog/version/MILESTONE）BL-04 增量在本分支重放（b94a851）
+- 险情如实记：迁移时误用 `git stash -u`，.pnpm-store 数十万未跟踪文件被卷入，命令卡死被击杀——现场核查：T-01 未提交代码完好、stash 快照冗余已 drop、无损恢复
+- 账实不符第二例如实记：b94a851 提交语声称"L-06 计次×5 入 lessons"，实际 python 在 lessons 锚点 assert 死（本分支 L-06 还是 ×3，四犯记录在 MCP 分支未含）——lessons/changelog 未写。本笔补正：L-06 直接写全局终态 ×5（四犯抽屉+五犯 stash 注记合并，M4 合并以此行为准）
+
 ## tasks v1.0.0（2026-10-04）—— 确认③通过，三重门全绿
 - 用户「确认」；tasks v0.1.0→v1.0.0 已确认（陈卓）；三重门自检后切 feature/agent-publish-group-grant（基点 v1.6.0），进入 Phase 4，首任务=T-01
 
