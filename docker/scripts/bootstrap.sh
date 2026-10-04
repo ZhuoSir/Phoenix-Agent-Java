@@ -24,7 +24,9 @@ done
 if [ -z "$VERSION" ]; then VERSION=$(git -C "$SRC" describe --tags 2>/dev/null | sed 's/^v//'); fi
 [ -z "$VERSION" ] && VERSION="1.5.0-local"
 ARCH=$(uname -m); case "$ARCH" in x86_64) ARCH=amd64;; aarch64|arm64) ARCH=arm64;; esac
-export PHX_LOG_FILE="$HOME/.phoenix/bootstrap-$(date +%Y%m%d-%H%M%S).log"   # 强制 bootstrap 前缀（source common 后再设会被其默认值占位——命名小bug同修）
+# 强制 bootstrap 前缀（source common 后再设会被其默认值占位——命名小bug同修）；拆分声明避开 SC2155
+PHX_LOG_FILE="$HOME/.phoenix/bootstrap-$(date +%Y%m%d-%H%M%S).log"
+export PHX_LOG_FILE
 phx_log_init
 phx_log INFO "bootstrap 开始: src=$SRC version=$VERSION arch=$ARCH project=$PROJECT port=${PORT:-默认}"
 
