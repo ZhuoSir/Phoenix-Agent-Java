@@ -15,6 +15,9 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ConfirmRequest implements Serializable {
+
+    /** 渠道标记：admin/front（T-05 MCP 挂载口径；null 按 admin） */
+    private String channel;
     private String userId;
     /**
      * 会话 ID，用于后端定位到具体的 Agent 实例和对应的 Flux 事件流

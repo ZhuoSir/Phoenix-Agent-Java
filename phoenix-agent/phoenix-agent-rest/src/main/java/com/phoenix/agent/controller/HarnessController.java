@@ -50,6 +50,7 @@ public class HarnessController {
     public Flux<ServerSentEvent<Map<String, Object>>> confirm(@RequestBody ConfirmRequest confirmRequest) {
         String userId = StpUtil.getLoginIdAsString();
         confirmRequest.setUserId(userId);
+        confirmRequest.setChannel("admin");
         // 诊断留痕（确认链路排障期）：入参原样记录
         log.info("[confirm-in] session={} agentId={} allowed={} user={}", confirmRequest.getSessionId(),
                 confirmRequest.getAgentId(), confirmRequest.isAllowed(), userId);
@@ -129,6 +130,7 @@ public class HarnessController {
                 .harnessSn(harnessRequest.getHarnessSn())
                 .agentId(harnessRequest.getAgentId())
                 .enabledSkillIds(harnessRequest.getEnabledSkillIds())
+                .channel("admin")
                 .build();
         return SseSupport.withHeartbeat(turnManager.openOrReject(harnessRequest.getSessionId(),
                 () -> harnessChatService.stream(request).map(HarnessEventMapper::toEventMap)));
