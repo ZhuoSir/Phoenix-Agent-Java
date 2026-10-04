@@ -97,3 +97,30 @@ export async function grantMcpGroupsApi(id: string, groupIds: string[]) {
 export async function testMcpApi(payload: Record<string, any>) {
   return requestClient.post<any>('/api/mcp/test', payload, { responseReturn: 'body' });
 }
+
+/** T-07：智能体编辑页绑定选项（启用池 ∪ 已绑定；停用且未绑定不可新选） */
+export interface McpOption {
+  bound: boolean;
+  id: string;
+  name: string;
+  status: string;
+  transport: string;
+}
+
+export async function getMcpOptionsApi(agentId: number) {
+  return requestClient.get<any>('/api/mcp/options', {
+    params: { agentId },
+    responseReturn: 'body',
+  });
+}
+
+export async function getAgentBoundMcpsApi(agentId: number) {
+  return requestClient.get<any>('/api/mcp/bound', {
+    params: { agentId },
+    responseReturn: 'body',
+  });
+}
+
+export async function bindAgentMcpsApi(agentId: number, mcpIds: string[]) {
+  return requestClient.put<any>('/api/mcp/bind', { agentId, mcpIds }, { responseReturn: 'body' });
+}

@@ -28,4 +28,13 @@ public interface McpAdminService {
     ReturnVo<Boolean> grantGroups(String mcpId, List<String> groupIds);
 
     ReturnVo<McpTestResultVO> testConnection(McpTestDTO dto);
+
+    /** T-07：智能体编辑页绑定选项池（启用池 ∪ 已绑定，镜像技能 options 语义）。 */
+    ReturnVo<java.util.List<com.phoenix.agent.model.McpOptionVO>> options(Long agentId);
+
+    /** T-07：智能体已绑定 MCP id 集。 */
+    ReturnVo<java.util.List<String>> boundIds(Long agentId);
+
+    /** T-07：覆盖式保存智能体 MCP 绑定（仅启用可新绑；已绑定的停用项可保留）。 */
+    ReturnVo<Boolean> bind(Long agentId, java.util.List<String> mcpIds, String operator);
 }

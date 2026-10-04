@@ -1,5 +1,10 @@
 # Changelog: mcp-client-tools
 
+## T-07 代码完成+API 级验证全绿（2026-10-04）——UI 走查与 T-06 合并待用户
+- 交付：后端 McpOptionVO/McpBindDTO + options/bound/bind 三端点（覆盖式物理删重建，镜像技能；仅启用可新绑、已绑停用保留）+ AgentServiceImpl 级联 n6（对齐 int nX 风格并入日志行）；前端 mcp.ts 三函数 + AgentMcpConfig.vue（1:1 镜像 AgentSkillConfig）+ 编辑页挂载块
+- 验证：①options=启用池✓ ②bind→bound 回读一致✓ ③新绑停用拒 46103✓/已绑停用保留 100✓ ④**级联实弹三证**：cascade 日志 `mcp=1` + 绑定行 del_flag=1 + agent 行消失（fixture agent 99901）⑤组件 chunk AgentMcpConfig-uyAwyqew.js 入包✓ ⑥typecheck 213=基线 + verify=0 + 夹具全清
+- 排障实录×2（皆我方工装非产品码）：①夹具插错列——tbl_data_agent 无 del_flag（PSQL 包装吞 stderr 又栽一次，L-03 重申）②"500"真相=重复 DELETE 已删 agent 的 404 被 GlobalExceptionHandler 包装——**BUG-64 已入册**（404→500 语义失真，既有行为，低优先）
+
 ## T-06 代码完成部署（2026-10-04）——UI 走查待用户（与 T-07 合并一次做）
 - 交付：api/core/mcp.ts（8 函数，/api/mcp 全路径+responseReturn:body 镜像 skill.ts 惯例）+ views/plugin/mcp/index.vue 467 行（列表搜索分页/传输 tag/启停 switch/授权组数/绑定数/操作列详情·编辑·授权·删除；编辑抽屉=四传输条件表单+headers/env KV 编辑器+stdio 风险 Alert(R-05)+掩码说明 Alert+测试连接结果区；详情抽屉=脱敏只读；授权弹窗=组多选覆盖式）
 - 验证：vue-tsc **213=基线分毫不差**（先 +5 全在我页——el-table DefaultRow 推断，签名放宽 any 修复）；build 7756 模块绿；chunk mcp-rcSPhu8W.js HTTP=200；菜单树 API 含插件市场>插件管理>MCP 三层；verify=0

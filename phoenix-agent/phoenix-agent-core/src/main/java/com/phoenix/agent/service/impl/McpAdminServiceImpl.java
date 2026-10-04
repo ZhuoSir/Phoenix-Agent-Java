@@ -368,6 +368,96 @@ public class McpAdminServiceImpl implements McpAdminService {
         return ReturnVo.ok(vo);
     }
 
+    @Override
+    public ReturnVo<List<com.phoenix.agent.model.McpOptionVO>> options(Long agentId) {
+        Set<String> bound = new HashSet<>(boundIdSet(agentId));
+        List<com.phoenix.agent.model.McpOptionVO> result = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
+        // 启用池
+        for (McpServerInfo e : mcpServerInfoMapper
+            .selectListByQuery(QueryWrapper.create().where("status = ?", "enabled").and("del_flag = 0"))) {
+            result.add(toOption(e, bound.contains(e.getId())));
+            seen.add(e.getId());
+        }
+        // 已绑定但停用/下线的保留展示（镜像技能：可手动解绑）
+        for (String id : bound) {
+            if (seen.contains(id)) {
+                continue;
+            }
+            McpServerInfo e = load(id);
+            if (e != null) {
+                result.add(toOption(e, true));
+            }
+        }
+        return ReturnVo.ok(result);
+    }
+
+    @Override
+    public ReturnVo<List<String>> boundIds(Long agentId) {
+        return ReturnVo.ok(boundIdSet(agentId));
+    }
+
+    @Override
+    public ReturnVo<Boolean> bind(Long agentId, List<String> mcpIds, String operator) {
+        if (agentId == null) {
+            return ReturnVo.fail(McpErrorCodeEnm.MCP_INVALID_PARAM.getMsg(), McpErrorCodeEnm.MCP_INVALID_PARAM.getCode());
+        }
+        List<String> distinct = mcpIds == null ? List.of()
+            : mcpIds.stream().filter(StringUtils::hasText).distinct().toList();
+        Set<String> currentlyBound = new HashSet<>(boundIdSet(agentId));
+        // 仅启用可新绑（已绑定的停用项允许保留——镜像技能 optionDisabled 语义）
+        for (String id : distinct) {
+            if (currentlyBound.contains(id)) {
+                continue;
+            }
+            McpServerInfo e = load(id);
+            if (e == null) {
+                return ReturnVo.fail(McpErrorCodeEnm.MCP_NOT_FOUND.getMsg() + ": " + id,
+                    McpErrorCodeEnm.MCP_NOT_FOUND.getCode());
+            }
+            if (!"enabled".equals(e.getStatus())) {
+                return ReturnVo.fail("仅启用的 MCP 可新绑定: " + e.getName(),
+                    McpErrorCodeEnm.MCP_INVALID_PARAM.getCode());
+            }
+        }
+        // 覆盖式：物理删后重建（绑定关系无审计留存要求，同组授权先例）
+        agentMcpInfoMapper.deleteByQuery(QueryWrapper.create().where("agent_id = ?", agentId));
+        if (!distinct.isEmpty()) {
+            Date now = new Date();
+            List<AgentMcpInfo> rows = distinct.stream().map(mid -> {
+                AgentMcpInfo a = new AgentMcpInfo();
+                a.setAgentId(agentId);
+                a.setMcpId(mid);
+                a.setCreator(operator);
+                a.setCreateTime(now);
+                a.setUpdateTime(now);
+                return a;
+            }).toList();
+            agentMcpInfoMapper.insertBatch(rows);
+        }
+        log.info("智能体 MCP 绑定覆盖: agentId={}, mcpIds={}, by={}", agentId, distinct, operator);
+        return ReturnVo.ok(Boolean.TRUE);
+    }
+
+    private List<String> boundIdSet(Long agentId) {
+        if (agentId == null) {
+            return List.of();
+        }
+        return agentMcpInfoMapper
+            .selectListByQuery(QueryWrapper.create().where("agent_id = ?", agentId).and("del_flag = 0"))
+            .stream().map(AgentMcpInfo::getMcpId).distinct().toList();
+    }
+
+    private com.phoenix.agent.model.McpOptionVO toOption(McpServerInfo e, boolean bound) {
+        com.phoenix.agent.model.McpOptionVO vo = new com.phoenix.agent.model.McpOptionVO();
+        vo.setId(e.getId());
+        vo.setName(e.getName());
+        vo.setTransport(e.getTransport());
+        vo.setStatus(e.getStatus());
+        vo.setBound(bound);
+        return vo;
+    }
+
     // ── 私有工具 ──
 
     private McpServerInfo load(String id) {

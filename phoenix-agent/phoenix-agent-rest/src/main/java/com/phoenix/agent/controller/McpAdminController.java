@@ -94,6 +94,22 @@ public class McpAdminController {
         return ReturnVo.ok(vos);
     }
 
+    /** T-07：智能体编辑页绑定三端点（options/bound/bind，镜像技能绑定惯例） */
+    @GetMapping("/options")
+    public ReturnVo<List<com.phoenix.agent.model.McpOptionVO>> options(@RequestParam Long agentId) {
+        return mcpAdminService.options(agentId);
+    }
+
+    @GetMapping("/bound")
+    public ReturnVo<List<String>> bound(@RequestParam Long agentId) {
+        return mcpAdminService.boundIds(agentId);
+    }
+
+    @PutMapping("/bind")
+    public ReturnVo<Boolean> bind(@RequestBody com.phoenix.agent.model.McpBindDTO dto) {
+        return mcpAdminService.bind(dto.getAgentId(), dto.getMcpIds(), operator());
+    }
+
     private String operator() {
         try {
             return StpUtil.getLoginIdAsString();

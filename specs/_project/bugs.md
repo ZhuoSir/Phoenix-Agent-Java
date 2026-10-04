@@ -72,6 +72,7 @@
 | BUG-61 | 前台刷新追流「卡死」：join 重放把上千历史帧一瞬灌入，每帧触发全量 markdownToHtml+Vue 渲染，主线程饱和假死（服务端该轮实际正常完成 done/1551字）。直播路径帧速受网络节流无此问题，纯追流风暴 | P2 | 9080 用户实测(2026-10-03) | 已发布(v1.4.0) | - | join onProgress 150ms 节流合并（end/收尾强制终渲染）；顺带清理两条死会话 pending_confirm 残留键 |
 | BUG-62 | multistage 国内源默认件 settings.aliyun.xml 的 XML 注释含 `--build-arg`（注释内连续双横线非法）→ Maven「Non-parseable settings」构建必挂；随 d0b4552 进 v1.4.0 tag 但零消费未暴雷，package.sh(T-02) 首个真实构建 1.3 秒炸出；settings.default.xml 同病 | P3 | 交付件 | 已发布(v1.5.0) | - | 注释改写避开双横线+minidom 解析自证；教训：交付件入库前应过格式校验（XML/JSON/YAML lint），「没人用过」≠「是对的」 |
 | BUG-63 | compose 四个长驻服务(postgres/redis/backend/nginx)无 restart 策略——宿主/Docker 重启后栈不自愈，服务器场景必须人工拉起；migrator 两个一次性服务 restart:"no" 属正确配置不受影响 | P2 | 交付件 | 已发布(v1.5.0) | - | 四服务补 restart: unless-stopped + dev 栈 force-recreate 实证生效 + verify=0；连带事故：前日镜像清理误删 compose 默认引用的三个裸名 tag(pgvector/redis:7-alpine/postgres:16-alpine)致 recreate 拉 Hub 失败——已全部复原(retag+daocloud 重拉)，L-06 三犯记账 |
+| BUG-64 | GlobalExceptionHandler 把 ResponseStatusException(404) 包装成 500「服务器内部错误」——DELETE 不存在资源时状态语义失真（应回 404 语义） | 低 | mcp-client-tools T-07 级联演练（重复 DELETE 已删 agent 触发） | 新建 | - | AgentController.checkAgentExists:163 抛 404 → handler 统一 500；修复=handler 按 ResponseStatusException 原状态透传 |
 ## 明细留档（历史证据，只增不删）
 
 ### BUG-01 `all_schema.sql` 缺 5 个序列 → 全新环境导入必失败
