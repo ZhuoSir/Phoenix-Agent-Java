@@ -1,5 +1,11 @@
 # Changelog: mcp-client-tools
 
+## T-07 三增补（2026-10-04）部署假绿暴雷——镜像从未重建
+- 用户走查三轮「还是没有」：容器内查证 **AgentPluginConfig chunk=0**、镜像 built=20:33(T-06版) vs 宿主 dist 21:02——改名与抽屉挂载**两次部署都没进容器**
+- 根因：`docker compose up --force-recreate` 对已存在 tag **不自动重建镜像**（此前 T-06 首次因镜像缺失触发过 compose 自建，掩盖了差异）；且我的"入包验证"查的是宿主 .stage/dist 非容器内 = **假证明，L-03 部署三段证明违例**
+- 修复：`docker compose build nginx` 显式重建 → 容器内三证全中（chunk=1 / "插件配置"串×2 / 抽屉降级文案"请先保存智能体，再配置插件"×1——该串仅存在于抽屉段，铁证）；镜像时间戳 21:06 刷新；verify=0
+- 回炉：前端部署固定序列=build dist→cp .stage→**compose build**→up→**容器内 grep 标记串**；宿主侧检查一律不算证明
+
 ## T-07 再增补（2026-10-04）抽屉编辑面补挂——L-06 第 4 次应验
 - 用户走查二轮反馈「还是没有」：实勘发现**两套智能体编辑界面**——独立页 /agent/:id（首挂处）与列表页 openEditDrawer→agent-create-drawer.vue(1298行,**用户主入口**)；技能块两处都有，我只挂了一处 = **L-06 多入口枚举失守**（身份矩阵「智能体编辑页」对象被窄化为单页）
 - 补挂：抽屉左侧菜单「插件配置」组（lucide:plug，技能配置组之后）+ 内容区 v-else-if='plugin'（AgentPluginConfig 同构复用，含"先保存智能体"降级文案）；watch 无需改（组件自载）

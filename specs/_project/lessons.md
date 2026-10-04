@@ -30,7 +30,7 @@
 - 根因: 把"命令跑过"当"部署生效"
 - 防再犯规则: 每次部署后必做三段证明——①`docker inspect` 核对 `.Config.Image`+`StartedAt` ②容器内 grep 产物标记串（新文案/新 chunk 名）③curl 功能探针打新行为；关键步骤禁止 >/dev/null 吞输出（至少 tail -1）；docker PATH 每个 shell 显式 export
 - 状态: active
-- 复发: ×3（历史）→ 规则建立后 ×0
+- 复发: ×3（历史）→ 规则建立后 ×1 ⚠（2026-10-04 mcp-client-tools T-07：compose up --force-recreate 对已存在 tag 不重建镜像，两轮前端改动未进容器；"入包验证"查宿主 dist 冒充容器内证明，用户走查三轮才暴雷。回炉：**部署证明只认容器内 grep 标记串**；前端固定序列=build→cp→compose build→up→容器内证）
 - 关联: d145c6b 部署轮（grep -c 断链）、8da028e 部署轮（.env 回退内鬼）
 
 ## L-04 Docker VM 盘满级联 + prune 误删在跑容器
