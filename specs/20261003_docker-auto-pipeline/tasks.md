@@ -70,7 +70,7 @@
 
 ## 组 4：bootstrap 一键（v1.2.0 增补，R-10）
 
-- [ ] T-11 编写 bootstrap.sh + bootstrap.ps1 + install.sh --port：四段串联（引擎/打包/解包/安装），ps1 含 WSL 就绪与 -Distro 兼容
+- [x] T-11 编写 bootstrap.sh + bootstrap.ps1 + install.sh --port：四段串联（引擎/打包/解包/安装），ps1 含 WSL 就绪与 -Distro 兼容
   关联: R-10
   依赖: T-02, T-03, T-05
   验证方式: shellcheck + bash -n + pwsh 7.4.2 Parser 实检；**本机 mac bootstrap.sh 全链真跑**（--port 9280 --project phx-bs 隔离演练：引擎已在跳过→打包→解包→九步安装→收据卡+产包保留核验）

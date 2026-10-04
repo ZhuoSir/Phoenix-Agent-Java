@@ -1,5 +1,10 @@
 # Changelog: docker-auto-pipeline
 
+## T-11 完成（2026-10-04）—— 演练五全链终证
+- 一条命令 `bootstrap.sh --port 9280 --project phx-bs --version bs-test --mirror daocloud`：引擎跳过→打包(1.36GB,缓存热9分钟)→解包→九步安装→**verify 12 PASS+1 预期 WARN(fresh) exit=0**→收据卡 16:10:41 完赛；独立复验+9280 首页 200+4 容器 healthy
+- 演练四~五共抓 3 真问题并全修：verify 裸 exec 假绿通道(项目参数化)/[7]首启断言误杀新装(PHOENIX_FRESH 软化)/步骤7 migrator 等待(防御性加固)
+- 环境事件如实记：VM 出网坏死(macOS26×Desktop4.13 vpnkit  compat)由用户 VPN 救活；我方"容器网络DEAD"诊断为失效探针假证据(L-02×2)；根治建议=升级 Docker Desktop
+
 ## 演练四复盘与两次归因更正（2026-10-04）
 - **打包段首次全链通过**（VPN 修好 VM 出网后：编译/五镜像/tar/自校验/解包全绿）
 - 安装段步骤 8 红 → 深挖出**比竞态更大的鱼**：verify.sh 裸 `docker compose exec` 被 compose.yaml 顶层 `name: phoenix-release` 解析到**开发栈**——昨日 drill-1 的 [6][10][12][7] PASS 全是假绿（查的 dev 数据）；今日 dev 栈午后又宕（Docker Desktop 4.13×macOS 26.6.2 不稳，已拉起）→ 假通道断裂 → 诚实报 0
