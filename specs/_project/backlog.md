@@ -7,7 +7,7 @@
 ## 一、功能待办
 | # | 待办 | 来源 | 状态 | 备注（现状 / 建议 spec） |
 |---|---|---|---|---|
-| BL-01 | **MCP 支持**：对话智能体接入 MCP 工具（作为 MCP Client 消费外部 MCP Server），与现有「平台作为 MCP Server 对外暴露 nl2sql/agent 列表」形成双端能力 | 2026-09-27 用户列入待办 | 待立项 | 平台侧已有 `McpServerService`（暴露 `nl2SqlToolCallback`/`listAgentsToolCallback`）与 `McpServerConfig`；AgentScope Harness 侧具备 `McpServerRegistrar`/`McpServerConfig`（jar 内已见）但**未接线**。建议 spec：`mcp-client-tools` |
+| BL-01 | **MCP 支持**：对话智能体接入 MCP 工具（作为 MCP Client 消费外部 MCP Server），与现有「平台作为 MCP Server 对外暴露 nl2sql/agent 列表」形成双端能力 | 2026-09-27 用户列入待办 | **已立项(v1.6.0)** | 平台侧已有 `McpServerService`（暴露 `nl2SqlToolCallback`/`listAgentsToolCallback`）与 `McpServerConfig`；AgentScope Harness 侧具备 `McpServerRegistrar`/`McpServerConfig`（jar 内已见）但**未接线**。建议 spec：`mcp-client-tools` |
 | BL-02 | 工作流智能体的**图定义与可视化编排** | 2026-09-27 用户明确"本期不做，先放起来" | 待立项 | 图仍由 Java 硬编码（`ParolCompiledGraph`），DB 无图定义存储、前端无画布。建议 spec：`workflow-orchestration` |
 | BL-03 | 存量 5 个 Java 自注册智能体的**迁移与删除**（现仅从列表隐藏） | 2026-09-27 用户决定"代码保留，暂作实现参考" | 待立项 | **前置已具备**：`dynamic-agent-types` 16/16 完成、数据驱动链路与存量行为等价已实测（存量 5 个各一轮对话不回归）。建议 spec：`legacy-agent-migration` |
 | BL-04 | 智能体↔组关联改为「**智能体发布时关联组**」（与技能发布时授权组同构） | 2026-09-27 用户明示（`agent-skill-management` Non-goals） | 待立项 | 现状：组授权在组管理侧维护（`tbl_platform_group_agent_info`）；目标是发布动作里多选组、发布后即时生效 |
