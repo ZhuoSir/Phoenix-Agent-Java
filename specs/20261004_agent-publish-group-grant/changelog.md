@@ -1,5 +1,12 @@
 # Changelog: agent-publish-group-grant
 
+## T-01 完成（2026-10-04）发布扩展+授权端点 七断言全绿
+- 前置：合并 feature/mcp-client-tools 入本分支（dev 栈单实例需合体构建；M4 合并序=先 MCP 后本支则近平滑）；台账冲突 5 文件按块定向消解（bugs 64-67 归位/version/lessons ×5 超集/MILESTONE 双行各取新）；.mvn-home 重建后构建须带 -s settings.aliyun.xml（默认库失败标记缓存）
+- 交付：AgentPublishDTO；publish 可选 body（无 body=仅置状态，A-1 兼容实证）；GET/PUT /api/agent/{id}/groups（PUT 假组回可读 400——BUG-64 绕行 catch）；覆盖式物理删重建；del_flag 默认 1 陷阱显式置 0
+- 七断言（夹具 agent99903/组99904，不碰用户数据）：①初始[] ②无body发布=仅置状态授权不动 ③带组发布=授权1行 ④假组=可读400"授权目标组不存在" ⑤覆盖式换组=仅新组+旧行物理删 ⑥空数组=清空(R-05全公开数据态) ⑦清场0/0/0
+- 合体 sanity：MCP 列表 100、麦当劳MCP 在列、agent36 绑定完好、verify=0——merge 未伤 MCP
+- 过程小账：重复 @Override 编译错（锚点吃了 deleteById 的注解）即修；一次构建忘带 -s 卡失败标记即纠
+
 ## 分支纠偏（2026-10-04）spec 文档迁入正确分支
 - 用户发现工作区看不到本 spec 文件夹——根因：立项~tasks 确认的 7 笔提交顺手落在了 feature/mcp-client-tools（MCP 收尾后未切分支），本 feature 分支基点 v1.6.0 不含它们
 - 修复：`git checkout feature/mcp-client-tools -- specs/20261004_agent-publish-group-grant/` 整目录迁移 + 共享台账（backlog/version/MILESTONE）BL-04 增量在本分支重放（b94a851）

@@ -107,7 +107,13 @@ public class AgentController {
     public ReturnVo<Boolean> updateGroups(@PathVariable Long id,
             @org.springframework.web.bind.annotation.RequestBody com.phoenix.data.dto.AgentPublishDTO dto) {
         checkAgentExists(id);
-        agentService.replaceGroupGrants(id, dto.getGroupIds(), currentOperator());
+        try {
+            agentService.replaceGroupGrants(id, dto.getGroupIds(), currentOperator());
+        }
+        catch (org.springframework.web.server.ResponseStatusException e) {
+            // BUG-64 绕行：不让校验错掉进全局 500 包装，直接回可读 fail
+            return ReturnVo.fail(e.getReason() == null ? "授权失败" : e.getReason(), 400);
+        }
         return ReturnVo.ok(Boolean.TRUE);
     }
 

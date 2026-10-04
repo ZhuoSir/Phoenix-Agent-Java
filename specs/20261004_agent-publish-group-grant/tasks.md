@@ -4,7 +4,7 @@
 
 ## 组 1：后端判定与端点
 
-- [ ] T-01 发布扩展+授权读写端点（phoenix-data）：AgentPublishDTO{groupIds}；publish 增 body（无 body=仅置状态不动授权，向后兼容）；GET/PUT /api/agent/{id}/groups（回显/覆盖式调整）；组存在性 Db 直查校验+假组拒绝（镜像技能 replaceGroupGrants）
+- [x] T-01 发布扩展+授权读写端点（phoenix-data）：AgentPublishDTO{groupIds}；publish 增 body（无 body=仅置状态不动授权，向后兼容）；GET/PUT /api/agent/{id}/groups（回显/覆盖式调整）；组存在性 Db 直查校验+假组拒绝（镜像技能 replaceGroupGrants）
   关联: R-01, R-02, R-04
   依赖: 无
   验证方式: curl 发布三态（无 body/空数组/带组）；覆盖式实证（重发布换组旧组行移除）；假组拒绝；GET 回显与 DB 双侧一致
