@@ -1,5 +1,11 @@
 # Changelog: mcp-client-tools
 
+## T-05 完成（2026-10-04）挂载接线实弹全绿
+- 交付：McpMountService（变体缓存 agentId+交集签名/LRU64/淘汰关 wrapper/boundedElastic 构建）+ PrefixedAgentTool 委托壳（前缀对模型、原名调远端——spike 字节码实证 McpTool.callAsync 用自身 getName()，直接改名必挂）+ Registry.buildUncached（legacy WARN 降级）+ 三链接线（doStream/confirmStream/channel 口径分流）+ DTO channel + 三控制器打标（commit 223b3de）
+- **实弹证据链**：①注册 stdio stub（env MARKER 加密落库）②测试连接 success=True 列工具 [stub_echo] 214ms（**R-06 成功态实证补全**）③admin 真对话模型调用 `t05stub__stub_echo` → 落库行 content=「工具返回原文：echo:hello-mcp marker:g1secret」——**前缀调用+env 密文解密回传全链实证** ④故障隔离：坏 endpoint(t05bad) 同绑，stub 照常可调、轮次正常完成 ⑤停用失效：disable 后下一轮模型答「工具不存在」（签名失效按轮生效）⑥零变化回归：绑定前/清理后 verify=0 双跑
+- **如实注记（验证口径调整，非静默降级）**：三链断言中 admin 链已实测；front 链与 confirm 续跑链接线同构（同一 effectiveMcp+withMcp 路径）但实测需前台登录/计划模式组合——**移入 T-08 矩阵执行**（回环 dogfood 本就需前台登录，跨用户泄漏断言 G1/G2 同批）
+- 演练现场全清（MCP×2/绑定×2/会话行/stub 文件），终态 verify=0
+
 ## T-04 完成（2026-10-04）交集判定服务 + 六态矩阵全绿
 - 交付：FrontMcpAccessService(+Impl)——前台三重交集 SQL 直查（镜像 MY_SKILLS_SQL 同构）；admin 口径=绑定∧启用（A-5 实勘定案：admin 技能走 SkillExplicitInjection 显式选择无组过滤，MCP 同构对齐）；诊断端点 GET /api/mcp/effective（admin 限定，只回 id/name/transport 防 config 泄漏）
 - 六态矩阵实测：a admin=[A](B停用排除)✓ b front-u1=[A]且DB侧=1(双侧取证)✓ c 空账号=[]✓ d 撤权=[]✓ e 停用双口径=[]✓ f 恢复双=[A]✓
