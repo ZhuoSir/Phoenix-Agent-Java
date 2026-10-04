@@ -24,7 +24,7 @@
   验证方式: curl 全链（建/查/改/删/启停/悬挂拒绝/测试三态）；**脱敏三点取证**（落库密文 grep+回显形态+服务日志无明文）；鉴权断言（前台 token 访问 admin 端点=403）
   验收标准: 全链 curl 证据+脱敏三点+403 断言全绿
 
-- [ ] T-04 FrontMcpAccessService：按用户组计算「绑定∩组授权∩启用」交集（镜像 FrontSkillAccessServiceImpl），admin 对话口径与技能现行一致（A-5，实勘后写死）
+- [x] T-04 FrontMcpAccessService：按用户组计算「绑定∩组授权∩启用」交集（镜像 FrontSkillAccessServiceImpl），admin 对话口径与技能现行一致（A-5，实勘后写死）
   关联: R-02, R-03
   依赖: T-02, T-03
   验证方式: 授权/撤销/停用各态下交集计算单测式 curl 取证；**双侧取证**（DB 授权行 + 服务返回一致，L-07）；G1/G2 两组用户交集差异断言

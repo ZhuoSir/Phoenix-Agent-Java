@@ -1,5 +1,10 @@
 # Changelog: mcp-client-tools
 
+## T-04 完成（2026-10-04）交集判定服务 + 六态矩阵全绿
+- 交付：FrontMcpAccessService(+Impl)——前台三重交集 SQL 直查（镜像 MY_SKILLS_SQL 同构）；admin 口径=绑定∧启用（A-5 实勘定案：admin 技能走 SkillExplicitInjection 显式选择无组过滤，MCP 同构对齐）；诊断端点 GET /api/mcp/effective（admin 限定，只回 id/name/transport 防 config 泄漏）
+- 六态矩阵实测：a admin=[A](B停用排除)✓ b front-u1=[A]且DB侧=1(双侧取证)✓ c 空账号=[]✓ d 撤权=[]✓ e 停用双口径=[]✓ f 恢复双=[A]✓
+- 插曲如实记：夹具清理顺序反了——绑定未删先 DELETE 被防悬挂 46104 拦截（防御行为反向实证），补删后双表零残留；U2（G1 外账号）现网不存在，c 态以空账号路径+撤权态(d)联合覆盖"未授权=空集"语义
+
 ## T-03 完成（2026-10-04）MCP 管理后端 + 13 断言全绿
 - 交付：api 9 件（三实体/DTO/VO/46xxx 错误码）+ core（Mapper×3/McpSecretCipher AES-GCM+平台同款掩码/McpAdminServiceImpl 549行）+ rest McpAdminController 七端点
 - 13 断言实测全绿：创建/分页(授权绑定计数)/详情掩码 sup****t123/重名46102/掩码回传保原密文/落库密文true明文false/启停/组授权+假组46105/悬挂拒删46104(列名agentIds)/删除+404=46101/日志无明文/无token=401

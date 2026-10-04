@@ -1,6 +1,7 @@
 package com.phoenix.agent.controller;
 
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -39,6 +40,7 @@ import lombok.extern.slf4j.Slf4j;
 public class McpAdminController {
 
     private final McpAdminService mcpAdminService;
+    private final com.phoenix.agent.service.FrontMcpAccessService frontMcpAccessService;
 
     @GetMapping
     public ReturnVo<Page<McpListVO>> page(@RequestParam(required = false) String keyword,
@@ -76,6 +78,20 @@ public class McpAdminController {
     public Mono<ReturnVo<McpTestResultVO>> test(@RequestBody McpTestDTO dto) {
         return Mono.fromCallable(() -> mcpAdminService.testConnection(dto))
             .subscribeOn(Schedulers.boundedElastic());
+    }
+
+    /** 诊断端点（T-04 验证 + 运维排障）：有效集判定，只回 id/name/transport，config 不出防泄漏 */
+    @GetMapping("/effective")
+    public ReturnVo<List<Map<String, String>>> effective(@RequestParam Long agentId,
+            @RequestParam(required = false) String accountId, @RequestParam(defaultValue = "admin") String channel) {
+        List<com.phoenix.agent.model.McpServerInfo> list = "front".equals(channel)
+            ? frontMcpAccessService.effectiveForFront(accountId, agentId)
+            : frontMcpAccessService.effectiveForAdmin(agentId);
+        List<Map<String, String>> vos = list.stream()
+            .map(e -> Map.of("id", String.valueOf(e.getId()), "name", String.valueOf(e.getName()), "transport",
+                String.valueOf(e.getTransport())))
+            .toList();
+        return ReturnVo.ok(vos);
     }
 
     private String operator() {
