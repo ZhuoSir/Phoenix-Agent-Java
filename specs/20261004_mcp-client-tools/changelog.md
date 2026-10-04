@@ -1,5 +1,11 @@
 # Changelog: mcp-client-tools
 
+## T-03 完成（2026-10-04）MCP 管理后端 + 13 断言全绿
+- 交付：api 9 件（三实体/DTO/VO/46xxx 错误码）+ core（Mapper×3/McpSecretCipher AES-GCM+平台同款掩码/McpAdminServiceImpl 549行）+ rest McpAdminController 七端点
+- 13 断言实测全绿：创建/分页(授权绑定计数)/详情掩码 sup****t123/重名46102/掩码回传保原密文/落库密文true明文false/启停/组授权+假组46105/悬挂拒删46104(列名agentIds)/删除+404=46101/日志无明文/无token=401
+- 过程抓 3 真 bug 即修：①WebFlux 无自动装配 ObjectMapper bean(启动崩溃)→自持实例 ②ReturnVo.ok(String) 重载歧义 id 落 message→ok(msg,data) ③Reactor 事件循环禁 block()(测试连接崩)→Mono.fromCallable+boundedElastic(AgentFileController 先例)
+- 如实注记：测试连接「不可达」分类现显示"连接失败：failed to initialize"（可读但未命中"不可达"分类词）——分类词库 T-08 用本地 MCP stub（含 401 鉴权桩）校准时一并精修；鉴权失败分类逻辑已在码
+
 ## T-02 完成（2026-10-04）Flyway 两件+回滚两件
 - 交付：V1.6.0_01 三表 DDL / V1.6.0_02 三层菜单+ACL DML（md5 常量 id+NOT EXISTS 防重，镜像 V1.2.0_02）/ R 两件回滚
 - 列形对照表（与技能三件套逐列核对）：
