@@ -31,22 +31,22 @@
 | # | 待办 | 来源 | 状态 | 备注 |
 |---|---|---|---|---|
 | BL-16 | **里程碑挂接（M0+M1）**：建 `releases/vX.Y.Z/`、把三个 spec 与已修复缺陷挂入、回填版本号 | skill 里程碑流程；项目原先无 `releases/` | **已交付(v1.2.0)** | 2026-09-27 完成：`releases/v1.2.0/MILESTONE.md`（3 spec + 18 缺陷）；版本号取 MINOR=v1.2.0（历史分支线已到 1.1.x，用户确认）。**M2 冻结前置未满足**：① `agent-config-ai-generate` 未合并；② P1（BUG-01/20）未达「已验证」 |
-| BL-17 | **汇总升级件（M3）**：把 spec-1/2/3 的 `01~05` 升级件重排为 Flyway 风格 `V<版本>_<序号>__<描述>.sql` + rollback 配对，产出 `UPGRADE.md` / `RELEASE-NOTES.md` / `config/changes.md` | 同上 | 待立项 | 铁律：M3 未汇总完不得进 M4；升级件禁止在单需求完成时私自塞进 `releases/` |
+| BL-17 | **汇总升级件（M3）**：把 spec-1/2/3 的 `01~05` 升级件重排为 Flyway 风格 `V<版本>_<序号>__<描述>.sql` + rollback 配对，产出 `UPGRADE.md` / `RELEASE-NOTES.md` / `config/changes.md` | 同上 | **已交付(v1.2.0)** | 2026-10-04 账面同步：M3 汇总自 v1.2.0 起成惯例，v1.3.0/v1.4.0/v1.5.0 三轮均执行（Flyway 重排/rollback 配对/四件套） |
 
 ## 四、在手未完成（指向 spec，不占 BL 编号）
-- `specs/20260927_agent-config-ai-generate`：**〔2026-10-01 注：该 spec 已随 v1.2.0 发布（tag 已打），本段为当时快照〕** 13 个任务已勾 8 个，未勾 `T-05 / T-10 / T-11 / T-12 / T-13` —— 只差**界面人工走查**（浏览器扩展未连接，无法自动走查）；代码层证据已齐（`vue-tsc` 189、8 个改动文件 Vite 转译 200）。
+- `specs/20260927_agent-config-ai-generate`：**〔已随 v1.2.0 发布，历史快照〕** 13 个任务已勾 8 个，未勾 `T-05 / T-10 / T-11 / T-12 / T-13` —— 只差**界面人工走查**（浏览器扩展未连接，无法自动走查）；代码层证据已齐（`vue-tsc` 189、8 个改动文件 Vite 转译 200）。
   分支 `feature/agent-config-ai-generate`（未合并，合并条件是 tasks 全勾 + 证据齐）；走查清单见该 spec `changelog.md` 末尾「界面走查待办」。
-- `bugs.md` 中 11 条「新建」缺陷待处置（`BUG-02/03/04/05/08/11/14/18/21/24/25`）；其中 `BUG-04` 的「不修复」**需用户批准**、`BUG-18` 的修复口径**需产品决策**。
-- 里程碑 `v1.2.0`〔已发布，tag v1.2.0；后续 v1.2.1 亦已发布。当前在途版本＝**v1.3.0**（已合并 agent-session-files + knowledge-base 两 spec，不发版续收；触发词「冻结 v1.3.0」/「发版 v1.3.0」）〕
+- ~~bugs.md 中 11 条「新建」缺陷待处置~~ **〔2026-10-04 注：已全部处置——fix-bug-batch 清仓（9 修复+BUG-04 批准不修复），随 v1.4.0 发布〕**
+- 里程碑〔2026-10-04 注：**v1.2.0/v1.2.1/v1.3.0/v1.4.0/v1.5.0 全部已发布**；在途=无，下一需求起 v1.6.0〕
 
 - **BL-18 前端 API 前缀治理**：**已交付(v1.3.0，原记 v1.2.2 已并入)**——baseURL 置空+路径归一+代理透传，nginx 折叠规则已删；BUG-33 转已修复。
 
-- **BL-19 会话文件面板（生成文件可见+可下载）**：方案已成稿 `specs/20261001_agent-session-files/design-proposal.md`（v0.1.0 草案，含 T1~T10 与 Q1~Q4）；待用户回答开放问题后按 spec 流程立项，建议挂 v1.3.0。
+- **BL-19 会话文件面板**：**已交付(v1.3.0)**——specs/20261001_agent-session-files 全链落地；v1.4.0 经 BUG-60 增强（复用文件跨会话可见）。
 
 ## 五、待办增补（2026-10-01 刷新）
 
 | BL-20 | **多子智能体编排模式**：智能体编辑页新增「运行模式」选择——**单智能体**（现状：一个主智能体独立完成，默认）/**多智能体**（主智能体拆解任务→派生多个子智能体并行执行子任务→**页面上可实时查看各子智能体的子任务详情**→最终由主智能体汇总产出统一回复；子任务流需 SSE 透出子 agent 身份与状态）。实现落点预判：AgentScope harness 原生具备 subagent 原语（`HarnessAgent$Builder.buildSubagentEntries`、`middleware/SubagentEntry`、`IsolationScope`），核心工作=运行配置加 mode 字段（Flyway 件）+ 编辑页模式选择 UI + 子任务详情面板 + SSE 事件扩展（复用 BL-19 agentFiles 帧先例的通道） | 2026-10-01 用户口述立项（明确：**列入待办，暂不实施**；将来立项时走 spec 四阶段，建议挂下一 MINOR 或 v1.3.0 若冻结前挤入需明示） | 待立项 | 关联既有：BL-19 会话文件面板（子智能体产物同样进面板）；BL-05 账号体系（子任务归属人展示）；开放问题预置：子智能体可否独立配置模型/知识库？并发上限？失败子任务的重试语义？ |
-| BL-21 | **对话页「深度思考」与「回答正文」分离展示**：智能体对话页当前把模型的思考增量（THINKING_BLOCK_DELTA）与最终回答（TEXT_BLOCK_DELTA）**混在同一条 content 流**里呈现（HarnessChatServiceImpl.toNodeOutput 两者同构造 StreamingOutput、mapper 同键透出）——用户实测多次看到英文思考独白混入答案（如「The user asks me to...」）。目标：思考内容经独立事件通道（如 eventMap.thinking）下发，前端渲染为**可折叠的「深度思考」区**（灰底/字号弱、默认收起或流式中展开结束后折叠），回答正文区只含最终输出；历史消息回显需持久区分（chat_message 增 thinking 列或 metadata 标记，M3 前定稿）；前台/后台两套聊天页同规范 | 2026-10-01 用户口述立项 → 同日 spec 实施完成（feature/thinking-display，待合并） | 已交付(v1.3.0待发版) | 关联：BL-19 agentFiles 帧先例（新增独立键向后兼容旧客户端）；BUG 面：现思考泄漏混排属既有行为，本单以功能形态收编不再单列缺陷 |
-| BL-22 | **断线续传/流恢复（BUG-53 的 B 方案）**：SSE 执行与连接解耦——harness 流经 Sinks.replay 中继 + Redis Streams 轮次缓冲（db8 现成，XADD/XREAD 带 offset 重放+追live+TTL 清孤儿），刷新/断网后重进会话 rejoin 继续观看至完成落库；配套改造：助手消息落库所有权由前端 onComplete **移交服务端按 turnId upsert**（幂等）、新增显式「停止生成」取消接口（断连≠停止）、前端进会话先查服务端状态再决定是否用 A′ 本地快照回显（防双半截）。可行性已评：Reactor 取消传染有标准解法、HITL pending_confirm 天然兼容、帧协议零改动；预估 2-3 天，A′ 原型（stash: BUG-53 A′）可作灰度兜底一并取用 | 2026-10-02 用户拍板「列入待办」→ 同日升级为 **v1.4.0 首需求立项（spec 进行中）** | 已立项(v1.4.0) | 关联: BUG-53 / BL-20（多子智能体的实时子任务详情与本缓冲基建同源，宜同期或先行设计对齐） |
+| BL-21 | **对话页「深度思考」与「回答正文」分离展示**：智能体对话页当前把模型的思考增量（THINKING_BLOCK_DELTA）与最终回答（TEXT_BLOCK_DELTA）**混在同一条 content 流**里呈现（HarnessChatServiceImpl.toNodeOutput 两者同构造 StreamingOutput、mapper 同键透出）——用户实测多次看到英文思考独白混入答案（如「The user asks me to...」）。目标：思考内容经独立事件通道（如 eventMap.thinking）下发，前端渲染为**可折叠的「深度思考」区**（灰底/字号弱、默认收起或流式中展开结束后折叠），回答正文区只含最终输出；历史消息回显需持久区分（chat_message 增 thinking 列或 metadata 标记，M3 前定稿）；前台/后台两套聊天页同规范 | 2026-10-01 用户口述立项 → 同日 spec 实施完成 | 已交付(v1.3.0，已发版) | 关联：BL-19 agentFiles 帧先例（新增独立键向后兼容旧客户端）；BUG 面：现思考泄漏混排属既有行为，本单以功能形态收编不再单列缺陷 |
+| BL-22 | **断线续传/流恢复（BUG-53 的 B 方案）**：SSE 执行与连接解耦——harness 流经 Sinks.replay 中继 + Redis Streams 轮次缓冲（db8 现成，XADD/XREAD 带 offset 重放+追live+TTL 清孤儿），刷新/断网后重进会话 rejoin 继续观看至完成落库；配套改造：助手消息落库所有权由前端 onComplete **移交服务端按 turnId upsert**（幂等）、新增显式「停止生成」取消接口（断连≠停止）、前端进会话先查服务端状态再决定是否用 A′ 本地快照回显（防双半截）。可行性已评：Reactor 取消传染有标准解法、HITL pending_confirm 天然兼容、帧协议零改动；预估 2-3 天，A′ 原型（stash: BUG-53 A′）可作灰度兜底一并取用 | 2026-10-02 用户拍板「列入待办」→ 同日升级为 v1.4.0 首需求立项 | **已交付(v1.4.0)** | 关联: BUG-53 / BL-20（多子智能体的实时子任务详情与本缓冲基建同源，宜同期或先行设计对齐） |
 | BL-23 | package.sh mirror 竞速探活升级为吞吐型（测小 blob 下载速率而非 HEAD 响应） | 2026-10-04 演练四实证：1ms.run HEAD 快但传输 40KB/s 僵死，竞速选中慢源 | 待立项 | P2；临时方案=--mirror 手工指定 |
 | BL-24 | install.ps1/bootstrap.ps1 共享 WSL 就绪段抽公共 ps1 库 | plan §1.6 被拒案留档（v1 薄复制+注释互指），两处改动需人工同步 | 待立项 | P3；下次改 ps1 时顺手做 |
