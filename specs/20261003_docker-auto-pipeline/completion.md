@@ -32,3 +32,8 @@
 ## 演练替身与清理记账（用户裁决「假设源完成」）
 - postgres:16-alpine=postgres:latest 替身 tag：**已删**（防未来打包误跳过真实拉取）
 - 测试栈 phoenix-t03（4容器+卷）、/tmp/phx-t03*、测试镜像 t02a/b/c、dist 测试包：**已清**
+
+## R-10 bootstrap 增量补记（2026-10-04，冻结前清账）
+- **T-11 ✅**：bootstrap.sh/ps1 + install --port/--env-from + verify 项目参数化与 fresh 软化；演练五全链终证（一条命令 16:00:48→16:10:41 收据卡；verify 12 PASS+1 预期 WARN exit=0；1.36GB 产包；演练四五共抓 3 真问题全修：verify 假绿通道/首启断言误杀/migrator 等待加固）；commits 4cdb8b8/3251d50/af45bed/77500e0
+- **T-12 ⏸ 延期（去向：发版后真机跟进）**：用户 Server 2022 执行 bootstrap.ps1，日志/收据回传即销账（连带 T-04 引擎真装/T-05 ps1 真机）；**用户裁决「不等真机直接冻结」（2026-10-04 M2 口令）**
+- 合并后直入小件（用户直接指令，非 spec 范围）：scripts/README.md 使用指南、BUG-63 compose 重启策略修复、phoenix-ctl.sh/.ps1 运维控制脚本（87b2ae7）
