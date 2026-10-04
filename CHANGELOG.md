@@ -3,6 +3,23 @@
 本项目版本记录。语义化版本 + 里程碑制（细则：bryanchen-spec skill / releases/ 目录）。
 tag 之前无正式发版记录，历史 1.1.x 分支线（phoenix-1.1.1-release / 1.1.2-dev）未打过 tag，不追溯。
 
+## [v1.5.0] - 2026-10-04
+### 新增（交付工具链——源码到目标机服务全自动，零 DDL、应用代码零变化）
+- 一键 bootstrap（R-10）：Windows `bootstrap.ps1` / Linux·mac `bootstrap.sh`，目标机源码一把梭（WSL2 就绪→引擎→打包→安装→收据卡），重启/失败重跑自动续接
+- 一键打包 package.sh：自包含 tar.gz（Phoenix 双侧+基础运行时五镜像/compose 资产/双平台安装脚本/manifest+sha256/文档）；国内源全链默认（mirrors.list 竞速、阿里云 Maven 含 30s 超时、npmmirror），--overseas 一键切官方；容器内编译=构建机零 JDK/Node；编译一次+跨架构薄组装
+- 九步安装 install.sh/install.ps1：环境三查（架构/OSType=windows 拒绝/磁盘）→引擎自动装（阿里源/离线 deb 降级）→sha 拒坏包→load→.env（随机密码 600）→compose→healthy 确定性轮询→verify 失败=安装失败→收据卡；幂等/断点/--env-from 升级承接/IMAGE_TAG 自动跟版
+- 运维控制 phoenix-ctl.sh/.ps1：start/stop/restart/status/logs/verify/purge 一条入口
+- compose 自愈：长驻服务 restart: unless-stopped（BUG-63）
+- 工具箱文档 docker/scripts/README.md（脚本地图/四场景/故障速查）
+### 修复（2）
+- BUG-62 multistage settings XML 注释双横线致 Maven Non-parseable（v1.4.0 交付暗雷，打包流水线首炸排雷）
+- BUG-63 compose 长驻服务无 restart 策略（宿主重启栈不自愈）
+### 已知边界
+- T-12 Windows 真机全链延期在案（ps1 过 Parser 实检+桩测；WSL 内九步与 Linux 同码已全链实证）；真机随时可销账
+- 离线 engine-debs 首发仅 Ubuntu 22.04；mirror 竞速测响应不测带宽（--mirror 可手工指定，吞吐型探活在 BL-23）
+### 升级说明
+既有部署零操作（应用无变化）；要重启自愈则换 compose 后 `up -d --force-recreate --pull never`。新机安装直接 bootstrap（docker/scripts/README.md）
+
 ## [v1.4.0] - 2026-10-03
 ### 新增
 - 断线续传/流恢复（BL-22）：关页面≠杀任务——服务端脱离式执行、5s 增量落库单行 upsert、重进自动追流（150ms 节流防风暴）、显式停止接口、HITL 断线暂存并轮回原轮、10min 兜底时限、一轮一约束

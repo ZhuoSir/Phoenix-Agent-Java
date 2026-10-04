@@ -58,7 +58,7 @@ SSE（`/api/stream/search`）与 90s 生成（R-01 实测 AC-03）依赖 `buffer
 |---|---|---|---|---|
 | postgres | `pgvector/pgvector:pg16`（pin digest） | `pg_isready -U phoenix` | — | 无宿主映射 |
 | redis | `redis:7-alpine` | `redis-cli ping` | — | 无 |
-| backend | 自研 | `GET /echo/ok`（10s×60 次，冷启含建表） | pg/redis/migrator healthy|completed | 无（nginx 代理） |
+| backend | 自研 | `GET /echo/ok`（10s×60 次，冷启含建表） | pg/redis/migrator healthy\|completed | 无（nginx 代理） |
 | migrator | postgres:16-alpine | 一次性（completed_successfully） | postgres | — |
 | migrator-post | 同上 | 一次性 | backend healthy | — |
 | nginx | 自研 | `wget -qO- localhost/ ≥200` | backend | `${PHOENIX_HTTP_PORT:-9080}:80` |

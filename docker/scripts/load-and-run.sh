@@ -1,4 +1,5 @@
 #!/bin/sh
+# 【定位注记(docker-auto-pipeline Q3 决议)】手工链脚本——保留兼容；日常一键交付请用 package.sh(打包)+install.sh/install.ps1(安装)
 # 目标机离线入口：导入镜像 tar → compose up（R-03）。用法：sh load-and-run.sh <images.tar.gz>
 set -eu
 # docker CLI 自愈：非交互 shell 可能不含 Docker Desktop 路径

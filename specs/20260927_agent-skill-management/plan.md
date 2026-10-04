@@ -31,6 +31,7 @@ SQL 升级件              ALTER + 2 新表 + 回滚（Implement 时登记 artif
 ## 接口设计
 
 **后台管理（Sa-Token 登录态，全量视角，前缀 `/api/skill`）**
+
 | 方法/路径 | 语义 | 关键约束 |
 |---|---|---|
 | GET `/api/skill` | 列表（?keyword ?status，分页 pageNum/pageSize） | 只回 id/name/description/status/updateTime，无 SELECT * |
@@ -44,6 +45,7 @@ SQL 升级件              ALTER + 2 新表 + 回滚（Implement 时登记 artif
 | GET/PUT `/api/skill/binding/agent/{agentId}` | 绑定查询/覆盖式保存 | 独立端点，不改 agent 保存链路 |
 
 **前台（platform 会话身份）**
+
 | 方法/路径 | 语义 |
 |---|---|
 | GET `/platform/account-info/getMySkills?agentId=` | 三重交集（组授权∧published∧绑定该agent）列表 |

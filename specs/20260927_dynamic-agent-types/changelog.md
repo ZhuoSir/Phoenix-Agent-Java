@@ -59,6 +59,7 @@
 - **回归中发现并修复的真实缺陷**：前台可见性校验原以「sn 非空」为通过条件 → 新建（sn=NULL）对话智能体在前台被判「智能体不存在」。已改为新增 `FrontSkillAccessService.validateVisible`（只判组-智能体授权，不要求 sn），前台对话准入改用它，`harnessSn` 降为可选兼容字段；修复后前台对话恢复
 
 **场景② 存量 5 个自注册智能体逐轮对话（不回归）**
+
 | 智能体 | 链路 | 结果 |
 |---|---|---|
 | 19 BpmReactAgent | `/api/admin/agent/chat`（agentSn） | OK，正常自我介绍 |
