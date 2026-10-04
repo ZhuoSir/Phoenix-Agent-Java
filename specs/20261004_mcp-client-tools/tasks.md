@@ -56,7 +56,7 @@
   验证方式: **回环**（注册平台自家 MCP 端点→授权 G1→绑定智能体→G1 前台对话真调 nl2sql 工具出结果）；泄漏断言复跑；R-07 对面断言（外部 Client 调平台 Server 端行为与旧版一致）；四路回归（技能链/菜单/admin 对话/front 对话）；verify 13/13；vue-tsc 基线
   验收标准: 回环出真结果+全部回归绿
 
-- [ ] T-09 台账收尾：completion/artifacts（Flyway 两件+rollback 登记）/MILESTONE 更新/bugs 核对/BL-01 交付联动注记
+- [x] T-09 台账收尾：completion/artifacts（Flyway 两件+rollback 登记）/MILESTONE 更新/bugs 核对/BL-01 交付联动注记
   关联: 流程
   依赖: T-08
   验证方式: completion 与勾选核对（审计判据同款）；artifacts 与 releases 目录对账
