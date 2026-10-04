@@ -1,6 +1,6 @@
 # Plan: mcp-client-tools（插件市场 · MCP 统一管理）
 
-> 版本: v0.1.0 | 状态: 草稿 | 更新: 2026-10-04
+> 版本: v1.0.0 | 状态: 已确认 | 确认人: 陈卓 | 确认日期: 2026-10-04 | 更新: 2026-10-04
 > 规范路由（.specrc.yml）：api-design=global / database=global / code-backend=global / code-frontend=none（跟随周边风格）/ git-workflow=global（v1.6.0 版本分支制）
 
 ## 〇、坑核对（lessons.md 全 14 条 active 逐条过）
