@@ -14,6 +14,9 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class HarnessRequest implements Serializable {
+
+    /** 渠道标记：admin=管理端 / front=前台（T-05 MCP 挂载口径分流；null 按 admin 兼容既有调用方） */
+    private String channel;
     @NotBlank
     private String userId;
     @NotBlank

@@ -9,7 +9,7 @@
 
 | spec | 版本 | 状态 | 新增 | 变更 | 摘要 |
 |---|---|---|---|---|---|
-| specs/20261004_mcp-client-tools | v0.1.0 | 立项中（Phase 1） | 待定 | 0 | 对话智能体作为 MCP Client 消费外部 MCP Server 工具，与平台既有 MCP Server 端形成双端能力（BL-01） |
+| specs/20261004_mcp-client-tools | req v1.1.0 / plan v1.1.0 / tasks v1.0.0 | **实现完成（9/9）** | SQL 2件+rollback 2件；三表；后端 22 文件；前端 3 文件 | 0（R-07 平台 Server 端零变化 git diff 实证） | 插件管理·MCP 统一管理+组授权+智能体绑定+对话挂载（BL-01）；BUG-65/66 已验证在途；confirm 链实弹移交 M4 演练 |
 | specs/20261004_agent-publish-group-grant | req/plan/tasks 均 v1.0.0 已确认 | 实现中（T-01） | 零 DDL；后端 4 文件+前端 4 文件（预计） | 待定 | 智能体发布时关联组+空授权=全公开语义（BL-04；2026-10-04 用户裁决挂本版） |
 
 ## 二、汇总进度（M3/M4 勾选）

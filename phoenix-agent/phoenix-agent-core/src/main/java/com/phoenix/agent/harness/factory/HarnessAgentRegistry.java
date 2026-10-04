@@ -141,6 +141,24 @@ public class HarnessAgentRegistry {
         return acquire(agentId).agent();
     }
 
+    /**
+     * MCP 变体专用（mcp-client-tools T-05 路线乙）：绕过主缓存构建全新实例，
+     * 由 McpMountService 按 (agentId+交集签名) 自行缓存与淘汰。
+     * 存量自注册实例不支持变体（工具面由 Java 类固定），原样返回并 WARN。
+     */
+    public HarnessAgent buildUncached(Long agentId) {
+        Agent agent = agentId == null ? null : agentService.findById(agentId);
+        if (agent == null) {
+            throw new java.util.NoSuchElementException("智能体不存在: " + agentId);
+        }
+        HarnessAgent legacy = harnessStaticLoader.findAgent(agent.getSn());
+        if (legacy != null) {
+            log.warn("存量自注册实例不支持 MCP 变体挂载，按无 MCP 处理: agentId={}", agentId);
+            return legacy;
+        }
+        return harnessAgentFactory.buildWithSummary(agent).agent();
+    }
+
     /** 主动失效（如智能体被删除/下线）；下次访问重建 */
     public void invalidate(Long agentId) {
         CacheEntry removed;
