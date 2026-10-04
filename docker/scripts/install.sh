@@ -163,7 +163,7 @@ phx_step 7 $TOTAL "等待 migrator 完成 + backend healthy（${TIMEOUT}s 上限
 
 phx_step 8 $TOTAL "verify 全断言（失败=安装失败，Q2 决议）" && {
   PORT=$(port_of_env)
-  ( cd "$PAYLOAD/docker" && PHOENIX_HTTP_PORT="$PORT" sh scripts/verify.sh ) >>"$PHX_LOG_FILE" 2>&1 \
+  ( cd "$PAYLOAD/docker" && PHOENIX_HTTP_PORT="$PORT" PHOENIX_COMPOSE_PROJECT="$PROJECT" PHOENIX_FRESH=1 sh scripts/verify.sh ) >>"$PHX_LOG_FILE" 2>&1 \
     || phx_fail 8 $TOTAL "verify 存在失败断言（详见日志，检索 PASS/FAIL）"
   phx_step_mark 8
 }
