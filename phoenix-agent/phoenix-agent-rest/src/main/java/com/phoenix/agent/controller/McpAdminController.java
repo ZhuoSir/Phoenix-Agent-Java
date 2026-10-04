@@ -21,6 +21,9 @@ import com.phoenix.agent.model.McpTestResultVO;
 import com.phoenix.agent.service.McpAdminService;
 import com.phoenix.tools.vo.ReturnVo;
 
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
+
 import cn.dev33.satoken.stp.StpUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -68,9 +71,11 @@ public class McpAdminController {
         return mcpAdminService.grantGroups(id, groupIds);
     }
 
+    /** Reactor 事件循环线程禁 block()（实测 IllegalStateException）——跳 boundedElastic，镜像 AgentFileController 的 Mono.fromCallable 先例 */
     @PostMapping("/test")
-    public ReturnVo<McpTestResultVO> test(@RequestBody McpTestDTO dto) {
-        return mcpAdminService.testConnection(dto);
+    public Mono<ReturnVo<McpTestResultVO>> test(@RequestBody McpTestDTO dto) {
+        return Mono.fromCallable(() -> mcpAdminService.testConnection(dto))
+            .subscribeOn(Schedulers.boundedElastic());
     }
 
     private String operator() {
