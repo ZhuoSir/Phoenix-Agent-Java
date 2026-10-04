@@ -1,5 +1,12 @@
 # Changelog: docker-auto-pipeline
 
+## 演练四复盘与两次归因更正（2026-10-04）
+- **打包段首次全链通过**（VPN 修好 VM 出网后：编译/五镜像/tar/自校验/解包全绿）
+- 安装段步骤 8 红 → 深挖出**比竞态更大的鱼**：verify.sh 裸 `docker compose exec` 被 compose.yaml 顶层 `name: phoenix-release` 解析到**开发栈**——昨日 drill-1 的 [6][10][12][7] PASS 全是假绿（查的 dev 数据）；今日 dev 栈午后又宕（Docker Desktop 4.13×macOS 26.6.2 不稳，已拉起）→ 假通道断裂 → 诚实报 0
+- 修复：verify 项目参数化（PHOENIX_COMPOSE_PROJECT）+ PHOENIX_FRESH 软化 [7]（首启两拍=全新安装预期态）；phx-bs 真验证 exit=0（12 PASS+1 WARN）、dev 严格回归 exit=0
+- **3251d50 归因更正**：步骤 7「等 migrator」保留为防御性加固，但演练四红的真因是本项目参数化缺失，非竞态
+- L-07 假阳性验证**复发×2 回炉**：断言必须显式绑定目标，禁止依赖默认解析的全局查询
+
 ## R-10 bootstrap 增量（2026-10-03）—— 三文档 bundled 确认
 - 用户 Server 2022 实战反馈「我要的是一键式，Windows Server 自己打包」→ requirements +R-10(v1.1.0)/plan +§1.6(v1.1.0)/tasks +T-11,T-12(v1.2.0)，用户单条「确认」bundled 过三门（增量条款已在前一条消息全文展示）
 - spec 已合并 v1.5.0 → 增量走新分支 feature/bootstrap-oneclick（基点 v1.5.0）
