@@ -10,13 +10,13 @@
   验证方式: curl 发布三态（无 body/空数组/带组）；覆盖式实证（重发布换组旧组行移除）；假组拒绝；GET 回显与 DB 双侧一致
   验收标准: 三态+覆盖式+假组+双侧取证全绿
 
-- [ ] T-02 validateVisible 双分支（FrontSkillAccessServiceImpl）：先数授权行（agent_id String 化），0 行→可见（全公开分支）；>0 行→现有交集 SQL 原样；同文件技能判定方法零改动
+- [x] T-02 validateVisible 双分支（FrontSkillAccessServiceImpl）：先数授权行（agent_id String 化），0 行→可见（全公开分支）；>0 行→现有交集 SQL 原样；同文件技能判定方法零改动
   关联: R-03
   依赖: 无
   验证方式: 三态 curl+DB 双侧取证（无行公开/有行命中/有行不命中）；**技能交集对面断言**（同文件他方法行为不变）
   验收标准: 三态全绿且技能域零变化
 
-- [ ] T-03 getMyAgents 公开合并（AccountInfoServiceImpl）：组交集结果 ∪ 无授权行 published 且 sn 空直查集（NOT EXISTS + id::text）；无组账号走公开集（现返回 null 死角修复）
+- [x] T-03 getMyAgents 公开合并（AccountInfoServiceImpl）：组交集结果 ∪ 无授权行 published 且 sn 空直查集（NOT EXISTS + id::text）；无组账号走公开集（现返回 null 死角修复）
   关联: R-03
   依赖: 无
   验证方式: 双账号实测（有组=交集∪公开 / 无组夹具=仅公开）；admin 列表（listCreatedInPlatform）零变化断言

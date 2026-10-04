@@ -1,5 +1,11 @@
 # Changelog: agent-publish-group-grant
 
+## T-02+T-03 完成（2026-10-04）两个判定读点全绿
+- T-02 validateVisible 双分支：无授权行→**仅 published 享全公开**（草稿拒绝，防反向漏洞——设计时补的安全闸）；有授权行→交集 SQL 原样。四态实测：A1 公开可对话(899字节真回复,且运行配置缺失也走通=工厂默认兜底)✓ A2 授权假组→chenzhuo 拒绝"未授权"文案✓ A3 撤权回公开✓ A4 草稿拒绝✓
+- T-03 getMyAgents 公开合并：交集∪公开集(NOT EXISTS+id::text+sn空过滤)，无组账号死角修复(现返回空列表非 null)。B1 chenzhuo=组授权4+公开夹具✓ B2 无组夹具=纯公开集✓ B3 admin 列表 5 条不变✓
+- 附带发现：**「制度专家」未出现在公开列表**——其 sn 非空被"平台内创建"过滤挡下（存量自注册不进前台列表既有规则），A-5 存量翻转实际影响面比预估更小（chat 直达仍公开，列表不可见）
+- 夹具全清（99905/99906/99907/t02 会话），合并部署一轮完成（合体镜像，MCP 共存无损——B3 与 MCP 端点此前 sanity 已过）
+
 ## T-01 完成（2026-10-04）发布扩展+授权端点 七断言全绿
 - 前置：合并 feature/mcp-client-tools 入本分支（dev 栈单实例需合体构建；M4 合并序=先 MCP 后本支则近平滑）；台账冲突 5 文件按块定向消解（bugs 64-67 归位/version/lessons ×5 超集/MILESTONE 双行各取新）；.mvn-home 重建后构建须带 -s settings.aliyun.xml（默认库失败标记缓存）
 - 交付：AgentPublishDTO；publish 可选 body（无 body=仅置状态，A-1 兼容实证）；GET/PUT /api/agent/{id}/groups（PUT 假组回可读 400——BUG-64 绕行 catch）；覆盖式物理删重建；del_flag 默认 1 陷阱显式置 0
