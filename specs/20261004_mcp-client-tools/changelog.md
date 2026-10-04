@@ -1,5 +1,13 @@
 # Changelog: mcp-client-tools
 
+## T-02 完成（2026-10-04）Flyway 两件+回滚两件
+- 交付：V1.6.0_01 三表 DDL / V1.6.0_02 三层菜单+ACL DML（md5 常量 id+NOT EXISTS 防重，镜像 V1.2.0_02）/ R 两件回滚
+- 列形对照表（与技能三件套逐列核对）：
+  - 注册表：tbl_harness_skills（应用建管/bigint id）→ tbl_mcp_server（DDL 建管/varchar32 id 对齐绑定表雪花串风格 + transport/config jsonb/status/审计列/del_flag + name 部分唯一索引 WHERE del_flag=0）——差异属自有域合理项
+  - 组授权：group_skill(group_id varchar, skill_id bigint) → group_mcp(group_id varchar, mcp_id varchar32)，列型对齐各自注册表
+  - 绑定：agent_skill(agent_id bigint, skill_id bigint) → agent_mcp(agent_id bigint, mcp_id varchar32)——**agent_id 用 bigint，避开 group_agent varchar 历史坑**
+- 验证（全新库 phoenix_fresh 实跑）：migrate exit=0 apply×10；台账 11 行(9+2)；表 59(56+3)；三层菜单+ACL 6 行(3菜单×2角色自智能体列表复制)；幂等复跑无错无重复；回滚逆执行表0菜单0；既有智能体列表 ACL=2 不变；演练库已清
+
 ## T-01 spike 报告（2026-10-04）—— 路线乙定案
 - **五问结论**（反编译 agentscope core/harness 2.0.0 取证）：
   ① 重复注册=ToolRegistry Map.put 撞名 last-wins 静默覆盖；同名 server 重复注册需先 removeMcpClient

@@ -1,0 +1,10 @@
+-- 回滚 V1.6.0_01：删三表（配置数据随删——回滚=放弃 MCP 功能）
+DROP INDEX IF EXISTS idx_agent_mcp_mcp;
+DROP INDEX IF EXISTS idx_agent_mcp_agent;
+DROP TABLE IF EXISTS tbl_data_agent_mcp_info;
+DROP INDEX IF EXISTS idx_group_mcp_mcp;
+DROP INDEX IF EXISTS idx_group_mcp_group;
+DROP TABLE IF EXISTS tbl_platform_group_mcp_info;
+DROP INDEX IF EXISTS idx_mcp_server_status;
+DROP INDEX IF EXISTS uk_mcp_server_name;
+DROP TABLE IF EXISTS tbl_mcp_server;

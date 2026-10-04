@@ -10,7 +10,7 @@
   验证方式: 五问逐项实测证据（输出/反编译片段）落盘 changelog；定案路线+理由成文；**定案前禁止编写任何挂载正式代码**
   验收标准: 五问全有答案；路线甲/乙择一（皆不可行→触发铁律 6 停工回 requirements 重议，此为合法出口）
 
-- [ ] T-02 Flyway 升级件：V1.6.0_01 三表 DDL（tbl_mcp_server/tbl_platform_group_mcp_info/tbl_data_agent_mcp_info，列形与技能三件套真实 DDL 逐列对照）+ V1.6.0_02 插件市场三层菜单与 ACL DML（镜像 V1.2.0_02 写法）+ rollback 配对
+- [x] T-02 Flyway 升级件：V1.6.0_01 三表 DDL（tbl_mcp_server/tbl_platform_group_mcp_info/tbl_data_agent_mcp_info，列形与技能三件套真实 DDL 逐列对照）+ V1.6.0_02 插件市场三层菜单与 ACL DML（镜像 V1.2.0_02 写法）+ rollback 配对
   关联: R-01
   依赖: 无
   验证方式: 全新库全链重放（基线+历史件+新两件）零错；表结构与技能模板对照表落盘；rollback 逆执行后零残留；**既有菜单/ACL 查询回归不变**（身份矩阵：菜单表对面断言）
