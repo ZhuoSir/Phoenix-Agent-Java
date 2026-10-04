@@ -1,5 +1,10 @@
 # Changelog: docker-auto-pipeline
 
+## R-10 bootstrap 增量（2026-10-03）—— 三文档 bundled 确认
+- 用户 Server 2022 实战反馈「我要的是一键式，Windows Server 自己打包」→ requirements +R-10(v1.1.0)/plan +§1.6(v1.1.0)/tasks +T-11,T-12(v1.2.0)，用户单条「确认」bundled 过三门（增量条款已在前一条消息全文展示）
+- spec 已合并 v1.5.0 → 增量走新分支 feature/bootstrap-oneclick（基点 v1.5.0）
+- 过程注记：首次批量编辑 plan 头锚点默写偏差被 assert 拦截（L-01 v2 第二次实战生效），读实文后补完
+
 ## 合并（2026-10-03）
 - 用户「合并进1.5.0分支吧」→ feature/docker-auto-pipeline（~22 commits）--no-ff 并入 v1.5.0，分支已删；amd64 正式包不在本机打（用户裁决：直接在 Server 2022 真机试装，走 WSL2 操作单/自建路线，真机日志回传即 T-04/T-05 延期项验证）
 
