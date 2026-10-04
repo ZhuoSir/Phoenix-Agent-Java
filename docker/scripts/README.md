@@ -10,6 +10,7 @@
 | package.sh | 只打包：源码 → 自包含 tar.gz（五镜像+资产+脚本+sha256） | 构建机（任一有 Docker 的机器） |
 | install.sh | 只安装：解包后九步到收据卡 | Linux / mac / WSL 内 |
 | install.ps1 | 只安装（Windows）：WSL2 就绪 + 进 WSL 跑 install.sh | Windows（管理员） |
+| **phoenix-ctl.sh / .ps1** | 日常运维一条入口：start/stop/restart/status/logs/verify/purge | 装机（ps1 为 Windows 转发） |
 | verify.sh | 13 项健康断言（装完自检/日常体检） | 有栈的机器 |
 | build.sh / save-offline.sh / load-and-run.sh | 旧手工链（保留兼容，日常不推荐） | 构建机/目标机 |
 | backup.sh / upgrade.sh | 数据备份 / 旧版升级辅助（手工链时代产物） | 运维机 |
@@ -52,6 +53,24 @@ bash install.sh --env-from /旧安装/docker/.env    # 升级：承接旧配置�
 bash install.sh --offline                        # 断网机（引擎已装 或 包内有 engine/*.deb）
 ```
 幂等：所有脚本重跑自动跳过已完成步骤（断点续传），失败输出必带「步骤 N/M + 日志路径」。
+
+## 场景四：日常运维（装好之后）
+```bash
+# Linux/WSL/mac —— 自动定位安装目录与项目名，直接：
+bash docker/scripts/phoenix-ctl.sh status     # 状态+健康+端口+首页探活
+bash docker/scripts/phoenix-ctl.sh stop       # 暂停（容器保留，秒级恢复）
+bash docker/scripts/phoenix-ctl.sh start      # 启动（等 backend healthy 才返回）
+bash docker/scripts/phoenix-ctl.sh restart backend   # 重启单个服务
+bash docker/scripts/phoenix-ctl.sh logs backend      # 跟日志
+bash docker/scripts/phoenix-ctl.sh verify            # 13 项体检
+bash docker/scripts/phoenix-ctl.sh purge             # 毁灭性清场（删数据卷，需输入 yes）
+```
+```powershell
+# Windows 侧同款（自动转发进 WSL）：
+.\docker\scripts\phoenix-ctl.ps1 status|start|stop|restart|logs|verify
+```
+服务器重启后：WSL 场景先 `sudo service docker start`（未开 systemd 时），然后 `phoenix-ctl.sh start`；
+compose 已配 `restart: unless-stopped`，docker 引擎起来后栈通常**自动复活**，ctl start 只是兜底。
 
 ## 国内源说明（默认全国内，无需配置）
 - 基础镜像：`mirrors.list` 三候选竞速（1ms.run/daocloud/dockerproxy），失稳时编辑该文件或 `--mirror` 指定

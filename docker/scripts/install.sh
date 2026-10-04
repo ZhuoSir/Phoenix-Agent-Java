@@ -142,6 +142,7 @@ phx_step 6 $TOTAL "compose up（项目名 $PROJECT）" && {
   elif command -v docker-compose >/dev/null 2>&1; then DC="docker-compose"
   else phx_fail 6 $TOTAL "无 docker compose 插件也无 docker-compose——装 compose 后重跑"; fi
   ( cd "$PAYLOAD/docker" && $DC -p "$PROJECT" up -d ) >>"$PHX_LOG_FILE" 2>&1 || phx_fail 6 $TOTAL "compose up 失败（见日志）"
+  echo "$PROJECT" > "$PAYLOAD/.phoenix-project"   # phoenix-ctl.sh 项目名自动解析锚
   phx_step_mark 6
 }
 
@@ -181,7 +182,7 @@ phx_step 9 $TOTAL "收据卡" && {
     "数据目录" "docker 卷 ${PROJECT}_*（/var/lib/docker/volumes/）" \
     "日志" "$PHX_LOG_FILE" >/dev/null
   cat "$PAYLOAD/RECEIPT"
-  phx_log INFO "下一步: ①浏览器打开上方地址并改密 ②模型管理配置真实 API key ③日常运维 cd docker && docker compose -p $PROJECT ps/logs"
+  phx_log INFO "下一步: ①浏览器打开上方地址并改密 ②模型管理配置真实 API key ③日常运维: docker/scripts/phoenix-ctl.sh start|stop|restart|status|logs|verify"
   phx_step_mark 9
 }
 phx_log INFO "安装完成: $PROJECT @ http://localhost:$(port_of_env)"
