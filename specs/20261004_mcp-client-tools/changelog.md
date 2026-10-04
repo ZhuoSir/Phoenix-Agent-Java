@@ -1,5 +1,10 @@
 # Changelog: mcp-client-tools
 
+## T-06/T-07 勾选（2026-10-04）用户走查通过
+- 走查实录：用户完成插件管理页 MCP 配置（真接麦当劳官方 MCP）+ 抽屉插件配置块绑定 + 对话实测；三轮反馈全部闭环（菜单两层化 / 插件配置命名 / 抽屉入口补挂 / BUG-65 NPE 修复）
+- 用户结论原话：「目前看整体问题不大」——T-06（界面走查）与 T-07（绑定+回显+既有块回归）验收以用户走查为准据勾选
+- 遗留待办移交 T-08：跨用户泄漏断言 G1/G2（需前台账号）、front/confirm 链实测、回环 dogfood、测试连接分类词精修
+
 ## BUG-65/66 排障记（2026-10-04）用户走查 NPE → 双修复全链绿
 - 用户走查报「生成异常中断:NullPointerException」（agent-36 绑麦当劳真 MCP https://mcp.mcd.cn）
 - 取证链：落库行 st=timeout+中断文案 → 日志 PRE_ACTING **name=null**×2 → 挂载正常(35工具,___MCP__前缀) → 确定性复现（同题重打）→ **A/B①中文名改 ASCII mcd：仍崩**（排除中文/下划线前缀）→ 嫌疑锁定连字符（mcd 全工具带 -，T-05 stub 全下划线正常）→ **修复①sanitize 连字符→下划线+折叠+首字符字母化** → 复测 done、PRE_ACTING name=mcd__query_nearby_stores、真调 mcp.mcd.cn 出 5 家门店实数据
