@@ -59,7 +59,8 @@ public class McpAdminServiceImpl implements McpAdminService {
     private final McpServerInfoMapper mcpServerInfoMapper;
     private final GroupMcpInfoMapper groupMcpInfoMapper;
     private final AgentMcpInfoMapper agentMcpInfoMapper;
-    private final ObjectMapper objectMapper;
+    /** WebFlux 上下文无自动装配 ObjectMapper bean（启动崩溃实证）——自持实例，同 HitlCacheService 惯例 */
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
     public ReturnVo<Page<McpListVO>> page(String keyword, int pageNum, int pageSize) {
