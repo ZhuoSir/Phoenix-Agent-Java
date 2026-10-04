@@ -1,5 +1,15 @@
 # Changelog: mcp-client-tools
 
+## T-08 完成（2026-10-04）回环 dogfood + 泄漏断言 + 三态分类 + 全量回归
+- **回环 dogfood（R-03 验收场景实测）**：注册平台自家 MCP（sse http://127.0.0.1:8066/sse）→ 授权通用组 → 绑定 agent36 → 前台 chenzhuo（用户供号）真对话 → 模型调用 `m_nl2sql__listAgentsToolCallback` → done，正文含真实 5 智能体列表——**平台吃自己的 MCP 狗粮全链通**
+- **泄漏断言（G1/G2 双向）**：夹具 G2 组+t08user2（同密码哈希，agent 可见但 MCP 未授权）→ 同题对话 → **零变体构建、零 m_* 工具面**，仅框架自带 agent_list（基座装备，未授权用户=现行为零变化）✓；chenzhuo 侧变体+双 server 挂载 ✓
+- **测试连接三态分类校准（R-06 全兑现）**：MCP SDK 把 401 统一包成"failed to initialize"→新增 **HTTP 层预探**（带配置 headers 直连读状态码）：401桩→「鉴权失败：HTTP 401（请检查 Headers 凭据）」/ 死端口→「目标不可达：ConnectException」/ 回环→成功 703ms 列工具——过程抓己错一枚（setRequestHeader→setRequestProperty，且 build=1 时误续部署跑旧码，当场纠正重测）
+- **R-07 对面断言**：git diff main...HEAD 平台 MCP Server 端四路径**零变化**；/sse 暴露面=勘察期同两工具
+- **四路回归**：技能 options 100 / 菜单树 100 / 前台登录 100 / admin 对话多轮 done；verify=0；vue-tsc 213=基线（T-08 无前端改动，引用 T-07 终测）
+- 清场全零（夹具账号/组/成员/授权行/LOOP MCP/t08 会话）；**用户资产完好**（麦当劳MCP 本体+agent36 绑定=1 复原）
+- **如实注记**：confirm 续跑链实测需计划模式 HITL 夹具（不动用户 agent 配置），接线与 front/admin 同源（同一 effectiveMcp+withMcp 码段）且两链实弹绿——confirm 链实弹**移交 M4 checklist 演练**执行
+- 探针小疵自记：auth/info 路径系我猜测不存在致 500（登录与四路全 100，非产品问题）
+
 ## v1.1.0 重确认通过（2026-10-04）
 - 用户「确认」；requirements/plan v1.1.0 翻已确认（陈卓，菜单层级修订）；三重门恢复全绿
 - T-08 前台测试账号：用户提供 chenzhuo（口令走安全通道不留档）

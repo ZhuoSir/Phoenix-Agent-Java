@@ -298,6 +298,17 @@ public class McpAdminServiceImpl implements McpAdminService {
         }
         long timeoutMs = dto.getTimeoutMs() == null ? DEFAULT_TIMEOUT_MS : dto.getTimeoutMs();
         long initMs = dto.getInitTimeoutMs() == null ? DEFAULT_INIT_TIMEOUT_MS : dto.getInitTimeoutMs();
+        // HTTP 层预探（R-06：MCP SDK 把 401/拒连统一包成"failed to initialize"，鉴权失败与不可达无法区分）——
+        // 带配置 headers 直连读状态码：401/403→鉴权失败；拒连/未知主机→不可达；其余状态放行给完整试连
+        if (!"stdio".equals(dto.getTransport()) && StringUtils.hasText(dto.getUrl())) {
+            String pre = httpPrecheck(dto.getUrl().trim(), headers);
+            if (pre != null) {
+                vo.setSuccess(false);
+                vo.setError(pre);
+                vo.setElapsedMs(System.currentTimeMillis() - t0);
+                return ReturnVo.ok(vo);
+            }
+        }
         McpClientWrapper wrapper = null;
         try {
             McpClientBuilder b = McpClientBuilder
@@ -563,6 +574,35 @@ public class McpAdminServiceImpl implements McpAdminService {
         return out;
     }
 
+    /** 返回 null=放行（继续完整试连）；非 null=可读错误定案。 */
+    private String httpPrecheck(String url, Map<String, String> headers) {
+        try {
+            java.net.HttpURLConnection conn = (java.net.HttpURLConnection) java.net.URI.create(url).toURL()
+                .openConnection();
+            conn.setConnectTimeout(4000);
+            conn.setReadTimeout(4000);
+            conn.setRequestMethod("POST");
+            conn.setDoOutput(true);
+            headers.forEach(conn::setRequestProperty);
+            conn.getOutputStream().write("{}".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            int code = conn.getResponseCode();
+            conn.disconnect();
+            if (code == 401 || code == 403) {
+                return "鉴权失败：HTTP " + code + "（请检查 Headers 凭据）";
+            }
+            return null; // 200/405/404 等交由完整 MCP 握手判定
+        }
+        catch (java.net.ConnectException | java.net.UnknownHostException e) {
+            return "目标不可达：" + e.getClass().getSimpleName() + " " + e.getMessage();
+        }
+        catch (java.net.SocketTimeoutException e) {
+            return "连接超时：预探 4s 无响应";
+        }
+        catch (Exception e) {
+            return null; // 预探自身异常不拦截，交给完整试连
+        }
+    }
+
     private String classifyError(Exception ex) {
         StringBuilder sb = new StringBuilder();
         Throwable t = ex;
@@ -581,8 +621,9 @@ public class McpAdminServiceImpl implements McpAdminService {
             return "连接超时：" + raw;
         }
         if (m.contains("connect") || m.contains("refused") || m.contains("unknownhost") || m.contains("resolve")
-                || m.contains("unreachable")) {
-            return "目标不可达：" + raw;
+                || m.contains("unreachable") || m.contains("failed to initialize")) {
+            // "failed to initialize"=MCP SDK 对连接层失败的统一包装（T-03 演练实证分类词缺失）
+            return "目标不可达或握手失败：" + raw;
         }
         return "连接失败：" + raw;
     }
