@@ -70,8 +70,9 @@ public class McpMountService {
     private String signature(Long agentId, List<McpServerInfo> effective) {
         StringBuilder sb = new StringBuilder().append(agentId);
         effective.stream().sorted((a, b) -> String.valueOf(a.getId()).compareTo(String.valueOf(b.getId())))
-            .forEach(e -> sb.append('|').append(e.getId()).append(':').append(String.valueOf(e.getConfig()).hashCode())
-                .append(':').append(e.getStatus()));
+            // name 必须入签名：前缀由 name 净化而来，改名后旧变体不得复用（实测缓存漂移）
+            .forEach(e -> sb.append('|').append(e.getId()).append(':').append(e.getName()).append(':')
+                .append(String.valueOf(e.getConfig()).hashCode()).append(':').append(e.getStatus()));
         return Integer.toHexString(sb.toString().hashCode()) + "-" + effective.size();
     }
 
@@ -208,8 +209,18 @@ public class McpMountService {
         }
     }
 
+    /**
+     * 工具名净化：仅 [a-zA-Z0-9_]（A/B 实证：连字符工具名令模型回传 name=null → 框架 NPE，
+     * mcd 真服务器两轮复现；T-05 全下划线 stub 正常）。连续下划线折叠，前导非字母补 m。
+     */
     private String sanitize(String s) {
-        String out = s == null ? "srv" : s.replaceAll("[^a-zA-Z0-9_-]", "_");
+        String out = s == null ? "srv" : s.replaceAll("[^a-zA-Z0-9_]", "_").replaceAll("_+", "_");
+        if (out.isEmpty()) {
+            out = "srv";
+        }
+        if (!Character.isLetter(out.charAt(0))) {
+            out = "m" + out;
+        }
         return out.length() > 24 ? out.substring(0, 24) : out;
     }
 

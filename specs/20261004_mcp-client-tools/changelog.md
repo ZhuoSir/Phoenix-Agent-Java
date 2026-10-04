@@ -1,5 +1,12 @@
 # Changelog: mcp-client-tools
 
+## BUG-65/66 排障记（2026-10-04）用户走查 NPE → 双修复全链绿
+- 用户走查报「生成异常中断:NullPointerException」（agent-36 绑麦当劳真 MCP https://mcp.mcd.cn）
+- 取证链：落库行 st=timeout+中断文案 → 日志 PRE_ACTING **name=null**×2 → 挂载正常(35工具,___MCP__前缀) → 确定性复现（同题重打）→ **A/B①中文名改 ASCII mcd：仍崩**（排除中文/下划线前缀）→ 嫌疑锁定连字符（mcd 全工具带 -，T-05 stub 全下划线正常）→ **修复①sanitize 连字符→下划线+折叠+首字符字母化** → 复测 done、PRE_ACTING name=mcd__query_nearby_stores、真调 mcp.mcd.cn 出 5 家门店实数据
+- 修复②（复测揪出）：改名后仍旧前缀=**变体签名缺 name 列**（BUG-66）→ 签名加 name → 中文名复原实测 m_MCP__query_nearby_stores 即时生效、NPE 双零
+- 用户数据处置如实报：A/B 期间将「麦当劳MCP」临时改名 mcd、description 被我覆盖——名字已复原；**description 现为「麦当劳官方 MCP（mcp.mcd.cn）」为我代填**，若与你原填不同请在页面上改回
+- 账面：BUG-65(高)/BUG-66(低) 已验证(v1.6.0在途)；**L-15 新坑入册**（外部资源名→模型工具名必须最保守字符集，BL-25 设计输入）；sanitize 新规随 v1.6.0 代码走
+
 ## T-07 三增补（2026-10-04）部署假绿暴雷——镜像从未重建
 - 用户走查三轮「还是没有」：容器内查证 **AgentPluginConfig chunk=0**、镜像 built=20:33(T-06版) vs 宿主 dist 21:02——改名与抽屉挂载**两次部署都没进容器**
 - 根因：`docker compose up --force-recreate` 对已存在 tag **不自动重建镜像**（此前 T-06 首次因镜像缺失触发过 compose 自建，掩盖了差异）；且我的"入包验证"查的是宿主 .stage/dist 非容器内 = **假证明，L-03 部署三段证明违例**
