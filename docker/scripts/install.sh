@@ -12,13 +12,14 @@ LIB="$PAYLOAD/docker/scripts/lib/common.sh"
 . "$LIB"
 
 TOTAL=9
-TIMEOUT=300; PROJECT=phoenix; OFFLINE=0; ENV_FROM=""
+TIMEOUT=300; PROJECT=phoenix; OFFLINE=0; ENV_FROM=""; PORT_ARG=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --timeout) TIMEOUT="$2"; shift 2;;
     --project) PROJECT="$2"; shift 2;;
     --offline) OFFLINE=1; shift;;
     --env-from) ENV_FROM="$2"; shift 2;;   # 升级标准姿势：承接旧安装 docker/.env（密码/端口不漂移）
+    --port) PORT_ARG="$2"; shift 2;;       # 仅 .env 首次生成时生效（bootstrap 隔离演练/端口冲突场景）
     --from-wsl) shift;;   # install.ps1 传入：语义与 Linux 相同（引擎装在 WSL Ubuntu 内）
     -h|--help) grep '^#' "$0" | head -5; exit 0;;
     *) echo "未知参数: $1" >&2; exit 2;;
@@ -128,6 +129,7 @@ phx_step 5 $TOTAL ".env 生成/保留" && {
     else PGPW=$(od -An -tx1 -N16 /dev/urandom | tr -d ' \n'); fi
     sed -i.bak "s|^IMAGE_TAG=.*|IMAGE_TAG=$VERSION|" "$ENVF"
     sed -i.bak "s|^PG_PASSWORD=.*|PG_PASSWORD=$PGPW|" "$ENVF"
+    [ -n "$PORT_ARG" ] && sed -i.bak "s|^PHOENIX_HTTP_PORT=.*|PHOENIX_HTTP_PORT=$PORT_ARG|" "$ENVF"
     rm -f "$ENVF.bak"; chmod 600 "$ENVF"
     echo "$PGPW" > "$PAYLOAD/.phoenix-pgpassword"; chmod 600 "$PAYLOAD/.phoenix-pgpassword"
     phx_log INFO ".env 已生成（IMAGE_TAG=$VERSION，PG_PASSWORD 随机——仅收据卡回显一次）"
