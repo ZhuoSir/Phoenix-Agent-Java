@@ -1,6 +1,6 @@
 # Plan: mcp-client-tools（插件市场 · MCP 统一管理）
 
-> 版本: v1.1.0 | 状态: 待重确认 | 确认人: 陈卓(v1.0.0) | 更新: 2026-10-04
+> 版本: v1.1.0 | 状态: 已确认 | 确认人: 陈卓 | 确认日期: 2026-10-04（v1.0.0 同日；v1.1.0 菜单层级修订重确认） | 更新: 2026-10-04
 > v1.0.0→v1.1.0：用户指令去市场层——§1.1 菜单 DML 两件改单件顶级、§1.4 三层改两层；其余不变
 > 规范路由（.specrc.yml）：api-design=global / database=global / code-backend=global / code-frontend=none（跟随周边风格）/ git-workflow=global（v1.6.0 版本分支制）
 
