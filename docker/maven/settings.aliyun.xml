@@ -11,4 +11,13 @@
       <url>https://maven.aliyun.com/repository/public/</url>
     </mirror>
   </mirrors>
+  <!-- 加固：连接/读超时 30s——mvn 默认无 socket 超时，死连接会永挂（bs 演练实证 18 分钟假死）；超时即失败可重跑，续用 buildkit 缓存 -->
+  <servers>
+    <server>
+      <id>aliyun-central</id>
+      <configuration>
+        <timeout>30000</timeout>
+      </configuration>
+    </server>
+  </servers>
 </settings>

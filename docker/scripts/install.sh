@@ -12,13 +12,14 @@ LIB="$PAYLOAD/docker/scripts/lib/common.sh"
 . "$LIB"
 
 TOTAL=9
-TIMEOUT=300; PROJECT=phoenix; OFFLINE=0; ENV_FROM=""
+TIMEOUT=300; PROJECT=phoenix; OFFLINE=0; ENV_FROM=""; PORT_ARG=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --timeout) TIMEOUT="$2"; shift 2;;
     --project) PROJECT="$2"; shift 2;;
     --offline) OFFLINE=1; shift;;
     --env-from) ENV_FROM="$2"; shift 2;;   # 升级标准姿势：承接旧安装 docker/.env（密码/端口不漂移）
+    --port) PORT_ARG="$2"; shift 2;;       # 仅 .env 首次生成时生效（bootstrap 隔离演练/端口冲突场景）
     --from-wsl) shift;;   # install.ps1 传入：语义与 Linux 相同（引擎装在 WSL Ubuntu 内）
     -h|--help) grep '^#' "$0" | head -5; exit 0;;
     *) echo "未知参数: $1" >&2; exit 2;;
@@ -128,6 +129,7 @@ phx_step 5 $TOTAL ".env 生成/保留" && {
     else PGPW=$(od -An -tx1 -N16 /dev/urandom | tr -d ' \n'); fi
     sed -i.bak "s|^IMAGE_TAG=.*|IMAGE_TAG=$VERSION|" "$ENVF"
     sed -i.bak "s|^PG_PASSWORD=.*|PG_PASSWORD=$PGPW|" "$ENVF"
+    [ -n "$PORT_ARG" ] && sed -i.bak "s|^PHOENIX_HTTP_PORT=.*|PHOENIX_HTTP_PORT=$PORT_ARG|" "$ENVF"
     rm -f "$ENVF.bak"; chmod 600 "$ENVF"
     echo "$PGPW" > "$PAYLOAD/.phoenix-pgpassword"; chmod 600 "$PAYLOAD/.phoenix-pgpassword"
     phx_log INFO ".env 已生成（IMAGE_TAG=$VERSION，PG_PASSWORD 随机——仅收据卡回显一次）"
@@ -143,20 +145,25 @@ phx_step 6 $TOTAL "compose up（项目名 $PROJECT）" && {
   phx_step_mark 6
 }
 
-phx_step 7 $TOTAL "等待 healthy（${TIMEOUT}s 上限，5s 轮询——L-08 确定性等待）" && {
+phx_step 7 $TOTAL "等待 migrator 完成 + backend healthy（${TIMEOUT}s 上限，5s 轮询——L-08 确定性等待）" && {
+  # 竞态修复（演练四实证）：backend 不依赖 migrator 完成，Spring 起动可能快过迁移脚本——
+  # 只等 backend healthy 会让 verify 撞上半迁移库（台账0行/表缺）。两个 migrator exited(0) 也是放行条件。
   i=0
   while [ $i -lt "$TIMEOUT" ]; do
     ST=$(docker inspect --format '{{.State.Health.Status}}' "${PROJECT}-backend-1" 2>/dev/null || echo missing)
-    [ "$ST" = "healthy" ] && break
+    M1=$(docker inspect --format '{{.State.ExitCode}}' "${PROJECT}-migrator-1" 2>/dev/null || echo running)
+    M2=$(docker inspect --format '{{.State.ExitCode}}' "${PROJECT}-migrator-post-1" 2>/dev/null || echo running)
+    if [ "$ST" = "healthy" ] && [ "$M1" = "0" ] && [ "$M2" = "0" ]; then break; fi
     i=$((i+5)); sleep 5
   done
   [ "$ST" = "healthy" ] || phx_fail 7 $TOTAL "backend 未在 ${TIMEOUT}s 内 healthy（当前=$ST；docker logs ${PROJECT}-backend-1 看详情）"
+  { [ "$M1" = "0" ] && [ "$M2" = "0" ]; } || phx_fail 7 $TOTAL "migrator 未正常完成（migrator=$M1 migrator-post=$M2；docker logs ${PROJECT}-migrator-1 看详情）"
   phx_step_mark 7
 }
 
 phx_step 8 $TOTAL "verify 全断言（失败=安装失败，Q2 决议）" && {
   PORT=$(port_of_env)
-  ( cd "$PAYLOAD/docker" && PHOENIX_HTTP_PORT="$PORT" sh scripts/verify.sh ) >>"$PHX_LOG_FILE" 2>&1 \
+  ( cd "$PAYLOAD/docker" && PHOENIX_HTTP_PORT="$PORT" PHOENIX_COMPOSE_PROJECT="$PROJECT" PHOENIX_FRESH=1 sh scripts/verify.sh ) >>"$PHX_LOG_FILE" 2>&1 \
     || phx_fail 8 $TOTAL "verify 存在失败断言（详见日志，检索 PASS/FAIL）"
   phx_step_mark 8
 }

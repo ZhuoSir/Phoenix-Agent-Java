@@ -1,6 +1,6 @@
 # Plan: docker-auto-pipeline
 
-> 版本: v1.0.1 | 状态: 已确认 | 确认人: 陈卓 | 确认日期: 2026-10-03 | 更新: 2026-10-03（v1.0.0 确认同日；v1.0.1 PATCH=payload 五镜像化，重确认 2026-10-03）
+> 版本: v1.1.0 | 状态: 已确认 | 确认人: 陈卓 | 确认日期: 2026-10-03 | 更新: 2026-10-03（v1.0.1=payload 五镜像化；v1.1.0=+§1.6 bootstrap 胶水层，用户 bundled 确认 2026-10-03）
 > 规范路由（.specrc.yml）：code-backend=global（Java 规范不适用 shell——跟随 docker/scripts 周边风格）；code-frontend=none；api-design/database 不涉（无新接口无库表）；git-workflow=global（版本分支 v1.5.0 制式）
 
 ## 〇、坑核对（lessons.md 全部 12 条 active 逐条过）
@@ -84,6 +84,12 @@ phoenix-<ver>-<arch>/
 - Maven：`docker/maven/settings.aliyun.xml`（v1.4.0 已入库，直接引用）；npm：`NPM_REGISTRY=https://registry.npmmirror.com`（同）
 - apt（引擎安装时）：`mirrors.aliyun.com` ubuntu/debian 源替换（备份原 sources.list）
 - `--overseas`：以上全部切官方默认值
+
+### 1.6 bootstrap 胶水层（v1.1.0 / R-10）
+- `docker/scripts/bootstrap.sh`（Linux/WSL/mac）：A 引擎就位（复用 install.sh 同款 get.docker --mirror Aliyun 逻辑，薄复制不改已验证代码）→ B `package.sh --arch native --version <git describe|fallback>` → C 解包到 `~/phoenix-install/` → D 包内 `install.sh`（透传 --project/--port/--timeout/--offline）。四段各自幂等=天然断点续接；产包保留可复用。
+- `docker/scripts/bootstrap.ps1`(Windows)：install.ps1 的 WSL 就绪段同构（管理员检查/原生引擎拒绝/功能启用重启续接/发行版检测，允许 -Distro 参数兼容 --import 自定义名）→ 源码 cp 进 WSL → 调 bootstrap.sh → Windows 侧收据。与 install.ps1 的重复段加注释互指（共享 ps1 库列 backlog，v1 不做）。
+- `install.sh` 增 `--port`（仅 .env 首次生成时生效；已存在仍保留原值——与 R-07 一致）。
+- 被拒：改造 install.sh 抽取引擎函数供 bootstrap source（重排已验证代码风险>收益，薄复制+注释互指）。
 
 ## 二、涉及模块与数据流
 - 新增：`docker/scripts/package.sh`、`install.sh`、`install.ps1`、`mirrors.list`、`docker/scripts/lib/common.sh`（日志/步骤状态机/探活/收据卡函数）、`docker/payload-docs/`（INSTALL/OFFLINE-ENGINE/RECEIPT-SAMPLE）
