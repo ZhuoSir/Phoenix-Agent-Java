@@ -8,7 +8,7 @@ set -uo pipefail
 SRC=$(cd "$(dirname "$0")/../.." && pwd)
 . "$SRC/docker/scripts/lib/common.sh"
 
-VERSION=""; PROJECT=phoenix; PORT=""; TIMEOUT=300; OFFLINE=0
+VERSION=""; PROJECT=phoenix; PORT=""; TIMEOUT=300; OFFLINE=0; MIRROR_OPT=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --version) VERSION="$2"; shift 2;;
@@ -16,6 +16,7 @@ while [ $# -gt 0 ]; do
     --port) PORT="$2"; shift 2;;
     --timeout) TIMEOUT="$2"; shift 2;;
     --offline) OFFLINE=1; shift;;
+    --mirror) MIRROR_OPT="$2"; shift 2;;   # 透传 package.sh：竞速只测HEAD不测带宽，慢源可手工指定（bs演练实证）
     -h|--help) grep '^#' "$0" | head -5; exit 0;;
     *) echo "未知参数: $1" >&2; exit 2;;
   esac
@@ -23,7 +24,7 @@ done
 if [ -z "$VERSION" ]; then VERSION=$(git -C "$SRC" describe --tags 2>/dev/null | sed 's/^v//'); fi
 [ -z "$VERSION" ] && VERSION="1.5.0-local"
 ARCH=$(uname -m); case "$ARCH" in x86_64) ARCH=amd64;; aarch64|arm64) ARCH=arm64;; esac
-export PHX_LOG_FILE="${PHX_LOG_FILE:-$HOME/.phoenix/bootstrap-$(date +%Y%m%d-%H%M%S).log}"
+export PHX_LOG_FILE="$HOME/.phoenix/bootstrap-$(date +%Y%m%d-%H%M%S).log"   # 强制 bootstrap 前缀（source common 后再设会被其默认值占位——命名小bug同修）
 phx_log_init
 phx_log INFO "bootstrap 开始: src=$SRC version=$VERSION arch=$ARCH project=$PROJECT port=${PORT:-默认}"
 
@@ -47,7 +48,9 @@ fi
 # ── B/4 本机打包（native 架构，国内源默认） ──
 phx_log INFO "[B/4] 源码打包 package.sh（--arch $ARCH --version $VERSION）"
 [ "$OFFLINE" -eq 1 ] && phx_log WARN "--offline 仅作用于安装段；打包段需外网（镜像源/依赖源）"
-bash "$SRC/docker/scripts/package.sh" --arch "$ARCH" --version "$VERSION" >>"$PHX_LOG_FILE" 2>&1 || phx_fail 2 4 "打包失败（见日志尾部）"
+PKG_MIRROR_ARG=""; [ -n "$MIRROR_OPT" ] && PKG_MIRROR_ARG="--mirror $MIRROR_OPT"
+# shellcheck disable=SC2086
+bash "$SRC/docker/scripts/package.sh" --arch "$ARCH" --version "$VERSION" $PKG_MIRROR_ARG >>"$PHX_LOG_FILE" 2>&1 || phx_fail 2 4 "打包失败（见日志尾部）"
 TAR="$SRC/docker/dist/phoenix-${VERSION}-${ARCH}.tar.gz"
 [ -f "$TAR" ] || phx_fail 2 4 "打包产物缺失: $TAR"
 phx_log INFO "[B/4] 产包就绪: $TAR ($(du -h "$TAR" | awk '{print $1}'))——可拷贝至其它机器离线安装"
