@@ -10,7 +10,7 @@
 | BL-01 | **MCP 支持**：对话智能体接入 MCP 工具（作为 MCP Client 消费外部 MCP Server），与现有「平台作为 MCP Server 对外暴露 nl2sql/agent 列表」形成双端能力 | 2026-09-27 用户列入待办 | **已立项(v1.6.0)** | 平台侧已有 `McpServerService`（暴露 `nl2SqlToolCallback`/`listAgentsToolCallback`）与 `McpServerConfig`；AgentScope Harness 侧具备 `McpServerRegistrar`/`McpServerConfig`（jar 内已见）但**未接线**。建议 spec：`mcp-client-tools` |
 | BL-02 | 工作流智能体的**图定义与可视化编排** | 2026-09-27 用户明确"本期不做，先放起来" | 待立项 | 图仍由 Java 硬编码（`ParolCompiledGraph`），DB 无图定义存储、前端无画布。建议 spec：`workflow-orchestration` |
 | BL-03 | 存量 5 个 Java 自注册智能体的**迁移与删除**（现仅从列表隐藏） | 2026-09-27 用户决定"代码保留，暂作实现参考" | 待立项 | **前置已具备**：`dynamic-agent-types` 16/16 完成、数据驱动链路与存量行为等价已实测（存量 5 个各一轮对话不回归）。建议 spec：`legacy-agent-migration` |
-| BL-04 | 智能体↔组关联改为「**智能体发布时关联组**」（与技能发布时授权组同构） | 2026-09-27 用户明示（`agent-skill-management` Non-goals） | 待立项 | 现状：组授权在组管理侧维护（`tbl_platform_group_agent_info`）；目标是发布动作里多选组、发布后即时生效 |
+| BL-04 | 智能体↔组关联改为「**智能体发布时关联组**」（与技能发布时授权组同构） | 2026-09-27 用户明示（`agent-skill-management` Non-goals） | **已立项(v1.6.0)** | 现状：组授权在组管理侧维护（`tbl_platform_group_agent_info`）；目标是发布动作里多选组、发布后即时生效 |
 |  BL-05  |  **统一账号中心**：消除 `tbl_privilege_user` / `tbl_platform_account_info` 双账号体系  |  2026-09-27 排障中发现（根因登记 `BUG-04`）  |  待立项  | 两表状态语义相反（1=禁用 vs 0=禁用）、密码互不相通、同名账号两条记录。最低成本方案=单表+角色字段；建议 spec：`unified-account`\|；承接 BUG-45 遗留：预设问题 add/delete 接口角色限制随体系统一一并做 |
 | BL-06 | 清理**早期 demo 遗留表**：`tbl_tmp_orders/products/users`、`tbl_data_orders/products/users/order_items/categories`（应用代码零引用） | `BUG-01` 附带建议 | 待立项 | 这批表源自早期演示数据，占种子体积且易误导（本次曾被它们触发级联报错）。需带迁移+回滚脚本 |
 | BL-07 | 关联表 `agent_id` **列类型统一为 bigint** | `BUG-29` 根因（代码侧已绕过） | 待立项 | `tbl_platform_group_agent_info.agent_id` 是 varchar，`tbl_data_agent_skill_info.agent_id` 是 bigint，口径不一致；涉及存量数据迁移与索引重建 |
