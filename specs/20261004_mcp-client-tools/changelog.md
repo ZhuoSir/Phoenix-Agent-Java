@@ -1,5 +1,10 @@
 # Changelog: mcp-client-tools
 
+## T-07 增补（2026-10-04）绑定块更名「插件配置」
+- 用户走查反馈：MCP 配置页成功，但编辑页未见绑定块（判定=浏览器缓存旧 chunk，块自 T-07 部署已在包）+ 命名指令「技能配置下面增加一个插件配置，可以选择 MCP」
+- AgentMcpConfig.vue → **AgentPluginConfig.vue**（git mv 留痕），标题「插件配置」、子标签「MCP」、Alert 注记未来 API 插件并入本块（BL-25）、按钮「保存插件配置」——与插件管理同哲学，为 BL-25 留位
+- typecheck 213=基线，build 绿，chunk AgentPluginConfig-f-qIHrQf.js 入包，nginx v1.6.0-dev 重建，verify=0；用户侧需硬刷新（L-11）
+
 ## requirements/plan v1.1.0 待重确认（2026-10-04）——菜单层级修订
 - 用户指令：「插件市场这个目录暂时先去掉，就是插件管理，插件市场和管理本质是一个」→ Q4 决议入档
 - requirements：R-01 顶级菜单改插件管理 / A-6 两层结构 / Q4 决议记录；plan：§1.1 DML 改两层 / §1.4 三层改两层；铁律3 双文档 bump 待重确认

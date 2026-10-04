@@ -29,7 +29,7 @@ import AgentDataSourceConfig from './components/AgentDataSourceConfig.vue';
 import AgentProfileAiFields from '#/components/agent-profile/AgentProfileAiFields.vue';
 
 import AgentRuntimeConfig from '../list/components/AgentRuntimeConfig.vue';
-import AgentMcpConfig from './components/AgentMcpConfig.vue';
+import AgentPluginConfig from './components/AgentPluginConfig.vue';
 import AgentSkillConfig from './components/AgentSkillConfig.vue';
 
 const route = useRoute();
@@ -291,7 +291,7 @@ onMounted(loadAgent);
       </div>
 
       <div v-if="Number(route.params.id)" class="rounded-lg bg-white p-6 shadow-sm">
-        <AgentMcpConfig :agent-id="Number(route.params.id)" />
+        <AgentPluginConfig :agent-id="Number(route.params.id)" />
       </div>
     </div>
   </Page>

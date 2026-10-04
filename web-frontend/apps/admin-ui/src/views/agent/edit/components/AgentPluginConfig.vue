@@ -63,19 +63,19 @@ onMounted(load);
 
 <template>
   <div>
-    <h3 class="m-0 mb-4 text-base font-semibold">MCP 工具配置</h3>
+    <h3 class="m-0 mb-4 text-base font-semibold">插件配置</h3>
 
     <ElAlert
       :closable="false"
       class="mb-4"
       show-icon
-      title="绑定的 MCP 工具在对话运行时挂载（至迟下一轮生效）；前台用户还需其所属组获得该 MCP 授权才可用（与技能同构）"
+      title="绑定的 MCP 工具在对话运行时挂载（至迟下一轮生效）；前台用户还需其所属组获得该 MCP 授权才可用（与技能同构）。未来 API 插件将并入本块（BL-25）"
       type="info"
     />
 
     <div class="mb-5">
       <label class="mb-2 block text-sm font-medium text-gray-700">
-        可选 MCP（仅「启用」状态可新绑定）
+        MCP（仅「启用」状态可新绑定）
       </label>
       <ElSelect
         v-model="selected"
@@ -85,7 +85,7 @@ onMounted(load);
         filterable
         multiple
         :loading="loading"
-        placeholder="选择该智能体可挂载的 MCP Server，可多选"
+        placeholder="选择该智能体可挂载的 MCP，可多选"
       >
         <ElOption
           v-for="option in options"
@@ -100,6 +100,6 @@ onMounted(load);
       </div>
     </div>
 
-    <ElButton :loading="saving" type="primary" @click="save">保存 MCP 配置</ElButton>
+    <ElButton :loading="saving" type="primary" @click="save">保存插件配置</ElButton>
   </div>
 </template>
