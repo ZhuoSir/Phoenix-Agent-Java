@@ -1,5 +1,11 @@
 # Changelog: mcp-client-tools
 
+## T-06 代码完成部署（2026-10-04）——UI 走查待用户（与 T-07 合并一次做）
+- 交付：api/core/mcp.ts（8 函数，/api/mcp 全路径+responseReturn:body 镜像 skill.ts 惯例）+ views/plugin/mcp/index.vue 467 行（列表搜索分页/传输 tag/启停 switch/授权组数/绑定数/操作列详情·编辑·授权·删除；编辑抽屉=四传输条件表单+headers/env KV 编辑器+stdio 风险 Alert(R-05)+掩码说明 Alert+测试连接结果区；详情抽屉=脱敏只读；授权弹窗=组多选覆盖式）
+- 验证：vue-tsc **213=基线分毫不差**（先 +5 全在我页——el-table DefaultRow 推断，签名放宽 any 修复）；build 7756 模块绿；chunk mcp-rcSPhu8W.js HTTP=200；菜单树 API 含插件市场>插件管理>MCP 三层；verify=0
+- 部署插曲×2 如实记：①手建镜像吞输出失败无察觉（Docker Hub 挡 nginx:1.27-alpine base）→daocloud 拉取 retag ②compose 自带 nginx 服务 build 配置（repo 根 context）——base 就绪后 compose 自建 v1.6.0-dev 成功；教训重申=关键步骤禁吞输出（L-03）
+- **UI 界面真走查移交用户**（无浏览器自动化通道）：建议与 T-07 绑定块完成后合并走查一次
+
 ## T-05 完成（2026-10-04）挂载接线实弹全绿
 - 交付：McpMountService（变体缓存 agentId+交集签名/LRU64/淘汰关 wrapper/boundedElastic 构建）+ PrefixedAgentTool 委托壳（前缀对模型、原名调远端——spike 字节码实证 McpTool.callAsync 用自身 getName()，直接改名必挂）+ Registry.buildUncached（legacy WARN 降级）+ 三链接线（doStream/confirmStream/channel 口径分流）+ DTO channel + 三控制器打标（commit 223b3de）
 - **实弹证据链**：①注册 stdio stub（env MARKER 加密落库）②测试连接 success=True 列工具 [stub_echo] 214ms（**R-06 成功态实证补全**）③admin 真对话模型调用 `t05stub__stub_echo` → 落库行 content=「工具返回原文：echo:hello-mcp marker:g1secret」——**前缀调用+env 密文解密回传全链实证** ④故障隔离：坏 endpoint(t05bad) 同绑，stub 照常可调、轮次正常完成 ⑤停用失效：disable 后下一轮模型答「工具不存在」（签名失效按轮生效）⑥零变化回归：绑定前/清理后 verify=0 双跑
