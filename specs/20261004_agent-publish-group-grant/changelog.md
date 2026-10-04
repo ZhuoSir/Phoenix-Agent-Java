@@ -3,7 +3,7 @@
 ## 分支纠偏（2026-10-04）spec 文档迁入正确分支
 - 用户发现工作区看不到本 spec 文件夹——根因：立项~tasks 确认的 7 笔提交顺手落在了 feature/mcp-client-tools（MCP 收尾后未切分支），本 feature 分支基点 v1.6.0 不含它们
 - 修复：`git checkout feature/mcp-client-tools -- specs/20261004_agent-publish-group-grant/` 整目录迁移 + 共享台账（backlog/version/MILESTONE）BL-04 增量在本分支重放（b94a851）
-- 险情如实记：迁移时误用 `git stash -u`，.pnpm-store 数十万未跟踪文件被卷入，命令卡死被击杀——现场核查：T-01 未提交代码完好、stash 快照冗余已 drop、无损恢复
+- 险情如实记（**二次修正：并非无损**）：迁移时误用 `git stash -u`，海量未跟踪目录被卷入，命令卡死被击杀；源码与 T-01 未提交改动完好、stash 快照冗余已 drop——**但 drop 时未核查快照删除面：`.mvn-home`（本地 Maven 仓库）被 stash 清掉大半（剩 141MB，spring-ai 等依赖缺失，23 个下载失败标记），后续编译卡远程下载 10 分钟才暴露**。修复：aliyun 镜像配置重拉依赖（后台 job）。教训升级：drop stash 前必须 `git stash show --include-untracked --stat` 核查删除面，"冗余"判断只对已核实的文件成立
 - 账实不符第二例如实记：b94a851 提交语声称"L-06 计次×5 入 lessons"，实际 python 在 lessons 锚点 assert 死（本分支 L-06 还是 ×3，四犯记录在 MCP 分支未含）——lessons/changelog 未写。本笔补正：L-06 直接写全局终态 ×5（四犯抽屉+五犯 stash 注记合并，M4 合并以此行为准）
 
 ## tasks v1.0.0（2026-10-04）—— 确认③通过，三重门全绿
