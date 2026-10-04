@@ -1,5 +1,16 @@
 # Changelog: mcp-client-tools
 
+## T-01 spike 报告（2026-10-04）—— 路线乙定案
+- **五问结论**（反编译 agentscope core/harness 2.0.0 取证）：
+  ① 重复注册=ToolRegistry Map.put 撞名 last-wins 静默覆盖；同名 server 重复注册需先 removeMcpClient
+  ② 框架原生工具名=裸 MCP tool 名（无前缀，wrapper 名仅入日志）→ 原生跨 server 同名互覆盖
+  ③ 卸载完备：removeMcpClient/removeTool/removeToolIfSame/removeToolGroups 全公开
+  ④ 并发：activeGroups=共享 volatile，ReActAgent 每轮 setActiveGroups；ExecutionConfig 无每调用过滤器 → 共享实例 per-user 过滤不安全
+  ⑤ enableTools=注册时过滤（shouldRegisterTool include/exclude）
+- **定案：路线乙**（甲判死于④）：agent 实例按 (agentId+交集签名) 缓存多实例；无 MCP 绑定走现有单例零变化；配置/授权/绑定变更 bump 全局版本→签名变→惰性重建+LRU 淘汰(关 wrapper)
+- **增益发现**：McpTool 公开构造器+registerAgentTool 公开 → 自建带前缀注册路径（server__tool），R-03 同名区分**无需改需求**即满足（原生注册器做不到）；工具名格式细节 T-05 定（满足模型工具名字符约束）
+- plan 未改动（§1.3 定案机制为 plan 预授权，不触发确认作废）
+
 ## tasks v1.0.0（2026-10-04）—— 确认③通过，三重门全绿
 - 用户「确认」；tasks v0.1.0→v1.0.0 已确认（陈卓）；三重门自检后切 feature/mcp-client-tools（基点 v1.6.0），进入 Phase 4，首任务=T-01 框架 spike
 
