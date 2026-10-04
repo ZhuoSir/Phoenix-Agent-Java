@@ -1,5 +1,8 @@
 # Changelog: mcp-client-tools
 
+## plan v0.1.0（2026-10-04）
+- Phase 2 落盘：技能三件套同构三表（tbl_mcp_server/group_mcp/agent_mcp，列形以真实 DDL 对照）+ Flyway 两件 + phoenix-agent 同模块三服务一控制器 + 前端插件市场三层；**T-01 spike 前置定案挂载路线**（agent 实例缓存共享 vs per-user 交集的核心矛盾：路线甲=调用面过滤/路线乙=按组签名多实例缓存）；身份矩阵 6 对象；被否案 5；风险 5（Toolkit 语义=头号，泄漏断言进矩阵）；坑核对 14 条全过重相交 4
+
 ## v1.0.0（2026-10-04）—— 确认①通过
 - 用户「确认」；requirements v0.3.0→v1.0.0 已确认（陈卓）；进入 Phase 2 Plan
 
