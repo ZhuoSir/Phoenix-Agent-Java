@@ -1,5 +1,10 @@
 # Changelog: mcp-client-tools
 
+## T-07 再增补（2026-10-04）抽屉编辑面补挂——L-06 第 4 次应验
+- 用户走查二轮反馈「还是没有」：实勘发现**两套智能体编辑界面**——独立页 /agent/:id（首挂处）与列表页 openEditDrawer→agent-create-drawer.vue(1298行,**用户主入口**)；技能块两处都有，我只挂了一处 = **L-06 多入口枚举失守**（身份矩阵「智能体编辑页」对象被窄化为单页）
+- 补挂：抽屉左侧菜单「插件配置」组（lucide:plug，技能配置组之后）+ 内容区 v-else-if='plugin'（AgentPluginConfig 同构复用，含"先保存智能体"降级文案）；watch 无需改（组件自载）
+- typecheck 213=基线 / build 绿 / nginx v1.6.0-dev 重建 / verify=0；lessons L-06 计次+1
+
 ## T-07 增补（2026-10-04）绑定块更名「插件配置」
 - 用户走查反馈：MCP 配置页成功，但编辑页未见绑定块（判定=浏览器缓存旧 chunk，块自 T-07 部署已在包）+ 命名指令「技能配置下面增加一个插件配置，可以选择 MCP」
 - AgentMcpConfig.vue → **AgentPluginConfig.vue**（git mv 留痕），标题「插件配置」、子标签「MCP」、Alert 注记未来 API 插件并入本块（BL-25）、按钮「保存插件配置」——与插件管理同哲学，为 BL-25 留位
