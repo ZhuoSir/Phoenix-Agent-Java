@@ -21,3 +21,13 @@
 
 ## 升级影响
 既有部署零影响（无 DDL/无配置键/旧手工链行为不变——开发栈 verify 13/13 回归实证）。
+
+## R-10 增量与合并后直入件补记（2026-10-04，M3 对账）
+| 件 | 性质 |
+|---|---|
+| scripts/bootstrap.sh / bootstrap.ps1 | 新增：目标机源码一键全链 |
+| scripts/phoenix-ctl.sh / phoenix-ctl.ps1 | 新增：运维控制一条入口（BUG-63 随附，用户直接指令） |
+| scripts/README.md | 新增：工具箱使用指南（用户直接指令） |
+| docker-compose.yaml | 变更：四长驻服务 +restart: unless-stopped（BUG-63） |
+| scripts/verify.sh | 变更：PHOENIX_COMPOSE_PROJECT/PHOENIX_FRESH 参数化（默认行为不变） |
+| scripts/install.sh | 变更：+--port/--env-from；.phoenix-project 锚 |
