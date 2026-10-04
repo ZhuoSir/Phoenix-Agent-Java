@@ -1,6 +1,6 @@
 # Requirements: Docker 自动化打包与安装流水线（docker-auto-pipeline）
 
-> 版本: v1.0.0 | 状态: 已确认 | 确认人: 陈卓 | 确认日期: 2026-10-03 | 更新: 2026-10-03
+> 版本: v1.1.0 | 状态: 已确认 | 确认人: 陈卓 | 确认日期: 2026-10-03 | 更新: 2026-10-03（v1.1.0 新增 R-10，用户 bundled 确认 2026-10-03）
 > 挂载: v1.5.0（2026-10-03，用户四裁决：新建 spec / 挂 v1.5.0 / 自动化管到引擎 / 五平台）
 
 ## 背景与目标
@@ -73,6 +73,14 @@ install/package 全程 SHALL 写带时间戳日志到文件（路径打入收据
 
 **验收场景**
 - GIVEN 成功安装 WHEN 查看终端 THEN 收据卡字段齐全；日志文件可回放每一步耗时。
+
+### R-10 目标机源码一键 bootstrap（v1.1.0 新增，用户「我要的是一键式，Windows Server 自己打包」）
+WHEN 用户在目标机（Windows 管理员执行 `bootstrap.ps1` 指向源码目录 / Linux·WSL 执行 `bootstrap.sh`）, 系统 SHALL 自动串联完成：WSL2 就绪（Windows）→ 引擎就位 → `package.sh` 本机打包（native 架构）→ 解包 → `install.sh` 九步 → 收据卡；IF 任一环节失败 THEN 停在原地输出环节号与日志路径，修复后重跑 SHALL 自动续接（复用 package/install 内部状态机）；本机产出的 tar.gz SHALL 保留（可拷贝至其它离线机器直接安装）。
+
+**验收场景**
+- GIVEN 已装 WSL2+引擎的 mac/Linux WHEN `bootstrap.sh --port 9280 --project phx-bs` THEN 全链到收据卡，且 dist/ 留下可复用安装包。
+- GIVEN 裸 Windows Server（无 WSL）WHEN 管理员 `bootstrap.ps1` THEN 自动启用功能并提示重启；重启重跑自动续接到收据卡。
+- GIVEN bootstrap 中途某环节失败 WHEN 修复后重跑 THEN 已完成环节自动跳过（不重复编译/不重复安装）。
 
 ## Non-goals（范围外）
 - Kubernetes/Helm/Swarm 编排（本流水线只出 compose 栈）
