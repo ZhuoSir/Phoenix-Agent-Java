@@ -1,5 +1,8 @@
 # Changelog: agent-publish-group-grant
 
+## plan v0.1.0（2026-10-04）
+- Phase 2 落盘：发布扩展(镜像技能 publish+DTO)+groups 读写端点；validateVisible 双分支；getMyAgents 交集∪公开合并(无组账号分支修复)；**L-06 读点清单六项实勘定案**(2改4零变化,前端三门面零改动全吃服务端)；前端发布弹窗+抽屉授权区块；身份矩阵6/被否案4/风险5(读点漏改头号)；坑核对15条全过
+
 ## v1.0.0（2026-10-04）—— 确认①通过
 - 用户「确认」；requirements v0.2.0→v1.0.0 已确认（陈卓）；进入 Phase 2 Plan
 
