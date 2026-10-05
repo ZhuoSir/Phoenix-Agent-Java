@@ -37,6 +37,10 @@ import java.util.function.Supplier;
 @RequiredArgsConstructor
 public class HarnessTurnManager {
 
+    /** BUG-77 根治：轮次开始前修复状态中缺失 reasoning 的 tool_use 消息 */
+    private final com.phoenix.agent.harness.state.HarnessStateRepairService stateRepairService;
+
+
     public static final String STATUS_GENERATING = "generating";
 
     public static final String STATUS_DONE = "done";
@@ -107,6 +111,8 @@ public class HarnessTurnManager {
             turns.remove(sessionId);
             throw e;
         }
+        // BUG-77 根治：发请求前修复历史（仅 tool_use 无 thinking 的助手消息会被 provider 拒）
+        stateRepairService.repairMissingReasoning(sessionId);
         turn.sourceSupplier = source; // BUG-77：留存供应商供自动重试
         turn.wire(source.get());
         return turn.sink.asFlux();
@@ -123,6 +129,7 @@ public class HarnessTurnManager {
         }
         log.info("[turn] confirm 并轮回原轮 session={} turnId={}", sessionId, turn.turnId);
         turn.awaitingConfirm.set(false);
+        stateRepairService.repairMissingReasoning(sessionId); // BUG-77 根治：续流同样先修复
         turn.sourceSupplier = source; // BUG-77：续流同样留存供应商
         turn.wireConfirm(source.get());
         return turn.sink.asFlux();

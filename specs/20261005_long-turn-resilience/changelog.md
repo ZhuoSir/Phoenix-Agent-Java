@@ -1,5 +1,13 @@
 # Changelog: long-turn-resilience
 
+## BUG-77 根治实现（2026-10-05，按用户指令未部署）
+- 新增 `HarnessStateRepairService`（harness/state）：直接修复框架状态表 `tbl_harness_store_state` 的 JSON——遍历 `context[]`，对 role=ASSISTANT 且**含 tool_use 但无 thinking 块**的消息，在 content 头部插入 thinking 块（占位文案 `[reasoning unavailable: turn was interrupted]`，必须非空以满足 provider），随后 UPDATE 回写
+- 接线：`HarnessTurnManager` 注入该服务，在 **openOrReject（新轮）** 与 **confirmOrResume（续流）** 发请求前各调一次；修复失败只告警不阻断（自动重试兜底）
+- 设计取舍：走 SQL+Jackson 改状态 JSON（避开框架 state 类型迷宫）；占位文案会进入模型上下文（无害但可见）；失败静默降级
+- **效力风险（如实标注）**：能否立即生效取决于框架何时加载会话状态（若 agent 实例内存中已缓存 state，则需实例重建后生效）→ 上线后必须做**中断复现验证**（打断一轮含工具调用的轮次 → 发「继续」→ 不应再 400）
+- 证据：`mvn package` 编译通过（首轮 `Db.selectObject` 签名不匹配已修正）；**未部署**
+- 三批待发清单：`ff27695` 两面改造对齐 · `06f766b` 自动重试 · 本次根治
+
 ## BUG-77 三轮取证（决定性）——违规源是"仅 tool_use 无 thinking"的历史消息
 - 扫描框架状态（44 条）：助手消息 **17 条含 thinking 块**，**5 条仅 tool_use 无 thinking**（idx 3/7/11/15/19）
 - DeepSeek 思考模式规则：带 tool_calls 的助手消息必须回传 reasoning_content → **这 5 条即 400 的违规源**
