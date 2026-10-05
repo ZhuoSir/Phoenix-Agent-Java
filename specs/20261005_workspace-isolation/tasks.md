@@ -61,7 +61,7 @@
   关联: R-06 | 依赖: 无
   验证: 新会话首轮构建日志含会话路径；file 工具落点实测=`{agentKey}/{sessionId}/{uid}/`
   验收: 落点符合约定且日志可观测
-  进展(2026-10-05): 代码已落地并编译通过（commit 3b385fb）；**运行时实测待部署**
+  进展(2026-10-05): 代码已落地并编译通过（commit f7a0964）；**运行时实测待部署**
 - [ ] T-12 shell cwd 统一（BUG-79）：先查框架 shell/exec 规格 cwd 支持；支持则配置，否则包装工具注入 `cd {sessionDir} && `（shell-local/pwsh/后台 job 三入口均覆盖）
   关联: R-06 | 依赖: T-11
   验证: 会话内 shell 执行 `pwd` 输出=会话目录；`echo x > probe_sh.txt` 落会话目录
