@@ -24,7 +24,7 @@
 
 ## 组 2：迁移
 
-- [ ] T-04 WorkspaceMigrationRunner：启动迁移（允许集=_legacy_shared ∪ DB 全量 runtimeKey；其余条目 move 入 _legacy_shared/；幂等；单条失败 WARN 继续、整体失败不阻塞启动）
+- [x] T-04 WorkspaceMigrationRunner：启动迁移（允许集=_legacy_shared ∪ DB 全量 runtimeKey；其余条目 move 入 _legacy_shared/；幂等；单条失败 WARN 继续、整体失败不阻塞启动）
   关联: R-04
   依赖: T-01
   验证方式: **迁移演练**——容器内造 legacy 假数据（MEMORY.md/散文件/假 userId 树）→ 重启 → 假数据全量入 _legacy_shared、新根干净、服务 healthy；**二次重启幂等**（_legacy_shared 不重复嵌套、允许集条目不动）；老文件下载仍通（tee 副本对面证）

@@ -1,5 +1,9 @@
 # Changelog: workspace-isolation
 
+## T-04 完成（2026-10-05）迁移演练三段全绿
+- 交付：WorkspaceMigrationRunner（ApplicationRunner；允许集=_legacy_shared ∪ DB 实时 runtimeKey；只 move 不删；名字冲突加时间戳绝不覆盖；允许集查询失败=宁可不迁；整体失败 WARN 不阻塞启动）
+- 演练：①布假存量（888-fake-user/MEMORY.md+memory/note.md+legacy-probe.txt）→ 部署 → 根级只剩 _legacy_shared+agent-36，**16 项归档**（含真存量 88MB 用户树/散文件/框架缓存），假存量三件在档 ②**二次重启幂等**：日志"无存量条目（幂等零动作）"、_legacy_shared 零嵌套、agent-36 树完好 ③**下载对面证**：迁移前登记的老文件走 tee 副本下载 HTTP 200/3859 字节（workspace 搬家零影响实证）④verify=0
+
 ## T-02+T-03 完成（2026-10-05）全局首占+窄窗四证全绿
 - 交付：existsByStoreKeyAnySession 全局首占方法；scanner 扫描根同源下沉（WorkspacePaths）+ storeKey 加 runtimeKey 前缀（防跨智能体相对路径误撞）；AgentFileController 补扫窗=最近 assistant 消息起（无消息不补扫）
 - 夹具实测（免模型）：①S1 补扫登记 w02-new ✓ ②S2 补扫**空**（不收编 S1 已占——BUG-67 主症状毙）✓ ③窄窗证：mtime 窗外文件零登记 ✓ ④归属 DB 双侧=w02-s1 ✓；调用方枚举复核：仅轮末主通道+本抽屉入口两处，前后台共用单端点无漏
