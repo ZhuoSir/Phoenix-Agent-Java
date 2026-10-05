@@ -18,7 +18,7 @@ function thinkingMetaOf(sid: string): string | undefined {
 }
 const filesPanelRef = ref<InstanceType<typeof ChatFilesPanel> | null>(null);
 import { notifyFilesChanged } from '#/api/core/agentFiles';
-import { forceClearStreamSnapshot, readStreamSnapshot, saveStreamSnapshot } from '#/utils/stream-snapshot';
+import { flushStreamSnapshot, forceClearStreamSnapshot, readStreamSnapshot, saveStreamSnapshot } from '#/utils/stream-snapshot';
 import type { Agent } from '#/api/core/agent';
 import type { ChatMessage, ChatSession } from '#/api/core/chat';
 import type {
@@ -74,6 +74,7 @@ import {
   saveMessageApi,
   streamChat,
   streamHarnessChat,
+  streamHarnessTurnJoin,
   streamSearch,
   TextType,
 } from '#/api';
@@ -115,6 +116,8 @@ interface SessionRuntimeState {
   // BUG-81：服务端轮次在跑（本页仅轮询）也必须**按会话记账**——页面级单例会让
   // 别的会话的"进行中"泄漏到当前会话（输入框锁死+按钮变终止，切不回来）
   remoteRunning: boolean;
+  /** T-04：join 追流的关闭句柄（切会话/停止时必须关，防泄漏订阅） */
+  closeJoin: (() => void) | null;
   // BUG-81：HITL 确认条同族视图态（全局会让 A 的待确认锁死 B 的输入框）
   showHarnessConfirm: boolean;
   pendingConfirmButtons: ConfirmButton[];
@@ -137,6 +140,7 @@ function useSessionStateManager() {
       sessionStates.set(sessionId, {
         isStreaming: false,
         remoteRunning: false,
+        closeJoin: null,
         showHarnessConfirm: false,
         pendingConfirmButtons: [],
         pendingConfirmPlanHtml: '',
@@ -185,6 +189,9 @@ function useSessionStateManager() {
     const state = sessionStates.get(sessionId);
     if (state?.closeStream) {
       state.closeStream();
+    }
+    if (state?.closeJoin) {
+      state.closeJoin();
     }
     sessionStates.delete(sessionId);
   };
@@ -387,6 +394,10 @@ async function selectSession(session: ChatSession | null) {
   if (currentSession.value) {
     saveViewToState(currentSession.value.id, { isStreaming, remoteRunning, nodeBlocks });
     saveConfirmToState(currentSession.value.id);
+    // T-04：离开会话即关掉它的追流订阅（回来时会重新探测+重连），避免无主订阅堆积
+    const prevState = getSessionState(currentSession.value.id);
+    prevState.closeJoin?.();
+    prevState.closeJoin = null;
   }
   currentSession.value = session;
   try {
@@ -400,59 +411,133 @@ async function selectSession(session: ChatSession | null) {
     }
     syncStateToView(session.id, { isStreaming, remoteRunning, nodeBlocks });
     syncConfirmFromState(session.id);
-    currentMessages.value = applyServerRowRender(await getSessionMessagesApi(session.id) as any[]) as any;
-    // detached-stream T-05：admin 进行中的轮次 → 5s 轮询增量视图（完成自动收敛）
+    // T-04：join 续渲需要"原始 markdown 基线"（applyServerRowRender 会把 content 转成 HTML），故转换前先取
+    const rows = (await getSessionMessagesApi(session.id)) as any[];
+    let joinBase = '';
+    let joinBaseThinking = '';
+    for (let i = rows.length - 1; i >= 0; i--) {
+      if (rows[i]?.role === 'assistant') {
+        joinBase = String(rows[i]?.content ?? '');
+        joinBaseThinking = String(rows[i]?.thinking ?? '');
+        break;
+      }
+    }
+    currentMessages.value = applyServerRowRender(rows) as any;
+    // detached-stream T-05 + long-turn-resilience T-04：admin 进行中的轮次 → **join 追流**
+    // （服务端 replay 全量帧 + live 原地续渲），替换原 5s 轮询；无进行中轮则静默返回
     void (async () => {
       try {
         // BUG-81：探测结果必须**回写本会话**（true/false 都写），否则上一会话的 remoteRunning
         // 会残留到新会话：输入框不可写 + 只剩终止按钮（用户实测"切会话就发不出去了"）
         const running = await harnessTurnStatusApi(session.id);
-        // BUG-74：轮询闭包必须带会话守卫——切会话/新建会话后严禁把旧会话内容写进当前视图
+        // BUG-74：闭包必须带会话守卫——切会话/新建会话后严禁把旧会话内容写进当前视图
         if (currentSession.value?.id !== session.id) {
-          // 已切走：只记账，不动当前视图
           getSessionState(session.id).remoteRunning = running;
           return;
         }
         remoteRunning.value = running;
         getSessionState(session.id).remoteRunning = running;
         if (!running) return;
-        // BUG-76：单次请求失败（负载下超时/网络抖动）不得当"轮次已结束"——累计连续失败超限才收敛
-        let consecutiveFailures = 0;
-        const tick = async () => {
-          // BUG-74：已切走则终止轮询（不同会话消息绝不允许串通）
+
+        let joined = '';
+        let joinedThinking = '';
+        let lastRender = 0;
+        let finished = false;
+        let attempts = 0;
+
+        // 原地续渲（绝不新建气泡 → 防 BUG-75 双输出窗口）；节流 ≥150ms：BUG-70 的教训是逐帧全量重渲会 O(n²) 打死主线程
+        const paint = (force: boolean) => {
           if (currentSession.value?.id !== session.id) return;
-          try {
-            currentMessages.value = applyServerRowRender(await getSessionMessagesApi(session.id) as any[]) as any;
-            consecutiveFailures = 0;
-          } catch { /* 忽略单次（下一 tick 再试） */ }
-          if (currentSession.value?.id !== session.id) return;
-          try {
-            if (await harnessTurnStatusApi(session.id)) {
-              setTimeout(tick, 5000);
-            } else {
-              // 轮次已结束：收敛为完成态（末次拉取刷新终稿）
-              if (currentSession.value?.id === session.id) {
-                remoteRunning.value = false;
-                getSessionState(session.id).remoteRunning = false;
-                try {
-                  currentMessages.value = applyServerRowRender(await getSessionMessagesApi(session.id) as any[]) as any;
-                } catch { /* ignore */ }
-              }
+          const now = Date.now();
+          if (!force && now - lastRender < 150) return;
+          lastRender = now;
+          const list = currentMessages.value as any[];
+          let idx = -1;
+          for (let i = list.length - 1; i >= 0; i--) {
+            if (list[i]?.role === 'assistant') {
+              idx = i;
+              break;
             }
-          } catch {
-            // BUG-76：异常=不确定态 → 继续轮询；仅连续失败 ≥12 次（约 1 分钟）才判定失联并收敛
-            consecutiveFailures += 1;
-            if (consecutiveFailures >= 12) {
-              if (currentSession.value?.id === session.id) {
-                remoteRunning.value = false;
-                getSessionState(session.id).remoteRunning = false;
-              }
-              return;
-            }
-            if (currentSession.value?.id === session.id) setTimeout(tick, 5000);
           }
+          if (idx < 0) {
+            // 服务端尚未落助手行：本地补一个流式气泡（后续帧原地更新它）
+            list.push({
+              id: `join-${Date.now()}`,
+              role: 'assistant',
+              messageType: 'md-card',
+              content: '',
+              thinking: '',
+              streaming: true,
+            } as any);
+            idx = list.length - 1;
+          }
+          const row = list[idx];
+          row.messageType = row.messageType || 'md-card';
+          row.content = markdownToHtml(joinBase + joined);
+          if (joinedThinking) row.thinking = joinBaseThinking + joinedThinking;
+          row.streaming = true;
+          currentMessages.value = [...list];
         };
-        setTimeout(tick, 5000);
+
+        const finish = async () => {
+          if (finished) return;
+          finished = true;
+          const st = getSessionState(session.id);
+          st.closeJoin = null;
+          if (currentSession.value?.id !== session.id) return;
+          remoteRunning.value = false;
+          st.remoteRunning = false;
+          try {
+            // 末次拉取：以服务端定稿行为准（join 只负责"看得见"，落库不归它管）
+            currentMessages.value = applyServerRowRender(await getSessionMessagesApi(session.id) as any[]) as any;
+          } catch { /* ignore */ }
+        };
+
+        // BUG-76：连接异常=不确定态，绝不当作"轮次已结束"——重探状态仍有界重连
+        const reconnect = async () => {
+          getSessionState(session.id).closeJoin = null;
+          if (currentSession.value?.id !== session.id) return;
+          attempts += 1;
+          if (attempts <= 5) {
+            setTimeout(() => {
+              if (currentSession.value?.id === session.id) connect();
+            }, 2000);
+            return;
+          }
+          await finish();
+        };
+
+        const connect = () => {
+          const close = streamHarnessTurnJoin(
+            session.id,
+            agentId.value,
+            async (response) => {
+              if (currentSession.value?.id !== session.id) return; // BUG-74 会话守卫
+              if ((response as any).agentFiles) notifyFilesChanged();
+              const piece = String((response as any).text || '');
+              const th = String((response as any).thinking || '');
+              if (!piece && !th) return;
+              joined += piece;
+              joinedThinking += th;
+              paint(false);
+            },
+            async () => {
+              await reconnect();
+            },
+            async () => {
+              paint(true);
+              await finish();
+            },
+          );
+          getSessionState(session.id).closeJoin = close;
+        };
+
+        connect();
+        if (currentSession.value?.id !== session.id) {
+          // 探测期间已切走：立即关闭，避免无主订阅
+          getSessionState(session.id).closeJoin?.();
+          getSessionState(session.id).closeJoin = null;
+        }
       } catch { /* ignore */ }
     })();
     // thinking-display R-05：历史 metadata 解析思考（旧行无键静默）
@@ -476,7 +561,7 @@ async function selectSession(session: ChatSession | null) {
             content: snap.contentHtml,
             createdAt: snap.ts,
             messageType: 'text',
-            metadata: { interrupted: true },
+            metadata: { interrupted: true, interruptedAt: snap.ts },
             thinking: snap.thinking,
           } as any);
         }
@@ -487,6 +572,15 @@ async function selectSession(session: ChatSession | null) {
   } catch {
     ElMessage.error('加载消息失败');
   }
+}
+
+/** T-04：中断轮文案带**时间归属**（`不是本轮`的语义靠时间点自明，避免用户把旧中断当成新轮） */
+function interruptedAtText(message: any): string {
+  const ts = Number(message?.metadata?.interruptedAt ?? message?.createdAt ?? 0);
+  if (!ts) return '时间未知';
+  const d = new Date(ts);
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
 }
 
 async function sendMessage() {
@@ -1321,6 +1415,9 @@ async function stopStreaming() {
   if (!sessionState.closeStream && remoteRunning.value) {
     try {
       await harnessTurnCancelApi(sessionId);
+      // T-04：停止后主动收掉追流订阅（服务端轮已移除，流会自然收尾，这里双保险）
+      sessionState.closeJoin?.();
+      sessionState.closeJoin = null;
       remoteRunning.value = false;
       sessionState.remoteRunning = false;
       currentMessages.value = applyServerRowRender(await getSessionMessagesApi(sessionId) as any[]) as any;
@@ -1483,6 +1580,19 @@ function firstNode(block: GraphNodeResponse[]): GraphNodeResponse | undefined {
 onMounted(async () => {
   await loadAgent();
 });
+
+// T-03②：页面关闭/切后台兜底写一次快照——400ms 节流窗口内的最后一段不再丢（A′ 语义只增不减）
+function flushActiveSnapshot() {
+  const sid = currentSession.value?.id;
+  if (!sid) return;
+  const state = getSessionState(sid) as any;
+  if (!state?.snapText) return;
+  flushStreamSnapshot(sid, state.snapText, getThinkingTrack(sid).text || undefined);
+}
+window.addEventListener('pagehide', flushActiveSnapshot);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') flushActiveSnapshot();
+});
 </script>
 
 <template>
@@ -1534,7 +1644,7 @@ onMounted(async () => {
                 v-if="(message as any).metadata && (message as any).metadata.interrupted"
                 class="run-interrupted-tip"
               >
-                ⚠ 输出在页面刷新时中断，以下为已生成部分
+                ⚠ 输出在页面刷新时中断（{{ interruptedAtText(message) }}），以下为已生成部分
               </div>
               <div
                 v-if="message.messageType === 'html'"
