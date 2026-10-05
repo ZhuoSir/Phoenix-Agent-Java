@@ -112,6 +112,15 @@ declare global {
 interface SessionRuntimeState {
     snapText?: string;
   isStreaming: boolean;
+  // BUG-81：服务端轮次在跑（本页仅轮询）也必须**按会话记账**——页面级单例会让
+  // 别的会话的"进行中"泄漏到当前会话（输入框锁死+按钮变终止，切不回来）
+  remoteRunning: boolean;
+  // BUG-81：HITL 确认条同族视图态（全局会让 A 的待确认锁死 B 的输入框）
+  showHarnessConfirm: boolean;
+  pendingConfirmButtons: ConfirmButton[];
+  pendingConfirmPlanHtml: string;
+  pendingConfirmSessionId: string;
+  pendingConfirmAgentId: number;
   nodeBlocks: GraphNodeResponse[][];
   closeStream: (() => void) | null;
   lastRequest: GraphRequest | null;
@@ -127,6 +136,12 @@ function useSessionStateManager() {
     if (!sessionStates.has(sessionId)) {
       sessionStates.set(sessionId, {
         isStreaming: false,
+        remoteRunning: false,
+        showHarnessConfirm: false,
+        pendingConfirmButtons: [],
+        pendingConfirmPlanHtml: '',
+        pendingConfirmSessionId: '',
+        pendingConfirmAgentId: 0,
         nodeBlocks: [],
         closeStream: null,
         lastRequest: null,
@@ -142,11 +157,13 @@ function useSessionStateManager() {
     sessionId: string,
     viewState: {
       isStreaming: { value: boolean };
+      remoteRunning: { value: boolean };
       nodeBlocks: { value: GraphNodeResponse[][] };
     },
   ) => {
     const state = getSessionState(sessionId);
     viewState.isStreaming.value = state.isStreaming;
+    viewState.remoteRunning.value = state.remoteRunning;
     viewState.nodeBlocks.value = state.nodeBlocks;
   };
 
@@ -154,11 +171,13 @@ function useSessionStateManager() {
     sessionId: string,
     viewState: {
       isStreaming: { value: boolean };
+      remoteRunning: { value: boolean };
       nodeBlocks: { value: GraphNodeResponse[][] };
     },
   ) => {
     const state = getSessionState(sessionId);
     state.isStreaming = viewState.isStreaming.value;
+    state.remoteRunning = viewState.remoteRunning.value;
     state.nodeBlocks = viewState.nodeBlocks.value;
   };
 
@@ -247,6 +266,49 @@ const pendingConfirmPlanHtml = ref('');
 const pendingConfirmSessionId = ref('');
 const pendingConfirmAgentId = ref<number>(0);
 const lastRequest = ref<GraphRequest | null>(null);
+
+// BUG-81：确认条一族同属"每会话"视图态。做成页面级单例时，A 会话的待确认会把 B 会话的
+// 输入框一起锁死（且确认条按钮/目标会话会串到 B）。与 isStreaming 同法：切会话时存取本会话副本。
+function saveConfirmToState(sessionId: string) {
+  const st = getSessionState(sessionId);
+  st.showHarnessConfirm = showHarnessConfirm.value;
+  st.pendingConfirmButtons = pendingConfirmButtons.value;
+  st.pendingConfirmPlanHtml = pendingConfirmPlanHtml.value;
+  st.pendingConfirmSessionId = pendingConfirmSessionId.value;
+  st.pendingConfirmAgentId = pendingConfirmAgentId.value;
+}
+
+function syncConfirmFromState(sessionId: string) {
+  const st = getSessionState(sessionId);
+  showHarnessConfirm.value = st.showHarnessConfirm;
+  pendingConfirmButtons.value = st.pendingConfirmButtons;
+  pendingConfirmPlanHtml.value = st.pendingConfirmPlanHtml;
+  pendingConfirmSessionId.value = st.pendingConfirmSessionId;
+  pendingConfirmAgentId.value = st.pendingConfirmAgentId;
+}
+
+function clearConfirmView() {
+  showHarnessConfirm.value = false;
+  pendingConfirmButtons.value = [];
+  pendingConfirmPlanHtml.value = '';
+  pendingConfirmSessionId.value = '';
+  pendingConfirmAgentId.value = 0;
+}
+
+// 确认条任何变动都镜像回当前会话副本（否则"已确认"的旧条会在切回该会话时复活）
+watch(
+  [
+    showHarnessConfirm,
+    pendingConfirmButtons,
+    pendingConfirmPlanHtml,
+    pendingConfirmSessionId,
+    pendingConfirmAgentId,
+  ],
+  () => {
+    const sid = currentSession.value?.id;
+    if (sid) saveConfirmToState(sid);
+  },
+);
 const resultSetDisplayConfig = reactive<ResultSetDisplayConfig>({
   showSqlResults: false,
   pageSize: 20,
@@ -323,7 +385,8 @@ async function loadAgent() {
 
 async function selectSession(session: ChatSession | null) {
   if (currentSession.value) {
-    saveViewToState(currentSession.value.id, { isStreaming, nodeBlocks });
+    saveViewToState(currentSession.value.id, { isStreaming, remoteRunning, nodeBlocks });
+    saveConfirmToState(currentSession.value.id);
   }
   currentSession.value = session;
   try {
@@ -331,19 +394,28 @@ async function selectSession(session: ChatSession | null) {
       currentMessages.value = [];
       nodeBlocks.value = [];
       isStreaming.value = false;
+      remoteRunning.value = false;
+      clearConfirmView();
       return;
     }
-    syncStateToView(session.id, { isStreaming, nodeBlocks });
+    syncStateToView(session.id, { isStreaming, remoteRunning, nodeBlocks });
+    syncConfirmFromState(session.id);
     currentMessages.value = applyServerRowRender(await getSessionMessagesApi(session.id) as any[]) as any;
     // detached-stream T-05：admin 进行中的轮次 → 5s 轮询增量视图（完成自动收敛）
     void (async () => {
       try {
-        if (!(await harnessTurnStatusApi(session.id))) return;
+        // BUG-81：探测结果必须**回写本会话**（true/false 都写），否则上一会话的 remoteRunning
+        // 会残留到新会话：输入框不可写 + 只剩终止按钮（用户实测"切会话就发不出去了"）
+        const running = await harnessTurnStatusApi(session.id);
         // BUG-74：轮询闭包必须带会话守卫——切会话/新建会话后严禁把旧会话内容写进当前视图
-        if (currentSession.value?.id !== session.id) return;
-        // BUG-73：刷新后在跑的轮次须恢复"进行中"态——输入区禁用、显示终止按钮
-        // BUG-75：用 remoteRunning 而非 isStreaming（后者会额外渲染直播区 → 与已加载行重复成双窗口）
-        remoteRunning.value = true;
+        if (currentSession.value?.id !== session.id) {
+          // 已切走：只记账，不动当前视图
+          getSessionState(session.id).remoteRunning = running;
+          return;
+        }
+        remoteRunning.value = running;
+        getSessionState(session.id).remoteRunning = running;
+        if (!running) return;
         // BUG-76：单次请求失败（负载下超时/网络抖动）不得当"轮次已结束"——累计连续失败超限才收敛
         let consecutiveFailures = 0;
         const tick = async () => {
@@ -361,6 +433,7 @@ async function selectSession(session: ChatSession | null) {
               // 轮次已结束：收敛为完成态（末次拉取刷新终稿）
               if (currentSession.value?.id === session.id) {
                 remoteRunning.value = false;
+                getSessionState(session.id).remoteRunning = false;
                 try {
                   currentMessages.value = applyServerRowRender(await getSessionMessagesApi(session.id) as any[]) as any;
                 } catch { /* ignore */ }
@@ -370,7 +443,10 @@ async function selectSession(session: ChatSession | null) {
             // BUG-76：异常=不确定态 → 继续轮询；仅连续失败 ≥12 次（约 1 分钟）才判定失联并收敛
             consecutiveFailures += 1;
             if (consecutiveFailures >= 12) {
-              if (currentSession.value?.id === session.id) remoteRunning.value = false;
+              if (currentSession.value?.id === session.id) {
+                remoteRunning.value = false;
+                getSessionState(session.id).remoteRunning = false;
+              }
               return;
             }
             if (currentSession.value?.id === session.id) setTimeout(tick, 5000);
@@ -1246,6 +1322,7 @@ async function stopStreaming() {
     try {
       await harnessTurnCancelApi(sessionId);
       remoteRunning.value = false;
+      sessionState.remoteRunning = false;
       currentMessages.value = applyServerRowRender(await getSessionMessagesApi(sessionId) as any[]) as any;
       ElMessage.success('已停止对话');
     } catch {
