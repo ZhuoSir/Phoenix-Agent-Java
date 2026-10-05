@@ -18,29 +18,33 @@
 
 ## 组 2：前端渲染（DSH 三件套）
 
-- [ ] T-03 admin run 页渲染管线：①帧缓冲批量 flush（150ms）②saveStreamSnapshot 1s 节流+beforeunload/visibilitychange 兜底 ③尾块增量渲染（流式中只重渲最后未完成块，完成块 v-memo 冻结；历史/完成态走原全量路径）④>10s 无帧活性指示"正在执行（mm:ss）"
+- [x] T-03 admin run 页渲染管线：①帧缓冲批量 flush（150ms）②saveStreamSnapshot 1s 节流+beforeunload/visibilitychange 兜底 ③尾块增量渲染（流式中只重渲最后未完成块，完成块 v-memo 冻结；历史/完成态走原全量路径）④>10s 无帧活性指示"正在执行（mm:ss）"
   关联: R-02
   依赖: 无
   验证方式: chunk 风暴脚本灌帧（对标 DSH stress 128条/16ms）浏览器可交互（滚动/停止按钮 <500ms，performance.now 抽查）；A′ 快照语义回归（刷新防双半截）；短轮渲染与旧版一致（历史消息走查）
   验收标准: 风暴不冻结+快照语义保留+渲染回归
+  收口(2026-10-05): **等价达成并记偏差**——帧合并实际落在服务端（`HarnessTurnManager` 100ms mergeJanitor，实测 600→6.6 帧/s），客户端 150ms flush / v-memo 冻结未单独实现；快照兜底(paint unload/visibilitychange)已补；用户界面确认"刷新续流无问题"（见 T-04）
 
-- [ ] T-04 join/重进修复：复现"think done 无正文"（admin run 页刷新运行中轮）钉死断点→修复续渲；历史中断轮文案带时间归属+弱化样式（不与新轮混淆）
+- [x] T-04 join/重进修复：复现"think done 无正文"（admin run 页刷新运行中轮）钉死断点→修复续渲；历史中断轮文案带时间归属+弱化样式（不与新轮混淆）
   关联: R-03
   依赖: T-03
   验证方式: 运行中刷新→数秒内续见流式输出直至完成（实测）；死轮重进→归属时间文案；新轮运行时旧中断文案明确历史态
   验收标准: 三场景实测全过
+  收口(2026-10-05): **用户界面实测通过（验证人=陈卓）**——运行中刷新 → join 追流**原地续渲**（非 5s 轮询跳变）、终止态恢复、切走再切回可续看；中断轮文案已带时间归属；连接异常按 BUG-76 语义有界重连
 
-- [ ] T-05 多端 transport 同治（L-06 四面收口）：front api-transport 增量渲染改造；pc-ui/mobile-ui transport 枚举定性（同源→共享工具函数；不合→单列方案回 requirements=铁律6 出口）
+- [x] T-05 多端 transport 同治（L-06 四面收口）：front api-transport 增量渲染改造；pc-ui/mobile-ui transport 枚举定性（同源→共享工具函数；不合→单列方案回 requirements=铁律6 出口）
   关联: R-02
   依赖: T-03
   验证方式: 前台长轮浏览器可交互实测；pc/mobile 枚举清单入 changelog（改或不改及理由逐一标注）
   验收标准: 四面全有结论+改造面实测绿
+  收口(2026-10-05): 四面结论入档——①admin-ui 前台 transport：已改造（增量渲染+400ms 节流）②admin run 页（同 app 第二面）：**已接 join**（T-04 实测通过）③pc-ui：grep SSE/transport **零命中=无对话流，N/A** ④mobile-ui：**独立实现** `services/stream.ts`（自带 token key `mobile-ui:auth:token`、独立端点）→ 按 T-05 规约"不合→单列方案"，本轮**不改**，留档待独立立项
 
-- [ ] T-06 运行时配置 UI 三输入：AgentRuntimeConfig 块加压缩触发/保留条数/工具结果截断三可选输入（留空=全局默认+DSH 语义说明文案）；抽屉+独立页双入口核对（L-06）
+- [ ] T-06 运行时配置 UI 三输入（**功能已上线，设计被否，挂 `BL-27` 重做**）：AgentRuntimeConfig 块加压缩触发/保留条数/工具结果截断三可选输入（留空=全局默认+DSH 语义说明文案）；抽屉+独立页双入口核对（L-06）
   关联: R-05
   依赖: T-02
   验证方式: 走查（填值保存→DB 列→指纹重建日志；清空→回默认）；typecheck 基线；双入口一致
   验收标准: 走查全通+基线守住
+  现状(2026-10-05): 三输入已上线且**功能可用**（API/DB/指纹三层实测：填值落库 51200/12/4096、不变=cached、改值/清空=built、已还原现场）；**用户实测判定"有，但这个设计不对"→ 列入待办 `BL-27`（设计重做），本任务不勾、不翻已验证**
 
 ## 组 3：收口
 

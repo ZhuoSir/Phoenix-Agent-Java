@@ -1,5 +1,13 @@
 # Changelog: long-turn-resilience
 
+## T-03/T-04/T-05 用户界面实测通过 + T-06 设计被否（2026-10-05）
+- **T-04 ✅（验证人=陈卓）**：run 页运行中**刷新 → join 追流原地续渲**（不再是 5s 轮询跳变）、终止态恢复、切走再切回可续看；用户原话「没问题」。实现：`streamHarnessTurnJoin`（`/api/admin/harness/turn/stream`）+ 与 chat 共用 SSE 解析 + 原位更新最后一条助手行（防 BUG-75 双窗）+ ≥150ms 节流（防 O(n²) 重渲）+ 连接异常按 BUG-76 语义有界重连；中断轮文案带时间归属
+- **T-03 ✅（等价达成，偏差入档）**：帧合并实际在**服务端**（100ms mergeJanitor，实测 600→6.6 帧/s），客户端 150ms flush / v-memo 冻结未单独实现；快照 unload/visibilitychange 兜底本批补上
+- **T-05 ✅（四面结论入档）**：admin-ui 前台已改造 / admin run 页已接 join / pc-ui 无对话流 N/A / **mobile-ui 独立实现 `services/stream.ts`**（自己的 token key 与端点）→ 按规约"不合→单列方案"，本轮不改、留待独立立项
+- **T-06 ⚠️ 设计被否 → 挂 `BL-27`**：三输入已上线且功能可用（API/DB/指纹三层实测：51200/12/4096 落库、不变=cached、改值/清空=built、现场已还原），但用户实测判定「有，但**这个设计不对**」→ 列入待办重做，本任务不勾、不翻已验证
+- **BUG-82 ✅（验证人=陈卓）**：用户原话「这个没了」——新会话文件面板不再出现技能缓存噪音
+- 非界面证据（本批）：`verify 13/13` 全 PASS；typecheck 基线 213 条预存错误、本次改动 3 文件 **0 新增**；线上 bundle 与本地构建 sha256 一致
+
 ## 部署完成 + BUG-78 验证 + BUG-80 入册（2026-10-05）
 - **部署**：后端 4 项（BUG-77 重试/根治 · BUG-78 扫描补根 · T-11 地基）+ 前端 2 项（两面改造 · think 贴底）全部上线；后端 healthy、nginx 重建、首页 200；部署前活跃轮=0（未打断任何人）
 - **BUG-78 已验证**：会话 a467aecf 文件列表 **0 → 82 条**（preview.html/a-sparkle.svg/c-human-ai.svg/applications.png 等 owl-kids 交付物全部出现，登记表同步 82 行）
