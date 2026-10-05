@@ -8,9 +8,11 @@ import com.phoenix.data.exception.InvalidInputException;
 import com.phoenix.data.vo.ApiResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.server.ResponseStatusException;
 
 /**
  * 全局异常处理器 (WebFlux 版本)
@@ -64,6 +66,21 @@ public class GlobalExceptionHandler {
 	public ApiResponse<Object> handleNotRoleException(NotRoleException e) {
 		log.warn("角色不匹配: {}", e.getMessage());
 		return ApiResponse.error("角色不匹配");
+	}
+
+	/**
+	 * BUG-64：带状态语义的异常按**原状态**透传。
+	 *
+	 * <p>原先 `ResponseStatusException(404)` 落到通用分支被包成 500「服务器内部错误」——
+	 * "资源不存在"这类语义失真，客户端与排障都会被误导（实测两次）。
+	 */
+	@ExceptionHandler(ResponseStatusException.class)
+	public ResponseEntity<ApiResponse<Object>> handleResponseStatusException(ResponseStatusException e) {
+		HttpStatus resolved = HttpStatus.resolve(e.getStatusCode().value());
+		HttpStatus status = resolved == null ? HttpStatus.INTERNAL_SERVER_ERROR : resolved;
+		String reason = e.getReason() == null ? status.getReasonPhrase() : e.getReason();
+		log.warn("带状态异常透传: status={}, reason={}", status.value(), reason);
+		return ResponseEntity.status(status).body(ApiResponse.error(reason));
 	}
 
 	/**
