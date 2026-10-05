@@ -60,25 +60,29 @@
 
 ## 组 3：长轮静默可见性（R-01）
 
-- [ ] T-07 轮次阶段标记：`HarnessChatServiceImpl` 把 `ModelCallStartEvent/ModelCallEndEvent` 回灌 `HarnessTurnManager.onPhase(sessionId, MODEL|TOOL, detail)`；Turn 保存 `phase/phaseSince`
+- [x] T-07 轮次阶段标记：`HarnessChatServiceImpl` 把 `ModelCallStartEvent/ModelCallEndEvent` 回灌 `HarnessTurnManager.onPhase(sessionId, MODEL|TOOL, detail)`；Turn 保存 `phase/phaseSince`
   关联: R-01.1, R-01.2 | 依赖: 无
   验证方式: 一轮含工具调用的实测 → 阶段切换可观测（日志/新指标）；既有帧路径零变化（内容/帧速回归对照金丝雀 `frames/emitted/textFrames`）
   验收标准: 阶段可观测且除新增外零行为变化
+  **收口(2026-10-05 实测)**：阶段序列实测（scratch 会话）`MODEL → TOOL(execute) → (12s 工具期) → IDLE → MODEL → IDLE`，`[turn-phase]` 日志可查、工具名随行。**两次实测修正**：① `ToolCallEnd` 只是"工具调用块"结束，真正执行在其后 → 改为保持 TOOL；② 真正标志执行开始的是 **`ToolResultStartEvent`**（实测 :51 到达而 sleep 到 :03 才结束）→ 修正为 `ToolResultStart→TOOL / ToolResultEnd→IDLE`
 
-- [ ] T-08 静默心跳：janitor 分支按 `phoenix.agent.silence-heartbeat-seconds`（默认 15s）下发心跳帧 `{silenceMs, phase, phaseLabel}`，**≤1 帧/5s** 节流；新增 `heartbeats` 计数并打印进 `[b69-canary]`
+- [x] T-08 静默心跳：janitor 分支按 `phoenix.agent.silence-heartbeat-seconds`（默认 15s）下发心跳帧 `{silenceMs, phase, phaseLabel}`，**≤1 帧/5s** 节流；新增 `heartbeats` 计数并打印进 `[b69-canary]`
   关联: R-01.2, R-01.3 | 依赖: T-07
   验证方式: **stub 模型服务**（OpenAI 兼容，可配延迟）延迟 30s → 心跳按 15s 起出现、秒数递增、前端可见；金丝雀 `heartbeats=` 与 `frames/emitted` 对比无恶化
   验收标准: 心跳可见 + 节流生效 + 帧指标不恶化
+  **收口(2026-10-05 实测)**：SSE 实测心跳帧 `silenceMs=18451/23452`（间隔 5s=**节流生效**）；标签按阶段正确取「模型调用中 / 工具执行中 / 等待响应中」（12s 工具期实测为**工具执行中**）；金丝雀行新增 `heartbeats=N`（实测 2/3/1）
 
-- [ ] T-09 首帧超时定稿：`MODEL` 阶段自调用发起 ≥ `phoenix.agent.model-first-frame-timeout-seconds`（默认 180s，**0=关**）→ `finish(STATUS_MODEL_TIMEOUT, 文案)` + `sourceSub.dispose()`；**不走** BUG-77 重试分支
+- [x] T-09 首帧超时定稿：`MODEL` 阶段自调用发起 ≥ `phoenix.agent.model-first-frame-timeout-seconds`（默认 180s，**0=关**）→ `finish(STATUS_MODEL_TIMEOUT, 文案)` + `sourceSub.dispose()`；**不走** BUG-77 重试分支
   关联: R-01.1, R-01.4, R-01.5 | 依赖: T-07
   验证方式: stub 延迟 200s → 180s 触发定稿（文案「⏱ 模型调用超时」）、已生成内容保留、`turn/status` 收敛 false；**负对照**：`TOOL` 期长任务（`execute sleep 200`）**不得**被杀，且心跳显示「工具执行中」
   验收标准: 超时可控可关 + 工具期零误杀
+  **收口(2026-10-05 实测，旁路容器）**：阈值 1s + tick 1s → 触发 `status=model_timeout` 定稿；**负对照**：阈值 5s + 工具 `sleep 12` → TOOL 期静默 12s **未被误杀**（`status=done`）。修正项：`finish()` 的文案追加条件原先只含 `timeout|cancelled`，**漏了新状态** → 已纳入（否则用户面对空气泡）
 
-- [ ] T-10 前端静默指示（两面）：`components/run/index.vue` 与 `views/front/components/ChatMessages.vue` 读新帧键，显示「模型调用中/工具执行中 · 已静默 Ns」；帧键进 mapper 白名单，**join 追流同样透传**
+- [x] T-10 前端静默指示（两面）：`components/run/index.vue` 与 `views/front/components/ChatMessages.vue` 读新帧键，显示「模型调用中/工具执行中 · 已静默 Ns」；帧键进 mapper 白名单，**join 追流同样透传**
   关联: R-01.2 | 依赖: T-08
   验证方式: 首发流与 join 追流**两路**都能看到心跳（身份矩阵「心跳两面」）；运行中刷新后仍可见；`vue-tsc` 0 新增
   验收标准: 两面两路一致
+  **收口(2026-10-05)**：`chat-shared` 增会话级 `silenceByS`（心跳帧不入消息列表，真实增量/结束即清除）；前台 chat 在「正在执行（已用时 mm:ss）」后追加「· 工具执行中 · 已静默 23s」；run 页按会话 `silenceText`（L-20 口径）同位置展示。typecheck **213=基线（0 新增）**；构建产物已部署且线上 chunk 哈希与本地一致（`run-D0GF370F.js` / `src-0GuhAFpw.js`）
 
 ## 组 4：收口
 

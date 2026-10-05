@@ -13,9 +13,12 @@ import DOMPurify from 'dompurify';
 
 const chat = useChatStore();
 const agentStore = useAgentStore();
-const { activeMessages, activeSession, activeSessionId, isActiveSessionSending, loadingMessages } =
+const { activeMessages, activeSession, activeSessionId, isActiveSessionSending, loadingMessages, silenceByS } =
   storeToRefs(chat);
 const { agents } = storeToRefs(agentStore);
+
+/** T-10：服务端静默心跳提示（会话级，如「工具执行中 · 已静默 23s」） */
+const silenceHint = computed(() => silenceByS.value[activeSessionId.value ?? ''] ?? '');
 
 const currentAgent = computed(() => {
   if (!activeSession.value) return null;
@@ -244,7 +247,7 @@ async function handleConfirmAction(
             v-html="renderMessage(msg)"
           ></div>
           <div v-if="msg.streaming && streamingElapsedText" class="chat-message__elapsed">
-            {{ streamingElapsedText }}
+            {{ streamingElapsedText }}<span v-if="silenceHint" class="chat-message__silence"> · {{ silenceHint }}</span>
           </div>
         </div>
 
@@ -291,6 +294,10 @@ async function handleConfirmAction(
 </template>
 
 <style lang="scss" scoped>
+.chat-message__silence {
+  color: #e6a23c;
+}
+
 .chat-messages {
   height: 100%;
   overflow-y: auto;

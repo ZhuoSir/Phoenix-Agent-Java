@@ -183,3 +183,7 @@
 - **根因**：`del_flag` 被 MyBatis-Flex 当作逻辑删列，**QueryChain 生成 SQL 时自动追加 `del_flag = 0`**——即使代码里已经删掉显式 `.eq(AgentFile::getDelFlag, 0)`，SQL 里仍会出现（实测日志：`WHERE ("store_key" = ?) AND "del_flag" = ?`，参数只有 storeKey 与 0）。
 - **对策**：凡需**看到墓碑/已删行**的判定，必须走**原生 SQL**（`Db.selectObject("select count(*) ... where store_key = ?")`）绕开自动注入；不要以为"删掉显式条件"就等价于"不过滤"。
 - **验证纪律**：我第一次的"修复已生效"验证是**假阳性**——用物化文件（`store_key` 为空、盘上落在 uploads tee 而非会话工作区）做删除→扫描试验，扫描器根本不会去登记它。**验证必须打在真实受控路径上**（本例=会话工作区里被扫描登记过的文件）。
+
+## L-22 交付物构建严禁并发（同一 stage 文件 + 同一镜像 tag）
+- **现象**：为验证 T-09 我起了旁路容器（需构建镜像），同时**守候式部署任务**也在构建同一镜像；两个 `cp jar → docker/.stage/` 与两次 `compose build backend` 交叠，镜像里被打进**半截 jar** → 生产 backend 启动即 `Invalid or corrupt jarfile`，restart 循环、health 502（约 1 分钟）。
+- **防再犯规则**：① 同一 `.stage/<artifact>` 与同一镜像 tag **永远串行构建**（先确认无在跑的构建任务，再动手）；② 需要"另一套配置"的验证优先用 `compose run --rm -d -p ... -e ...`（**复用已有镜像**，不重建）；③ 部署脚本里的 `cp` 之后加一条 jar 完整性校验（`unzip -t` / sha 比对）再进 `build`；④ 事后必须核对 `health=200` 且容器 `running`（不看 502 就报"部署完成"=假绿）。

@@ -11,6 +11,9 @@ export const useChatStore = defineStore('phoenix-chat-shared/chat', () => {
 
   const sessions = ref<ChatSession[]>([]);
   const messagesByS = ref<Record<string, ChatMessage[]>>({});
+
+  /** v1.7.0 T-10：服务端静默心跳 → 会话级"仍在执行"提示（如「工具执行中 · 已静默 23s」） */
+  const silenceByS = ref<Record<string, string>>({});
   const activeSessionId = ref<string | null>(null);
 
   const loadingSessions = ref(false);
@@ -217,6 +220,21 @@ export const useChatStore = defineStore('phoenix-chat-shared/chat', () => {
 
     // 节点回调：将已完成的节点消息直接推入消息列表
     const onNodeMessage: OnNodeMessage = (nodeMsg) => {
+      // T-10：心跳帧不进消息列表——只更新"静默提示"，任何真实增量/结束则清除
+      const beat = nodeMsg as any;
+      if (beat && beat.silenceMs != null) {
+        const sec = Math.round(Number(beat.silenceMs) / 1000);
+        silenceByS.value = {
+          ...silenceByS.value,
+          [sessionId]: `${beat.phaseLabel || '处理中'} · 已静默 ${sec}s`,
+        };
+        return;
+      }
+      if (beat && (beat.content || beat.thinking || beat.end) && silenceByS.value[sessionId]) {
+        const next = { ...silenceByS.value };
+        delete next[sessionId];
+        silenceByS.value = next;
+      }
       const msgs = messagesByS.value[sessionId] ?? [];
       msgs.push(nodeMsg);
       messagesByS.value = { ...messagesByS.value, [sessionId]: [...msgs] };
@@ -317,6 +335,7 @@ export const useChatStore = defineStore('phoenix-chat-shared/chat', () => {
   return {
     sessions,
     messagesByS,
+    silenceByS,
     activeSessionId,
     activeSession,
     activeMessages,

@@ -1,5 +1,15 @@
 # Changelog: visibility-filetree-hygiene
 
+## 组 3 收口：T-07~T-10 全部实测通过（2026-10-05）
+- **T-07 阶段标记**：实测 `MODEL → TOOL(execute) → 12s → IDLE → MODEL → IDLE`；两次实测修正（ToolCallEnd 不等于执行结束；`ToolResultStartEvent` 才是执行起点）
+- **T-08 静默心跳**：SSE 实测 `silenceMs=18451/23452`（5s 节流）+ 标签按阶段正确 + 金丝雀 `heartbeats=N`
+- **T-09 首帧超时**：阈值 1s → `status=model_timeout` 定稿；**负对照**（5s 阈值 + 工具 sleep 12s）**未误杀**；补上 `finish()` 文案条件（漏了新状态会留空气泡）
+- **T-10 前端指示**：两面（前台 chat / run 页）在「正在执行（已用时 mm:ss）」后展示「· 阶段 · 已静默 Ns」；typecheck 213=基线；前端已部署（chunk 哈希一致）
+- **旁路验证法**：用 `docker compose run --rm -d -p <host>:8066 -e <覆盖项> backend` 起**独立实例**验证（如首帧超时 1s），**不触碰生产配置**
+- ⚠️ **部署事故（如实记录）**：我并发执行"旁路容器构建"与"守候部署构建"，两者同时写 `.stage/phoenix-admin.jar` → 镜像装进半截文件 → 生产 backend **crash-loop（Invalid or corrupt jarfile）约 1 分钟**（health 502）；已串行重建恢复（health 200），根因与纪律入 `lessons.md` **L-22**
+- 粒度说明：超时/心跳的检查粒度跟随 `PHOENIX_AGENT_TURN_FLUSH_SECONDS`（生产默认 **5s**）→ 180s 实为 180~185s；已在 `config/changes.md` 口径内
+- 试验残留已清：旁路容器全删、7 个 scratch 会话及其消息/文件行删除（残留 0）
+
 ## T-06 走查反馈修复：文件删除"复活"（BUG-87）+ 物化文件回落（2026-10-05）
 - 用户反馈：「文件树没问题，但是删除文件又失败了」→ 现场取证（日志）：**删除本身成功**，但扫描器随后把磁盘上仍在的文件**重新登记**（同 store_key）→ 刷新后文件复活
 - **真根因（两段）**：① 扫描器按 store_key 去重时只数 `del_flag=0`；② 把条件删掉也无效——`del_flag` 被框架按**逻辑删列**处理，QueryChain 生成 SQL 时**自动追加 `del_flag = 0`**（日志实证：`WHERE ("store_key" = ?) AND "del_flag" = ?`）
