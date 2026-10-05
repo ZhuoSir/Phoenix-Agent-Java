@@ -86,6 +86,9 @@ public class WorkspaceArtifactScanner {
      *  故扫整棵用户目录（含任意子层），并兼容 {root}/agents/{key} 历史布局；agent 归属由调用轮次决定。 */
     private List<Path> candidateAgentDirs(Path root, String userId, Long agentId, String sn) {
         List<Path> dirs = new ArrayList<>();
+        // BUG-78：workspace-isolation 后智能体根下沉一层，产物可能直接落在根下（如 root/owl-kids/...），
+        // 不再带 {userId} 前缀 → 必须把"智能体根自身"也作为候选（isInternal 过滤框架内部目录）
+        dirs.add(root);
         if (userId != null && !userId.isBlank()) {
             dirs.add(root.resolve(userId));
         }
