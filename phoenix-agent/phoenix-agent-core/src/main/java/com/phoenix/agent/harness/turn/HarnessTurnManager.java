@@ -241,10 +241,16 @@ public class HarnessTurnManager {
                 });
         }
 
+        /** BUG-69 金丝雀计数：帧总数/非空正文帧 */
+        final AtomicLong framesSeen = new AtomicLong();
+        final AtomicLong framesWithText = new AtomicLong();
+
         private void onFrame(Map<String, Object> frame) {
             try {
+                framesSeen.incrementAndGet();
                 Object c = frame.get("content");
                 if (c instanceof String s && !s.isEmpty()) {
+                    framesWithText.incrementAndGet();
                     content.append(s);
                 }
                 Object th = frame.get("thinking");
@@ -306,6 +312,16 @@ public class HarnessTurnManager {
         synchronized void finish(String status, String suffix) {
             if (sinkDone.get()) {
                 return;
+            }
+            // BUG-69 金丝雀：每轮一行体检；contentLen>0 而 textFrames=0 即用户所见与落库背离，告警级
+            long cl = content.length(), tf = framesWithText.get(), fs = framesSeen.get();
+            if (cl > 0 && tf == 0) {
+                log.warn("[b69-canary] 背离告警: session={} status={} contentLen={} frames={} textFrames=0", sessionId,
+                        status, cl, fs);
+            }
+            else {
+                log.info("[b69-canary] session={} status={} contentLen={} frames={} textFrames={}", sessionId, status,
+                        cl, fs, tf);
             }
             sinkDone.set(true);
             if (janitor != null) {

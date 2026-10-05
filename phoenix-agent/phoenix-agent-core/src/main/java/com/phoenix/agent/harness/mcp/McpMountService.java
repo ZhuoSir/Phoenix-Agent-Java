@@ -46,15 +46,23 @@ public class McpMountService {
 
     private final Map<String, Variant> variants = new LinkedHashMap<>(16, 0.75f, true);
 
+    /** BUG-69 缓解：变体闲置 TTL——超时即重建，封顶任何陈旧状态的生命周期 */
+    private static final long VARIANT_TTL_MS = 30 * 60 * 1000L;
+
     private static final class Variant {
         final HarnessAgent agent;
         final List<McpClientWrapper> wrappers;
         final List<String> toolNames;
+        volatile long lastAccess = System.currentTimeMillis();
 
         Variant(HarnessAgent agent, List<McpClientWrapper> wrappers, List<String> toolNames) {
             this.agent = agent;
             this.wrappers = wrappers;
             this.toolNames = toolNames;
+        }
+
+        boolean expired() {
+            return System.currentTimeMillis() - lastAccess > VARIANT_TTL_MS;
         }
     }
 
@@ -78,12 +86,23 @@ public class McpMountService {
 
     private HarnessAgent getOrBuild(Long agentId, String sig, List<McpServerInfo> effective) {
         String key = agentId + "@" + sig;
+        List<Variant> stale = new ArrayList<>();
         synchronized (variants) {
             Variant cached = variants.get(key);
             if (cached != null) {
-                log.debug("MCP 变体命中: key={}", key);
-                return cached.agent;
+                if (!cached.expired()) {
+                    cached.lastAccess = System.currentTimeMillis();
+                    log.debug("MCP 变体命中: key={}", key);
+                    return cached.agent;
+                }
+                // BUG-69 缓解：闲置超 TTL——弃旧重建（旧 wrapper 关闭）
+                variants.remove(key);
+                stale.add(cached);
+                log.info("MCP 变体闲置超 TTL，重建: key={}", key);
             }
+        }
+        for (Variant v : stale) {
+            closeQuietly(v);
         }
         HarnessAgent fresh = harnessAgentRegistry.buildUncached(agentId);
         List<McpClientWrapper> wrappers = new ArrayList<>();
