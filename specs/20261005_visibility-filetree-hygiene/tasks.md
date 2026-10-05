@@ -5,20 +5,23 @@
 
 ## 组 1：工程清账（R-03，先清工作树）
 
-- [ ] T-01 `.gitignore` + 工作区残留清理：`.gitignore` 增 `.mvn-home/`、`.pnpm-store/`；删 `WSL`、`或在`（0 字节误建）、`AGENTS.md.bak.20260927101837`；删 `scripts/fib.py`（测试夹具）；`diagrams/phoenix-architecture.html` 入库
+- [x] T-01 `.gitignore` + 工作区残留清理：`.gitignore` 增 `.mvn-home/`、`.pnpm-store/`；删 `WSL`、`或在`（0 字节误建）、`AGENTS.md.bak.20260927101837`；删 `scripts/fib.py`（测试夹具）；`diagrams/phoenix-architecture.html` 入库
   关联: R-03.1, R-03.2 | 依赖: 无
   验证方式: `git status --porcelain` 前后对照；`git check-ignore -v .mvn-home .pnpm-store` 命中；删除项 `ls` 复核；建筑图 `git status` 显示为新增
   验收标准: status 仅剩有意保留项；无交付物误删（diagrams 入库可 review）
+  **收口(2026-10-05, commit 6f16a8c)**：`.gitignore` 增 `.mvn-home/`/`.pnpm-store/`（`git check-ignore -v` 双双命中）；删 `WSL`/`或在`(各 0B)/`AGENTS.md.bak.20260927101837`/`scripts/fib.py`(目录随之清空)；`diagrams/phoenix-architecture.html`(15K) 入库。**`git status` 由 7 条未跟踪噪声 → 0**
 
-- [ ] T-02 删死配置 `PhoenixAgentProperties.skillPath`：删字段（含注解/Lombok 访问器），全链编译
+- [x] T-02 删死配置 `PhoenixAgentProperties.skillPath`：删字段（含注解/Lombok 访问器），全链编译
   关联: R-03.3 | 依赖: 无
   验证方式: `mvn -pl phoenix-admin/phoenix-admin-manager -am package -DskipTests` 绿；`grep -rn getSkillPath --include=*.java` **0 命中**；技能链回归（技能列表 options / 前台 mySkills 各 100）
   验收标准: 编译绿 + 零引用复核 + 技能链不回退
+  **收口(2026-10-05, commit a84538b)**：字段已删（Lombok @Data 访问器自动收敛）；`mvn -pl phoenix-admin/phoenix-admin-manager -am package -DskipTests` **绿**；`getSkillPath/setSkillPath` **0 命中**；技能链回归 `/api/skill/options?agentId=33` **code=100**、`/platform/account-info/getMySkills?agentId=33` **code=100**（注：该套 API 成功码即 `100`）
 
-- [ ] T-03 台账销账：backlog §四 两条注记修正（agent-config：**实测 13/13 全勾**、历史快照、分支不存在；里程碑：v1.6.0 已发布并合 main、在途=v1.7.0）；`RulesHarnessAgent.java` 旧注记销账（bugs.md 工作区遗留段，实测已无未提交改动）
+- [x] T-03 台账销账：backlog §四 两条注记修正（agent-config：**实测 13/13 全勾**、历史快照、分支不存在；里程碑：v1.6.0 已发布并合 main、在途=v1.7.0）；`RulesHarnessAgent.java` 旧注记销账（bugs.md 工作区遗留段，实测已无未提交改动）
   关联: R-03.4 | 依赖: 无
   验证方式: `mdtable_check` 全绿；每条注记与 `git`/`tasks.md` 事实逐条对照留档
   验收标准: 台账无过期注记、无自相矛盾
+  **收口(2026-10-05, commit 6fb8cda)**：§四 agent-config 条目改为 **13/13 全勾**并封存为历史快照（旧注"已勾 8 个"系误记）；里程碑条目更新为 **v1.6.0 已发布并合 main（merge d6dbb4d）、在途唯一=v1.7.0**；bugs.md 工作区遗留段两条作废（RulesHarnessAgent 实测无未提交改动 / 未跟踪噪声已清零）；**清掉 2 条被取代的中间注记**（防台账自相矛盾）；两文件 `mdtable_check` 全绿
 
 ## 组 2：会话文件文件夹树（R-02）
 
