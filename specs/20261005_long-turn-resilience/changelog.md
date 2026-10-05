@@ -1,5 +1,10 @@
 # Changelog: long-turn-resilience
 
+## T-04 十刀（2026-10-05）think 框刷新后停在顶部 → 挂载即贴底（用户实测反馈）
+- 用户原话：「刷新后，Think模块从第一行显示，这个改成最下面的一行（最新的）显示，要不然还得手动拉下去」
+- 根因：`ThinkingBlock` 的贴底跟随**只在 props.content 变化时触发**；刷新后挂载时已有内容不再变化 → 停在第一行；新增 `scrollThinkingToBottom()` 在 **onMounted** 与 **expanded 变真**时各调一次（共享组件，运行页与前台聊天页同时受益）
+- 证据：typecheck 213=基线；本地构建成功；**未部署**（加入待发队列）
+
 ## BUG-77 根治实现（2026-10-05，按用户指令未部署）
 - 新增 `HarnessStateRepairService`（harness/state）：直接修复框架状态表 `tbl_harness_store_state` 的 JSON——遍历 `context[]`，对 role=ASSISTANT 且**含 tool_use 但无 thinking 块**的消息，在 content 头部插入 thinking 块（占位文案 `[reasoning unavailable: turn was interrupted]`，必须非空以满足 provider），随后 UPDATE 回写
 - 接线：`HarnessTurnManager` 注入该服务，在 **openOrReject（新轮）** 与 **confirmOrResume（续流）** 发请求前各调一次；修复失败只告警不阻断（自动重试兜底）

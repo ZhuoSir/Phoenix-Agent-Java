@@ -4,7 +4,7 @@
  * 流式思考中 → 展开滚动 + "思考中…"；正文首字到达（streaming=false）→ 自动折叠为
  * 一行「🧠 已深度思考（N 秒）」，点击回看。无内容整块不渲染（R-04）。
  */
-import { computed, nextTick, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
 
 const props = defineProps<{ content: string; streaming: boolean; hasContent?: boolean; durationMs?: number }>();
 
@@ -18,6 +18,24 @@ function onThinkingScroll() {
   if (!el) return;
   stickToBottom.value = el.scrollHeight - el.scrollTop - el.clientHeight <= 24;
 }
+
+/** 滚到最新一行（挂载/展开/增量到达时调用；历史回显也要停在底部） */
+async function scrollThinkingToBottom() {
+  await nextTick();
+  const el = bodyRef.value;
+  if (el) el.scrollTop = el.scrollHeight;
+}
+
+// 刷新后挂载即贴底（原先只在内容变化时跟随 → 刷新后停在第一行需手动下拉）
+onMounted(() => {
+  stickToBottom.value = true;
+  void scrollThinkingToBottom();
+});
+
+// 展开时同样贴底
+watch(expanded, (on: boolean) => {
+  if (on) void scrollThinkingToBottom();
+});
 watch(
   () => props.content,
   async () => {
