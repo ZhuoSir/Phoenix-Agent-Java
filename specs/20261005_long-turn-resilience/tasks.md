@@ -55,7 +55,7 @@
   验收标准: logo 跑完出图+全矩阵绿
   收口(2026-10-05): **用户判定"基本通过"**；`verify 13/13` 实跑 PASS；typecheck 基线 213 条预存错误/本次 0 新增；T-04 刷新续流用户实测通过；BUG-82 面板噪音用户实测已消
 
-- [ ] T-08 台账收尾：completion/artifacts/MILESTONE 第四需求行/BUG-70、71 翻已验证/config changes（env 三新键+两默认变更）移交 M3/部署纪律记录（L-16 执行痕迹）
+- [x] T-08 台账收尾：completion/artifacts/MILESTONE 第四需求行/BUG-70、71 翻已验证/config changes（env 三新键+两默认变更）移交 M3/部署纪律记录（L-16 执行痕迹）
   关联: 流程
   依赖: T-07
   验证方式: completion 与勾选核对；artifacts 与实改动对账
