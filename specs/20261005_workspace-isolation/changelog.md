@@ -1,5 +1,10 @@
 # Changelog: workspace-isolation
 
+## T-01 完成（2026-10-05）factory 换根生效实证
+- 交付：WorkspacePaths（runtimeKey/agentRoot 单一实现）+ factory .workspace 下沉 {root}/{runtimeKey} + runtimeKey 方法同源化委托；build 绿
+- 目录实证：部署后 agent-36 对话轮 → 框架自建 `agent-36/agents/36/tasks/_sweep.marker` 落**专属子树**，根级零新增散文件 ✓；存量旧树（461671…/agents/fonts/散文件）原样未动（待 T-04 迁移归档）
+- 环境注记：探针轮模型调用报 OpenAIException(HTTP transport error)=容器→模型 API 网络故障（既有 VPN 拐杖问题，非本改动）——R-02 暗号等模型依赖验证待外联恢复（T-05 批次）
+
 ## tasks v1.0.0（2026-10-05）—— 确认③通过，三重门全绿
 - 用户「确认」；tasks v0.1.0→v1.0.0 已确认（陈卓）；三重门自检后切 feature/workspace-isolation（基点 v1.6.0），进入 Phase 4，首任务=T-01
 

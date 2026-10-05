@@ -107,7 +107,8 @@ public class HarnessAgentFactory {
             .sysPrompt(sysPrompt(agent))
             .model(model)
             .toolkit(bundle.toolkit())
-            .workspace(Path.of(workspaceRoot))
+            // workspace-isolation R-01：根按智能体隔离（{root}/{runtimeKey}），记忆/产物/索引全落专属子树（BUG-68 主刀）
+            .workspace(com.phoenix.agent.util.WorkspacePaths.agentRoot(workspaceRoot, runtimeKey(agent)))
             .enablePlanMode(isOn(config.getPlanMode()))
             .distributedStore(redisDistributedStore)
             .stateStore(postgresAgentStateStore)
@@ -232,7 +233,8 @@ public class HarnessAgentFactory {
      * 用 agentId 派生一个稳定身份（R-08 agentId 寻址），从而不依赖 Java 自注册。
      */
     public String runtimeKey(Agent agent) {
-        return StringUtils.hasText(agent.getSn()) ? agent.getSn() : "agent-" + agent.getId();
+        // 规则单一实现移至 WorkspacePaths（scanner 同源引用，防漂移）
+        return com.phoenix.agent.util.WorkspacePaths.runtimeKey(agent.getId(), agent.getSn());
     }
 
     private String sysPrompt(Agent agent) {

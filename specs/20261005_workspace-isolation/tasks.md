@@ -4,7 +4,7 @@
 
 ## 组 1：隔离主刀
 
-- [ ] T-01 WorkspacePaths 共享工具 + factory 换根：runtimeKey(agentId,sn)/agentRoot(root,key) 单一实现；HarnessAgentFactory .workspace 下沉 {root}/{runtimeKey}（BUG-68 主刀；MCP 变体经 buildUncached 自动继承）
+- [x] T-01 WorkspacePaths 共享工具 + factory 换根：runtimeKey(agentId,sn)/agentRoot(root,key) 单一实现；HarnessAgentFactory .workspace 下沉 {root}/{runtimeKey}（BUG-68 主刀；MCP 变体经 buildUncached 自动继承）
   关联: R-01, R-02
   依赖: 无
   验证方式: 编译绿；容器内目录实证（新对话后 root 下出现 agent-{id}/ 树，根级零新增散文件）；runtimeKey 规则与 factory 原 name() 逐字一致（同源引用断言）
