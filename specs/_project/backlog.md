@@ -1,16 +1,17 @@
 # 待办清单（Backlog）
 > 编号 `BL-xx` **永久不复用**（同 R/T/BUG 规则；作废标 `[作废]` 保留）
 > 状态：`待立项` → `已立项(vX.Y.Z)` → `已交付(vX.Y.Z)`；旁路 `搁置(原因)`、`待确认`（需用户先定口径）
+> 〔2026-10-05 补〕`已交付(vX.Y.Z，已冻结)`=**内容随该版冻结定版、发版件齐备**；打 tag 后追注「已发布」。（此前易被误读为"还在做"）
 > 边界：本表只放**非需求、非缺陷**的功能与工程待办 —— 缺陷走 `bugs.md`；在手任务走对应 spec 的 `tasks.md`/`completion.md`
 > 立项时移入 `specs/{日期}_{功能名}/`，本表条目**保留不删除**，状态列标注交付版本
 
 ## 一、功能待办
 | # | 待办 | 来源 | 状态 | 备注（现状 / 建议 spec） |
 |---|---|---|---|---|
-| BL-01 | **MCP 支持**：对话智能体接入 MCP 工具（作为 MCP Client 消费外部 MCP Server），与现有「平台作为 MCP Server 对外暴露 nl2sql/agent 列表」形成双端能力 | 2026-09-27 用户列入待办 | **已立项(v1.6.0)** | 平台侧已有 `McpServerService`（暴露 `nl2SqlToolCallback`/`listAgentsToolCallback`）与 `McpServerConfig`；AgentScope Harness 侧具备 `McpServerRegistrar`/`McpServerConfig`（jar 内已见）但**未接线**。建议 spec：`mcp-client-tools` |
+| BL-01 | **MCP 支持**：对话智能体接入 MCP 工具（作为 MCP Client 消费外部 MCP Server），与现有「平台作为 MCP Server 对外暴露 nl2sql/agent 列表」形成双端能力 | 2026-09-27 用户列入待办 | 已交付(v1.6.0，已冻结) | 平台侧已有 `McpServerService`（暴露 `nl2SqlToolCallback`/`listAgentsToolCallback`）与 `McpServerConfig`；AgentScope Harness 侧具备 `McpServerRegistrar`/`McpServerConfig`（jar 内已见）但**未接线**。建议 spec：`mcp-client-tools` 〔2026-10-05 冻结注〕mcp-client-tools 9/9 实现完成，已并入 v1.6.0 并冻结；BUG-65/66 已验证；SQL V1.6.0_01/02 在册——状态列的「在途」字样已去除|
 | BL-02 | 工作流智能体的**图定义与可视化编排** | 2026-09-27 用户明确"本期不做，先放起来" | 待立项 | 图仍由 Java 硬编码（`ParolCompiledGraph`），DB 无图定义存储、前端无画布。建议 spec：`workflow-orchestration` |
 | BL-03 | 存量 5 个 Java 自注册智能体的**迁移与删除**（现仅从列表隐藏） | 2026-09-27 用户决定"代码保留，暂作实现参考" | 待立项 | **前置已具备**：`dynamic-agent-types` 16/16 完成、数据驱动链路与存量行为等价已实测（存量 5 个各一轮对话不回归）。建议 spec：`legacy-agent-migration` |
-| BL-04 | 智能体↔组关联改为「**智能体发布时关联组**」（与技能发布时授权组同构） | 2026-09-27 用户明示（`agent-skill-management` Non-goals） | **已立项(v1.6.0)** | 现状：组授权在组管理侧维护（`tbl_platform_group_agent_info`）；目标是发布动作里多选组、发布后即时生效 |
+| BL-04 | 智能体↔组关联改为「**智能体发布时关联组**」（与技能发布时授权组同构） | 2026-09-27 用户明示（`agent-skill-management` Non-goals） | 已交付(v1.6.0，已冻结) | 现状：组授权在组管理侧维护（`tbl_platform_group_agent_info`）；目标是发布动作里多选组、发布后即时生效 〔2026-10-05 冻结注〕agent-publish-group-grant 7/7 实现完成，已并入 v1.6.0 并冻结；用户走查通过；零 DDL——状态列的「在途」字样已去除|
 |  BL-05  |  **统一账号中心**：消除 `tbl_privilege_user` / `tbl_platform_account_info` 双账号体系  |  2026-09-27 排障中发现（根因登记 `BUG-04`）  |  待立项  | 两表状态语义相反（1=禁用 vs 0=禁用）、密码互不相通、同名账号两条记录。最低成本方案=单表+角色字段；建议 spec：`unified-account`\|；承接 BUG-45 遗留：预设问题 add/delete 接口角色限制随体系统一一并做 |
 | BL-06 | 清理**早期 demo 遗留表**：`tbl_tmp_orders/products/users`、`tbl_data_orders/products/users/order_items/categories`（应用代码零引用） | `BUG-01` 附带建议 | 待立项 | 这批表源自早期演示数据，占种子体积且易误导（本次曾被它们触发级联报错）。需带迁移+回滚脚本 |
 | BL-07 | 关联表 `agent_id` **列类型统一为 bigint** | `BUG-29` 根因（代码侧已绕过） | 待立项 | `tbl_platform_group_agent_info.agent_id` 是 varchar，`tbl_data_agent_skill_info.agent_id` 是 bigint，口径不一致；涉及存量数据迁移与索引重建 |
@@ -31,13 +32,15 @@
 | # | 待办 | 来源 | 状态 | 备注 |
 |---|---|---|---|---|
 | BL-16 | **里程碑挂接（M0+M1）**：建 `releases/vX.Y.Z/`、把三个 spec 与已修复缺陷挂入、回填版本号 | skill 里程碑流程；项目原先无 `releases/` | **已交付(v1.2.0)** | 2026-09-27 完成：`releases/v1.2.0/MILESTONE.md`（3 spec + 18 缺陷）；版本号取 MINOR=v1.2.0（历史分支线已到 1.1.x，用户确认）。**M2 冻结前置未满足**：① `agent-config-ai-generate` 未合并；② P1（BUG-01/20）未达「已验证」 |
-| BL-17 | **汇总升级件（M3）**：把 spec-1/2/3 的 `01~05` 升级件重排为 Flyway 风格 `V<版本>_<序号>__<描述>.sql` + rollback 配对，产出 `UPGRADE.md` / `RELEASE-NOTES.md` / `config/changes.md` | 同上 | **已交付(v1.2.0)** | 2026-10-04 账面同步：M3 汇总自 v1.2.0 起成惯例，v1.3.0/v1.4.0/v1.5.0 三轮均执行（Flyway 重排/rollback 配对/四件套） |
+| BL-17 | **汇总升级件（M3）**：把 spec-1/2/3 的 `01~05` 升级件重排为 Flyway 风格 `V<版本>_<序号>__<描述>.sql` + rollback 配对，产出 `UPGRADE.md` / `RELEASE-NOTES.md` / `config/changes.md` | 同上 | **已交付(v1.2.0)** | 2026-10-04 账面同步：M3 汇总自 v1.2.0 起成惯例，v1.3.0/v1.4.0/v1.5.0 三轮均执行（Flyway 重排/rollback 配对/四件套） 〔2026-10-05：v1.6.0 汇总件已执行——`V1.6.0_01~03`+rollback 配对+RELEASE-NOTES/UPGRADE/config/checklist 四件套，全新库重放绿、回滚零残留〕|
 
 ## 四、在手未完成（指向 spec，不占 BL 编号）
 - `specs/20260927_agent-config-ai-generate`：**〔已随 v1.2.0 发布，历史快照〕** 13 个任务已勾 8 个，未勾 `T-05 / T-10 / T-11 / T-12 / T-13` —— 只差**界面人工走查**（浏览器扩展未连接，无法自动走查）；代码层证据已齐（`vue-tsc` 189、8 个改动文件 Vite 转译 200）。
+  〔2026-10-05 注：本地已无该 feature 分支；账面按**历史快照**收存。彻底销账=补勾剩余 5 项或整 spec 标「作废」，待用户裁决〕
   分支 `feature/agent-config-ai-generate`（未合并，合并条件是 tasks 全勾 + 证据齐）；走查清单见该 spec `changelog.md` 末尾「界面走查待办」。
 - ~~bugs.md 中 11 条「新建」缺陷待处置~~ **〔2026-10-04 注：已全部处置——fix-bug-batch 清仓（9 修复+BUG-04 批准不修复），随 v1.4.0 发布〕**
 - 里程碑〔2026-10-04 注：**v1.2.0/v1.2.1/v1.3.0/v1.4.0/v1.5.0 全部已发布**；在途=无，下一需求起 v1.6.0〕
+  〔2026-10-05 注：**v1.6.0 已立项并冻结**（基线 `16225cf`），在途唯一=v1.6.0；冻结后新需求挂 v1.7.0〕
 
 - **BL-18 前端 API 前缀治理**：**已交付(v1.3.0，原记 v1.2.2 已并入)**——baseURL 置空+路径归一+代理透传，nginx 折叠规则已删；BUG-33 转已修复。
 

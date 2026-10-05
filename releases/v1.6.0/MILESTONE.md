@@ -1,6 +1,6 @@
 # MILESTONE: v1.6.0
 
-> 创建: 2026-10-04 | 状态: 进行中（M1 挂 4 需求：mcp-client-tools 9/9、workspace-isolation 6/6+v1.1.0 增量、long-turn-resilience 7/8 均实现完成，四个 spec 的改动均在 feature 分支待合并；**用户明示不冻结续收**） | 类型: MINOR | 验证日期: -
+> 创建: 2026-10-04 | **状态: 已冻结（2026-10-05，基线 `16225cf`；未打 tag、未 push、未发布——待用户「发版」口令）** | 类型: MINOR | 验证日期: 2026-10-05（冻结批次：全新库重放 + 回滚零残留 + verify 13/13） | 内容：4 需求（mcp-client-tools 9/9 / agent-publish-group-grant 7/7 / workspace-isolation 12/12 / long-turn-resilience 7/8〔T-06→BL-27〕）+ v1.6.0 批次 21 条 bug（18 已验证 / 2 延期 / 1 新建）
 > **版本分支**: `v1.6.0`（2026-10-04 建，基点 = main tip 270fcfa，v1.5.0 已合 main 无悬空）
 
 **版本语义**：MINOR——向下兼容新功能。首挂 BL-01 MCP 客户端工具接入。

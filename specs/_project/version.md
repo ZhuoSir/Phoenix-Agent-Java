@@ -11,7 +11,7 @@
 
 > 冻结后新需求默认挂下一版（v1.5.0）；挤入 v1.4.0 需用户明确同意。
 
-| **v1.6.0** | **在途** | 立项 2026-10-04 | **v1.6.0**（基点 main tip 270fcfa，v1.5.0 已合 main） | - | 已挂 mcp-client-tools（实现完成 9/9，已合并 f7e0313）+ agent-publish-group-grant（实现完成 7/7，已合并 aad1f89）+ workspace-isolation（实现完成 6/6，feature 分支待合并）+ long-turn-resilience（BUG-70/71 立项中）；**用户明示不冻结续收**（2026-10-04） |
+| **v1.6.0** | **已冻结(2026-10-05)** | 立项 2026-10-04 | **v1.6.0**（基点 main tip 270fcfa；本轮已并入 4 spec，基线 `16225cf`） | - | 挂载：mcp-client-tools 9/9 + agent-publish-group-grant 7/7 + workspace-isolation 12/12（v1.0.0 6/6 + v1.1.0 R-06 6/6）+ long-turn-resilience 7/8（T-06→BL-27）；SQL `V1.6.0_01~03` + rollback 配对（全新库重放绿、回滚零残留）；v1.6.0 批次 bug 21 条（18 已验证 / BUG-69 延期观察 / BUG-83 延期→BL-26 / BUG-85 新建）；发布件已落 `RELEASE-NOTES/UPGRADE/config/checklist`；**冻结后新需求挂 v1.7.0**；tag/push/合并 main 待用户口令 |
 
 | **v1.5.0** | **已发布(2026-10-04)** | 立项 2026-10-03 | **v1.5.0**（基点 main tip 3083273，v1.4.0 已合 main） | - | 已挂 docker-auto-pipeline（Docker 自动化打包+安装流水线，用户四裁决：新建spec/挂v1.5.0/管到引擎/五平台） |
 
