@@ -1,5 +1,10 @@
 # Changelog: agent-publish-group-grant
 
+## T-04/T-05 代码完成部署 + T-06 API 级全绿（2026-10-04）——UI 走查待用户
+- T-04/T-05 交付：publishAgentApi 可选 body；列表页发布弹窗（组多选+重发布回显+空选全公开警示）；AgentGroupGrant.vue（全公开语义提示/非 published 禁用引导）；**双入口挂载**（抽屉「授权组」菜单+独立编辑页）；typecheck 213=基线（过程抓己错：抽屉数据变量是 form 非 agent，即修）；容器内标记串证+verify=0（L-03 回炉条款执行）
+- T-06 API 级：E2E 收敛链三断言（公开→无组用户可见 / 勾 G1 收敛→无组用户失见名单空 / G1 用户 chenzhuo 仍可见）+ 对面断言双证（**MCP 判定/挂载四文件对本 spec 零 diff**；MY_SKILLS_SQL 零改动=技能域不串）+ admin 列表不变（B3）+ verify=0 + 夹具全清
+- T-04/T-05 界面走查项与 T-06 的 UI 面移交用户走查（发布弹窗三态/抽屉授权组块/独立页块）
+
 ## T-02+T-03 完成（2026-10-04）两个判定读点全绿
 - T-02 validateVisible 双分支：无授权行→**仅 published 享全公开**（草稿拒绝，防反向漏洞——设计时补的安全闸）；有授权行→交集 SQL 原样。四态实测：A1 公开可对话(899字节真回复,且运行配置缺失也走通=工厂默认兜底)✓ A2 授权假组→chenzhuo 拒绝"未授权"文案✓ A3 撤权回公开✓ A4 草稿拒绝✓
 - T-03 getMyAgents 公开合并：交集∪公开集(NOT EXISTS+id::text+sn空过滤)，无组账号死角修复(现返回空列表非 null)。B1 chenzhuo=组授权4+公开夹具✓ B2 无组夹具=纯公开集✓ B3 admin 列表 5 条不变✓
