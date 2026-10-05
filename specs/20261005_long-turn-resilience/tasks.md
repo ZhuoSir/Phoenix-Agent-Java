@@ -67,5 +67,5 @@
 - T-04 join/重进：BUG-73/74/75/76 已验证（轮询双态 + 会话守卫 + 重试收敛）；**BUG-71（Think Done）仍为「新建」未修** → 本任务不能整体收
 - T-05 多端 transport 同治：前台 `api-transport` 增量渲染（incrementalMarkdown + 400ms 节流）已落地；`pc-ui`/其它端未核对 → 部分完成
 - T-06 运行时配置 UI 三输入：**未做**（前端全仓 grep `compactionTriggerTokens|compactionKeepMessages|toolResultMaxChars` 零命中）
-- T-07 E2E 全矩阵（logo ≥20 分钟长轮不被腰斩）：无整轮留档（今日长任务实测由用户侧进行，未按本任务矩阵记录）
+- T-07 E2E 全矩阵：**verify 13/13 已 PASS**（2026-10-05 实跑 `docker/scripts/verify.sh`，13 断言逐条 PASS）；其余项——logo ≥20 分钟长轮无整轮留档（今日长任务由用户侧进行）、中断五文案抽查未做、typecheck 基线未跑
 - T-08 台账收尾：未开始（本 spec `completion.md` 为空）
