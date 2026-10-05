@@ -1,5 +1,11 @@
 # Changelog: workspace-isolation
 
+## T-15/T-16 收口（2026-10-05）verify 13/13 + 归属对账，具备合并条件
+- T-15 全绿：跨会话隔离✓ 旧会话可见✓ 同会话三工具同处✓ **MCP 链✓**（agent36 变体键含 sessionId、35 工具挂载）技能链✓ **verify 13/13（`docker/scripts/verify.sh` 13 断言逐条 PASS）**
+- T-16：BUG-78/79/80 翻已验证；completion 补 v1.1.0 段；MILESTONE 第三行补 R-06 增量与记忆重置去向；改动面归属对账入 artifacts
+- **归属对账结论（回应"两个 spec 是否都改了会话文件夹"）**：文件夹布局**唯一 owner=本 spec**；LTR 从未改布局，仅在 `HarnessAgentFactory`/`HarnessAgentRegistry` 内改配置与指纹（不同代码区）；`5b78f1f`(BUG-78 扫描器) 虽记在 LTR 批次、逻辑归属本 spec
+- 合并条件：tasks 12/12 全勾 + 证据齐；分支无分叉（`v1.6.0` 领先 HEAD 0 个提交）→ `--no-ff` 合并零冲突
+
 ## BUG-83 裁决（2026-10-05）按 A 保留，C 列待办
 - 用户裁决「先做 A（保持现状），把 C 列入待办」→ 本轮**零代码改动**（现状即 A）：shell cwd=会话根、文件工具落 `{sessionRoot}/{uid}/`，两者都在会话目录内，面板递归扫全树故都可见
 - C（去 USER namespace 层做单根，文件工具根=shell cwd=技能包根=memory 根）已登记 `BL-26`（建议 M3 批次；立项第一步=AGENT 档位落点/记忆/技能三件 spike；触及已确认 plan「框架内再拼 uid」→ 需增量重确认）
