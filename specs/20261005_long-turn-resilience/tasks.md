@@ -4,7 +4,7 @@
 
 ## 组 1：后端
 
-- [ ] T-01 看门狗活性化+中断文案分原因：Turn 增 lastActivityAt（onFrame 脉冲=DSH arm）；janitor 判据=空闲>600s（env turn-idle-timeout-seconds）；总时长闸默认关（turn-timeout-seconds 默认 0，>0 保留兜底）；定稿文案五分类（挂起超时/总时长/服务重启/模型流错误/手动取消）
+- [x] T-01 看门狗活性化+中断文案分原因：Turn 增 lastActivityAt（onFrame 脉冲=DSH arm）；janitor 判据=空闲>600s（env turn-idle-timeout-seconds）；总时长闸默认关（turn-timeout-seconds 默认 0，>0 保留兜底）；定稿文案五分类（挂起超时/总时长/服务重启/模型流错误/手动取消）
   关联: R-01, R-04
   依赖: 无
   验证方式: 假死轮模拟（构造无帧轮：断点或桩）600s 定稿+文案；短轮/活跃轮零误杀（金丝雀行对照）；总时长闸 0=关断言（长活轮>600s 总时长不被杀——与 T-07 logo 真跑联动）

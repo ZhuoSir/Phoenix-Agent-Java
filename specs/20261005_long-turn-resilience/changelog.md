@@ -1,5 +1,11 @@
 # Changelog: long-turn-resilience
 
+## T-01 完成（2026-10-05）看门狗活性化三证+意外活体战果
+- 前置：分支叠基 workspace-isolation（TurnManager 同文件共享面仲裁，M4 先 isolation 后本支平滑）；compose env 两件（TURN_TIMEOUT 默认 0=关+TURN_IDLE 默认 600）
+- 交付：Turn.lastActivityAt 每帧脉冲（DSH arm 语义）；janitor 双闸换轨（空闲>600s 判挂起；总时长默认关）；文案五分类就位（挂起/总时长/重启既有/模型流错误/取消既有）
+- 三证（idle=30s 临时加速实测后恢复默认）：①**黑洞模型挂起轮**（host 黑洞 stub+夹具 agent99912/model999）30s 定稿+「⚠️ 轮次挂起：连续 30 秒无任何模型/工具活动」✓ ②**意外活体**：短轮测试撞上 DeepSeek 真实流停滞（7帧后无终号）——空闲闸当场优雅定稿内容保留（用户历史"执行一半中断"的另一真凶现形：旧闸下要挂满600s）✓ ③正常短轮 done 不误杀 ✓
+- 部署纪律执行（L-16）：部署前查 generating=0；夹具全清（agent/model/runtime/会话/黑洞stub/workspace目录）；verify=0
+
 ## tasks v1.0.0（2026-10-05）—— 确认③通过，三重门全绿
 - 用户「确认」；tasks v0.1.0→v1.0.0 已确认（陈卓）；三重门自检后切 feature/long-turn-resilience（基点 v1.6.0），进入 Phase 4，首任务=T-01
 

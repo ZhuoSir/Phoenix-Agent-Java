@@ -49,8 +49,13 @@ public class HarnessTurnManager {
 
     private final ChatMessageMapper chatMessageMapper;
 
-    @Value("${phoenix.agent.turn-timeout-seconds:600}")
+    /** 总时长闸：默认 0=关闭（long-turn-resilience R-01/Q2 决议，DSH 轮次层无墙钟强杀）；>0 保留兜底语义 */
+    @Value("${phoenix.agent.turn-timeout-seconds:0}")
     private long turnTimeoutSeconds;
+
+    /** 空闲挂起闸：连续无帧超过此秒数判挂起（R-01/Q1=600s，DSH 工具等待上限对齐；idleWatchdog arm 语义） */
+    @Value("${phoenix.agent.turn-idle-timeout-seconds:600}")
+    private long turnIdleTimeoutSeconds;
 
     @Value("${phoenix.agent.turn-flush-seconds:5}")
     private long flushSeconds;
@@ -205,6 +210,9 @@ public class HarnessTurnManager {
 
         final long startedAt = System.currentTimeMillis();
 
+        /** R-01：每帧脉冲（=DSH idleWatchdog 的 arm 重置） */
+        volatile long lastActivityAt = System.currentTimeMillis();
+
         volatile Long messageId;
 
         volatile Disposable sourceSub;
@@ -231,8 +239,17 @@ public class HarnessTurnManager {
         private void startFlusherAndWatchdog() {
             this.janitor = Flux.interval(Duration.ofSeconds(flushSeconds), Schedulers.boundedElastic())
                 .subscribe(t -> {
-                    if (System.currentTimeMillis() - startedAt > turnTimeoutSeconds * 1000L) {
-                        Turn self = this;
+                    long now = System.currentTimeMillis();
+                    Turn self = this;
+                    // R-01 空闲闸（DSH idleWatchdog 语义）：连续无任何帧超阈值 → 判挂起定稿
+                    if (now - lastActivityAt > turnIdleTimeoutSeconds * 1000L) {
+                        HarnessTurnManager.this.turns.remove(self.sessionId, self);
+                        self.finish(STATUS_TIMEOUT, "\n\n⚠️ 轮次挂起：连续 " + turnIdleTimeoutSeconds
+                                + " 秒无任何模型/工具活动，已定稿至此内容（内容保留至最后增量）");
+                        return;
+                    }
+                    // 总时长闸：默认 0=关闭（Q2 决议，DSH 轮次层无墙钟强杀）；>0 保留兜底
+                    if (turnTimeoutSeconds > 0 && now - startedAt > turnTimeoutSeconds * 1000L) {
                         HarnessTurnManager.this.turns.remove(self.sessionId, self);
                         self.finish(STATUS_TIMEOUT, "\n\n⚠️ 生成超时（>" + turnTimeoutSeconds + "s），已定稿至此内容");
                         return;
@@ -247,6 +264,7 @@ public class HarnessTurnManager {
 
         private void onFrame(Map<String, Object> frame) {
             try {
+                lastActivityAt = System.currentTimeMillis();
                 framesSeen.incrementAndGet();
                 Object c = frame.get("content");
                 if (c instanceof String s && !s.isEmpty()) {
@@ -287,7 +305,8 @@ public class HarnessTurnManager {
 
         private void onError(Throwable err) {
             log.warn("[turn] 源流异常 session={}: {}", sessionId, err.toString());
-            finish(STATUS_TIMEOUT, "\n\n⚠️ 生成异常中断：" + err.getClass().getSimpleName());
+            // R-04 文案分类：模型/流错误类（此前与超时共用笼统文案）
+            finish(STATUS_TIMEOUT, "\n\n⚠️ 模型或流错误中断：" + err.getClass().getSimpleName() + "（内容保留至最后增量）");
         }
 
         private synchronized void flush() {
