@@ -90,6 +90,30 @@ public class AccountInfoServiceImpl extends ServiceImpl<AccountInfoMapper, Accou
                 }
             }
         }
+        // agent-publish-group-grant R-03：公开合并——published ∧ 无授权行 ∧ sn空（全公开对所有前台可见；无组账号也得公开集）
+        try {
+            java.util.List<com.mybatisflex.core.row.Row> pubRows = com.mybatisflex.core.row.Db.selectListBySql(
+                "select a.id from tbl_data_agent a where a.status = 'published' and (a.sn is null or a.sn = '') "
+                    + "and not exists (select 1 from tbl_platform_group_agent_info g "
+                    + "where g.agent_id = a.id::text and g.del_flag = 0)");
+            if (CollUtil.isNotEmpty(pubRows)) {
+                java.util.List<Long> pubIds = pubRows.stream().map(r -> r.getLong("id")).toList();
+                java.util.List<Agent> pubs = agentService.findByIds(pubIds, AgentStatusEnm.PUBLISHED.getCode())
+                    .stream().filter(a -> a != null && StrUtil.isBlank(a.getSn())).toList();
+                java.util.Map<Long, Agent> byId = new java.util.LinkedHashMap<>();
+                if (datas != null) {
+                    datas.forEach(a -> byId.put(a.getId(), a));
+                }
+                pubs.forEach(a -> byId.putIfAbsent(a.getId(), a));
+                datas = new java.util.ArrayList<>(byId.values());
+            }
+        }
+        catch (Exception e) {
+            log.warn("公开智能体合并失败（降级返回交集集）: {}", e.toString());
+        }
+        if (datas == null) {
+            datas = new java.util.ArrayList<>();
+        }
         return datas;
     }
 
