@@ -40,6 +40,7 @@ public class HarnessFrontController {
     public Flux<org.springframework.http.codec.ServerSentEvent<Map<String, Object>>> confirm(@RequestBody ConfirmRequest confirmRequest) {
         String userId = StpUtil.getLoginIdAsString();
         confirmRequest.setUserId(userId);
+        confirmRequest.setChannel("front");
         return com.phoenix.agent.harness.sse.SseSupport.withHeartbeat(turnManager.confirmOrResume(confirmRequest.getSessionId(),
             () -> harnessChatService.confirmStream(confirmRequest).map(output -> {
             Map<String, Object> eventMap = new LinkedHashMap<>();
@@ -72,7 +73,7 @@ public class HarnessFrontController {
     @PostMapping(value = "/chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<org.springframework.http.codec.ServerSentEvent<Map<String, Object>>> harnessChat(@RequestBody HarnessRequest  harnessRequest) {
         String userId = StpUtil.getLoginIdAsString();
-        HarnessRequest request = HarnessRequest.builder().userId(userId).sessionId(harnessRequest.getSessionId()).message(harnessRequest.getMessage()).build();
+        HarnessRequest request = HarnessRequest.builder().userId(userId).sessionId(harnessRequest.getSessionId()).message(harnessRequest.getMessage()).channel("front").build();
         return com.phoenix.agent.harness.sse.SseSupport.withHeartbeat(turnManager.openOrReject(harnessRequest.getSessionId(),
             () -> harnessChatService.stream(harnessRequest.getHarnessSn(), request)
                 .map(output -> {

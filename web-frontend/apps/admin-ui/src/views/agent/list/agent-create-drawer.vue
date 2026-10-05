@@ -55,6 +55,7 @@ import AgentProfileAiFields from '#/components/agent-profile/AgentProfileAiField
 
 import AgentRuntimeConfig from './components/AgentRuntimeConfig.vue';
 import AgentKbaseBind from './components/AgentKbaseBind.vue';
+import AgentPluginConfig from '../edit/components/AgentPluginConfig.vue';
 import AgentSkillConfig from '../edit/components/AgentSkillConfig.vue';
 import BusinessKnowledgeConfig from './components/BusinessKnowledgeConfig.vue';
 import SemanticsConfig from './components/SemanticsConfig.vue';
@@ -701,6 +702,12 @@ const [Drawer, drawerApi] = useVbenDrawer({
               <span>技能配置</span>
             </ElMenuItem>
           </ElMenuItemGroup>
+          <ElMenuItemGroup title="插件配置">
+            <ElMenuItem index="plugin">
+              <ElIcon><IconifyIcon icon="lucide:plug" /></ElIcon>
+              <span>插件配置</span>
+            </ElMenuItem>
+          </ElMenuItemGroup>
           <ElMenuItemGroup title="PROMPT配置">
             <ElMenuItem index="prompt">
               <ElIcon><IconifyIcon icon="lucide:message-square" /></ElIcon>
@@ -895,6 +902,12 @@ const [Drawer, drawerApi] = useVbenDrawer({
         <div v-else-if="activeMenu === 'skill'">
           <AgentSkillConfig v-if="editId" :agent-id="editId" />
           <div v-else class="text-sm text-gray-500">请先保存智能体，再配置技能。</div>
+        </div>
+
+        <!-- 插件配置（mcp-client-tools T-07；与技能配置同构，未来 API 插件并入） -->
+        <div v-else-if="activeMenu === 'plugin'">
+          <AgentPluginConfig v-if="editId" :agent-id="editId" />
+          <div v-else class="text-sm text-gray-500">请先保存智能体，再配置插件。</div>
         </div>
 
         <!-- 对话智能体运行配置 -->

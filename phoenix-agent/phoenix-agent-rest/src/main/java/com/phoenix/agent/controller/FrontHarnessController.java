@@ -78,6 +78,7 @@ public class FrontHarnessController {
         // 3) 组装请求：前台身份 + 技能范围约束提示（自主模式缝隙缓解）
         //    R-08：统一以 agentId 寻址（内部走运行时注册表）；harnessSn 仅作存量兼容兜底字段
         HarnessRequest request = HarnessRequest.builder()
+            .channel("front")
             .userId(accountId)
             .sessionId(body.getSessionId())
             .message(body.getMessage())
