@@ -1,5 +1,19 @@
 # Changelog: visibility-filetree-hygiene
 
+## T-06 收口：前端树 UI 实现并部署（2026-10-05，UI 走查移交用户）
+- `agentFiles.ts`：新增 `getAgentFileTreeApi(sessionId, path, scan)` + `AgentFileTreeNode` / `AgentFileTreeLevel` 类型 + `HISTORY_PATH` 常量（与后端 `AgentFileService.HISTORY_PATH` 对齐）
+- `ChatFilesPanel.vue`：改树形——面包屑（会话目录 / a / b，可点跳转）、返回上级、文件夹优先、**单层懒加载**（改 `path` 拉一层）、`FILES_CHANGED_EVENT` 刷新当前层、目录显示「N 个文件夹 · M 个文件」、历史节点显示「跨会话遗留 · N 项」；文件行预览/下载/删除与 temp 会话空态**保持不变**
+- 质量门：`vue-tsc` **213 = 基线**（本 spec 文件 0 错误；过程中 1 条未用函数已删并复验）
+- 部署：build → `.stage/dist` → `compose build nginx` → `up -d nginx`（health 200）；线上 chunk `js/ChatFilesPanel-C3cJj9Ah.js` 与本地 **sha256 一致**（b72fb31229d3eadd），关键字「会话目录/跨会话遗留/此文件夹为空」均在线上包内
+- **UI 走查清单（移交用户，两个入口）**
+  1. 前台 chat（`chenzhuo/12345678`）打开「梅西蓝白 logo」会话（`6e9c09e0`）→ 抽屉根层应直接见 `messi-personal-logo` 文件夹 + `harness-讲义.md`（**不应**再有纯数字文件夹）
+  2. 点进 `messi-personal-logo` → 面包屑出现，子目录计数（deliverables 84 / concepts 10 / presentations 8 / tools 8 / renders 3）；点面包屑或返回箭头可回上级
+  3. 文件行「预览 / 下载 / 删除」仍正常（删除后当前层自动刷新）
+  4. 老会话（文件数多者，如 `3ccf0341`/`0690b2d0` 对应会话）→ 应见真实文件夹层级，而非单个「历史文件」
+  5. 若有跨会话遗留行的会话 → 根层出现带「跨会话遗留」标注的「历史文件」节点，进入可见明细
+  6. 发一条会产出文件的消息 → 回复结束后当前层自动出现新文件
+  7. 后台 run 页（`admin/123456`）`/agent/33/run` → 同一抽屉组件，同样验证 1~5（两面一致）
+
 ## T-05 收口：v1.1.0 归属/折叠口径落地（2026-10-05）
 - 用户重确认「确认」→ requirements/plan **v1.1.0 已确认（陈卓）**
 - 实现落地：`SessionFileTree` 归属改**三态**（SESSION / OTHER_SESSION / NO_SESSION）；新增 `foldUserNamespace`（**循环折叠双层 uid**，展示层单一实现）；`AgentFileServiceImpl` 按「他会话→历史文件；无会话段→归本会话」归位 + 折叠 uid

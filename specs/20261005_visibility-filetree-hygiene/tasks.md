@@ -44,10 +44,15 @@
   - 夹具探针 14/14 PASS（含双层 uid 折叠、他会话隔离、无会话段旧行三态）
   - 双次部署留痕：19:41（v1.0.0 口径，暴露问题）→ 20:0x（v1.1.0 口径，达标）
 
-- [ ] T-06 前端树 UI（`ChatFilesPanel.vue`，run 页与前台**共用同一组件**）：面包屑 + 文件夹优先 + 进入/返回 + 懒加载 + `FILES_CHANGED_EVENT` 刷新当前层；下载/删除/空面板提示保持不变
+- [x] T-06 前端树 UI（`ChatFilesPanel.vue`，run 页与前台**共用同一组件**）：面包屑 + 文件夹优先 + 进入/返回 + 懒加载 + `FILES_CHANGED_EVENT` 刷新当前层；下载/删除/空面板提示保持不变
   关联: R-02.2, R-02.5, R-02.6 | 依赖: T-05
   验证方式: 两面走查（run 页 + 前台 chat 同一组件）；下载/删除/SSE 产物刷新回归；`vue-tsc` 基线（213 预存 / **0 新增**）
   验收标准: 两面体验一致 + 既有能力不回归
+  **收口(2026-10-05, 实现+API级/构建级)**：`ChatFilesPanel.vue` 改树形（面包屑 + 返回 + 文件夹优先 + 单层懒加载 + `FILES_CHANGED_EVENT` 刷新当前层 + `path` 导航），文件行预览/下载/删除与空态提示保持不变（`HISTORY_PATH` 常量与后端对齐）。新增 `getAgentFileTreeApi` + `AgentFileTreeNode/TreeLevel` 类型。
+  - `vue-tsc` **213 错误 = 基线（本 spec 文件 0 错误）**（过程中曾因未用函数 `toItem` 多 1 条，已删并复验回基线）
+  - 构建产物已部署：`pnpm -F @vben/web-ele build` → stage → `compose build nginx` → `up -d`（health 200）
+  - **线上校验**：线上 `js/ChatFilesPanel-C3cJj9Ah.js` 与本地构建 **sha256 一致**（b72fb31229d3eadd），且含「会话目录 / 跨会话遗留 / 此文件夹为空」关键字
+  - **UI 走查移交用户**（项目规矩：agent 不自测 UI）——走查清单见本 spec changelog 末尾
 
 ## 组 3：长轮静默可见性（R-01）
 
