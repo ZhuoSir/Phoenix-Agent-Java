@@ -1,5 +1,11 @@
 # Changelog: long-turn-resilience
 
+## BUG-77 二轮取证（2026-10-05）——数据没坏，是报文转换缺 reasoning
+- 用户复现（诊断文案已生效，能直接看到 provider 原文）：同会话「继续」再次 400
+- 二层取证：`tbl_harness_store_state`（注意 session_id 形如 `uid:sessionId`）该会话 29 条消息**结构完全合法**：tool_use/tool_result 成对、每条 assistant 均含 thinking 块 → **否定"状态损坏/悬挂配对"假设**，也否定"reasoning 未持久化"
+- 结论：真因=**框架把持久化状态转 provider 请求时未回填 reasoning_content**（重启后重新加载历史的路径）；表现为"重启/中断后紧接一轮 400 → 之后自行恢复"
+- 计划修法（下批）：Turn 保存 source 供应商 → `onError` 识别 400/reasoning_content 签名 → **自动重试一次**（实测重试可成功）→ 仍失败才定稿；备选：该智能体切非思考模型临时代偿
+
 ## T-04 七刀（2026-10-05）BUG-77 中断后 BadRequestException（用户实测，provider 原文取证）
 - 用户原话：「模型或流错误中断：BadRequestException（内容保留至最后增量），继续执行任务提示这个」
 - 取证链：①该会话仅 ≈922 token（总 2306 字符）→ **排除上下文超限**（我先前的猜测被自己推翻）②后端日志拿到 provider 原文：`400 invalid_request_error: The reasoning_content in the thinking mode must be passed back to the API`（deepseek-v4-flash 思考模式硬性要求）③DB 时序显示失败后 15:32:52 一轮正常恢复 → **一次性状态不一致**（被中断轮丢失 reasoning_content/tool 配对），非会话永久中毒
