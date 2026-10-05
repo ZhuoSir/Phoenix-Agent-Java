@@ -1,5 +1,11 @@
 # Changelog: visibility-filetree-hygiene
 
+## v1.0.0 确认①通过 + v1.7.0 双建（2026-10-05）
+- 用户口令「确认」→ requirements v0.1.0 → **v1.0.0 已确认（陈卓）**；三重门第①关过，进 Phase 2
+- Q1~Q6 未逐条答复 → 按 agent 建议口径暂定执行并在 requirements §七 记明，② 关口可纠
+- **v1.7.0 双建**：version.md 新增 v1.7.0「在途」行（基点 main tip `456f8ab`，v1.6.0 已合 main 无悬空）+ `releases/v1.7.0/MILESTONE.md` + 分支 `v1.7.0` + 特性分支 `feature/visibility-filetree-hygiene`
+- 待办挂载：BL-28 / BL-11 / BL-12 / BL-15 → 已立项(v1.7.0)；BUG-85 → 已规划(v1.7.0)；§四 agent-config 销账随本 spec R-03
+
 ## v0.1.0（2026-10-05）立项草稿
 - 用户口令：「BUG-85 和 BL-28，还有 BL-12/15/11、§四 两条过期注记 + agent-config 历史快照销账，**列为一个 spec，新建**」
 - 挂载：**v1.7.0**（v1.6.0 已于同日发布 tag `v1.6.0` 并 `--no-ff` 合入 main；在途唯一 ⇒ 待立项双建 v1.7.0）
