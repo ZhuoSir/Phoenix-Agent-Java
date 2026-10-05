@@ -1,5 +1,14 @@
 # Changelog: visibility-filetree-hygiene
 
+## T-04 完成：路径解析器 + 隐藏规则同源化（2026-10-05）
+- 新增 `SessionWorkspaceFilters`（内部件判定**单一实现**：目录名单∪点开头 / 文件名单∪`call_*`∪点开头无扩展名∪内部后缀 / 会话 UUID 判据）
+- 新增 `SessionFileTree`（三代 `store_key` → 会话内相对路径；**非本会话→历史**；解析失败不抛异常、保留文件名）
+- `WorkspaceArtifactScanner` 改为**同源引用**：删除 5 个局部名单常量，`isInternal`/`otherSessionArtifact` 全部委托共享工具（`grep` 复核局部名单已零残留）
+- **实现细化（探针发现，不改需求/验收）**：归属判定改为**以会话段为锚**（只看第 0/1 段是否等于本会话 ID），前缀（agentKey/显示名）不参与判定——BUG-78 类"入库前缀 ≠ 库中 sn"现场下不会把本会话文件误归历史；同时他会话 UUID 落在第 0/1 段一律归历史（隔离不放宽）。仅记入 changelog，不回改已确认 plan（非需求/设计缺陷）
+- **夹具证据（可复现）**：`fixture/TreeProbe.java` 13 用例 → **PASS=13 FAIL=0**（三代各一 / uid 嵌套 / `.pylibs` 噪音 / `call_*` 占位 / 二代历史 / 一代历史 / 他会话隔离×2 / 无 size / 前缀不匹配 / 内部状态文件 / 内部后缀 / 空键不抛）
+  复现命令：`java -cp phoenix-agent/phoenix-agent-core/target/classes specs/20261005_visibility-filetree-hygiene/fixture/TreeProbe.java`
+- 编译：`mvn -pl phoenix-admin/phoenix-admin-manager -am package -DskipTests` 绿
+
 ## tasks v1.0.0 确认③通过——三重门全绿，进 Phase 4（2026-10-05）
 - 用户口令「确认」→ tasks v0.1.0 → **v1.0.0 已确认（陈卓）**；三重门（requirements①/plan②/tasks③）全绿
 - Phase 4 开工，首任务 **T-01**（清账组，零风险先行）；交付顺序：T-01~03 清账 → T-04~06 文件树 → T-07~10 静默可见性 → T-11~12 收口

@@ -25,10 +25,11 @@
 
 ## 组 2：会话文件文件夹树（R-02）
 
-- [ ] T-04 路径解析器 + 隐藏规则同源化：新增 `SessionFileTree`（判三代 `store_key` → 会话内相对路径，非本会话段→历史）；把「框架内部目录/占位」判定从 `WorkspaceArtifactScanner` **抽为公共常量/工具**，扫描器改为引用同一处（防两处漂移，落实 L-19）
+- [x] T-04 路径解析器 + 隐藏规则同源化：新增 `SessionFileTree`（判三代 `store_key` → 会话内相对路径，非本会话段→历史）；把「框架内部目录/占位」判定从 `WorkspaceArtifactScanner` **抽为公共常量/工具**，扫描器改为引用同一处（防两处漂移，落实 L-19）
   关联: R-02.3, R-02.4 | 依赖: 无
   验证方式: 夹具断言三代各一（三代→相对路径；二代/一代→历史）＋噪音样例（`.pylibs`/`.skills-cache`/`large_tool_results`/`call_*`）全判隐；`grep` 证明扫描器已改用同一常量（同源引用证据）
   验收标准: 三代解析全绿 + 同源引用可证
+  **收口(2026-10-05)**：新增 `SessionWorkspaceFilters`（判定单一实现）+ `SessionFileTree`（三代解析）；扫描器删 5 个局部名单常量并全部委托共享工具（`grep` 零残留=同源可证）；`fixture/TreeProbe.java` **13/13 PASS**（含他会话隔离 2 例、前缀不匹配 1 例、空键不抛 1 例）；编译绿。实现细化：归属改为**会话段锚定**（前缀不参与判定），仅记 changelog 未回改已确认 plan
 
 - [ ] T-05 树接口：`GET /api/agent/files/tree?sessionId=&path=&scan=` **单层**返回（含目录 `dirCount/fileCount` 一次性分组计数；隐藏项不出现；历史行归「历史文件」节点）；属主/管理员校验复用 `canAccessSession`；`scan=true` 保留抽屉补扫语义
   关联: R-02.1, R-02.2, R-02.4, R-02.6 | 依赖: T-04
