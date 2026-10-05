@@ -321,12 +321,15 @@ async function selectSession(session: ChatSession | null) {
         // BUG-73：刷新后在跑的轮次须恢复"进行中"态——输入区禁用、显示终止按钮
         // BUG-75：用 remoteRunning 而非 isStreaming（后者会额外渲染直播区 → 与已加载行重复成双窗口）
         remoteRunning.value = true;
+        // BUG-76：单次请求失败（负载下超时/网络抖动）不得当"轮次已结束"——累计连续失败超限才收敛
+        let consecutiveFailures = 0;
         const tick = async () => {
           // BUG-74：已切走则终止轮询（不同会话消息绝不允许串通）
           if (currentSession.value?.id !== session.id) return;
           try {
             currentMessages.value = applyServerRowRender(await getSessionMessagesApi(session.id) as any[]) as any;
-          } catch { /* 忽略单次 */ }
+            consecutiveFailures = 0;
+          } catch { /* 忽略单次（下一 tick 再试） */ }
           if (currentSession.value?.id !== session.id) return;
           try {
             if (await harnessTurnStatusApi(session.id)) {
@@ -341,7 +344,13 @@ async function selectSession(session: ChatSession | null) {
               }
             }
           } catch {
-            if (currentSession.value?.id === session.id) remoteRunning.value = false;
+            // BUG-76：异常=不确定态 → 继续轮询；仅连续失败 ≥12 次（约 1 分钟）才判定失联并收敛
+            consecutiveFailures += 1;
+            if (consecutiveFailures >= 12) {
+              if (currentSession.value?.id === session.id) remoteRunning.value = false;
+              return;
+            }
+            if (currentSession.value?.id === session.id) setTimeout(tick, 5000);
           }
         };
         setTimeout(tick, 5000);
