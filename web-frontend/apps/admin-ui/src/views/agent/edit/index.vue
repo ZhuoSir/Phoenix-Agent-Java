@@ -29,6 +29,7 @@ import AgentDataSourceConfig from './components/AgentDataSourceConfig.vue';
 import AgentProfileAiFields from '#/components/agent-profile/AgentProfileAiFields.vue';
 
 import AgentRuntimeConfig from '../list/components/AgentRuntimeConfig.vue';
+import AgentGroupGrant from './components/AgentGroupGrant.vue';
 import AgentPluginConfig from './components/AgentPluginConfig.vue';
 import AgentSkillConfig from './components/AgentSkillConfig.vue';
 
@@ -292,6 +293,13 @@ onMounted(loadAgent);
 
       <div v-if="Number(route.params.id)" class="rounded-lg bg-white p-6 shadow-sm">
         <AgentPluginConfig :agent-id="Number(route.params.id)" />
+      </div>
+
+      <div v-if="Number(route.params.id)" class="rounded-lg bg-white p-6 shadow-sm">
+        <AgentGroupGrant
+          :agent-id="Number(route.params.id)"
+          :status="agent.status"
+        />
       </div>
     </div>
   </Page>

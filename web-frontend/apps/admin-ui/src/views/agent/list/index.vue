@@ -8,25 +8,31 @@ import { Page, useVbenDrawer } from '@vben/common-ui';
 import { IconifyIcon } from '@vben/icons';
 
 import {
+  ElAlert,
   ElAvatar,
   ElButton,
   ElCard,
   ElCol,
+  ElDialog,
   ElEmpty,
   ElIcon,
   ElInput,
   ElMessage,
   ElMessageBox,
+  ElOption,
   ElRadioButton,
   ElRadioGroup,
   ElRow,
+  ElSelect,
   ElSkeleton,
   ElTag,
 } from 'element-plus';
 
 import {
   deleteAgentApi,
+  getAgentGroupsApi,
   getAgentListApi,
+  getGroupInfoPageApi,
   offlineAgentApi,
   publishAgentApi,
 } from '#/api';
@@ -147,24 +153,47 @@ async function handleDelete(agent: Agent) {
   }
 }
 
+/* -------- 发布弹窗（agent-publish-group-grant T-04：发布+组授权一步） -------- */
+const publishVisible = ref(false);
+const publishTarget = ref<Agent | null>(null);
+const publishGroupIds = ref<string[]>([]);
+const publishGroupOptions = ref<any[]>([]);
+const publishing = ref(false);
+
 async function handlePublish(agent: Agent) {
+  publishTarget.value = agent;
+  publishGroupIds.value = [];
+  if (publishGroupOptions.value.length === 0) {
+    const res = await getGroupInfoPageApi(1, 200);
+    publishGroupOptions.value = (res as any)?.data?.records ?? (res as any)?.records ?? [];
+  }
+  // 重发布回显现有授权（R-04）
+  if (agent.id && agent.status === 'published') {
+    try {
+      const cur = await getAgentGroupsApi(agent.id);
+      publishGroupIds.value = ((cur as any)?.data ?? []) as string[];
+    } catch {
+      publishGroupIds.value = [];
+    }
+  }
+  publishVisible.value = true;
+}
+
+async function submitPublish() {
+  const t = publishTarget.value;
+  if (!t?.id) return;
+  publishing.value = true;
   try {
-    await ElMessageBox.confirm(
-      `确定要发布智能体 "${agent.name}" 吗？`,
-      '发布确认',
-      {
-        confirmButtonText: '确定发布',
-        cancelButtonText: '取消',
-        type: 'info',
-      },
-    );
-    const id = agent.id;
-    if (!id) return;
-    await publishAgentApi(id);
+    const res = await publishAgentApi(t.id, publishGroupIds.value);
+    if ((res as any)?.success === false) {
+      ElMessage.error((res as any)?.msg || '发布失败');
+      return;
+    }
     ElMessage.success('智能体发布成功');
+    publishVisible.value = false;
     await loadAgents();
-  } catch {
-    // cancelled
+  } finally {
+    publishing.value = false;
   }
 }
 
@@ -386,7 +415,43 @@ onMounted(loadAgents);
     <FormDrawer @success="loadAgents" />
 
   </Page>
-</template>
+    <!-- 发布弹窗（发布+组授权一步；空选=全公开警示） -->
+    <ElDialog v-model="publishVisible" title="发布智能体" width="480px">
+      <p class="mb-2 text-sm">
+        发布「{{ publishTarget?.name }}」并选择授权组：
+      </p>
+      <ElAlert
+        v-if="publishGroupIds.length === 0"
+        :closable="false"
+        class="mb-2"
+        show-icon
+        title="未授权任何组时，所有前台用户均可见（全公开）"
+        type="warning"
+      />
+      <ElSelect
+        v-model="publishGroupIds"
+        collapse-tags
+        collapse-tags-tooltip
+        filterable
+        multiple
+        placeholder="选择授权组（留空=全公开）"
+        style="width: 100%"
+      >
+        <ElOption
+          v-for="g in publishGroupOptions"
+          :key="g.id"
+          :label="g.name"
+          :value="g.id!"
+        />
+      </ElSelect>
+      <template #footer>
+        <ElButton @click="publishVisible = false">取消</ElButton>
+        <ElButton :loading="publishing" type="primary" @click="submitPublish">
+          确定发布
+        </ElButton>
+      </template>
+    </ElDialog>
+  </template>
 
 <style scoped>
 .tab-count {
