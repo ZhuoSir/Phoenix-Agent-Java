@@ -1,5 +1,10 @@
 # Changelog: workspace-isolation
 
+## BUG-83 裁决（2026-10-05）按 A 保留，C 列待办
+- 用户裁决「先做 A（保持现状），把 C 列入待办」→ 本轮**零代码改动**（现状即 A）：shell cwd=会话根、文件工具落 `{sessionRoot}/{uid}/`，两者都在会话目录内，面板递归扫全树故都可见
+- C（去 USER namespace 层做单根，文件工具根=shell cwd=技能包根=memory 根）已登记 `BL-26`（建议 M3 批次；立项第一步=AGENT 档位落点/记忆/技能三件 spike；触及已确认 plan「框架内再拼 uid」→ 需增量重确认）
+- 定案依据（实测）：技能包物化在**会话根** `.skills-cache/...`，而文件工具相对根在 `{uid}/` 差一层——老会话 a467aecf 模型自述「read_file 打不开 .skills-cache…；改用 execute+cat」即此代价；B（shell 挪进 {uid}/）会让两个工具都够不到技能包相对路径且 shell cwd 随"谁在跑这轮"漂移，故弃
+
 ## T-11~T-14 部署 + 实测验收通过（2026-10-05，commit f7a0964 + 1b0a3a0 噪声过滤 + BUG-81 前端 7bacf16）
 - 部署：`docker compose build backend nginx`（ES9 基座）+ `up -d`；健康 200、首页 200；L-16 门禁两轮均先查 `metadata->>'status'='generating'`=0
 - **T-11 实证**：构建日志 `对话智能体构建完成: agentId=33, runtimeKey=agent-33, ..., workspace=/app/uploads/agent-workspace/agent-33/{sessionId}`；磁盘树 `agent-33/{sessionId}/{uid}/file_probe.txt`（文件工具）+ `agent-33/{sessionId}/sh_probe.txt`（shell）
