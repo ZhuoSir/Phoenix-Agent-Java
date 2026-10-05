@@ -1,5 +1,10 @@
 # Changelog: long-turn-resilience
 
+## T-02 完成（2026-10-05）上下文治理三列贯通三证
+- 交付：V1.6.0_03 三列 DDL+rollback；实体/DTO/VO/Service 四层贯通；**UpdateChain 强写三列**（复用既有 maxIterations「留空=清除」先例机制）；factory compactionFor/toolResultEvictionFor 两级回退（DSH 换算默认 102400/20/8192）+ 指纹显式纳入
+- 三证：①全新库重放（台账 12/三列在/rollback 零残留）②配置往返（写 5000/5/1000 → DB/GET 一致；留空 → 三列全 null 回默认，**首测踩坑即修**：flex update 忽略 null，须走 UpdateChain 定向强写——既有先例模式复用）③**指纹重建实证**（改配置→「运行配置已变更，重建实例」日志+新旧指纹可见 null 位）
+- 纪律：部署前查活跃轮=0（L-16）；两批夹具（99913/99914/99915）全清；verify=0
+
 ## T-01 完成（2026-10-05）看门狗活性化三证+意外活体战果
 - 前置：分支叠基 workspace-isolation（TurnManager 同文件共享面仲裁，M4 先 isolation 后本支平滑）；compose env 两件（TURN_TIMEOUT 默认 0=关+TURN_IDLE 默认 600）
 - 交付：Turn.lastActivityAt 每帧脉冲（DSH arm 语义）；janitor 双闸换轨（空闲>600s 判挂起；总时长默认关）；文案五分类就位（挂起/总时长/重启既有/模型流错误/取消既有）

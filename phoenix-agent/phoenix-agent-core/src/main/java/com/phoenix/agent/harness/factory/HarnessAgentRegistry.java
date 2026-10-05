@@ -197,6 +197,8 @@ public class HarnessAgentRegistry {
             String.valueOf(config.getModelConfigId()), String.valueOf(config.getPlanMode()),
             String.valueOf(config.getMemoryEnabled()), String.valueOf(config.getKnowledgeEnabled()),
             String.valueOf(config.getDbQueryEnabled()), String.valueOf(config.getDbDeepAnalysisEnabled()),
+            String.valueOf(config.getCompactionTriggerTokens()), String.valueOf(config.getCompactionKeepMessages()),
+            String.valueOf(config.getToolResultMaxChars()),
             String.valueOf(config.getDatasourceId()), String.valueOf(config.getFilesystemPolicy()),
             String.valueOf(agent.getPrompt() == null ? null : agent.getPrompt().hashCode()), bindingVersion);
     }

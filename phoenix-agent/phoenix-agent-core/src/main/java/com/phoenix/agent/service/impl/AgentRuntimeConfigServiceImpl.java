@@ -125,6 +125,9 @@ public class AgentRuntimeConfigServiceImpl implements AgentRuntimeConfigService 
         // R-01「留空」持久：flex update(entity) 忽略 null 无法清除——UpdateChain 定向强写该列（含 null）
         com.mybatisflex.core.update.UpdateChain.of(agentRuntimeConfigMapper)
             .set(AgentRuntimeConfig::getMaxIterations, target.getMaxIterations())
+            .set(AgentRuntimeConfig::getCompactionTriggerTokens, target.getCompactionTriggerTokens())
+            .set(AgentRuntimeConfig::getCompactionKeepMessages, target.getCompactionKeepMessages())
+            .set(AgentRuntimeConfig::getToolResultMaxChars, target.getToolResultMaxChars())
             .where(AgentRuntimeConfig::getAgentId).eq(agentId)
             .update();
         log.info("对话智能体运行配置已保存, agentId={}, 工具数={}, datasourceId={}", agentId, toolCount,
@@ -147,6 +150,10 @@ public class AgentRuntimeConfigServiceImpl implements AgentRuntimeConfigService 
         }
         // 全量保存语义：UI 留空=null → 清除配置回退默认（R-01"留空"可持久）
         config.setMaxIterations(dto.getMaxIterations());
+        // R-05 上下文治理（全量保存语义：null=清除回退全局默认）
+        config.setCompactionTriggerTokens(dto.getCompactionTriggerTokens());
+        config.setCompactionKeepMessages(dto.getCompactionKeepMessages());
+        config.setToolResultMaxChars(dto.getToolResultMaxChars());
         if (dto.getKnowledgeTopK() != null) {
             config.setKnowledgeTopK(dto.getKnowledgeTopK());
         }
@@ -207,6 +214,9 @@ public class AgentRuntimeConfigServiceImpl implements AgentRuntimeConfigService 
         vo.setDatasourceId(config.getDatasourceId());
         vo.setFilesystemPolicy(config.getFilesystemPolicy());
         vo.setMaxIterations(config.getMaxIterations());
+        vo.setCompactionTriggerTokens(config.getCompactionTriggerTokens());
+        vo.setCompactionKeepMessages(config.getCompactionKeepMessages());
+        vo.setToolResultMaxChars(config.getToolResultMaxChars());
         return vo;
     }
 

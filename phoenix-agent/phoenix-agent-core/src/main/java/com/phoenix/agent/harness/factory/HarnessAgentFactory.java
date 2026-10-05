@@ -52,6 +52,16 @@ public class HarnessAgentFactory {
     /** 工作区（与存量自注册智能体保持一致，避免两套目录） */
     /** BL-19/R-01：workspace 根配置化。默认与历史一致（裸机开发零感知）；
      *  交付包经 env 指向 uploads 卷内路径，使产物持久化可备份。旧常量无外部引用，安全收敛。 */
+    /** R-05 上下文治理全局默认（DSH 对标换算：0.8×128k≈102400 / keep 20 / pruner 8192） */
+    @Value("${phoenix.agent.compaction-trigger-tokens:102400}")
+    private int compactionTriggerTokensDefault;
+
+    @Value("${phoenix.agent.compaction-keep-messages:20}")
+    private int compactionKeepMessagesDefault;
+
+    @Value("${phoenix.agent.tool-result-max-chars:8192}")
+    private int toolResultMaxCharsDefault;
+
     @Value("${phoenix.agent.workspace-root:.agentscope/workspace}")
     private String workspaceRoot = ".agentscope/workspace";
 
@@ -115,8 +125,8 @@ public class HarnessAgentFactory {
             .skillRepository(skillRepository(agent))
             .enablePendingToolRecovery(true)
             .middlewares(List.of(new StopOnAllDeniedMiddleware(), new ExplicitSkillMiddleware()))
-            .compaction(defaultCompaction())
-            .toolResultEviction(ToolResultEvictionConfig.defaults());
+            .compaction(compactionFor(config))
+            .toolResultEviction(toolResultEvictionFor(config));
 
         if (FilesystemPolicyEnm.REMOTE.getCode().equals(config.getFilesystemPolicy())) {
             // 远程共享存储不支持 shell（bugs.md B-07），显式关闭而非留给模型试错
@@ -256,14 +266,33 @@ public class HarnessAgentFactory {
             .build();
     }
 
-    private CompactionConfig defaultCompaction() {
+    /** R-05：智能体配置 → 全局默认 两级回退（DSH compaction 语义对标） */
+    private CompactionConfig compactionFor(AgentRuntimeConfig config) {
+        int triggerTokens = config.getCompactionTriggerTokens() == null ? compactionTriggerTokensDefault
+                : config.getCompactionTriggerTokens();
+        int keepMessages = config.getCompactionKeepMessages() == null ? compactionKeepMessagesDefault
+                : config.getCompactionKeepMessages();
         return CompactionConfig.builder()
             .triggerMessages(50)
+            .triggerTokens(triggerTokens)
             .truncateArgs(CompactionConfig.TruncateArgsConfig.builder()
                 .maxArgLength(2000)
                 .truncationText("... [truncated] ...")
                 .build())
-            .keepMessages(20)
+            .keepMessages(keepMessages)
+            .build();
+    }
+
+    /** R-05：工具结果回收阈值两级回退（其余参数保持框架默认） */
+    private ToolResultEvictionConfig toolResultEvictionFor(AgentRuntimeConfig config) {
+        int maxChars = config.getToolResultMaxChars() == null ? toolResultMaxCharsDefault
+                : config.getToolResultMaxChars();
+        ToolResultEvictionConfig d = ToolResultEvictionConfig.defaults();
+        return ToolResultEvictionConfig.builder()
+            .maxResultChars(maxChars)
+            .previewChars(d.getPreviewChars())
+            .evictionPath(d.getEvictionPath())
+            .excludedToolNames(d.getExcludedToolNames())
             .build();
     }
 

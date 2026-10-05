@@ -10,7 +10,7 @@
   验证方式: 假死轮模拟（构造无帧轮：断点或桩）600s 定稿+文案；短轮/活跃轮零误杀（金丝雀行对照）；总时长闸 0=关断言（长活轮>600s 总时长不被杀——与 T-07 logo 真跑联动）
   验收标准: 假死定稿+活跃不杀+文案五类实证
 
-- [ ] T-02 Flyway V1.6.0_03 三列+compaction 两级回退+指纹：runtime_config 加 compaction_trigger_tokens/compaction_keep_messages/tool_result_max_chars（nullable）+rollback；factory defaultCompaction 改 agent 配置→全局 env 默认（102400/20/8192，DSH 换算）两级回退；三列进 fingerprint
+- [x] T-02 Flyway V1.6.0_03 三列+compaction 两级回退+指纹：runtime_config 加 compaction_trigger_tokens/compaction_keep_messages/tool_result_max_chars（nullable）+rollback；factory defaultCompaction 改 agent 配置→全局 env 默认（102400/20/8192，DSH 换算）两级回退；三列进 fingerprint
   关联: R-05
   依赖: 无
   验证方式: 全新库重放（台账+1/列存在/rollback 零残留）；配置小值→压缩提前触发日志；留空=默认等价（指纹不变断言）；改值→指纹变更重建日志

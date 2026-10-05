@@ -43,4 +43,13 @@ public class AgentRuntimeConfigDTO implements Serializable {
 
     /** 工具迭代上限（1~100；不传=维持现状） */
     private Integer maxIterations;
+
+    /** R-05：压缩触发令牌水位（留空=全局默认） */
+    private Integer compactionTriggerTokens;
+
+    /** R-05：压缩保留原文条数（留空=全局默认） */
+    private Integer compactionKeepMessages;
+
+    /** R-05：工具结果回收字符阈值（留空=全局默认） */
+    private Integer toolResultMaxChars;
 }
