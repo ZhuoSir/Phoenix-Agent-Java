@@ -107,6 +107,7 @@ public class HarnessTurnManager {
             turns.remove(sessionId);
             throw e;
         }
+        turn.sourceSupplier = source; // BUG-77：留存供应商供自动重试
         turn.wire(source.get());
         return turn.sink.asFlux();
     }
@@ -122,6 +123,7 @@ public class HarnessTurnManager {
         }
         log.info("[turn] confirm 并轮回原轮 session={} turnId={}", sessionId, turn.turnId);
         turn.awaitingConfirm.set(false);
+        turn.sourceSupplier = source; // BUG-77：续流同样留存供应商
         turn.wireConfirm(source.get());
         return turn.sink.asFlux();
     }
@@ -212,6 +214,10 @@ public class HarnessTurnManager {
 
         /** R-01：每帧脉冲（=DSH idleWatchdog 的 arm 重置） */
         volatile long lastActivityAt = System.currentTimeMillis();
+
+        /** BUG-77：源流供应商（可再取一次 = 自动重试能力）与重试标记（每轮至多一次） */
+        private Supplier<Flux<Map<String, Object>>> sourceSupplier;
+        private volatile boolean retryUsed = false;
 
         volatile Long messageId;
 
@@ -392,8 +398,29 @@ public class HarnessTurnManager {
             finish(STATUS_DONE, null);
         }
 
+        /** BUG-77：思考模式 reasoning_content 未回传/400 类 provider 错误 → 可原样重试（实测重试即成功） */
+        private boolean isRetryableProviderError(Throwable err) {
+            String msg = err.toString() == null ? "" : err.toString();
+            return msg.contains("reasoning_content") || msg.contains("BadRequestException")
+                    || msg.contains("HTTP request failed with status 400");
+        }
+
         private void onError(Throwable err) {
             log.warn("[turn] 源流异常 session={}: {}", sessionId, err.toString());
+            // BUG-77：provider 4xx（典型 reasoning_content 未回传）且本轮尚无任何产出 → 自动重试一次，
+            // 让用户感知不到这次中断；仍失败才按原逻辑定稿（内容保留）
+            if (!retryUsed && isRetryableProviderError(err) && content.length() == 0 && thinking.length() == 0
+                    && sourceSupplier != null && !sinkDone.get()) {
+                retryUsed = true;
+                log.warn("[turn] 识别为可重试的 provider 错误，自动重试一次 session={} turnId={}", sessionId, turnId);
+                try {
+                    subscribeCommon(sourceSupplier.get());
+                    return;
+                }
+                catch (Exception e) {
+                    log.warn("[turn] 自动重试订阅失败，转为定稿 session={}: {}", sessionId, e.toString());
+                }
+            }
             // R-04 文案分类：模型/流错误类；BUG-77 起带上 provider 原文（截断），免去翻日志
             String detail = err.getMessage() == null ? "" : err.getMessage().replaceAll("\\s+", " ").trim();
             if (detail.length() > 300) {

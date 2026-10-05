@@ -1,5 +1,10 @@
 # Changelog: long-turn-resilience
 
+## BUG-77 自动重试实现（2026-10-05，按用户指令未部署）
+- 落码四处：①Turn 增 `sourceSupplier`（openOrReject/confirmOrResume 两入口均留存，可再取一次源流）②`retryUsed` 每轮至多一次 ③`isRetryableProviderError` 识别签名（reasoning_content / BadRequestException / 400）④`onError` 中：**本轮零产出**（content/thinking 均为空，杜绝重复内容）且未重试过 → 自动 `subscribeCommon(sourceSupplier.get())` 重试，用户无感；仍失败才按现文案定稿
+- 设计取舍：只在"零产出"时重试（该 400 发生于请求阶段，此时必然无产出），避免重试造成内容重复；sink 保持开启（前端 SSE 不断流）
+- 证据：`mvn package` 编译通过；**未部署**（遵用户"先改不发布"）；上线后需按 BUG-77 复现场景验证（重启/中断后紧接一轮不再报 400 中断）
+
 ## T-04 九刀（2026-10-05）admin/chat 两面改造对齐（用户指令：先改不发布）
 - 用户提问：「这些 admin 的改造有没有应用在 chat 上？」→ 逐项代码核验后确认 4 处缺口
 - 本次补齐（**已改已提交，按用户指令不部署**）：
