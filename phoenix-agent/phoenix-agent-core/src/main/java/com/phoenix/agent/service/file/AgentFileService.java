@@ -4,6 +4,7 @@ import com.phoenix.agent.enums.AgentFileBackendEnm;
 import com.phoenix.agent.enums.AgentFileSourceEnm;
 import com.phoenix.agent.model.AgentFile;
 import com.phoenix.agent.vo.AgentFileVO;
+import com.phoenix.data.entity.ChatSession;
 import lombok.Builder;
 
 import java.util.List;
@@ -36,6 +37,12 @@ public interface AgentFileService {
 
     /** 属主逻辑删（不物理删，R-10/R-19）。 */
     void logicalDelete(String fileId, String requesterUserId);
+
+    /**
+     * 会话产物可访问性（BUG-80）：属主本人 **或** 后台管理员。
+     * admin 运行页需要查看/管理前台用户会话的产物，原实现只认 userId 相等 → 列表可见但删除 42031。
+     */
+    boolean canAccessSession(ChatSession session, String requesterUserId);
 
     /** inline 预览白名单（HTML/图片/文本类，R-09；.sh 等仅下载）。 */
     static boolean inlineAllowed(String mime) {

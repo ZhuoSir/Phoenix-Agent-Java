@@ -55,7 +55,8 @@ public class AgentFileController {
             // BL-19：抽屉打开即补扫（此前只靠轮末扫描，写尾文件会"看不到"；scan 由 storeKey 幂等去重）
             if (scan) {
                 ChatSession session = chatSessionMapper.selectOneById(sessionId);
-                if (session != null && userId.equals(session.getUserId())) {
+                // BUG-80：属主本人或后台管理员均可触发补扫（admin 运行页查看前台用户会话）
+                if (session != null && agentFileService.canAccessSession(session, userId)) {
                     // BUG-67：补扫窗口从"会话创建时间"收窄为"最近一条 assistant 消息以来"——
                     // 只兜最后一轮尾写，不再全史收编（跨会话污染主通道）；轮末扫描仍是归属主通道
                     Object lastTurn = com.mybatisflex.core.row.Db.selectObject(

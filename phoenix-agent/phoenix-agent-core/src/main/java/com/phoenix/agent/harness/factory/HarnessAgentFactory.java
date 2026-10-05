@@ -9,6 +9,7 @@ import com.phoenix.agent.mapper.HarnessSkillMapper;
 import com.phoenix.agent.model.AgentRuntimeConfig;
 import com.phoenix.agent.service.AgentRuntimeConfigService;
 import com.phoenix.agent.service.harness.HarnessModelRegistry;
+import com.phoenix.agent.util.WorkspacePaths;
 import com.phoenix.data.entity.Agent;
 import io.agentscope.core.skill.repository.postgresql.PostgresSkillRepository;
 import io.agentscope.core.tool.Toolkit;
@@ -103,12 +104,38 @@ public class HarnessAgentFactory {
      * 构建并返回构建摘要（T-05 验证入口 / 管理端「构建预演」）。
      */
     public BuildResult buildWithSummary(Agent agent) {
+        return buildWithSummary(agent, null);
+    }
+
+    /**
+     * R-06（workspace-isolation v1.1.0）：按**会话**构建。
+     *
+     * <p>sessionId 非空 → workspace 下沉一层到 {@code {root}/{agentKey}/{sessionId}}（框架内再拼 uid），
+     * 会话之间互不可见；sessionId 为空保持存量行为（{@code {root}/{agentKey}}，管理端构建预演等无会话场景）。
+     *
+     * @param agent 智能体（须有 id 与 sn）
+     * @param sessionId 会话ID；空=存量智能体级工作区
+     */
+    public BuildResult buildWithSummary(Agent agent, String sessionId) {
         if (agent == null || agent.getId() == null) {
             throw new IllegalArgumentException("智能体不存在或缺少 id，无法构建运行时实例");
         }
         AgentRuntimeConfig config = agentRuntimeConfigService.resolve(agent.getId());
         OpenAIChatModel model = harnessModelRegistry.getOpenAIChatModel(config.getModelConfigId());
         ToolkitBundle bundle = buildToolkit(agent, config);
+        // R-06：会话级工作区（会话空则回落智能体级，零行为变化）
+        Path workspace = WorkspacePaths.sessionRoot(workspaceRoot, runtimeKey(agent), sessionId);
+        if (StringUtils.hasText(sessionId)) {
+            // T-12 前置：会话目录必须先存在——框架只在 namespace 分支 mkdir，而 shellCwd 命中时直接
+            // 作为 ProcessBuilder.directory()；目录缺失会让**每条 shell 命令**抛 IOException（实测 error=2）
+            Path abs = workspace.toAbsolutePath().normalize();
+            try {
+                java.nio.file.Files.createDirectories(abs);
+            }
+            catch (java.io.IOException e) {
+                log.warn("会话工作区目录创建失败（shell 命令将不可用）: path={}, err={}", abs, e.toString());
+            }
+        }
 
         HarnessAgent.Builder builder = HarnessAgent.builder()
             .name(runtimeKey(agent))
@@ -117,8 +144,9 @@ public class HarnessAgentFactory {
             .sysPrompt(sysPrompt(agent))
             .model(model)
             .toolkit(bundle.toolkit())
-            // workspace-isolation R-01：根按智能体隔离（{root}/{runtimeKey}），记忆/产物/索引全落专属子树（BUG-68 主刀）
-            .workspace(com.phoenix.agent.util.WorkspacePaths.agentRoot(workspaceRoot, runtimeKey(agent)))
+            // workspace-isolation R-01/R-06：根按智能体+会话隔离（{root}/{runtimeKey}/{sessionId}），
+            // 记忆/产物/索引全落专属子树（BUG-68 主刀，R-06 下沉会话层）
+            .workspace(workspace)
             .enablePlanMode(isOn(config.getPlanMode()))
             .distributedStore(redisDistributedStore)
             .stateStore(postgresAgentStateStore)
@@ -133,7 +161,13 @@ public class HarnessAgentFactory {
             builder.filesystem(pgRemoteFilesystemSpec).disableShellTool();
         }
         else {
-            builder.filesystem(new LocalFilesystemSpec().isolationScope(IsolationScope.USER));
+            LocalFilesystemSpec spec = new LocalFilesystemSpec().isolationScope(IsolationScope.USER);
+            if (StringUtils.hasText(sessionId)) {
+                // T-12/BUG-79：框架 shell cwd 取 LocalFilesystemSpec.project，缺省回落到 user.dir（容器内=/app，
+                // shell 产物逃出工作区且面板不可见）。显式置为会话目录 → shell 与 file 工具同根。
+                spec.project(workspace.toAbsolutePath().normalize());
+            }
+            builder.filesystem(spec);
         }
 
         if (isOn(config.getMemoryEnabled())) {
@@ -150,7 +184,7 @@ public class HarnessAgentFactory {
             builder.maxIters(maxIters);
         }
         HarnessAgent built = builder.build();
-        String summary = describe(agent, config, bundle.toolNames());
+        String summary = describe(agent, config, bundle.toolNames()) + ", workspace=" + workspace;
         log.info("对话智能体构建完成: {}", summary);
         return new BuildResult(built, summary, bundle.toolNames());
     }
@@ -244,7 +278,7 @@ public class HarnessAgentFactory {
      */
     public String runtimeKey(Agent agent) {
         // 规则单一实现移至 WorkspacePaths（scanner 同源引用，防漂移）
-        return com.phoenix.agent.util.WorkspacePaths.runtimeKey(agent.getId(), agent.getSn());
+        return WorkspacePaths.runtimeKey(agent.getId(), agent.getSn());
     }
 
     private String sysPrompt(Agent agent) {

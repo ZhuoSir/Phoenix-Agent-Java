@@ -68,11 +68,17 @@ public class McpMountService {
 
     /** 对话轮次入口：交集空→原实例；否则→变体（boundedElastic 上构建，绝不在事件循环 block）。 */
     public Mono<HarnessAgent> withMcp(HarnessAgent base, Long agentId, List<McpServerInfo> effective) {
+        return withMcp(base, agentId, null, effective);
+    }
+
+    /** R-06：变体同样按会话隔离（会话级工作区；无会话=存量智能体级行为）。 */
+    public Mono<HarnessAgent> withMcp(HarnessAgent base, Long agentId, String sessionId, List<McpServerInfo> effective) {
         if (effective == null || effective.isEmpty() || agentId == null) {
             return Mono.just(base);
         }
         String sig = signature(agentId, effective);
-        return Mono.fromCallable(() -> getOrBuild(agentId, sig, effective)).subscribeOn(Schedulers.boundedElastic());
+        return Mono.fromCallable(() -> getOrBuild(agentId, sessionId, sig, effective))
+            .subscribeOn(Schedulers.boundedElastic());
     }
 
     private String signature(Long agentId, List<McpServerInfo> effective) {
@@ -84,8 +90,8 @@ public class McpMountService {
         return Integer.toHexString(sb.toString().hashCode()) + "-" + effective.size();
     }
 
-    private HarnessAgent getOrBuild(Long agentId, String sig, List<McpServerInfo> effective) {
-        String key = agentId + "@" + sig;
+    private HarnessAgent getOrBuild(Long agentId, String sessionId, String sig, List<McpServerInfo> effective) {
+        String key = agentId + (sessionId == null || sessionId.isBlank() ? "" : "@" + sessionId) + "@" + sig;
         List<Variant> stale = new ArrayList<>();
         synchronized (variants) {
             Variant cached = variants.get(key);
@@ -104,7 +110,7 @@ public class McpMountService {
         for (Variant v : stale) {
             closeQuietly(v);
         }
-        HarnessAgent fresh = harnessAgentRegistry.buildUncached(agentId);
+        HarnessAgent fresh = harnessAgentRegistry.buildUncached(agentId, sessionId);
         List<McpClientWrapper> wrappers = new ArrayList<>();
         List<String> toolNames = new ArrayList<>();
         Toolkit toolkit = fresh.getToolkit();

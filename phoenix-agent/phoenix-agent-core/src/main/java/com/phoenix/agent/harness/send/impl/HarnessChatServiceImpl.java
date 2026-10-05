@@ -92,7 +92,8 @@ public class HarnessChatServiceImpl implements HarnessChatService {
      */
     private HarnessAgent resolveAgent(HarnessRequest request) {
         if (request.getAgentId() != null) {
-            return harnessAgentRegistry.get(request.getAgentId());
+            // R-06：按（智能体, 会话）取实例——工作区随会话独立
+            return harnessAgentRegistry.get(request.getAgentId(), request.getSessionId());
         }
         if (!org.springframework.util.StringUtils.hasText(request.getHarnessSn())) {
             // 显式入参校验：两者皆缺时给明确错误（原先落到 loadAgent(null) → 500）
@@ -121,7 +122,7 @@ public class HarnessChatServiceImpl implements HarnessChatService {
         final Integer effMaxIters = resolveEffectiveMaxIters(request.getAgentId());
         // T-05：MCP 变体挂载（交集空=原实例零变化路径；构建/注册全在 boundedElastic）
         Flux<NodeOutput> body = mcpMountService
-            .withMcp(harnessAgent, request.getAgentId(),
+            .withMcp(harnessAgent, request.getAgentId(), request.getSessionId(),
                 effectiveMcp(request.getChannel(), request.getUserId(), request.getAgentId()))
             .flatMapMany(agent -> agent
                 .streamEvents(buildUserMessage(request), buildRuntimeContext(request, injection.block()))
@@ -222,7 +223,8 @@ public class HarnessChatServiceImpl implements HarnessChatService {
     @Override
     public Flux<NodeOutput> confirmStream(ConfirmRequest request) {
         if (request.getAgentId() != null) {
-            return confirmStream(harnessAgentRegistry.get(request.getAgentId()), request);
+            // R-06：确认续跑必须取同一会话实例（否则换到智能体级工作区，产物落错地方）
+            return confirmStream(harnessAgentRegistry.get(request.getAgentId(), request.getSessionId()), request);
         }
         if (!org.springframework.util.StringUtils.hasText(request.getAgentSn())) {
             throw new InvalidInputException("agentId 与 agentSn 至少需要一个");
@@ -288,7 +290,7 @@ public class HarnessChatServiceImpl implements HarnessChatService {
         java.util.concurrent.atomic.AtomicBoolean textDeltaSeen = new java.util.concurrent.atomic.AtomicBoolean(false);
         // T-05：confirm 续跑链同挂 MCP 变体（口径随渠道）
         return mcpMountService
-                .withMcp(harnessAgent, request.getAgentId(),
+                .withMcp(harnessAgent, request.getAgentId(), request.getSessionId(),
                     effectiveMcp(request.getChannel(), request.getUserId(), request.getAgentId()))
                 .flatMapMany(agent -> agent.streamEvents(confirmMsg, RuntimeContext.builder()
                     .userId(request.getUserId()).sessionId(request.getSessionId()).build())

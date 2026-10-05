@@ -113,7 +113,7 @@ public class AgentFileServiceImpl implements AgentFileService {
     @Override
     public Download download(String fileId, String requesterUserId, boolean inline) {
         AgentFile f = requireLiveFile(fileId);
-        requireSessionOwner(f.getSessionId(), requesterUserId);
+        requireSessionOwner(f.getSessionId(), requesterUserId, f);
         if (inline && !AgentFileService.inlineAllowed(f.getMime())) {
             throw new AgentFileException(AgentFileErrorCodeEnm.INLINE_FORBIDDEN);
         }
@@ -134,7 +134,7 @@ public class AgentFileServiceImpl implements AgentFileService {
     @Override
     public void logicalDelete(String fileId, String requesterUserId) {
         AgentFile f = requireLiveFile(fileId);
-        requireSessionOwner(f.getSessionId(), requesterUserId);
+        requireSessionOwner(f.getSessionId(), requesterUserId, f);
         f.setDelFlag(1);
         agentFileMapper.update(f);
         log.info("会话文件逻辑删除: id={}, by={}", fileId, requesterUserId);
@@ -164,6 +164,36 @@ public class AgentFileServiceImpl implements AgentFileService {
                 .count() > 0;
     }
 
+    @Override
+    public boolean canAccessSession(ChatSession session, String requesterUserId) {
+        if (session == null || requesterUserId == null) {
+            return false;
+        }
+        if (requesterUserId.equals(session.getUserId())) {
+            return true;
+        }
+        if (isBackendAdmin(requesterUserId)) {
+            // BUG-80：管理侧（admin 运行页）跨属主访问留痕，便于审计
+            log.info("管理员访问会话产物: sessionId={}, admin={}, owner={}", session.getId(), requesterUserId,
+                    session.getUserId());
+            return true;
+        }
+        return false;
+    }
+
+    /** 后台用户表命中即为管理员（前台用户表与后台用户表 id 空间独立，不存在误判）。 */
+    private boolean isBackendAdmin(String loginId) {
+        try {
+            return com.mybatisflex.core.row.Db
+                .selectObject("select id from tbl_privilege_user where id = ? limit 1", loginId) != null;
+        }
+        catch (RuntimeException e) {
+            // 判定失败按非管理员处理（宁可拒绝，不放行）
+            log.warn("管理员判定失败（按非管理员处理）: loginId={}, err={}", loginId, e.toString());
+            return false;
+        }
+    }
+
     private AgentFile requireLiveFile(String fileId) {
         AgentFile f = agentFileMapper.selectOneById(fileId);
         if (f == null || Integer.valueOf(1).equals(f.getDelFlag())) {
@@ -173,8 +203,23 @@ public class AgentFileServiceImpl implements AgentFileService {
     }
 
     private void requireSessionOwner(String sessionId, String requesterUserId) {
+        requireSessionOwner(sessionId, requesterUserId, null);
+    }
+
+    /** 属主/管理员校验；fileForOrphanFallback 非空时，会话行缺失（历史/测试残留）允许创建者本人访问。 */
+    private void requireSessionOwner(String sessionId, String requesterUserId, AgentFile fileForOrphanFallback) {
         ChatSession session = chatSessionMapper.selectOneById(sessionId);
-        if (session == null || requesterUserId == null || !requesterUserId.equals(session.getUserId())) {
+        if (session == null) {
+            // BUG-80 副产物：孤儿行（会话已不存在）此前一律 42031，创建者连自己的残留文件都清不掉
+            if (fileForOrphanFallback != null && requesterUserId != null
+                    && requesterUserId.equals(fileForOrphanFallback.getCreator())) {
+                log.info("会话不存在，按产物创建者放行: fileId={}, sessionId={}, user={}",
+                        fileForOrphanFallback.getId(), sessionId, requesterUserId);
+                return;
+            }
+            throw new AgentFileException(AgentFileErrorCodeEnm.FILE_FORBIDDEN);
+        }
+        if (!canAccessSession(session, requesterUserId)) {
             throw new AgentFileException(AgentFileErrorCodeEnm.FILE_FORBIDDEN);
         }
     }
