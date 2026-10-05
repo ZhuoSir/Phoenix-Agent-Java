@@ -1,5 +1,12 @@
 # Changelog: long-turn-resilience
 
+## T-04 首刀（2026-10-05）刷新后"Think Done"误判修复（用户实测）
+- 用户原话：「还有个问题，明明是thinking ，刷新后就think done了」
+- 根因（实证）：刷新走 `loadMessages` → `transport.listMessages` → `toStoreMessage` **从不设置 streaming 标记**；行 metadata 虽有 `status=generating`，但 UI 只看 `msg.streaming` → ThinkingBlock 标签 `streaming ? 'Thinking…' : 'Think Done'` 判成完成态
+- 修复：`toStoreMessage` 解析 metadata，`status==='generating'` → `streaming:true`（类型已有 `streaming?: boolean`，共享包无需改）；与 join 追流回调的 `streaming:true` 语义一致，轮次结束后重载自然归位
+- 证据：typecheck 213=基线；容器内分片含状态判定（上下文实证）；首页 200
+- 归属：T-04（join/重进正确渲染，R-03）首刀；T-04 剩余=「刷新无正文」断点复现 + 历史中断文案归属
+
 ## T-03 附加（2026-10-05）流式贴底跟随（用户实测反馈）
 - 用户原话：「thinking那个滚动条能不能到底自动滚动，现在需要手动下拉」
 - 实现两处**贴底跟随 + 尊重手动上翻**：①思考区 ThinkingBlock（`max-height:180px` 内滚动，原无任何跟随）②消息区 ChatMessages（原只在消息数组变化时滚动，正文/思考增长不跟随）

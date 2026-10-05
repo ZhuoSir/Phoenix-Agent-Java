@@ -46,11 +46,17 @@ function toStoreMessage(api: any): ChatMessage {
   // thinking-display R-05：历史消息 metadata.thinking 回显（旧行无键=undefined 静默）
   let thinking: string | undefined;
   let thinkingMs: number | undefined;
+  // long-turn-resilience T-04：服务端进行中轮次（status=generating）刷新后须仍标流式，
+  // 否则思考区误显"Think Done"、正文区按完成态渲染（用户实测：明明是 thinking，刷新后 think done）
+  let streaming = false;
   try {
     const md = typeof api.metadata === 'string' ? JSON.parse(api.metadata) : api.metadata;
     if (md && typeof md.thinking === 'string') {
       thinking = md.thinking;
       thinkingMs = typeof md.thinkingMs === 'number' ? md.thinkingMs : undefined;
+    }
+    if (md && md.status === 'generating') {
+      streaming = true;
     }
   } catch { /* metadata 非 JSON 或为空：按无思考处理（R-04） */ }
   return {
@@ -62,6 +68,7 @@ function toStoreMessage(api: any): ChatMessage {
     metadata: api.metadata,
     thinking,
     thinkingMs,
+    streaming,
   };
 }
 
