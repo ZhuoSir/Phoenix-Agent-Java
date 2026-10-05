@@ -27,7 +27,7 @@ import type {
   GraphRequest,
   HarnessChatRequest,
 } from '#/api/core/graph';
-import { harnessTurnStatusApi } from '#/api/core/graph';
+import { harnessTurnCancelApi, harnessTurnStatusApi } from '#/api/core/graph';
 import type {
   ResultData,
   ResultSetData,
@@ -192,6 +192,10 @@ const {
   deleteSessionState,
 } = useSessionStateManager();
 const isStreaming = ref(false);
+
+// BUG-75：区分「本页在直播」(isStreaming) 与「服务端轮次在跑、本页仅轮询」(remoteRunning)——
+// 前者渲染直播区，后者只控制输入禁用/终止按钮；混用会导致刷新后上下双输出窗口
+const remoteRunning = ref(false);
 const nodeBlocks = ref<GraphNodeResponse[][]>([]);
 const options = ref({
   markdownIt: { linkify: true },
@@ -315,8 +319,8 @@ async function selectSession(session: ChatSession | null) {
         // BUG-74：轮询闭包必须带会话守卫——切会话/新建会话后严禁把旧会话内容写进当前视图
         if (currentSession.value?.id !== session.id) return;
         // BUG-73：刷新后在跑的轮次须恢复"进行中"态——输入区禁用、显示终止按钮
-        // （此前轮询只刷新消息、从不置 isStreaming → 刷新后误判空闲：可编辑可发送、终止按钮变发送）
-        isStreaming.value = true;
+        // BUG-75：用 remoteRunning 而非 isStreaming（后者会额外渲染直播区 → 与已加载行重复成双窗口）
+        remoteRunning.value = true;
         const tick = async () => {
           // BUG-74：已切走则终止轮询（不同会话消息绝不允许串通）
           if (currentSession.value?.id !== session.id) return;
@@ -330,14 +334,14 @@ async function selectSession(session: ChatSession | null) {
             } else {
               // 轮次已结束：收敛为完成态（末次拉取刷新终稿）
               if (currentSession.value?.id === session.id) {
-                isStreaming.value = false;
+                remoteRunning.value = false;
                 try {
                   currentMessages.value = applyServerRowRender(await getSessionMessagesApi(session.id) as any[]) as any;
                 } catch { /* ignore */ }
               }
             }
           } catch {
-            if (currentSession.value?.id === session.id) isStreaming.value = false;
+            if (currentSession.value?.id === session.id) remoteRunning.value = false;
           }
         };
         setTimeout(tick, 5000);
@@ -1184,6 +1188,19 @@ async function stopStreaming() {
   const sessionId = currentSession.value.id;
   const sessionState = getSessionState(sessionId);
 
+  // BUG-75：轮询态（服务端在跑但本页无本地流）→ 调服务端取消，否则终止按钮点了等于没点
+  if (!sessionState.closeStream && remoteRunning.value) {
+    try {
+      await harnessTurnCancelApi(sessionId);
+      remoteRunning.value = false;
+      currentMessages.value = applyServerRowRender(await getSessionMessagesApi(sessionId) as any[]) as any;
+      ElMessage.success('已停止对话');
+    } catch {
+      ElMessage.error('停止对话失败');
+    }
+    return;
+  }
+
   try {
     if (!sessionState.closeStream) {
       ElMessage.warning('没有正在进行的对话');
@@ -1702,11 +1719,11 @@ onMounted(async () => {
               type="textarea"
               :rows="3"
               placeholder="请输入您的问题..."
-              :disabled="isStreaming || showHarnessConfirm"
+              :disabled="isStreaming || remoteRunning || showHarnessConfirm"
               @keydown.enter.exact.prevent="sendMessage"
             />
             <el-button
-              v-if="!isStreaming && !showHarnessConfirm"
+              v-if="!isStreaming && !remoteRunning && !showHarnessConfirm"
               type="primary"
               @click="sendMessage"
               circle
@@ -1715,7 +1732,7 @@ onMounted(async () => {
               <el-icon><Promotion /></el-icon>
             </el-button>
             <el-button
-              v-if="isStreaming"
+              v-if="isStreaming || remoteRunning"
               type="danger"
               @click="stopStreaming"
               circle

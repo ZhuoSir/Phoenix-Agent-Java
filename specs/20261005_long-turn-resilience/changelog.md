@@ -1,5 +1,12 @@
 # Changelog: long-turn-resilience
 
+## T-04 五刀（2026-10-05）BUG-75 双输出窗口（用户实测，BUG-73 副作用）
+- 用户原话：「刷新后，任务正常执行，但是下方会多一个输出窗口，上面有个，下面还有个」
+- 根因（自省）：BUG-73 用 `isStreaming=true` 表达"轮次在跑"，而直播区渲染条件同为 `v-if="isStreaming || nodeBlocks.length>0"` → 刷新后除已加载的服务端行外，**凭空多渲染一个空直播窗口**
+- 修复：拆双状态——`remoteRunning`（轮询态：只控输入禁用 + 终止按钮）与 `isStreaming`（本页真直播：驱动直播区渲染）；顺带补齐轮询态终止语义（`harnessTurnCancelApi` 服务端取消，原先只认本地 closeStream → 点了无反应）
+- 教训入账：**状态语义单一职责**——新增布尔态前先核清它的全部消费点，避免"一个标志两种含义"
+- 证据：typecheck 213=基线；新 run 分片已上线；容器内 `turn/cancel` 实证；首页 200
+
 ## T-04 四刀（2026-10-05）BUG-74 跨会话串消息（用户实测，高危）
 - 用户原话：「当前任务执行中，我新建个会话，就会把执行中的这个会话的当前的内容显示在新建的会话里，这个不对，不同会话肯定是不能消息串通的」
 - 根因：detached-stream T-05 轮询闭包**无会话守卫**——`tick` 无条件执行 `currentMessages.value = applyServerRowRender(旧会话消息)`；切会话/新建会话后旧 tick 仍在跑 → 直接把旧会话内容写进新会话视图；BUG-73 新增的 `isStreaming=true` 同为全局无条件（会顺带把新会话标成进行中）

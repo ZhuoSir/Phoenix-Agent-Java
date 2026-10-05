@@ -83,6 +83,7 @@
 | BUG-72 | 运行页思考块自行消失：刷新后可见，约 5 秒后消失（正文输出前后不稳定） | 中 | 2026-10-05 用户实测（运行页长轮） | 已验证 | v1.6.0（long-turn-resilience T-04） | 根因：5s 轮询 tick 只走 `applyServerRowRender`，而 metadata.thinking 解析仅存在于首载路径 → tick 覆盖消息即丢 thinking 字段 → `v-if="message.thinking"` 卸载思考块；修复=解析统一收进 applyServerRowRender（thinking/thinkingMs/streaming 一次到位），首载与轮询同源 |
 | BUG-73 | 运行页刷新后误判空闲：任务仍在跑但输入区可编辑可发送、终止按钮变回发送（应禁用编辑但可终止） | 中 | 2026-10-05 用户实测 | 已验证 | v1.6.0（long-turn-resilience T-04） | 根因：detached-stream T-05 轮询只刷新消息（currentMessages），**从不置 isStreaming** → 刷新后 isStreaming=false → 输入框 `:disabled="isStreaming"` 为假、发送按钮 `v-if="!isStreaming"` 显示；修复=初始 turnStatus 为真即 `isStreaming=true`，tick 检测到结束再置 false 并收敛终稿 |
 | BUG-74 | 会话串消息：任务执行中新建/切换会话，旧会话正在输出的内容显示在新会话里（跨会话污染） | 高 | 2026-10-05 用户实测 | 已验证 | v1.6.0（long-turn-resilience T-04） | 根因：detached-stream T-05 轮询闭包**无会话守卫**——`tick` 无条件 `currentMessages.value = applyServerRowRender(旧session消息)`；切到新会话后旧 tick 仍运行并覆盖视图；且 BUG-73 加的 `isStreaming=true` 亦为全局无条件；修复=闭包入口与每 tick 前后三处 `currentSession.id === session.id` 守卫（切走即停轮询、不再触碰视图），视图态随会话隔离 |
+| BUG-75 | 运行页刷新后双输出窗口：上面一个（已加载行）下面还一个（空的直播区） | 中 | 2026-10-05 用户实测（BUG-73 修复引入） | 已验证 | v1.6.0（long-turn-resilience T-04） | 根因：BUG-73 用 `isStreaming=true` 表达"轮次在跑"，而直播区渲染条件同为 `v-if="isStreaming \|\| nodeBlocks.length>0"` → 直播区凭空多出一个空窗口；修复=拆双状态 `remoteRunning`（只控输入禁用/终止按钮），直播区仍只由 isStreaming/nodeBlocks 驱动；并补：轮询态下终止按钮走服务端 `harnessTurnCancelApi`（原先只认本地 closeStream，点了无反应） |
 ## 明细留档（历史证据，只增不删）
 
 ### BUG-01 `all_schema.sql` 缺 5 个序列 → 全新环境导入必失败
