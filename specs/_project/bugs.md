@@ -310,8 +310,8 @@
 - **注**：identity 关闭压缩，OpenAI 补全响应体本就小（KB 级），对带宽无实质影响
 
 ## 工作区遗留状态（非缺陷，处置需确认）
-- `RulesHarnessAgent.java` 有**未提交实验改动**（开 shell + LocalFilesystemSpec），已编译进 `.mvn-home`；还原：`git checkout -- phoenix-agent/phoenix-agent-core/src/main/java/com/phoenix/agent/harness/agent/rules/RulesHarnessAgent.java` 后重新 install
+- 〔**2026-10-05 销账（v1.7.0 T-03）**〕`RulesHarnessAgent.java` **已无未提交改动**（`git status` 复核为空）→ 原"有未提交实验改动"注记**作废**；`.mvn-home` 中的旧编译产物随 `.gitignore` 生效（T-01）一并归档不再影响工作树。
 - 环境改动（验证所必需，已记录）：数据源 id=11「本地测试」的 `host` 由不可达的 `192.168.66.19` 改为 `127.0.0.1`、`connection_url` 同步、`password` 由 `123456` 改为容器实际密码 `phoenix`
 - 环境问题：曾出现**僵尸 JVM 占用 8066**（`pkill -f phoenix-admin.jar` 无效，需 `lsof -tiTCP:8066 -sTCP:LISTEN | xargs kill`）；本机代理（TUN）开启时 JDK23 解析 `127.0.0.1` 报 `UnknownHostException`，关代理即恢复
 - 库中实验数据：技能 `py-fib-demo`（含 scripts/fib.py）曾用于验证；前台账号 chenzhuo 密码现=12345678；两套账号表密码现均=12345678
-- 未跟踪：`.mvn-home/`、`.pnpm-store/`、`diagrams/`、`scripts/`（建议进 `.gitignore`）；`AGENTS.md` 有 init 追加段（备份 `AGENTS.md.bak.*`）
+- 〔**2026-10-05 销账（v1.7.0 T-01）**〕未跟踪噪声**已清零**：`.mvn-home/`、`.pnpm-store/` 进 `.gitignore`（check-ignore 命中）；`WSL`、`或在`（两枚 0 字节误建）、`AGENTS.md.bak.20260927101837`、`scripts/fib.py` 已删；`diagrams/phoenix-architecture.html` 入库。`git status` 现只剩有意保留项。
