@@ -2,6 +2,14 @@
 
 > 版本: v1.0.0 | 更新: 2026-10-05 | 改动面以 git 提交为准，本文件为对账清单
 
+## 〇、归属声明（重要，避免与 workspace-isolation 互相"抢功"）
+本 spec **未改动工作区/会话文件夹布局**（布局唯一 owner = `workspace-isolation`）。下表标 **[LTR]** 的才是本 spec 的改动；标 **[WS]** 的是同文件里属于 workspace-isolation 的改动（同分支交错，引用备查）：
+- `HarnessAgentFactory.java`：**[LTR]** compaction 两级回退/env 默认；**[WS]** `.workspace`/`.project`/会话目录预建
+- `HarnessAgentRegistry.java`：**[LTR]** 三列进指纹；**[WS]** 会话缓存键 `agentId@sessionId`/`invalidate`
+- `WorkspaceArtifactScanner.java`、`WorkspacePaths.java`、`WorkspaceMigrationRunner.java`、`AgentFileService(.Impl)`、`AgentFileController.java`：**[WS]**（BUG-78/80/82 亦落此区）
+- `HarnessChatServiceImpl.java`/`McpMountService.java`：**[WS]**（按会话取实例/变体键）
+- 其余文件为 **[LTR]**（TurnManager 看门狗/合并/join、StateRepairService、AgentRuntimeConfig 四层、V1.6.0_03 DDL+rollback、前端 6 文件）
+
 ## 一、后端（phoenix-agent / phoenix-admin）
 
 | 文件 | 变更 |
