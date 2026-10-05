@@ -1,5 +1,14 @@
 # Changelog: visibility-filetree-hygiene
 
+## T-06 走查反馈修复：文件删除"复活"（BUG-87）+ 物化文件回落（2026-10-05）
+- 用户反馈：「文件树没问题，但是删除文件又失败了」→ 现场取证（日志）：**删除本身成功**，但扫描器随后把磁盘上仍在的文件**重新登记**（同 store_key）→ 刷新后文件复活
+- **真根因（两段）**：① 扫描器按 store_key 去重时只数 `del_flag=0`；② 把条件删掉也无效——`del_flag` 被框架按**逻辑删列**处理，QueryChain 生成 SQL 时**自动追加 `del_flag = 0`**（日志实证：`WHERE ("store_key" = ?) AND "del_flag" = ?`）
+- **修复**：`existsByStoreKeyAnySession` 改**原生 SQL** `select count(*) from tbl_data_agent_file where store_key = ?`，绕开自动注入 → 墓碑优先生效
+- **同时修我引入的回归**：`materialize`（报告「另存为文件」）行 `store_key` 为空 → 树里被跳过（平铺列表有）→ 补回落：以文件名落**会话根**，并保留内部件过滤
+- **验证（硬证据）**：用户被删的 `harness-讲义.md`（该键 4 行全删）→ 连续 3 次带 `scan=true` 扫描**无新行**；去重 SQL 已是原生 1 参数形态；全局"复活键"清零；新文件仍正常登记（OCR 层 16 文件）；物化文件可见且删除后不复活；编译绿
+- **复盘如实记**：我第一次的"修复生效"验证是**假阳性**（用物化文件做删除→扫描试验，而物化文件盘上落在 uploads tee、不在会话工作区，扫描器根本不会登记它）→ 教训入 `lessons.md` **L-21**（含"验证必须打在真实受控路径上"）
+- 数据回填（用户删除意图优先）：4 组复活活行 `del_flag=1`（id 清单 `/tmp/bug87_ids.txt`，同谓词可回滚）
+
 ## T-06 收口：前端树 UI 实现并部署（2026-10-05，UI 走查移交用户）
 - `agentFiles.ts`：新增 `getAgentFileTreeApi(sessionId, path, scan)` + `AgentFileTreeNode` / `AgentFileTreeLevel` 类型 + `HISTORY_PATH` 常量（与后端 `AgentFileService.HISTORY_PATH` 对齐）
 - `ChatFilesPanel.vue`：改树形——面包屑（会话目录 / a / b，可点跳转）、返回上级、文件夹优先、**单层懒加载**（改 `path` 拉一层）、`FILES_CHANGED_EVENT` 刷新当前层、目录显示「N 个文件夹 · M 个文件」、历史节点显示「跨会话遗留 · N 项」；文件行预览/下载/删除与 temp 会话空态**保持不变**

@@ -156,14 +156,23 @@ public class AgentFileServiceImpl implements AgentFileService {
     }
 
     /** workspace-isolation T-02（BUG-67）：storeKey 全局首占——任何会话已登记即不再收编。 */
+    /**
+     * 同 store_key 是否**曾经登记过**（BUG-87：含已逻辑删的行 → 墓碑优先）。
+     *
+     * <p>此前只数 {@code del_flag=0}，导致用户逻辑删掉的文件在下一轮扫描中被当作"新文件"重新登记（复活）；
+     * 本 spec 零 DDL 且表无 update_time，无法做"删后再生成"的时序比较，故取**墓碑优先**：
+     * 只要该 store_key 出现过（无论存活/删除），就不再次登记。
+     * 代价：同名**且同字节数**的再生成文件会被视为已登记（改名/变大小即正常登记）。
+     */
     public boolean existsByStoreKeyAnySession(String storeKey) {
         if (storeKey == null || storeKey.isBlank()) {
             return false;
         }
-        return QueryChain.of(agentFileMapper)
-                .eq(AgentFile::getStoreKey, storeKey)
-                .eq(AgentFile::getDelFlag, 0)
-                .count() > 0;
+        // **必须走原生 SQL**：del_flag 是 MyBatis-Flex 逻辑删列，框架会给一切 QueryChain 查询
+        // 自动追加 `del_flag = 0`（实测日志可见），因此用 QueryChain 永远看不到墓碑行 → 会继续复活。
+        Object cnt = com.mybatisflex.core.row.Db.selectObject(
+                "select count(*) from tbl_data_agent_file where store_key = ?", storeKey);
+        return cnt instanceof Number number && number.longValue() > 0;
     }
 
     @Override
@@ -286,13 +295,29 @@ public class AgentFileServiceImpl implements AgentFileService {
         List<TreeNode> files = new java.util.ArrayList<>();
         int historyTotal = 0;
         for (AgentFile f : rows) {
+            String relPath;
+            boolean history;
             if (f.getStoreKey() == null || f.getStoreKey().isBlank()) {
-                continue;
+                // v1.1.0 补：**物化文件**（`materialize`，报告「另存为文件」）没有 store_key → 以文件名落在会话根。
+                // 不补则树里丢失（平铺列表本来有 → 属回归），文件名即相对路径。
+                String name = f.getFileName() == null ? "" : f.getFileName();
+                if (name.isEmpty() || com.phoenix.agent.util.SessionWorkspaceFilters.isInternalFile(name)) {
+                    continue;
+                }
+                relPath = name;
+                history = false;
             }
-            com.phoenix.agent.util.SessionFileTree.Parsed parsed =
-                    com.phoenix.agent.util.SessionFileTree.parse(f.getStoreKey(), agentKey, sessionId);
-            // v1.1.0 归属口径：他会话段 → 「历史文件」；**无会话段旧行 → 归本会话**（行 session_id 为权威）
-            boolean history = parsed.isOtherSession();
+            else {
+                com.phoenix.agent.util.SessionFileTree.Parsed parsed =
+                        com.phoenix.agent.util.SessionFileTree.parse(f.getStoreKey(), agentKey, sessionId);
+                // v1.1.0 归属口径：他会话段 → 「历史文件」；**无会话段旧行 → 归本会话**（行 session_id 为权威）
+                history = parsed.isOtherSession();
+                // R-02.3：框架内部件一律不出现在树里（与扫描器同源判据）
+                if (parsed.internal()) {
+                    continue;
+                }
+                relPath = parsed.relativePath();
+            }
             if (history) {
                 historyTotal++;
                 if (!historyLevel) {
@@ -302,12 +327,8 @@ public class AgentFileServiceImpl implements AgentFileService {
             else if (historyLevel) {
                 continue;
             }
-            // R-02.3：框架内部件一律不出现在树里（与扫描器同源判据）
-            if (parsed.internal()) {
-                continue;
-            }
             // v1.1.0 R-02.7：折叠 {uid} 展示层（单一实现见 SessionFileTree）
-            List<String> segs = com.phoenix.agent.util.SessionFileTree.foldUserNamespace(segments(parsed.relativePath()));
+            List<String> segs = com.phoenix.agent.util.SessionFileTree.foldUserNamespace(segments(relPath));
             if (segs.size() <= base.size() || !segs.subList(0, base.size()).equals(base)) {
                 continue;
             }

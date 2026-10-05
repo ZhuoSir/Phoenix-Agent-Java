@@ -53,6 +53,10 @@
   - 构建产物已部署：`pnpm -F @vben/web-ele build` → stage → `compose build nginx` → `up -d`（health 200）
   - **线上校验**：线上 `js/ChatFilesPanel-C3cJj9Ah.js` 与本地构建 **sha256 一致**（b72fb31229d3eadd），且含「会话目录 / 跨会话遗留 / 此文件夹为空」关键字
   - **UI 走查移交用户**（项目规矩：agent 不自测 UI）——走查清单见本 spec changelog 末尾
+  - **走查中发现的缺陷已修（BUG-87 + 物化回落）**：
+    ① `existsByStoreKeyAnySession` 改**原生 SQL**（`del_flag` 被框架按逻辑删列处理，QueryChain 会被自动追加 `del_flag=0` → 查不到墓碑行 → 删除后文件复活）；实测用户被删的 `harness-讲义.md` 连续 3 次扫描**不复活**，全局复活键清零（仅剩空 store_key 物化行分组，与扫描无关）
+    ② 树补 `store_key` 为空的**物化文件**回落（以文件名落会话根）——原先树里丢失（平铺列表有）属我引入的回归；实测物化文件可见且删除后不复活
+    ③ `mvn ... package -DskipTests` 绿、`verify` 交付面不回退
 
 ## 组 3：长轮静默可见性（R-01）
 

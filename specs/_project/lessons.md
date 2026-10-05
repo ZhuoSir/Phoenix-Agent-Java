@@ -177,3 +177,9 @@
 
 <!-- 去重：记前先 grep "L-" 找同类，同类加复发计数不新开号；
      长度控制：active 超 ~80 条触发季度审，休眠/退休挪到文件尾"冷库"区 -->
+
+## L-21 MyBatis-Flex 逻辑删列会让"墓碑行"在任何 QueryChain 查询里隐形
+- **现象**：按 `store_key` 去重时，逻辑删（`del_flag=1`）的行查不到 → 扫描器把用户已删的文件当新文件重新登记 → **删除后文件复活**（BUG-87）。
+- **根因**：`del_flag` 被 MyBatis-Flex 当作逻辑删列，**QueryChain 生成 SQL 时自动追加 `del_flag = 0`**——即使代码里已经删掉显式 `.eq(AgentFile::getDelFlag, 0)`，SQL 里仍会出现（实测日志：`WHERE ("store_key" = ?) AND "del_flag" = ?`，参数只有 storeKey 与 0）。
+- **对策**：凡需**看到墓碑/已删行**的判定，必须走**原生 SQL**（`Db.selectObject("select count(*) ... where store_key = ?")`）绕开自动注入；不要以为"删掉显式条件"就等价于"不过滤"。
+- **验证纪律**：我第一次的"修复已生效"验证是**假阳性**——用物化文件（`store_key` 为空、盘上落在 uploads tee 而非会话工作区）做删除→扫描试验，扫描器根本不会去登记它。**验证必须打在真实受控路径上**（本例=会话工作区里被扫描登记过的文件）。
