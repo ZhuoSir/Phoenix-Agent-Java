@@ -1,5 +1,15 @@
 # Changelog: workspace-isolation
 
+## T-11~T-14 部署 + 实测验收通过（2026-10-05，commit f7a0964 + 1b0a3a0 噪声过滤 + BUG-81 前端 7bacf16）
+- 部署：`docker compose build backend nginx`（ES9 基座）+ `up -d`；健康 200、首页 200；L-16 门禁两轮均先查 `metadata->>'status'='generating'`=0
+- **T-11 实证**：构建日志 `对话智能体构建完成: agentId=33, runtimeKey=agent-33, ..., workspace=/app/uploads/agent-workspace/agent-33/{sessionId}`；磁盘树 `agent-33/{sessionId}/{uid}/file_probe.txt`（文件工具）+ `agent-33/{sessionId}/sh_probe.txt`（shell）
+- **T-12 实证（BUG-79 毙）**：会话内 shell `pwd` = `/app/uploads/agent-workspace/agent-33/{sessionId}`（修前 `/app`）；shell 产物落会话目录且面板可见；三入口共用 `ShellExecuteTool→ProcessBuilder.directory(shellCwd)`
+- **T-13 实证**：同会话三工具产物同处可见（面板列出 `sh_probe.txt`＋`file_probe.txt`）；**新建会话 B 文件数=0**（跨会话零交叉）；旧会话属主可见（3a3f8fe1=3 条、31f42c23=10 条）；`call_*` 条目=0
+- **BUG-82 实测发现并修复**：扫描器把框架技能缓存当产物登记——`.skills-cache/` 只被"点开头且无扩展名"规则漏过，单会话噪音 28 条（catalog.json/search_library.py/svg_audit.py…）；修法=目录段凡 `.` 开头即内部件；**C 会话修后 1 条（c_probe.txt）**
+- **BUG-80 实测通过**：admin token 列前台用户会话 → code=100/30 条；admin 删 `catalog.json` → code=100 且库内 `del_flag=1`；属主本人删自己文件 → 100（正对照）；前台 token 访问他人会话 → 42031（负对照，越权仍拦）
+- 遗留（如实记）：①文件工具根=会话目录/uid 子层、shell cwd=会话目录，**二者差一层**（模型当场指出并要求确认）→ 记 BUG-83 待裁决 ②`listBySession` 仍按会话查 DB，历史广扫遗留的跨会话行（10-02 老数据）不动 ③agent 根下 `probe_test.txt`/`sample-note.txt` 等旧探针文件仍在（tee 副本已登记，删盘会伤下载，留待迁移）
+- 夹具清理：r06-verify A/B/C 三会话（文件行 del_flag=1 + 会话行删除 + 磁盘目录 rm）全清
+
 ## T-11~T-14 代码落地（2026-10-05）**未部署**，commit f7a0964
 - 交付（后端 8 文件；前端/DB/配置零改动）：
   - T-11 `HarnessAgentFactory.buildWithSummary(agent, sessionId)` → `.workspace({root}/{agentKey}/{sessionId})`（空=存量智能体级，零行为变化）；`HarnessAgentRegistry` 缓存键 `agentId@sessionId`（LRU 键改 String）、`acquire/get/buildUncached` 增会话重载、`invalidate` 连带清全部会话实例；`McpMountService` 变体键含 sessionId；`HarnessChatServiceImpl` 对话+确认续跑均按（智能体,会话）取实例

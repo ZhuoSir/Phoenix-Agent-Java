@@ -57,29 +57,30 @@
 
 > 版本: v0.2.0 | 状态: 已确认 | 确认人: 陈卓 | 确认日期: 2026-10-05 | 更新: 2026-10-05
 
-- [ ] T-11 会话级工作区根：registry 键加 sessionId + factory 接收会话工作区 + WorkspacePaths 增 `sessionRoot(root, agentKey, sessionId)`
+- [x] T-11 会话级工作区根：registry 键加 sessionId + factory 接收会话工作区 + WorkspacePaths 增 `sessionRoot(root, agentKey, sessionId)`
   关联: R-06 | 依赖: 无
   验证: 新会话首轮构建日志含会话路径；file 工具落点实测=`{agentKey}/{sessionId}/{uid}/`
   验收: 落点符合约定且日志可观测
-  进展(2026-10-05): 代码已落地并编译通过（commit f7a0964）；**运行时实测待部署**
-- [ ] T-12 shell cwd 统一（BUG-79）：先查框架 shell/exec 规格 cwd 支持；支持则配置，否则包装工具注入 `cd {sessionDir} && `（shell-local/pwsh/后台 job 三入口均覆盖）
+  进展(2026-10-05): 落地+部署+实测通过——构建日志 `workspace=/app/uploads/agent-workspace/agent-33/{sessionId}`；磁盘 `agent-33/{sessionId}/{uid}/file_probe.txt`（file）与 `agent-33/{sessionId}/sh_probe.txt`（shell）
+- [x] T-12 shell cwd 统一（BUG-79）：先查框架 shell/exec 规格 cwd 支持；支持则配置，否则包装工具注入 `cd {sessionDir} && `（shell-local/pwsh/后台 job 三入口均覆盖）
   关联: R-06 | 依赖: T-11
   验证: 会话内 shell 执行 `pwd` 输出=会话目录；`echo x > probe_sh.txt` 落会话目录
   验收: 三入口实测一致
-  进展(2026-10-05): 查证框架**支持**（`LocalFilesystemSpec.project` = shellCwd，唯一 shell 入口 ShellExecuteTool）→ 走配置路线，弃包装注入；**pwd 实测待部署**
-- [ ] T-13 读路径统一（BUG-78）：产物扫描+面板 API 以会话目录为根递归；legacy 多根只读兼容
+  进展(2026-10-05): 走框架配置路线（`.project`=shellCwd，弃包装注入）；实测 `pwd=/app/uploads/agent-workspace/agent-33/{sessionId}`、产物落会话目录且面板可见；唯一 shell 入口 `ShellExecuteTool` 覆盖三入口
+- [x] T-13 读路径统一（BUG-78）：产物扫描+面板 API 以会话目录为根递归；legacy 多根只读兼容
   关联: R-06 | 依赖: T-11
   验证: 面板列出同会话三工具产物；跨会话列表为空；旧会话仍可见
   验收: 三场景实测通过
-  进展(2026-10-05): 代码已落地并编译通过；顺带揪出 BUG-78 真根因（扫描根用请求 sn 而写入根用库中 sn）；**三场景实测待部署**
-- [ ] T-14 `/app` 散落清理 + 迁移说明：清理容器内 `/app` 历史产物（登记去向），文档写明存量兼容策略
+  进展(2026-10-05): 三场景全绿（A 会话含 file+shell 两产物、新建 B=0 条、旧会话 3 与 10 条）+ `call_*` 与技能缓存噪音过滤（BUG-82：单会话 28 条噪音→修后 1 条）
+- [x] T-14 `/app` 散落清理 + 迁移说明：清理容器内 `/app` 历史产物（登记去向），文档写明存量兼容策略
   关联: R-06 | 依赖: T-12
   验证: 清理前后文件清单对照，无业务文件误删
   验收: 清单留档
-  进展(2026-10-05): 清单已取（见 changelog）；`/app` 零业务产物，无需删除动作，仅留档
+  进展(2026-10-05): 清单已取（`/app` 零业务产物，逃逸件随容器重建蒸发）；存量兼容策略=会话目录缺失时回落智能体级多根只读（时间窗+他会话目录排除双约束）
 - [ ] T-15 E2E 四项验收 + 回归：verify 13/13、跨会话隔离、旧会话可见、MCP/技能链不回退
   关联: R-06/全 | 依赖: T-11~T-14
   验证: 四项验收实测留档（用户可见面为准）
   验收: 全绿
+  进展(2026-10-05): 跨会话隔离✓ / 旧会话可见✓ / 会话内三工具同处✓；**未完成**=verify 13/13 与 MCP/技能链回归（另 BUG-81 前端待用户界面复验）
 - [ ] T-16 台账收口：BUG-78/79 翻已验证、completion 增量、MILESTONE 备注、待发批次清单更新
   关联: 流程 | 依赖: T-15
