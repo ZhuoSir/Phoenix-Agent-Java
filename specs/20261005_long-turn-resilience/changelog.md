@@ -1,5 +1,8 @@
 # Changelog: long-turn-resilience
 
+## plan v0.1.0（2026-10-05）
+- Phase 2 落盘（DSH 对标设计）：看门狗=TurnManager 单点活性化（onFrame 脉冲 arm+600s 空闲闸+总时长默认关+文案分原因）；渲染=DSH 三件套（批量消费/快照 1s 降频+beforeunload 兜底/尾块增量+完成块冻结）覆盖四面（admin live 零节流实勘/admin join 5s 轮询/front transport 150ms 全量 markdown/pc+mobile 枚举后同治）；join"think done 无正文"列复现定位任务；上下文=V1.6.0_03 三列 nullable+全局 env 默认按 DSH 换算（102400≈0.8×128k、pruner 8192）+factory 两级回退+指纹白拿；被否案 4（含 Worker 化与比例制列 BL 候补）；坑核对 16 条（L-06 四面枚举/L-07 用户可见面验收/L-16 部署避让）
+
 ## v1.0.0（2026-10-05）—— 确认①通过（DSH 对标版）
 - 用户「确认」；前置修订入版：Q1=600s（DSH 工具等待上限）/Q2=不设总时长（DSH 轮次层无墙钟强杀）；**A-6 设计蓝本=DSH 直接对标**（idleWatchdog arm 语义/promoteOnTimeout/reasoning-chunks.stress 渲染方法论/compaction 比例水位 0.8·0.16·8192-4096-1024，源码出处全入档）；R-01 看门狗语义/R-02 验收/R-05 参数语义对齐 DSH
 - 过程注记：首次落盘锚点默写偏差（漏"logo"二字）被 assert 拦截零污染，读实文重做（L-01 v2 纪律生效）
