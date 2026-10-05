@@ -55,7 +55,7 @@
 
 ## v1.1.0 增量任务（R-06）
 
-> 版本: v0.2.0 | 状态: 草稿 | 更新: 2026-10-05
+> 版本: v0.2.0 | 状态: 已确认 | 确认人: 陈卓 | 确认日期: 2026-10-05 | 更新: 2026-10-05
 
 - [ ] T-11 会话级工作区根：registry 键加 sessionId + factory 接收会话工作区 + WorkspacePaths 增 `sessionRoot(root, agentKey, sessionId)`
   关联: R-06 | 依赖: 无

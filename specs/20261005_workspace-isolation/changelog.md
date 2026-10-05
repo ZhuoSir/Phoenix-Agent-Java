@@ -1,5 +1,14 @@
 # Changelog: workspace-isolation
 
+## T-11 起步（2026-10-05）会话级根地基 + 交接点
+- 已落：`WorkspacePaths.sessionRoot(workspaceRoot, runtimeKey, sessionId)` = `{root}/{agentKey}/{sessionId}`（含 {uid} 层注记）；编译通过
+- **下一会话从这三处接续（T-11 主体）**：
+  1. `HarnessAgentFactory`（约 105/121 行）：`buildWithSummary(Agent)` 增会话工作区重载（null=保持现行为），`.workspace(...)` 改用 `sessionRoot(..., sessionId)`
+  2. `HarnessAgentRegistry.acquire(Long agentId)`（72 行）：签名加 sessionId、缓存键加 sessionId（`fingerprint` 不变，键=(agentId,sessionId,fingerprint)）
+  3. 调用方：`HarnessChatServiceImpl`/`HarnessController` 链路把 `request.getSessionId()` 透传到 acquire（预览服务保持无会话=legacy）
+- 之后 T-12（shell cwd 统一：先查框架 shell/exec 规格 cwd 支持，否则包装注入 `cd {sessionDir} && `，覆盖 shell-local/pwsh/后台 job）→ T-13（扫描/面板以会话目录为唯一根+legacy 只读兼容）→ T-14（/app 清理）→ T-15（四项验收）→ T-16（台账）
+- 上下文耗尽说明：本次会话上下文已满，以上交接点已写细，新会话按此续做即可
+
 ## v1.1.0 确认① + plan/tasks 增量（2026-10-05）
 - 用户「确认」→ requirements v1.1.0 已确认（陈卓）；plan v1.1.0 + tasks v0.2.0 增量落盘（T-11~T-16）
 - 方案要点：会话级工作区根 `{root}/{agentKey}/{sessionId}`（框架再拼 `{uid}` 层→实际 `.../{sessionId}/{uid}/`，面板递归扫）；shell cwd 统一（先查框架 cwd 支持，否则包装注入 `cd`）；读路径以会话目录为唯一根+legacy 只读兼容；实例缓存改按 (agent,session)
