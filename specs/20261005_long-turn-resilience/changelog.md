@@ -1,5 +1,8 @@
 # Changelog: long-turn-resilience
 
+## tasks v1.0.0（2026-10-05）—— 确认③通过，三重门全绿
+- 用户「确认」；tasks v0.1.0→v1.0.0 已确认（陈卓）；三重门自检后切 feature/long-turn-resilience（基点 v1.6.0），进入 Phase 4，首任务=T-01
+
 ## tasks v0.1.0（2026-10-05）
 - Phase 3 拆解：T-01~T-08 三组（后端/前端渲染/收口）；看门狗假死模拟验证、Flyway 重放、DSH stress 风暴灌帧、join 三场景、四面枚举收口、logo 真跑 20 分钟一锤定音；R 全覆盖自检无孤儿
 
