@@ -11,7 +11,7 @@
 
 > 冻结后新需求默认挂下一版（v1.5.0）；挤入 v1.4.0 需用户明确同意。
 
-| **v1.6.0** | **在途** | 立项 2026-10-04 | **v1.6.0**（基点 main tip 270fcfa，v1.5.0 已合 main） | - | 已挂 mcp-client-tools（实现完成 9/9，在 feature/mcp-client-tools）+ agent-publish-group-grant（BL-04，用户裁决同版续收，未冻结） |
+| **v1.6.0** | **在途** | 立项 2026-10-04 | **v1.6.0**（基点 main tip 270fcfa，v1.5.0 已合 main） | - | 已挂 mcp-client-tools（实现完成 9/9，已合并 f7e0313）+ agent-publish-group-grant（实现完成 7/7，用户走查通过，已合并 aad1f89）；**用户明示不冻结续收**（2026-10-04） |
 
 | **v1.5.0** | **已发布(2026-10-04)** | 立项 2026-10-03 | **v1.5.0**（基点 main tip 3083273，v1.4.0 已合 main） | - | 已挂 docker-auto-pipeline（Docker 自动化打包+安装流水线，用户四裁决：新建spec/挂v1.5.0/管到引擎/五平台） |
 
