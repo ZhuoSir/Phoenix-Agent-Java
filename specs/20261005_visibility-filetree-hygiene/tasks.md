@@ -1,6 +1,6 @@
 # Tasks: visibility-filetree-hygiene
 
-> 版本: v0.1.0 | 状态: 待确认 | 确认人: （待填） | 确认日期: - | 更新: 2026-10-05
+> 版本: v1.0.0 | 状态: 已确认 | 确认人: 陈卓 | 确认日期: 2026-10-05 | 更新: 2026-10-05
 > 上游: requirements v1.0.0（已确认①）+ plan v1.0.0（已确认②）｜挂载: v1.7.0｜分支: `feature/visibility-filetree-hygiene`
 
 ## 组 1：工程清账（R-03，先清工作树）

@@ -1,5 +1,9 @@
 # Changelog: visibility-filetree-hygiene
 
+## tasks v1.0.0 确认③通过——三重门全绿，进 Phase 4（2026-10-05）
+- 用户口令「确认」→ tasks v0.1.0 → **v1.0.0 已确认（陈卓）**；三重门（requirements①/plan②/tasks③）全绿
+- Phase 4 开工，首任务 **T-01**（清账组，零风险先行）；交付顺序：T-01~03 清账 → T-04~06 文件树 → T-07~10 静默可见性 → T-11~12 收口
+
 ## plan v1.0.0 确认②通过 + tasks v0.1.0 草稿（2026-10-05）
 - 用户口令「确认」→ plan v0.1.0 → **v1.0.0 已确认（陈卓）**；三重门第②关过，进 Phase 3
 - Q1~Q6 暂定口径随 plan 一并生效（记入 plan §九）
