@@ -76,6 +76,7 @@
 | BUG-65 | MCP 工具名含连字符时模型回传 name=null → 框架调度 NPE 崩轮（"生成异常中断"） | 高 | mcp-client-tools T-07 用户走查（麦当劳真 MCP 两轮复现） | 已验证(v1.6.0在途) | v1.6.0 | A/B 隔离：同服务器仅改净化规则即愈；sanitize 连字符→下划线+折叠+首字符字母化（McpMountService）；PRE_ACTING name=m_MCP__query_nearby_stores 实证 |
 | BUG-66 | 变体签名缺 name 列——MCP 改名后命中旧缓存变体，工具前缀漂移且跨重启不确定 | 低 | BUG-65 修复复测（改名后日志仍旧前缀） | 已验证(v1.6.0在途) | v1.6.0 | 签名加入 name（McpMountService.signature）；中文名复原实测前缀 m_MCP__ 即时生效 |
 | BUG-67 | 会话文件面板跨会话污染：列表显示同智能体其它会话的文件（「logo设计」会话实测挂 17 行）——scan=true 补扫按 agent 共享 workspace+「会话创建时间」时间窗归属文件，老会话窗口大，把窗口内所有新文件收编进本会话（BUG-60 窗口收窄方案的回归面） | 中 | 2026-10-04 用户实用发现（logo设计会话，session 264458e0，agent 33，建于10-03） | 新建 | - | AgentFileController.list:61 windowStart=session.createTime + WorkspaceArtifactScanner 扫描归属；修复方向：归属判定从时间窗收窄为轮次边界或排除已归属其它会话的文件；需小设计，关联 BL-19/BUG-60 |
+| BUG-68 | 跨智能体记忆污染：不同智能体的不同会话出现其它智能体其它会话的记忆 | 高 | 2026-10-04 用户实用发现 | 新建 | - | 根因实勘：HarnessAgentFactory:110 `.workspace(Path.of(workspaceRoot))` 固定值——**全部智能体共享同一 workspace 目录**，harness 记忆文件/会话转录/产物同目录互相读写；Redis 分布式存储键含 agentName 段（agents␀名␀users␀uid）但默认本地文件系统无隔离；PostgresAgentStateStore 键=userId:sessionId 亦无 agentId 维（结构性弱点）。**与 BUG-67 同根**（文件面板跨会话污染=共享 workspace 另一症状）。修复方向：workspace 按 agent 分目录（workspaceRoot/runtimeKey）+存量混合文件迁移策略+BUG-67 轮次归属一并收口；同刃双修 |
 ## 明细留档（历史证据，只增不删）
 
 ### BUG-01 `all_schema.sql` 缺 5 个序列 → 全新环境导入必失败

@@ -1,5 +1,10 @@
 # Changelog: agent-publish-group-grant
 
+## BUG-68 勘察记（2026-10-04）跨智能体记忆污染——根因锁定共享 workspace
+- 用户报告：不同智能体不同会话串记忆。勘察链：①持久层排除（store_state 键=userId:sessionId 会话隔离✓、user_memory 表空✓）②UI 排除（admin/前台会话列表均按 agentId 过滤✓）③Redis 分布式存储键解剖（NUL 分隔：agents␀HumanInTheLoop␀users␀uid␀sessions␀path——含 agentName 维，为存量 Java 智能体遗留键）④**真凶=HarnessAgentFactory:110 workspace 固定共享目录**——所有库驱动智能体记忆文件/产物同目录互读互写
+- 与 BUG-67 同根认定：文件面板跨会话污染=共享 workspace 的另一症状；修复应同刃（workspace 按 agent 分目录后，BUG-67 的时间窗补扫再收窄为轮次归属即双收口）
+- 结构性附带发现：PostgresAgentStateStore 键无 agentId 维（userId:sessionId）——sessionId 唯一性目前兜底，属加固候选
+
 ## T-04/T-05 代码完成部署 + T-06 API 级全绿（2026-10-04）——UI 走查待用户
 - T-04/T-05 交付：publishAgentApi 可选 body；列表页发布弹窗（组多选+重发布回显+空选全公开警示）；AgentGroupGrant.vue（全公开语义提示/非 published 禁用引导）；**双入口挂载**（抽屉「授权组」菜单+独立编辑页）；typecheck 213=基线（过程抓己错：抽屉数据变量是 form 非 agent，即修）；容器内标记串证+verify=0（L-03 回炉条款执行）
 - T-06 API 级：E2E 收敛链三断言（公开→无组用户可见 / 勾 G1 收敛→无组用户失见名单空 / G1 用户 chenzhuo 仍可见）+ 对面断言双证（**MCP 判定/挂载四文件对本 spec 零 diff**；MY_SKILLS_SQL 零改动=技能域不串）+ admin 列表不变（B3）+ verify=0 + 夹具全清
