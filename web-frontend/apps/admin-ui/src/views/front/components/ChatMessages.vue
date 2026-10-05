@@ -25,6 +25,32 @@ const currentAgent = computed(() => {
 });
 const botName = computed(() => currentAgent.value?.name ?? 'AI');
 
+// long-turn-resilience T-03/R-02：长轮活性指示——流式中每秒刷新已用时，证明"在跑"而非卡死
+const streamingElapsedText = ref('');
+let elapsedStart = 0;
+let elapsedTimer: ReturnType<typeof setInterval> | null = null;
+watch(
+  () => activeMessages.value.some((m: any) => m.streaming),
+  (on: boolean) => {
+    if (elapsedTimer) {
+      clearInterval(elapsedTimer);
+      elapsedTimer = null;
+    }
+    if (!on) {
+      streamingElapsedText.value = '';
+      return;
+    }
+    elapsedStart = Date.now();
+    elapsedTimer = setInterval(() => {
+      const sec = Math.floor((Date.now() - elapsedStart) / 1000);
+      const mm = String(Math.floor(sec / 60)).padStart(2, '0');
+      const ss = String(sec % 60).padStart(2, '0');
+      streamingElapsedText.value = `正在执行（已用时 ${mm}:${ss}）`;
+    }, 1000);
+  },
+  { immediate: true },
+);
+
 function renderMessage(msg: Record<string, any>): string {
   const content = String(msg.content ?? '');
   if (msg.role === 'user') {
@@ -193,6 +219,9 @@ async function handleConfirmAction(
             }"
             v-html="renderMessage(msg)"
           ></div>
+          <div v-if="msg.streaming && streamingElapsedText" class="chat-message__elapsed">
+            {{ streamingElapsedText }}
+          </div>
         </div>
 
         <div
@@ -320,6 +349,12 @@ async function handleConfirmAction(
     color: hsl(var(--primary-foreground));
     background: hsl(var(--primary));
     border: none;
+  }
+
+  &__elapsed {
+    margin-top: 4px;
+    font-size: 12px;
+    color: var(--el-text-color-secondary);
   }
 
   &__text--streaming {

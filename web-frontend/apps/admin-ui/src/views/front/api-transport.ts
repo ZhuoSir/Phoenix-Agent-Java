@@ -340,14 +340,49 @@ export const apiChatTransport: ChatTransport = {
     // BUG-61：追流重放是帧风暴（千帧一瞬灌入），每帧全量 markdown 渲染会打死主线程——150ms 节流合并
     let lastPush = 0;
     let pushTimer: ReturnType<typeof setTimeout> | null = null;
+    // long-turn-resilience T-03：增量 markdown（完成块冻结/仅重解析尾块，DSH reasoning-chunks 方法论）
+    // 替代 BUG-61 时代的"每推全量 markdown"——长轮数千次全量解析仍会打死主线程
+    let mdRendered = '';
+    let mdHtml = '';
+    const incrementalMarkdown = (buf: string): string => {
+      if (!buf) {
+        mdRendered = '';
+        mdHtml = '';
+        return '';
+      }
+      if (!buf.startsWith(mdRendered)) {
+        // 非追加（新一轮/回退/重放）→ 重置缓存
+        mdRendered = '';
+        mdHtml = '';
+      }
+      const cutPoint = buf.lastIndexOf('\n\n');
+      const fenceBalanced =
+        (buf.match(/```/g) || []).length % 2 === 0 &&
+        (cutPoint <= 0 || (buf.slice(0, cutPoint).match(/```/g) || []).length % 2 === 0);
+      if (cutPoint <= 0 || !fenceBalanced) {
+        // 围栏未闭合或无块边界 → 全量保守解析
+        mdHtml = markdownToHtml(buf);
+        mdRendered = buf;
+        return mdHtml;
+      }
+      if (cutPoint + 2 > mdRendered.length) {
+        mdHtml += markdownToHtml(buf.slice(mdRendered.length, cutPoint + 2));
+        mdRendered = buf.slice(0, cutPoint + 2);
+      }
+      const tail = buf.slice(cutPoint + 2);
+      return mdHtml + (tail ? markdownToHtml(tail) : '');
+    };
+    // 大缓冲自适应节流：正文越长推送间隔越大（DOM 整体替换成本线性）
+    const pushInterval = () => (textBuf.length > 20000 ? 400 : 150);
     const pushNow = () => {
       lastPush = Date.now();
-      onProgress?.(markdownToHtml(textBuf), thinkBuf || undefined);
+      onProgress?.(incrementalMarkdown(textBuf), thinkBuf || undefined);
     };
     const pushThrottled = () => {
       const now = Date.now();
-      if (now - lastPush >= 150) { pushNow(); }
-      else if (!pushTimer) { pushTimer = setTimeout(() => { pushTimer = null; pushNow(); }, 150); }
+      const iv = pushInterval();
+      if (now - lastPush >= iv) { pushNow(); }
+      else if (!pushTimer) { pushTimer = setTimeout(() => { pushTimer = null; pushNow(); }, iv); }
     };
     (async () => {
       try {

@@ -1,5 +1,12 @@
 # Changelog: long-turn-resilience
 
+## T-03 进行中（2026-10-05）活页面三刀已落 + 一条自纠
+- **自纠（L-17 新坑）**：首刀误改 `components/run/index.vue`（全仓零引用死组件）——改前未做 import 链核验；已 `git checkout` 还原，零残留
+- 活页面真身：`views/front/chat.vue` → `views/front/api-transport.ts`（帧消费/节流）+ `views/front/components/ChatMessages.vue`（渲染），核心状态在共享包 `packages/chat-shared`（四面共用根因）
+- 三刀落活页面：①**增量 markdown**（完成块冻结/仅重解析尾块/围栏奇偶守护，替代 BUG-61 时代"每推全量解析"）②**大缓冲自适应节流**（>20k 字 400ms，抑制 DOM 整体替换频率）③**长轮活性指示**（流式中每秒刷新"正在执行（已用时 mm:ss）"，R-02 兜底）
+- 证据：typecheck 213=基线零回归；产物与**容器内**（js+css）均含标记实证；nginx 已 `compose build`+recreate（L-03）
+- 待办：浏览器实测（需用户走查长轮不卡死）；若仍卡 → **T-03b 追加块级 DOM 增量（v-for 分块，只补尾块节点）**
+
 ## T-02 完成（2026-10-05）上下文治理三列贯通三证
 - 交付：V1.6.0_03 三列 DDL+rollback；实体/DTO/VO/Service 四层贯通；**UpdateChain 强写三列**（复用既有 maxIterations「留空=清除」先例机制）；factory compactionFor/toolResultEvictionFor 两级回退（DSH 换算默认 102400/20/8192）+ 指纹显式纳入
 - 三证：①全新库重放（台账 12/三列在/rollback 零残留）②配置往返（写 5000/5/1000 → DB/GET 一致；留空 → 三列全 null 回默认，**首测踩坑即修**：flex update 忽略 null，须走 UpdateChain 定向强写——既有先例模式复用）③**指纹重建实证**（改配置→「运行配置已变更，重建实例」日志+新旧指纹可见 null 位）
