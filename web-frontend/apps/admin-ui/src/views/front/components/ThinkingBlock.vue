@@ -4,11 +4,40 @@
  * 流式思考中 → 展开滚动 + "思考中…"；正文首字到达（streaming=false）→ 自动折叠为
  * 一行「🧠 已深度思考（N 秒）」，点击回看。无内容整块不渲染（R-04）。
  */
-import { computed, ref, watch } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 
 const props = defineProps<{ content: string; streaming: boolean; hasContent?: boolean; durationMs?: number }>();
 
 const expanded = ref(true);
+
+// long-turn-resilience T-03 附加：思考区贴底跟随（用户手动上翻则暂停跟随，滚回底部自动恢复）
+const bodyRef = ref<HTMLElement | null>(null);
+const stickToBottom = ref(true);
+function onThinkingScroll() {
+  const el = bodyRef.value;
+  if (!el) return;
+  stickToBottom.value = el.scrollHeight - el.scrollTop - el.clientHeight <= 24;
+}
+watch(
+  () => props.content,
+  async () => {
+    if (!stickToBottom.value) return;
+    await nextTick();
+    const el = bodyRef.value;
+    if (el) el.scrollTop = el.scrollHeight;
+  },
+);
+// 新一轮思考开始 → 恢复跟随并跳底
+watch(
+  () => props.streaming,
+  async (on: boolean) => {
+    if (!on) return;
+    stickToBottom.value = true;
+    await nextTick();
+    const el = bodyRef.value;
+    if (el) el.scrollTop = el.scrollHeight;
+  },
+);
 // R-03：正文首字到达(hasContent)或流式结束(streaming→false) → 自动折叠；再次思考则恢复展开
 watch(
   () => [props.hasContent, props.streaming] as const,
@@ -32,7 +61,7 @@ const seconds = computed(() => {
       <span class="thinking__label">{{ streaming ? 'Thinking…' : 'Think Done' }}{{ !streaming && seconds ? ` · ${seconds}` : '' }}</span>
       <span class="thinking__caret">{{ expanded ? '▾' : '▸' }}</span>
     </button>
-    <div v-show="expanded" class="thinking__body">{{ content }}</div>
+    <div v-show="expanded" ref="bodyRef" class="thinking__body" @scroll="onThinkingScroll">{{ content }}</div>
   </div>
 </template>
 

@@ -1,5 +1,12 @@
 # Changelog: long-turn-resilience
 
+## T-03 附加（2026-10-05）流式贴底跟随（用户实测反馈）
+- 用户原话：「thinking那个滚动条能不能到底自动滚动，现在需要手动下拉」
+- 实现两处**贴底跟随 + 尊重手动上翻**：①思考区 ThinkingBlock（`max-height:180px` 内滚动，原无任何跟随）②消息区 ChatMessages（原只在消息数组变化时滚动，正文/思考增长不跟随）
+- 规则：距底 ≤24px/≤40px 视为贴底持续跟随；用户上翻即暂停跟随，滚回底部自动恢复；新一轮/换会话强制跳底
+- 证据：typecheck 213=基线；容器内实证 `clientHeight<=40`（ChatMessages 分片）/`clientHeight<=24`（思考区）+ 首页 200
+- 归属：R-02「持续可见进度」子项（流式可读性），非新增需求
+
 ## T-03 进行中（2026-10-05）活页面三刀已落 + 一条自纠
 - **自纠（L-17 新坑）**：首刀误改 `components/run/index.vue`（全仓零引用死组件）——改前未做 import 链核验；已 `git checkout` 还原，零残留
 - 活页面真身：`views/front/chat.vue` → `views/front/api-transport.ts`（帧消费/节流）+ `views/front/components/ChatMessages.vue`（渲染），核心状态在共享包 `packages/chat-shared`（四面共用根因）

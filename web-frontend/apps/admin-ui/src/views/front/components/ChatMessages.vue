@@ -75,20 +75,42 @@ function escapeHtml(text: string): string {
 
 const scrollRef = ref<HTMLElement | null>(null);
 
-async function scrollToBottom() {
+// long-turn-resilience T-03 附加：消息区贴底跟随（流式内容增长也跟随；用户上翻则暂停，滚回底部恢复）
+let stickToBottom = true;
+function onMessagesScroll() {
+  const el = scrollRef.value;
+  if (!el) return;
+  stickToBottom = el.scrollHeight - el.scrollTop - el.clientHeight <= 40;
+}
+
+async function scrollToBottom(force = true) {
   await nextTick();
   const el = scrollRef.value;
   if (!el) return;
+  if (!force && !stickToBottom) return;
   el.scrollTop = el.scrollHeight;
 }
 
 watch(activeMessages, () => {
+  stickToBottom = true;
   void scrollToBottom();
 });
 
 watch(activeSessionId, () => {
+  stickToBottom = true;
   void scrollToBottom();
 });
+
+// 流式正文/思考增长 → 贴底跟随（原实现只在消息数组变化时滚动，内容增长不跟随=需手动下拉）
+watch(
+  () => {
+    const last = activeMessages.value[activeMessages.value.length - 1] as any;
+    return last ? `${String(last.content ?? '').length}:${String(last.thinking ?? '').length}` : '';
+  },
+  () => {
+    void scrollToBottom(false);
+  },
+);
 
 let msgCounter = 0;
 function uid(): string {
@@ -128,7 +150,7 @@ async function handleConfirmAction(
 </script>
 
 <template>
-  <div ref="scrollRef" class="chat-messages">
+  <div ref="scrollRef" class="chat-messages" @scroll="onMessagesScroll">
     <div class="chat-messages__inner">
       <div
         v-for="(msg, index) in activeMessages"
