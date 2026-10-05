@@ -1,5 +1,10 @@
 # Changelog: long-turn-resilience
 
+## v1.0.0（2026-10-05）—— 确认①通过（DSH 对标版）
+- 用户「确认」；前置修订入版：Q1=600s（DSH 工具等待上限）/Q2=不设总时长（DSH 轮次层无墙钟强杀）；**A-6 设计蓝本=DSH 直接对标**（idleWatchdog arm 语义/promoteOnTimeout/reasoning-chunks.stress 渲染方法论/compaction 比例水位 0.8·0.16·8192-4096-1024，源码出处全入档）；R-01 看门狗语义/R-02 验收/R-05 参数语义对齐 DSH
+- 过程注记：首次落盘锚点默写偏差（漏"logo"二字）被 assert 拦截零污染，读实文重做（L-01 v2 纪律生效）
+- 进 Phase 2 Plan
+
 ## v0.2.0（2026-10-05）—— 用户两点纠正 + 取证修正
 - 用户纠正①：前端非"没渲染"而是**浏览器整体无响应** → 实勘 api-transport.ts 病灶：每 150ms 全量 markdownToHtml(textBuf)+整树重渲，长轮 O(n²) 压垮主线程；R-02 重写为"长轮浏览器不卡死"（增量化渲染+可交互性验收，admin/前台双管线 L-06 覆盖）
 - 用户纠正②：停止金丝雀部署后重试仍见"服务重启" → 查证：后端 RestartCount=0/OOMKilled=false/清扫仅启动一次，**无幻影重启**；12:47 匹配"服务重启"的行实为只读查询 Row dump（我误读为 UPDATE Parameters）；真相=用户重进 12:23 旧会话回显旧轮定稿文案；R-03 增补"历史中断标注归属，不得误读为新失败"
