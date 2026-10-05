@@ -1,5 +1,12 @@
 # Changelog: long-turn-resilience
 
+## BUG-77 三轮取证（决定性）——违规源是"仅 tool_use 无 thinking"的历史消息
+- 扫描框架状态（44 条）：助手消息 **17 条含 thinking 块**，**5 条仅 tool_use 无 thinking**（idx 3/7/11/15/19）
+- DeepSeek 思考模式规则：带 tool_calls 的助手消息必须回传 reasoning_content → **这 5 条即 400 的违规源**
+- 排除项：我方 `HarnessModelRegistry:52` **已使用 `DeepSeekFormatter`**（javap 确认 formatter 为可配置项且我们配置正确）→ 不是 formatter 选型问题
+- 产生路径推断：中断/重启后 `enablePendingToolRecovery` 合成的 tool_use 消息不带 thinking；"为何只影响紧接一轮"未完全证明（如实标注）
+- 根治候选：轮次开始前状态修复（为仅 tool_use 无 thinking 的消息注入空 thinking 块），经框架 stateStore 写回；已落码的自动重试为兜底
+
 ## BUG-77 自动重试实现（2026-10-05，按用户指令未部署）
 - 落码四处：①Turn 增 `sourceSupplier`（openOrReject/confirmOrResume 两入口均留存，可再取一次源流）②`retryUsed` 每轮至多一次 ③`isRetryableProviderError` 识别签名（reasoning_content / BadRequestException / 400）④`onError` 中：**本轮零产出**（content/thinking 均为空，杜绝重复内容）且未重试过 → 自动 `subscribeCommon(sourceSupplier.get())` 重试，用户无感；仍失败才按现文案定稿
 - 设计取舍：只在"零产出"时重试（该 400 发生于请求阶段，此时必然无产出），避免重试造成内容重复；sink 保持开启（前端 SSE 不断流）
