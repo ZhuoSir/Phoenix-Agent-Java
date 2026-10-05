@@ -32,13 +32,13 @@
 
 ## 组 3：收口
 
-- [ ] T-05 E2E 矩阵：暗号双智能体实测（A 记 alpha→B 答不出→A 答得出）+ 对面五连（legacy 对话/技能加载/文件下载/MCP 链抽查含麦当劳绑定与回环测试连接/verify 13-13）+ admin/front 对话回归 + 夹具全清
+- [x] T-05 E2E 矩阵：暗号双智能体实测（A 记 alpha→B 答不出→A 答得出）+ 对面五连（legacy 对话/技能加载/文件下载/MCP 链抽查含麦当劳绑定与回环测试连接/verify 13-13）+ admin/front 对话回归 + 夹具全清
   关联: 全部 R
   依赖: T-02, T-03, T-04
   验证方式: 如上逐项留档（暗号双向断言为 R-02 一锤定音证）
   验收标准: 全矩阵绿、现场零残留
 
-- [ ] T-06 台账收尾：completion/artifacts/MILESTONE 第三需求行/BUG-67、BUG-68 翻已修复→已验证(v1.6.0在途)/记忆重置提示移交 M3 RELEASE-NOTES+UPGRADE
+- [x] T-06 台账收尾：completion/artifacts/MILESTONE 第三需求行/BUG-67、BUG-68 翻已修复→已验证(v1.6.0在途)/记忆重置提示移交 M3 RELEASE-NOTES+UPGRADE
   关联: 流程
   依赖: T-05
   验证方式: completion 与勾选核对；bugs 状态机与证据对齐

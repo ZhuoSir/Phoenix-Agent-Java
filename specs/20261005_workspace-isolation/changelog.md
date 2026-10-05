@@ -1,5 +1,10 @@
 # Changelog: workspace-isolation
 
+## T-05+T-06 完成（2026-10-05）实现完成 6/6
+- T-05 E2E：**暗号双向断言一锤定音**（A agent36 记住 alpha-w05 → B agent33 答「不知道」→ A 复认答出——BUG-68 主症状毙且记忆功能未损）；对面五连（技能 options 100/MCP 列表+回环测试 success/前台 mySkills 100/前台对话 done/legacy 默认根未动）+verify=0；夹具全清（含暗号记忆文件 MEMORY.md+日记，归档区外 md 残留=0）
+- 排障注记：对面④首测 500=我猜错端点路径（真路径 /platform/account-info/getMySkills 复测 100）——BUG-64 包装再误导，佐证其修复价值
+- T-06：completion（R-01~05 兑现+四注记）/artifacts（后端 5 文件零 DDL）/MILESTONE 第三行翻实现完成/BUG-67+68 翻已验证(v1.6.0在途)/记忆重置提示移交 M3
+
 ## T-04 完成（2026-10-05）迁移演练三段全绿
 - 交付：WorkspaceMigrationRunner（ApplicationRunner；允许集=_legacy_shared ∪ DB 实时 runtimeKey；只 move 不删；名字冲突加时间戳绝不覆盖；允许集查询失败=宁可不迁；整体失败 WARN 不阻塞启动）
 - 演练：①布假存量（888-fake-user/MEMORY.md+memory/note.md+legacy-probe.txt）→ 部署 → 根级只剩 _legacy_shared+agent-36，**16 项归档**（含真存量 88MB 用户树/散文件/框架缓存），假存量三件在档 ②**二次重启幂等**：日志"无存量条目（幂等零动作）"、_legacy_shared 零嵌套、agent-36 树完好 ③**下载对面证**：迁移前登记的老文件走 tee 副本下载 HTTP 200/3859 字节（workspace 搬家零影响实证）④verify=0
