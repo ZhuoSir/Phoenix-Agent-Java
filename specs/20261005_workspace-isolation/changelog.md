@@ -1,5 +1,13 @@
 # Changelog: workspace-isolation
 
+## 存量文件行清理（2026-10-05，用户口令"该清理就清理，但不要清理出错"）
+- **清理集（逻辑删 del_flag=1，共 2499 行，存活 4643→2144）**，谓词精确可复算：
+  `session 行不存在（孤儿）` ∪ `store_key 命中框架内部目录`（`/.pylibs/`、`/.skills-cache/`、`/.agentscope/`、`/.index/`、`/sessions/`、`/tasks/`、`/memory/`、`/large_tool_results/`）∪ `file_name like 'call\_%'`
+- **最大噪声源=`.pylibs`（Python 依赖树）2334 行**：单会话 `0690b2d0` 在 16:27–16:50 被登记 2997 行（2423 个不同包内文件：`__init__.py/.pyc/__main__.py/.pyi`）——**全部产生于 BUG-82 点目录过滤上线（17:01）之前**；上线后新噪声行 **0**（实测 `create_time > 17:01` 且命中上述谓词 = 0），证明过滤已根治
+- **误伤防护（三道）**：①按 `store_key` 结构判定"框架内部件"，不按文件名猜 ②执行前打印各会话"保留/清理"分布 + 真产物抽样（`favicon.ico`/`preview.html`/`onboarding-guide.md`/`a-sparkle.svg` 全为"保留"）③id 清单落 `/tmp/clean_ids.txt`，回滚件 `/tmp/rollback_cleanup.sql`（**按同谓词 `set del_flag=0`，幂等，无需 id 清单**）
+- **清理后实测**：孤儿行 0 / `call_*` 0 / `.pylibs` 0；面板回归——`0690b2d0` 仍列 594 件真产物（`b-jie.svg`/`a-mozhu.svg`…）、`a467aecf` 仍列 79 件（`preview.html`/`a-sparkle.svg`/`applications.png`）
+- **故意不动（如实）**：①历史广扫遗留的"跨会话行"（旧 store_key 格式无会话段，无法证伪，如会话 `31f42c23` 里 10-02 的 onboarding 系列）——按"不清理出错"原则保留待裁决 ②磁盘 tee 副本未删（仅逻辑删行；副本在 `/app/uploads/{agentId}/{sessionId}/`，删了会让已登记行下载 404）
+
 ## T-15/T-16 收口（2026-10-05）verify 13/13 + 归属对账，具备合并条件
 - T-15 全绿：跨会话隔离✓ 旧会话可见✓ 同会话三工具同处✓ **MCP 链✓**（agent36 变体键含 sessionId、35 工具挂载）技能链✓ **verify 13/13（`docker/scripts/verify.sh` 13 断言逐条 PASS）**
 - T-16：BUG-78/79/80 翻已验证；completion 补 v1.1.0 段；MILESTONE 第三行补 R-06 增量与记忆重置去向；改动面归属对账入 artifacts
