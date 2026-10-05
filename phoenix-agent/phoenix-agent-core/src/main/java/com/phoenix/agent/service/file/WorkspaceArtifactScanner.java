@@ -174,8 +174,16 @@ public class WorkspaceArtifactScanner {
             }
         }
         Path rel = agentDir.relativize(file);
-        for (Path p : rel) {
-            if (SKIP_DIRS.contains(p.toString())) {
+        // 末段是文件本身，只判中间的目录段
+        int dirCount = rel.getNameCount() - 1;
+        for (int i = 0; i < dirCount; i++) {
+            String seg = rel.getName(i).toString();
+            if (SKIP_DIRS.contains(seg)) {
+                return true;
+            }
+            // R-06 实测收尾：框架内部目录（.skills-cache 技能包缓存/.index/.agentscope/.pylibs…）不是用户产物。
+            // 漏掉后每个会话都会把整包技能脚本注册成"产物"（实测单会话 28 条噪音：catalog.json/search_library.py…）
+            if (seg.startsWith(".")) {
                 return true;
             }
         }
