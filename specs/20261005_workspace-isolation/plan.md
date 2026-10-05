@@ -1,6 +1,6 @@
 # Plan: workspace-isolation（BUG-67+68 同刃双修）
 
-> 版本: v0.1.0 | 状态: 草稿 | 更新: 2026-10-05
+> 版本: v1.0.0 | 状态: 已确认 | 确认人: 陈卓 | 确认日期: 2026-10-05 | 更新: 2026-10-05
 > 规范路由：code-backend=global / database=global（零 DDL、零 DB 重写）/ git-workflow=global（v1.6.0 第三 spec）
 
 ## 〇、坑核对（lessons 全 15 条 active 逐条过）
