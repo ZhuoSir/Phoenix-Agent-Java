@@ -1,5 +1,8 @@
 # Changelog: workspace-isolation
 
+## plan v0.1.0（2026-10-05）
+- Phase 2 落盘：L-06 消费方勘察闭环（真实消费仅 3 处，8/10 文件零引用；**下载走 tee 副本 filesRoot 另一根→迁移零 DB 重写**——枚举省掉一台多余手术）；方案=factory 换根一行级+scanner 全局首占+补扫窄窗（最近 assistant 消息起）+迁移 runner（允许集=DB runtimeKey 实时查询，只 move 不删，幂等）；身份矩阵 6/被否案 4/风险 5；坑核对 15 条全过
+
 ## v1.0.0（2026-10-05）—— 确认①通过
 - 用户「确认，按推荐」（Q1 归档重置/Q2 接受记忆重置）；存储布局图已向用户展示（卷不动、根下加 agent 层、_legacy_shared 归档）；进 Phase 2
 
