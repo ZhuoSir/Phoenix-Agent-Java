@@ -48,3 +48,7 @@ clean-deploy-all-local.bat
 /phoenix-agent/.flattened-pom.xml
 .DS_Store
 .agentscope
+
+### 本地构建/缓存与临时产物（v1.7.0 T-01 / BL-12）
+.mvn-home/
+.pnpm-store/
