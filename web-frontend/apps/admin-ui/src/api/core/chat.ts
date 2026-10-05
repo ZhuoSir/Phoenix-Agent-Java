@@ -60,7 +60,8 @@ export async function clearAgentSessionsApi(agentId: number): Promise<void> {
 export async function getSessionMessagesApi(sessionId: string): Promise<ChatMessage[]> {
   const response = await requestClient.get<{ success: boolean; data: ChatMessage[] }>(
     `${API_BASE_URL}/sessions/${sessionId}/messages`,
-    { responseReturn: 'body' },
+    // BUG-76：长轮期间后端负载高，默认超时易触发前端"请求超时"toast 与误判 → 放宽到 60s
+    { responseReturn: 'body', timeout: 60_000 },
   );
   if (!response.success) {
     return [];

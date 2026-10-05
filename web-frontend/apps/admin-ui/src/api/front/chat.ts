@@ -42,6 +42,8 @@ export async function getSessionMessagesApi(
     return (
       (await requestClient.get<ApiChatMessage[]>(
         `/api/sessions/${sessionId}/messages`,
+        // long-turn-resilience：长轮期间后端负载高，默认超时易触发前端"请求超时" → 与运行页对齐放宽 60s
+        { timeout: 60_000 },
       )) ?? []
     );
   } catch {

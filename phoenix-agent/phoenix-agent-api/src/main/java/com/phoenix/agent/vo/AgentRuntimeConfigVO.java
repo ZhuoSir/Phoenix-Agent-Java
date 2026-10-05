@@ -33,5 +33,14 @@ public class AgentRuntimeConfigVO implements Serializable {
     /** 工具迭代上限（1~100；null=框架默认） */
     private Integer maxIterations;
 
+    /** R-05：压缩触发令牌水位（null=全局默认） */
+    private Integer compactionTriggerTokens;
+
+    /** R-05：压缩保留原文条数（null=全局默认） */
+    private Integer compactionKeepMessages;
+
+    /** R-05：工具结果回收字符阈值（null=全局默认） */
+    private Integer toolResultMaxChars;
+
     private String filesystemPolicy;
 }

@@ -76,10 +76,19 @@ export interface AgentApiKeyResponse {
 
 // ===== 发布/下线 =====
 
-export async function publishAgentApi(id: number) {
-  return requestClient.post(`/api/agent/${id}/publish`, undefined, {
+export async function publishAgentApi(id: number, groupIds?: string[]) {
+  // agent-publish-group-grant R-01：带 groupIds=发布+覆盖式授权；不带=老行为仅置状态
+  return requestClient.post(`/api/agent/${id}/publish`, groupIds ? { groupIds } : undefined, {
     responseReturn: 'body',
   });
+}
+
+export async function getAgentGroupsApi(id: number) {
+  return requestClient.get<string[]>(`/api/agent/${id}/groups`, { responseReturn: 'body' });
+}
+
+export async function updateAgentGroupsApi(id: number, groupIds: string[]) {
+  return requestClient.put<boolean>(`/api/agent/${id}/groups`, { groupIds }, { responseReturn: 'body' });
 }
 
 export async function offlineAgentApi(id: number) {

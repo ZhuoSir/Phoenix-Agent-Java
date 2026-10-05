@@ -163,6 +163,43 @@ public class AgentServiceImpl extends ServiceImpl<AgentMapper, Agent> implements
 	 * 根据 ID 删除 Agent，同时清理向量数据和头像文件
 	 */
 	@Override
+	public java.util.List<String> getGrantGroupIds(Long agentId) {
+		if (agentId == null) {
+			return java.util.List.of();
+		}
+		// agent_id 列 varchar（历史坑 BUG-29），String 化比较
+		return com.mybatisflex.core.row.Db
+			.selectListBySql("select group_id from tbl_platform_group_agent_info where agent_id = ? and del_flag = 0",
+					String.valueOf(agentId))
+			.stream().map(r -> r.getString("group_id")).toList();
+	}
+
+	@Override
+	public void replaceGroupGrants(Long agentId, java.util.List<String> groupIds, String operator) {
+		java.util.List<String> distinct = groupIds == null ? java.util.List.of()
+				: groupIds.stream().filter(org.springframework.util.StringUtils::hasText).distinct().toList();
+		for (String gid : distinct) {
+			Object cnt = com.mybatisflex.core.row.Db
+				.selectObject("select count(*) from tbl_platform_group_info where id = ? and del_flag = 0", gid);
+			if (cnt == null || ((Number) cnt).longValue() == 0) {
+				throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST,
+						"授权目标组不存在: " + gid);
+			}
+		}
+		// 覆盖式：物理删后重建（授权关系无审计留存要求，技能先例同构）
+		com.mybatisflex.core.row.Db.updateBySql("DELETE FROM tbl_platform_group_agent_info WHERE agent_id = ?",
+				String.valueOf(agentId));
+		for (String gid : distinct) {
+			// del_flag 列默认 1（默认已删！）——必须显式置 0（T-01 实勘）
+			com.mybatisflex.core.row.Db.insertBySql(
+					"INSERT INTO tbl_platform_group_agent_info (id, group_id, agent_id, creator, updator, create_time, update_time, del_flag) "
+							+ "VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0)",
+					java.util.UUID.randomUUID().toString().replace("-", ""), gid, String.valueOf(agentId), operator,
+					operator);
+		}
+		log.info("智能体组授权覆盖式重写: agentId={}, groupIds={}, by={}", agentId, distinct, operator);
+	}
+
 	public void deleteById(Long id) {
 		try {
 			// 获取头像信息用于文件清理
@@ -179,6 +216,9 @@ public class AgentServiceImpl extends ServiceImpl<AgentMapper, Agent> implements
 					"UPDATE tbl_data_agent_runtime_config SET del_flag = 1 WHERE agent_id = ? AND del_flag = 0", id);
 				int n2 = com.mybatisflex.core.row.Db.updateBySql(
 					"UPDATE tbl_data_agent_skill_info SET del_flag = 1 WHERE agent_id = ? AND del_flag = 0", id);
+				// mcp-client-tools T-07：MCP 绑定同构级联（BUG-14 教训：删除必须清全部关系表）
+				int n6 = com.mybatisflex.core.row.Db.updateBySql(
+					"UPDATE tbl_data_agent_mcp_info SET del_flag = 1 WHERE agent_id = ? AND del_flag = 0", id);
 				int n3 = com.mybatisflex.core.row.Db.updateBySql(
 					"UPDATE tbl_platform_group_agent_info SET del_flag = 1 WHERE agent_id = ? AND del_flag = 0",
 					String.valueOf(id)); // 平台列 varchar，String 化（PG 无 varchar=bigint）
@@ -186,7 +226,7 @@ public class AgentServiceImpl extends ServiceImpl<AgentMapper, Agent> implements
 					"DELETE FROM tbl_data_agent_kbase_bind WHERE agent_id = ?", id);
 				int n5 = com.mybatisflex.core.row.Db.updateBySql(
 					"DELETE FROM tbl_data_agent_datasource WHERE agent_id = ?", id);
-				log.info("BUG-14 级联清理 agent={}: runtime={} skill={} group={} kbase={} ds={}", id, n1, n2, n3, n4, n5);
+				log.info("BUG-14 级联清理 agent={}: runtime={} skill={} group={} kbase={} ds={} mcp={}", id, n1, n2, n3, n4, n5, n6);
 			}
 			catch (Exception ce) {
 				log.warn("BUG-14 级联清理失败（不影响智能体删除）agent={}: {}", id, ce.toString());

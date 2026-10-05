@@ -46,6 +46,8 @@ public class HarnessChatServiceImpl implements HarnessChatService {
     private final HarnessAgentRegistry harnessAgentRegistry;
     private final HitlCacheService hitlCacheService;
     private final SkillExplicitInjectionService skillExplicitInjectionService;
+    private final com.phoenix.agent.harness.mcp.McpMountService mcpMountService;
+    private final com.phoenix.agent.service.FrontMcpAccessService frontMcpAccessService;
     private final WorkspaceArtifactScanner workspaceArtifactScanner;
     private final com.phoenix.agent.service.AgentRuntimeConfigService agentRuntimeConfigService;
 
@@ -90,7 +92,8 @@ public class HarnessChatServiceImpl implements HarnessChatService {
      */
     private HarnessAgent resolveAgent(HarnessRequest request) {
         if (request.getAgentId() != null) {
-            return harnessAgentRegistry.get(request.getAgentId());
+            // R-06：按（智能体, 会话）取实例——工作区随会话独立
+            return harnessAgentRegistry.get(request.getAgentId(), request.getSessionId());
         }
         if (!org.springframework.util.StringUtils.hasText(request.getHarnessSn())) {
             // 显式入参校验：两者皆缺时给明确错误（原先落到 loadAgent(null) → 500）
@@ -117,9 +120,13 @@ public class HarnessChatServiceImpl implements HarnessChatService {
         // 技能全文经 RuntimeContext 交给 ExplicitSkillMiddleware 注入系统提示（plan v1.1.0 决策4）
         java.util.concurrent.atomic.AtomicBoolean textDeltaSeen = new java.util.concurrent.atomic.AtomicBoolean(false);
         final Integer effMaxIters = resolveEffectiveMaxIters(request.getAgentId());
-        Flux<NodeOutput> body = harnessAgent
-            .streamEvents(buildUserMessage(request), buildRuntimeContext(request, injection.block()))
-            .map(event -> toNodeOutput(event, sessionId, textDeltaSeen, effMaxIters));
+        // T-05：MCP 变体挂载（交集空=原实例零变化路径；构建/注册全在 boundedElastic）
+        Flux<NodeOutput> body = mcpMountService
+            .withMcp(harnessAgent, request.getAgentId(), request.getSessionId(),
+                effectiveMcp(request.getChannel(), request.getUserId(), request.getAgentId()))
+            .flatMapMany(agent -> agent
+                .streamEvents(buildUserMessage(request), buildRuntimeContext(request, injection.block()))
+                .map(event -> toNodeOutput(event, sessionId, textDeltaSeen, effMaxIters)));
         // BL-19：轮末扫 workspace 产物。END 帧从 body 中剥离、在扫描事件之后统一补发——
         // 否则 agentFiles 落在 end=true 之后，前端（按 end 收尾）收不到，还会多渲染一个空消息框。
         java.time.Instant turnStart = java.time.Instant.now();
@@ -216,7 +223,8 @@ public class HarnessChatServiceImpl implements HarnessChatService {
     @Override
     public Flux<NodeOutput> confirmStream(ConfirmRequest request) {
         if (request.getAgentId() != null) {
-            return confirmStream(harnessAgentRegistry.get(request.getAgentId()), request);
+            // R-06：确认续跑必须取同一会话实例（否则换到智能体级工作区，产物落错地方）
+            return confirmStream(harnessAgentRegistry.get(request.getAgentId(), request.getSessionId()), request);
         }
         if (!org.springframework.util.StringUtils.hasText(request.getAgentSn())) {
             throw new InvalidInputException("agentId 与 agentSn 至少需要一个");
@@ -280,9 +288,29 @@ public class HarnessChatServiceImpl implements HarnessChatService {
                 .metadata(Map.of(Msg.METADATA_CONFIRM_RESULTS, List.of(result)))
                 .build();
         java.util.concurrent.atomic.AtomicBoolean textDeltaSeen = new java.util.concurrent.atomic.AtomicBoolean(false);
-        return harnessAgent.streamEvents(confirmMsg, RuntimeContext.builder().userId(request.getUserId()).sessionId(request.getSessionId()).build())
-                .map(event -> toNodeOutput(event, request.getSessionId(), textDeltaSeen,
-                    resolveEffectiveMaxIters(null)));
+        // T-05：confirm 续跑链同挂 MCP 变体（口径随渠道）
+        return mcpMountService
+                .withMcp(harnessAgent, request.getAgentId(), request.getSessionId(),
+                    effectiveMcp(request.getChannel(), request.getUserId(), request.getAgentId()))
+                .flatMapMany(agent -> agent.streamEvents(confirmMsg, RuntimeContext.builder()
+                    .userId(request.getUserId()).sessionId(request.getSessionId()).build())
+                    .map(event -> toNodeOutput(event, request.getSessionId(), textDeltaSeen,
+                        resolveEffectiveMaxIters(null))));
+    }
+
+    /** T-05 口径分流：front=三重交集（组授权），admin/null=绑定∧启用（A-5 实勘对齐技能口径）。 */
+    private List<com.phoenix.agent.model.McpServerInfo> effectiveMcp(String channel, String userId, Long agentId) {
+        if (agentId == null) {
+            return List.of();
+        }
+        try {
+            return "front".equals(channel) ? frontMcpAccessService.effectiveForFront(userId, agentId)
+                    : frontMcpAccessService.effectiveForAdmin(agentId);
+        }
+        catch (Exception e) {
+            log.warn("MCP 有效集计算失败，按无 MCP 降级: agentId={}, err={}", agentId, e.toString());
+            return List.of();
+        }
     }
 
     private NodeOutput toNodeOutput(AgentEvent event, String sessionId,

@@ -25,6 +25,32 @@ const currentAgent = computed(() => {
 });
 const botName = computed(() => currentAgent.value?.name ?? 'AI');
 
+// long-turn-resilience T-03/R-02：长轮活性指示——流式中每秒刷新已用时，证明"在跑"而非卡死
+const streamingElapsedText = ref('');
+let elapsedStart = 0;
+let elapsedTimer: ReturnType<typeof setInterval> | null = null;
+watch(
+  () => activeMessages.value.some((m: any) => m.streaming),
+  (on: boolean) => {
+    if (elapsedTimer) {
+      clearInterval(elapsedTimer);
+      elapsedTimer = null;
+    }
+    if (!on) {
+      streamingElapsedText.value = '';
+      return;
+    }
+    elapsedStart = Date.now();
+    elapsedTimer = setInterval(() => {
+      const sec = Math.floor((Date.now() - elapsedStart) / 1000);
+      const mm = String(Math.floor(sec / 60)).padStart(2, '0');
+      const ss = String(sec % 60).padStart(2, '0');
+      streamingElapsedText.value = `正在执行（已用时 ${mm}:${ss}）`;
+    }, 1000);
+  },
+  { immediate: true },
+);
+
 function renderMessage(msg: Record<string, any>): string {
   const content = String(msg.content ?? '');
   if (msg.role === 'user') {
@@ -49,20 +75,42 @@ function escapeHtml(text: string): string {
 
 const scrollRef = ref<HTMLElement | null>(null);
 
-async function scrollToBottom() {
+// long-turn-resilience T-03 附加：消息区贴底跟随（流式内容增长也跟随；用户上翻则暂停，滚回底部恢复）
+let stickToBottom = true;
+function onMessagesScroll() {
+  const el = scrollRef.value;
+  if (!el) return;
+  stickToBottom = el.scrollHeight - el.scrollTop - el.clientHeight <= 40;
+}
+
+async function scrollToBottom(force = true) {
   await nextTick();
   const el = scrollRef.value;
   if (!el) return;
+  if (!force && !stickToBottom) return;
   el.scrollTop = el.scrollHeight;
 }
 
 watch(activeMessages, () => {
+  stickToBottom = true;
   void scrollToBottom();
 });
 
 watch(activeSessionId, () => {
+  stickToBottom = true;
   void scrollToBottom();
 });
+
+// 流式正文/思考增长 → 贴底跟随（原实现只在消息数组变化时滚动，内容增长不跟随=需手动下拉）
+watch(
+  () => {
+    const last = activeMessages.value[activeMessages.value.length - 1] as any;
+    return last ? `${String(last.content ?? '').length}:${String(last.thinking ?? '').length}` : '';
+  },
+  () => {
+    void scrollToBottom(false);
+  },
+);
 
 let msgCounter = 0;
 function uid(): string {
@@ -102,7 +150,7 @@ async function handleConfirmAction(
 </script>
 
 <template>
-  <div ref="scrollRef" class="chat-messages">
+  <div ref="scrollRef" class="chat-messages" @scroll="onMessagesScroll">
     <div class="chat-messages__inner">
       <div
         v-for="(msg, index) in activeMessages"
@@ -138,6 +186,7 @@ async function handleConfirmAction(
           <div
             v-if="(msg as any).messageType === 'html'"
             class="chat-message__html"
+            v-show="String(msg.content ?? '').trim()"
             v-html="msg.content"
           ></div>
           <div
@@ -191,8 +240,12 @@ async function handleConfirmAction(
               'chat-message__text--markdown': msg.role === 'assistant',
               'chat-message__text--streaming': msg.streaming
             }"
+            v-show="String(msg.content ?? '').trim()"
             v-html="renderMessage(msg)"
           ></div>
+          <div v-if="msg.streaming && streamingElapsedText" class="chat-message__elapsed">
+            {{ streamingElapsedText }}
+          </div>
         </div>
 
         <div
@@ -320,6 +373,12 @@ async function handleConfirmAction(
     color: hsl(var(--primary-foreground));
     background: hsl(var(--primary));
     border: none;
+  }
+
+  &__elapsed {
+    margin-top: 4px;
+    font-size: 12px;
+    color: var(--el-text-color-secondary);
   }
 
   &__text--streaming {

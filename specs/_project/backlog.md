@@ -1,16 +1,17 @@
 # 待办清单（Backlog）
 > 编号 `BL-xx` **永久不复用**（同 R/T/BUG 规则；作废标 `[作废]` 保留）
 > 状态：`待立项` → `已立项(vX.Y.Z)` → `已交付(vX.Y.Z)`；旁路 `搁置(原因)`、`待确认`（需用户先定口径）
+> 〔2026-10-05 补〕`已交付(vX.Y.Z，已冻结)`=**内容随该版冻结定版、发版件齐备**；打 tag 后追注「已发布」。（此前易被误读为"还在做"）
 > 边界：本表只放**非需求、非缺陷**的功能与工程待办 —— 缺陷走 `bugs.md`；在手任务走对应 spec 的 `tasks.md`/`completion.md`
 > 立项时移入 `specs/{日期}_{功能名}/`，本表条目**保留不删除**，状态列标注交付版本
 
 ## 一、功能待办
 | # | 待办 | 来源 | 状态 | 备注（现状 / 建议 spec） |
 |---|---|---|---|---|
-| BL-01 | **MCP 支持**：对话智能体接入 MCP 工具（作为 MCP Client 消费外部 MCP Server），与现有「平台作为 MCP Server 对外暴露 nl2sql/agent 列表」形成双端能力 | 2026-09-27 用户列入待办 | 待立项 | 平台侧已有 `McpServerService`（暴露 `nl2SqlToolCallback`/`listAgentsToolCallback`）与 `McpServerConfig`；AgentScope Harness 侧具备 `McpServerRegistrar`/`McpServerConfig`（jar 内已见）但**未接线**。建议 spec：`mcp-client-tools` |
+| BL-01 | **MCP 支持**：对话智能体接入 MCP 工具（作为 MCP Client 消费外部 MCP Server），与现有「平台作为 MCP Server 对外暴露 nl2sql/agent 列表」形成双端能力 | 2026-09-27 用户列入待办 | 已交付(v1.6.0，已冻结) | 平台侧已有 `McpServerService`（暴露 `nl2SqlToolCallback`/`listAgentsToolCallback`）与 `McpServerConfig`；AgentScope Harness 侧具备 `McpServerRegistrar`/`McpServerConfig`（jar 内已见）但**未接线**。建议 spec：`mcp-client-tools` 〔2026-10-05 冻结注〕mcp-client-tools 9/9 实现完成，已并入 v1.6.0 并冻结；BUG-65/66 已验证；SQL V1.6.0_01/02 在册——状态列的「在途」字样已去除|
 | BL-02 | 工作流智能体的**图定义与可视化编排** | 2026-09-27 用户明确"本期不做，先放起来" | 待立项 | 图仍由 Java 硬编码（`ParolCompiledGraph`），DB 无图定义存储、前端无画布。建议 spec：`workflow-orchestration` |
 | BL-03 | 存量 5 个 Java 自注册智能体的**迁移与删除**（现仅从列表隐藏） | 2026-09-27 用户决定"代码保留，暂作实现参考" | 待立项 | **前置已具备**：`dynamic-agent-types` 16/16 完成、数据驱动链路与存量行为等价已实测（存量 5 个各一轮对话不回归）。建议 spec：`legacy-agent-migration` |
-| BL-04 | 智能体↔组关联改为「**智能体发布时关联组**」（与技能发布时授权组同构） | 2026-09-27 用户明示（`agent-skill-management` Non-goals） | 待立项 | 现状：组授权在组管理侧维护（`tbl_platform_group_agent_info`）；目标是发布动作里多选组、发布后即时生效 |
+| BL-04 | 智能体↔组关联改为「**智能体发布时关联组**」（与技能发布时授权组同构） | 2026-09-27 用户明示（`agent-skill-management` Non-goals） | 已交付(v1.6.0，已冻结) | 现状：组授权在组管理侧维护（`tbl_platform_group_agent_info`）；目标是发布动作里多选组、发布后即时生效 〔2026-10-05 冻结注〕agent-publish-group-grant 7/7 实现完成，已并入 v1.6.0 并冻结；用户走查通过；零 DDL——状态列的「在途」字样已去除|
 |  BL-05  |  **统一账号中心**：消除 `tbl_privilege_user` / `tbl_platform_account_info` 双账号体系  |  2026-09-27 排障中发现（根因登记 `BUG-04`）  |  待立项  | 两表状态语义相反（1=禁用 vs 0=禁用）、密码互不相通、同名账号两条记录。最低成本方案=单表+角色字段；建议 spec：`unified-account`\|；承接 BUG-45 遗留：预设问题 add/delete 接口角色限制随体系统一一并做 |
 | BL-06 | 清理**早期 demo 遗留表**：`tbl_tmp_orders/products/users`、`tbl_data_orders/products/users/order_items/categories`（应用代码零引用） | `BUG-01` 附带建议 | 待立项 | 这批表源自早期演示数据，占种子体积且易误导（本次曾被它们触发级联报错）。需带迁移+回滚脚本 |
 | BL-07 | 关联表 `agent_id` **列类型统一为 bigint** | `BUG-29` 根因（代码侧已绕过） | 待立项 | `tbl_platform_group_agent_info.agent_id` 是 varchar，`tbl_data_agent_skill_info.agent_id` 是 bigint，口径不一致；涉及存量数据迁移与索引重建 |
@@ -31,13 +32,15 @@
 | # | 待办 | 来源 | 状态 | 备注 |
 |---|---|---|---|---|
 | BL-16 | **里程碑挂接（M0+M1）**：建 `releases/vX.Y.Z/`、把三个 spec 与已修复缺陷挂入、回填版本号 | skill 里程碑流程；项目原先无 `releases/` | **已交付(v1.2.0)** | 2026-09-27 完成：`releases/v1.2.0/MILESTONE.md`（3 spec + 18 缺陷）；版本号取 MINOR=v1.2.0（历史分支线已到 1.1.x，用户确认）。**M2 冻结前置未满足**：① `agent-config-ai-generate` 未合并；② P1（BUG-01/20）未达「已验证」 |
-| BL-17 | **汇总升级件（M3）**：把 spec-1/2/3 的 `01~05` 升级件重排为 Flyway 风格 `V<版本>_<序号>__<描述>.sql` + rollback 配对，产出 `UPGRADE.md` / `RELEASE-NOTES.md` / `config/changes.md` | 同上 | **已交付(v1.2.0)** | 2026-10-04 账面同步：M3 汇总自 v1.2.0 起成惯例，v1.3.0/v1.4.0/v1.5.0 三轮均执行（Flyway 重排/rollback 配对/四件套） |
+| BL-17 | **汇总升级件（M3）**：把 spec-1/2/3 的 `01~05` 升级件重排为 Flyway 风格 `V<版本>_<序号>__<描述>.sql` + rollback 配对，产出 `UPGRADE.md` / `RELEASE-NOTES.md` / `config/changes.md` | 同上 | **已交付(v1.2.0)** | 2026-10-04 账面同步：M3 汇总自 v1.2.0 起成惯例，v1.3.0/v1.4.0/v1.5.0 三轮均执行（Flyway 重排/rollback 配对/四件套） 〔2026-10-05：v1.6.0 汇总件已执行——`V1.6.0_01~03`+rollback 配对+RELEASE-NOTES/UPGRADE/config/checklist 四件套，全新库重放绿、回滚零残留〕|
 
 ## 四、在手未完成（指向 spec，不占 BL 编号）
 - `specs/20260927_agent-config-ai-generate`：**〔已随 v1.2.0 发布，历史快照〕** 13 个任务已勾 8 个，未勾 `T-05 / T-10 / T-11 / T-12 / T-13` —— 只差**界面人工走查**（浏览器扩展未连接，无法自动走查）；代码层证据已齐（`vue-tsc` 189、8 个改动文件 Vite 转译 200）。
+  〔2026-10-05 注：本地已无该 feature 分支；账面按**历史快照**收存。彻底销账=补勾剩余 5 项或整 spec 标「作废」，待用户裁决〕
   分支 `feature/agent-config-ai-generate`（未合并，合并条件是 tasks 全勾 + 证据齐）；走查清单见该 spec `changelog.md` 末尾「界面走查待办」。
 - ~~bugs.md 中 11 条「新建」缺陷待处置~~ **〔2026-10-04 注：已全部处置——fix-bug-batch 清仓（9 修复+BUG-04 批准不修复），随 v1.4.0 发布〕**
 - 里程碑〔2026-10-04 注：**v1.2.0/v1.2.1/v1.3.0/v1.4.0/v1.5.0 全部已发布**；在途=无，下一需求起 v1.6.0〕
+  〔2026-10-05 注：**v1.6.0 已立项并冻结**（基线 `16225cf`），在途唯一=v1.6.0；冻结后新需求挂 v1.7.0〕
 
 - **BL-18 前端 API 前缀治理**：**已交付(v1.3.0，原记 v1.2.2 已并入)**——baseURL 置空+路径归一+代理透传，nginx 折叠规则已删；BUG-33 转已修复。
 
@@ -50,3 +53,8 @@
 | BL-22 | **断线续传/流恢复（BUG-53 的 B 方案）**：SSE 执行与连接解耦——harness 流经 Sinks.replay 中继 + Redis Streams 轮次缓冲（db8 现成，XADD/XREAD 带 offset 重放+追live+TTL 清孤儿），刷新/断网后重进会话 rejoin 继续观看至完成落库；配套改造：助手消息落库所有权由前端 onComplete **移交服务端按 turnId upsert**（幂等）、新增显式「停止生成」取消接口（断连≠停止）、前端进会话先查服务端状态再决定是否用 A′ 本地快照回显（防双半截）。可行性已评：Reactor 取消传染有标准解法、HITL pending_confirm 天然兼容、帧协议零改动；预估 2-3 天，A′ 原型（stash: BUG-53 A′）可作灰度兜底一并取用 | 2026-10-02 用户拍板「列入待办」→ 同日升级为 v1.4.0 首需求立项 | **已交付(v1.4.0)** | 关联: BUG-53 / BL-20（多子智能体的实时子任务详情与本缓冲基建同源，宜同期或先行设计对齐） |
 | BL-23 | package.sh mirror 竞速探活升级为吞吐型（测小 blob 下载速率而非 HEAD 响应） | 2026-10-04 演练四实证：1ms.run HEAD 快但传输 40KB/s 僵死，竞速选中慢源 | 待立项 | P2；临时方案=--mirror 手工指定 |
 | BL-24 | install.ps1/bootstrap.ps1 共享 WSL 就绪段抽公共 ps1 库 | plan §1.6 被拒案留档（v1 薄复制+注释互指），两处改动需人工同步 | 待立项 | P3；下次改 ps1 时顺手做 |
+| BL-25 | **API 插件**：插件市场「插件管理」下第二类插件——把 HTTP API 注册为智能体可调用工具（API 定义/鉴权/参数映射，组授权与绑定同 MCP 同构） | 2026-10-04 用户 BL-01 立项时明示「未来还会做 API 插件，列入待办」 | 待立项 | 依赖 mcp-client-tools（v1.6.0）落地的插件市场架构扩展位；立项时复用 R-02/R-03 组授权与绑定语义 |
+| BL-26 | **工作区「单根」收敛（`BUG-83` 的 C 方案）**：去掉会话工作区的 USER namespace 层——`IsolationScope.AGENT` + `.workspace(sessionRoot)`，使 **文件工具根 = shell cwd = `.skills-cache` 技能包根 = `memory/` 根** 完全重合（现状 A：文件工具在 `{sessionRoot}/{uid}/`、shell 在 `{sessionRoot}/`，同会话两个根，模型实测困惑并追问按哪种约定；技能包在会话根，文件工具相对路径够不到→老会话日志自述「read_file 打不开 .skills-cache…改用 execute+cat」） | 2026-10-05 R-06 验收实测发现 `BUG-83`；用户裁决「先做 A（保持现状），把 C 列入待办」 | 待立项 | **前置 spike**（立项第一步，勿跳）：AGENT 档位下实测 ①落点树 ②memory 读写 ③技能脚本执行三件；**流程**：触及已确认 plan「框架内再拼 uid」决策 → 需 requirements/plan 增量 + 重确认（铁律 3）；**收益**：模型单一根心智、技能包相对路径两工具都可达、面板不再有"子文件夹里的产物"观感；**代价**：memory/技能缓存落点上移一层（存量记忆再重置一次，并入 M3 `RELEASE-NOTES` 的"记忆重置"提示）；**建议批次**：M3（与 BL-17 汇总升级件同期，避免再动一次工作区布局） |
+| BL-27 | **运行时配置参数形态重做（`T-06` 被否版）**：该位置应暴露 **①模型上下文 token ②输出最大 token ③压缩比例** 三项；**其余参数一律收为默认**（不在 UI 暴露，含现状已上线的"压缩触发 token/保留条数/工具结果截断"三输入） | 2026-10-05 long-turn-resilience T-06 用户实测："有，但是这个设计不对"；同日口径明示（见左） | 待立项（**用户 2026-10-05：先列入待办不管，等指令**） | **为何现在这版不对**：暴露的是底层技术参数（token 阈值/条数/字符数），业务用户无法据此决策；按新口径改成"模型侧三参数"（上下文窗口/最大输出/压缩比例）后，压缩触发点可由 比例×(上下文−输出预留) 推导，用户只需理解模型本身。**实现要点（立项时核）**：①新参数落点=运行配置表加列（Flyway 件）+ 前端三输入替换 ②与模型配置（`tbl_data_model_config`）的关系——上下文/最大输出是否应从模型配置继承（避免同一事实两处填） ③压缩比例如何映射到框架 `CompactionConfig.triggerTokens` ④现三列保留（默认值不变）但不再暴露 |
+| BL-28 | **会话文件面板改「文件夹树」展示**：从**会话目录**为根，逐层列出文件夹与文件，点文件夹可进入/展开查看里面的文件（用户原话："文件列表现在显示的是所有文件，但是没有智能体生成了文件夹，要求按照文件夹显示，生成的文件夹要显示出来，然后可以点文件夹里面看文件，从会话目录文件夹开始，往下是文件还有文件夹"） | 2026-10-05 用户口述（当时语境：R-06 会话级工作区上线后，面板仍是全平铺） | 待立项 | **现状**：`AgentFileServiceImpl.listBySession` 按会话平铺查 `tbl_data_agent_file`（orderBy create_time desc），VO 只有 id/fileName/sizeBytes/mime/source/createTime → 前端只能平铺；**目录层次在库里可还原**：`store_key` 形如 `{agentKey}/{会话内相对路径}:{size}`（例 `agent-33/{sessionId}/{uid}/a/b.svg:1234`），而 `rel_path` 是 tee 布局（`{agentId}/{sessionId}/{rand}_{name}`）**不可用于展示**。**要做**：①后端加"会话文件树"接口（按 store_key 相对路径切层，根=会话目录）②前端树组件（文件夹在前、文件在后，可展开/进入）③**空文件夹**是否显示待定——DB 只登记有内容的文件，纯空目录不在库里（要显示需改为扫磁盘目录树）④框架内部目录继续隐藏（`.pylibs`/`.skills-cache`/`.agentscope`/`large_tool_results`，过滤规则已有）⑤历史行（旧 store_key 无会话段）归位策略或单列「历史文件」节点 ⑥下载/删除沿用现有 row id 接口。**风险**：store_key 有三代格式（`{uid}/…`、`{agentKey}/{uid}/…`、`{agentKey}/{sessionId}/…`），解析需兼容。建议 spec：`specs/{日期}_session-file-tree` |
+| BL-29 | **模型接入支持 Ollama**（本地/内网） | 2026-10-05 用户口述 | 待立项 | **现状**：`HarnessModelRegistry` 只建 `OpenAIChatModel` 且 formatter 硬编码 `DeepSeekFormatter`；`HarnessAgentFactory`/`memoryConfig` 等签名都是 `OpenAIChatModel` **具体类型**；`tbl_data_model_config` 已有 `provider/base_url/api_key/model_name/model_type`（provider=varchar，**无需改 DDL**）。**关键利好（已实勘）**：框架自带 `agentscope-extensions-model-ollama:2.0.0`（`OllamaChatModel` + `OllamaChatFormatter`/`OllamaMultiAgentFormatter`），且 jar **已在本机 maven 仓**（离线可编）；`OllamaChatModel` 与 `OpenAIChatModel` **同基类** `io.agentscope.core.model.ChatModelBase`，而 `HarnessAgent.Builder.model(...)` 收的是 `io.agentscope.core.model.Model` → 改造=**把本工程模型类型从具体类上移到 `ChatModelBase`/`Model`** + 按 provider 分支 + formatter 选择。**要做**：①加依赖 + 类型上移（registry/factory/memory 三处签名）②按 provider 分支（deepseek/openai/ollama）③配置 UI：ollama 的 baseUrl（如 `http://host:11434`）、apiKey 可空（表列 NOT NULL → 存空串或放宽约束）④连通性测试（复用现有模型测试链路）⑤**能力差异**：Ollama 多数模型不支持 thinking/tool-calling 或格式不同 → 需能力开关/降级，并与 BUG-77（思考回传）兼容 ⑥离线场景验证（内网 Ollama，交付包无外网） |

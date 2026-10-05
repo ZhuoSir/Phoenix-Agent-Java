@@ -12,6 +12,12 @@ export interface AgentRuntimeConfig {
   knowledgeTopK?: number;
   /** 工具迭代上限 1~100；null/undefined=系统默认（runtime-max-iterations） */
   maxIterations?: null | number;
+  /** 上下文治理（R-05）：压缩触发 token 数；null/undefined=全局默认（当前 102400 ≈ 0.8×128k，DSH 换算） */
+  compactionTriggerTokens?: null | number;
+  /** 上下文治理（R-05）：压缩后保留消息条数；null/undefined=全局默认（当前 20） */
+  compactionKeepMessages?: null | number;
+  /** 上下文治理（R-05）：单个工具结果最大字符数，超出走回收（不删，落盘可回读）；null/undefined=全局默认（当前 8192） */
+  toolResultMaxChars?: null | number;
   /** 知识库检索相似度阈值 0~1 */
   knowledgeSimilarityThreshold?: number;
   dbQueryEnabled?: boolean;

@@ -57,6 +57,15 @@ public class AgentRuntimeConfig implements Serializable {
     /** 单轮内工具迭代上限（1~100）；null=框架默认（runtime-max-iterations R-01） */
     private Integer maxIterations;
 
+    /** R-05 上下文治理：压缩触发令牌水位（NULL=全局默认） */
+    private Integer compactionTriggerTokens;
+
+    /** R-05：压缩保留原文条数（NULL=全局默认） */
+    private Integer compactionKeepMessages;
+
+    /** R-05：工具结果回收字符阈值（NULL=全局默认） */
+    private Integer toolResultMaxChars;
+
     private String creator;
 
     private Date createTime = new Date();

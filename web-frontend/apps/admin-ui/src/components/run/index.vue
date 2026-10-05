@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { watch } from 'vue';
 import ChatFilesPanel from '#/views/front/components/ChatFilesPanel.vue';
 import ThinkingBlock from '#/views/front/components/ThinkingBlock.vue';
 
@@ -17,7 +18,7 @@ function thinkingMetaOf(sid: string): string | undefined {
 }
 const filesPanelRef = ref<InstanceType<typeof ChatFilesPanel> | null>(null);
 import { notifyFilesChanged } from '#/api/core/agentFiles';
-import { forceClearStreamSnapshot, readStreamSnapshot, saveStreamSnapshot } from '#/utils/stream-snapshot';
+import { flushStreamSnapshot, forceClearStreamSnapshot, readStreamSnapshot, saveStreamSnapshot } from '#/utils/stream-snapshot';
 import type { Agent } from '#/api/core/agent';
 import type { ChatMessage, ChatSession } from '#/api/core/chat';
 import type {
@@ -27,7 +28,7 @@ import type {
   GraphRequest,
   HarnessChatRequest,
 } from '#/api/core/graph';
-import { harnessTurnStatusApi } from '#/api/core/graph';
+import { harnessTurnCancelApi, harnessTurnStatusApi } from '#/api/core/graph';
 import type {
   ResultData,
   ResultSetData,
@@ -73,6 +74,7 @@ import {
   saveMessageApi,
   streamChat,
   streamHarnessChat,
+  streamHarnessTurnJoin,
   streamSearch,
   TextType,
 } from '#/api';
@@ -111,6 +113,17 @@ declare global {
 interface SessionRuntimeState {
     snapText?: string;
   isStreaming: boolean;
+  // BUG-81：服务端轮次在跑（本页仅轮询）也必须**按会话记账**——页面级单例会让
+  // 别的会话的"进行中"泄漏到当前会话（输入框锁死+按钮变终止，切不回来）
+  remoteRunning: boolean;
+  /** T-04：join 追流的关闭句柄（切会话/停止时必须关，防泄漏订阅） */
+  closeJoin: (() => void) | null;
+  // BUG-81：HITL 确认条同族视图态（全局会让 A 的待确认锁死 B 的输入框）
+  showHarnessConfirm: boolean;
+  pendingConfirmButtons: ConfirmButton[];
+  pendingConfirmPlanHtml: string;
+  pendingConfirmSessionId: string;
+  pendingConfirmAgentId: number;
   nodeBlocks: GraphNodeResponse[][];
   closeStream: (() => void) | null;
   lastRequest: GraphRequest | null;
@@ -126,6 +139,13 @@ function useSessionStateManager() {
     if (!sessionStates.has(sessionId)) {
       sessionStates.set(sessionId, {
         isStreaming: false,
+        remoteRunning: false,
+        closeJoin: null,
+        showHarnessConfirm: false,
+        pendingConfirmButtons: [],
+        pendingConfirmPlanHtml: '',
+        pendingConfirmSessionId: '',
+        pendingConfirmAgentId: 0,
         nodeBlocks: [],
         closeStream: null,
         lastRequest: null,
@@ -141,11 +161,13 @@ function useSessionStateManager() {
     sessionId: string,
     viewState: {
       isStreaming: { value: boolean };
+      remoteRunning: { value: boolean };
       nodeBlocks: { value: GraphNodeResponse[][] };
     },
   ) => {
     const state = getSessionState(sessionId);
     viewState.isStreaming.value = state.isStreaming;
+    viewState.remoteRunning.value = state.remoteRunning;
     viewState.nodeBlocks.value = state.nodeBlocks;
   };
 
@@ -153,11 +175,13 @@ function useSessionStateManager() {
     sessionId: string,
     viewState: {
       isStreaming: { value: boolean };
+      remoteRunning: { value: boolean };
       nodeBlocks: { value: GraphNodeResponse[][] };
     },
   ) => {
     const state = getSessionState(sessionId);
     state.isStreaming = viewState.isStreaming.value;
+    state.remoteRunning = viewState.remoteRunning.value;
     state.nodeBlocks = viewState.nodeBlocks.value;
   };
 
@@ -165,6 +189,9 @@ function useSessionStateManager() {
     const state = sessionStates.get(sessionId);
     if (state?.closeStream) {
       state.closeStream();
+    }
+    if (state?.closeJoin) {
+      state.closeJoin();
     }
     sessionStates.delete(sessionId);
   };
@@ -192,6 +219,10 @@ const {
   deleteSessionState,
 } = useSessionStateManager();
 const isStreaming = ref(false);
+
+// BUG-75：区分「本页在直播」(isStreaming) 与「服务端轮次在跑、本页仅轮询」(remoteRunning)——
+// 前者渲染直播区，后者只控制输入禁用/终止按钮；混用会导致刷新后上下双输出窗口
+const remoteRunning = ref(false);
 const nodeBlocks = ref<GraphNodeResponse[][]>([]);
 const options = ref({
   markdownIt: { linkify: true },
@@ -212,6 +243,28 @@ function getMessageFormat(messageId: number | undefined): 'markdown' | 'html' {
 const inputControlsCollapsed = ref(false);
 const autoScroll = ref(true);
 const chatContainer = ref<HTMLElement | null>(null);
+
+// long-turn-resilience：长轮活性指示（每秒刷新已用时，证明"在跑"而非卡死）
+const streamElapsedText = ref('');
+let streamElapsedStart = 0;
+let streamElapsedTimer: ReturnType<typeof setInterval> | null = null;
+watch(isStreaming, (on: boolean) => {
+  if (streamElapsedTimer) {
+    clearInterval(streamElapsedTimer);
+    streamElapsedTimer = null;
+  }
+  if (!on) {
+    streamElapsedText.value = '';
+    return;
+  }
+  streamElapsedStart = Date.now();
+  streamElapsedTimer = setInterval(() => {
+    const sec = Math.floor((Date.now() - streamElapsedStart) / 1000);
+    const mm = String(Math.floor(sec / 60)).padStart(2, '0');
+    const ss = String(sec % 60).padStart(2, '0');
+    streamElapsedText.value = `正在执行（已用时 ${mm}:${ss}）`;
+  }, 1000);
+});
 const showHumanFeedback = ref(false);
 const showHarnessConfirm = ref(false);
 const pendingConfirmButtons = ref<ConfirmButton[]>([]);
@@ -220,6 +273,49 @@ const pendingConfirmPlanHtml = ref('');
 const pendingConfirmSessionId = ref('');
 const pendingConfirmAgentId = ref<number>(0);
 const lastRequest = ref<GraphRequest | null>(null);
+
+// BUG-81：确认条一族同属"每会话"视图态。做成页面级单例时，A 会话的待确认会把 B 会话的
+// 输入框一起锁死（且确认条按钮/目标会话会串到 B）。与 isStreaming 同法：切会话时存取本会话副本。
+function saveConfirmToState(sessionId: string) {
+  const st = getSessionState(sessionId);
+  st.showHarnessConfirm = showHarnessConfirm.value;
+  st.pendingConfirmButtons = pendingConfirmButtons.value;
+  st.pendingConfirmPlanHtml = pendingConfirmPlanHtml.value;
+  st.pendingConfirmSessionId = pendingConfirmSessionId.value;
+  st.pendingConfirmAgentId = pendingConfirmAgentId.value;
+}
+
+function syncConfirmFromState(sessionId: string) {
+  const st = getSessionState(sessionId);
+  showHarnessConfirm.value = st.showHarnessConfirm;
+  pendingConfirmButtons.value = st.pendingConfirmButtons;
+  pendingConfirmPlanHtml.value = st.pendingConfirmPlanHtml;
+  pendingConfirmSessionId.value = st.pendingConfirmSessionId;
+  pendingConfirmAgentId.value = st.pendingConfirmAgentId;
+}
+
+function clearConfirmView() {
+  showHarnessConfirm.value = false;
+  pendingConfirmButtons.value = [];
+  pendingConfirmPlanHtml.value = '';
+  pendingConfirmSessionId.value = '';
+  pendingConfirmAgentId.value = 0;
+}
+
+// 确认条任何变动都镜像回当前会话副本（否则"已确认"的旧条会在切回该会话时复活）
+watch(
+  [
+    showHarnessConfirm,
+    pendingConfirmButtons,
+    pendingConfirmPlanHtml,
+    pendingConfirmSessionId,
+    pendingConfirmAgentId,
+  ],
+  () => {
+    const sid = currentSession.value?.id;
+    if (sid) saveConfirmToState(sid);
+  },
+);
 const resultSetDisplayConfig = reactive<ResultSetDisplayConfig>({
   showSqlResults: false,
   pageSize: 20,
@@ -296,7 +392,12 @@ async function loadAgent() {
 
 async function selectSession(session: ChatSession | null) {
   if (currentSession.value) {
-    saveViewToState(currentSession.value.id, { isStreaming, nodeBlocks });
+    saveViewToState(currentSession.value.id, { isStreaming, remoteRunning, nodeBlocks });
+    saveConfirmToState(currentSession.value.id);
+    // T-04：离开会话即关掉它的追流订阅（回来时会重新探测+重连），避免无主订阅堆积
+    const prevState = getSessionState(currentSession.value.id);
+    prevState.closeJoin?.();
+    prevState.closeJoin = null;
   }
   currentSession.value = session;
   try {
@@ -304,23 +405,139 @@ async function selectSession(session: ChatSession | null) {
       currentMessages.value = [];
       nodeBlocks.value = [];
       isStreaming.value = false;
+      remoteRunning.value = false;
+      clearConfirmView();
       return;
     }
-    syncStateToView(session.id, { isStreaming, nodeBlocks });
-    currentMessages.value = applyServerRowRender(await getSessionMessagesApi(session.id) as any[]) as any;
-    // detached-stream T-05：admin 进行中的轮次 → 5s 轮询增量视图（完成自动收敛）
+    syncStateToView(session.id, { isStreaming, remoteRunning, nodeBlocks });
+    syncConfirmFromState(session.id);
+    // T-04：join 续渲需要"原始 markdown 基线"（applyServerRowRender 会把 content 转成 HTML），故转换前先取
+    const rows = (await getSessionMessagesApi(session.id)) as any[];
+    let joinBase = '';
+    let joinBaseThinking = '';
+    for (let i = rows.length - 1; i >= 0; i--) {
+      if (rows[i]?.role === 'assistant') {
+        joinBase = String(rows[i]?.content ?? '');
+        joinBaseThinking = String(rows[i]?.thinking ?? '');
+        break;
+      }
+    }
+    currentMessages.value = applyServerRowRender(rows) as any;
+    // detached-stream T-05 + long-turn-resilience T-04：admin 进行中的轮次 → **join 追流**
+    // （服务端 replay 全量帧 + live 原地续渲），替换原 5s 轮询；无进行中轮则静默返回
     void (async () => {
       try {
-        if (!(await harnessTurnStatusApi(session.id))) return;
-        const tick = async () => {
-          try {
-            currentMessages.value = applyServerRowRender(await getSessionMessagesApi(session.id) as any[]) as any;
-          } catch { /* 忽略单次 */ }
-          try {
-            if (await harnessTurnStatusApi(session.id)) setTimeout(tick, 5000);
-          } catch { /* 停 */ }
+        // BUG-81：探测结果必须**回写本会话**（true/false 都写），否则上一会话的 remoteRunning
+        // 会残留到新会话：输入框不可写 + 只剩终止按钮（用户实测"切会话就发不出去了"）
+        const running = await harnessTurnStatusApi(session.id);
+        // BUG-74：闭包必须带会话守卫——切会话/新建会话后严禁把旧会话内容写进当前视图
+        if (currentSession.value?.id !== session.id) {
+          getSessionState(session.id).remoteRunning = running;
+          return;
+        }
+        remoteRunning.value = running;
+        getSessionState(session.id).remoteRunning = running;
+        if (!running) return;
+
+        let joined = '';
+        let joinedThinking = '';
+        let lastRender = 0;
+        let finished = false;
+        let attempts = 0;
+
+        // 原地续渲（绝不新建气泡 → 防 BUG-75 双输出窗口）；节流 ≥150ms：BUG-70 的教训是逐帧全量重渲会 O(n²) 打死主线程
+        const paint = (force: boolean) => {
+          if (currentSession.value?.id !== session.id) return;
+          const now = Date.now();
+          if (!force && now - lastRender < 150) return;
+          lastRender = now;
+          const list = currentMessages.value as any[];
+          let idx = -1;
+          for (let i = list.length - 1; i >= 0; i--) {
+            if (list[i]?.role === 'assistant') {
+              idx = i;
+              break;
+            }
+          }
+          if (idx < 0) {
+            // 服务端尚未落助手行：本地补一个流式气泡（后续帧原地更新它）
+            list.push({
+              id: `join-${Date.now()}`,
+              role: 'assistant',
+              messageType: 'md-card',
+              content: '',
+              thinking: '',
+              streaming: true,
+            } as any);
+            idx = list.length - 1;
+          }
+          const row = list[idx];
+          row.messageType = row.messageType || 'md-card';
+          row.content = markdownToHtml(joinBase + joined);
+          if (joinedThinking) row.thinking = joinBaseThinking + joinedThinking;
+          row.streaming = true;
+          currentMessages.value = [...list];
         };
-        setTimeout(tick, 5000);
+
+        const finish = async () => {
+          if (finished) return;
+          finished = true;
+          const st = getSessionState(session.id);
+          st.closeJoin = null;
+          if (currentSession.value?.id !== session.id) return;
+          remoteRunning.value = false;
+          st.remoteRunning = false;
+          try {
+            // 末次拉取：以服务端定稿行为准（join 只负责"看得见"，落库不归它管）
+            currentMessages.value = applyServerRowRender(await getSessionMessagesApi(session.id) as any[]) as any;
+          } catch { /* ignore */ }
+        };
+
+        // BUG-76：连接异常=不确定态，绝不当作"轮次已结束"——重探状态仍有界重连
+        const reconnect = async () => {
+          getSessionState(session.id).closeJoin = null;
+          if (currentSession.value?.id !== session.id) return;
+          attempts += 1;
+          if (attempts <= 5) {
+            setTimeout(() => {
+              if (currentSession.value?.id === session.id) connect();
+            }, 2000);
+            return;
+          }
+          await finish();
+        };
+
+        const connect = () => {
+          const close = streamHarnessTurnJoin(
+            session.id,
+            agentId.value,
+            async (response) => {
+              if (currentSession.value?.id !== session.id) return; // BUG-74 会话守卫
+              if ((response as any).agentFiles) notifyFilesChanged();
+              const piece = String((response as any).text || '');
+              const th = String((response as any).thinking || '');
+              if (!piece && !th) return;
+              joined += piece;
+              joinedThinking += th;
+              paint(false);
+            },
+            async () => {
+              await reconnect();
+            },
+            async () => {
+              paint(true);
+              await finish();
+            },
+          );
+          getSessionState(session.id).closeJoin = close;
+        };
+
+        connect();
+        if (currentSession.value?.id !== session.id) {
+          // 探测期间已切走：立即关闭，避免无主订阅
+          getSessionState(session.id).closeJoin?.();
+          getSessionState(session.id).closeJoin = null;
+        }
       } catch { /* ignore */ }
     })();
     // thinking-display R-05：历史 metadata 解析思考（旧行无键静默）
@@ -344,7 +561,7 @@ async function selectSession(session: ChatSession | null) {
             content: snap.contentHtml,
             createdAt: snap.ts,
             messageType: 'text',
-            metadata: { interrupted: true },
+            metadata: { interrupted: true, interruptedAt: snap.ts },
             thinking: snap.thinking,
           } as any);
         }
@@ -355,6 +572,15 @@ async function selectSession(session: ChatSession | null) {
   } catch {
     ElMessage.error('加载消息失败');
   }
+}
+
+/** T-04：中断轮文案带**时间归属**（`不是本轮`的语义靠时间点自明，避免用户把旧中断当成新轮） */
+function interruptedAtText(message: any): string {
+  const ts = Number(message?.metadata?.interruptedAt ?? message?.createdAt ?? 0);
+  if (!ts) return '时间未知';
+  const d = new Date(ts);
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
 }
 
 async function sendMessage() {
@@ -907,6 +1133,19 @@ function applyServerRowRender(list: any[]) {
   for (const m of list) {
     const mdRaw = m.metadata;
     const metaStr = typeof mdRaw === 'string' ? mdRaw : JSON.stringify(mdRaw ?? {});
+    // long-turn-resilience T-04：metadata 解析（thinking/thinkingMs/流式态）必须在本函数统一完成——
+    // 5s 轮询 tick 只走本函数；此前仅首载单独解析 thinking，tick 覆盖后即丢
+    // （BUG-72 用户实测：思考块"刷新后有、过几秒又消失"）
+    try {
+      const md = typeof mdRaw === 'string' ? JSON.parse(mdRaw) : mdRaw;
+      if (md && typeof md.thinking === 'string') {
+        (m as any).thinking = md.thinking;
+        (m as any).thinkingMs = typeof md.thinkingMs === 'number' ? md.thinkingMs : undefined;
+      }
+    } catch { /* metadata 非 JSON：静默（旧行无键） */ }
+    // 服务端进行中轮次（status=generating）刷新后须保持流式态，
+    // 否则思考块硬编码 false → 明明是 thinking 却显示 "Think Done"（用户实测）
+    (m as any).streaming = metaStr.includes('generating');
     if (m.role === 'assistant' && (!m.messageType || m.messageType === 'text') && metaStr.includes('turnId')) {
       m.content = markdownToHtml(String(m.content ?? ''));
       m.messageType = 'md-card'; // 专属分支：全宽卡片；'html' 留给 legacy generateNodeHtml 行原样渲染
@@ -1069,7 +1308,16 @@ function resetReportState(
   sessionState.markdownReportContent = '';
 }
 
-function scrollToBottom() {
+// long-turn-resilience：消息区贴底跟随（用户上翻即暂停，回底自动恢复；流式内容增长也跟随）
+let stickToBottom = true;
+function onMessagesScroll() {
+  const el = chatContainer.value;
+  if (!el) return;
+  stickToBottom = el.scrollHeight - el.scrollTop - el.clientHeight <= 40;
+}
+
+function scrollToBottom(force = true) {
+  if (!force && !stickToBottom) return;
   nextTick(() => {
     requestAnimationFrame(() => {
       if (chatContainer.value) {
@@ -1078,6 +1326,18 @@ function scrollToBottom() {
     });
   });
 }
+
+// 流式正文/思考增长 → 贴底跟随（原实现不跟随内容增长，需手动下拉）
+watch(
+  () => [
+    nodeBlocks.value.length,
+    nodeBlocks.value[nodeBlocks.value.length - 1]?.length ?? 0,
+    thinkingMap.get(currentSession.value?.id ?? '')?.text?.length ?? 0,
+  ],
+  () => {
+    scrollToBottom(false);
+  },
+);
 
 
 async function handleHarnessButtonClick(btn: ConfirmButton) {
@@ -1150,6 +1410,23 @@ async function stopStreaming() {
 
   const sessionId = currentSession.value.id;
   const sessionState = getSessionState(sessionId);
+
+  // BUG-75：轮询态（服务端在跑但本页无本地流）→ 调服务端取消，否则终止按钮点了等于没点
+  if (!sessionState.closeStream && remoteRunning.value) {
+    try {
+      await harnessTurnCancelApi(sessionId);
+      // T-04：停止后主动收掉追流订阅（服务端轮已移除，流会自然收尾，这里双保险）
+      sessionState.closeJoin?.();
+      sessionState.closeJoin = null;
+      remoteRunning.value = false;
+      sessionState.remoteRunning = false;
+      currentMessages.value = applyServerRowRender(await getSessionMessagesApi(sessionId) as any[]) as any;
+      ElMessage.success('已停止对话');
+    } catch {
+      ElMessage.error('停止对话失败');
+    }
+    return;
+  }
 
   try {
     if (!sessionState.closeStream) {
@@ -1303,6 +1580,19 @@ function firstNode(block: GraphNodeResponse[]): GraphNodeResponse | undefined {
 onMounted(async () => {
   await loadAgent();
 });
+
+// T-03②：页面关闭/切后台兜底写一次快照——400ms 节流窗口内的最后一段不再丢（A′ 语义只增不减）
+function flushActiveSnapshot() {
+  const sid = currentSession.value?.id;
+  if (!sid) return;
+  const state = getSessionState(sid) as any;
+  if (!state?.snapText) return;
+  flushStreamSnapshot(sid, state.snapText, getThinkingTrack(sid).text || undefined);
+}
+window.addEventListener('pagehide', flushActiveSnapshot);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') flushActiveSnapshot();
+});
 </script>
 
 <template>
@@ -1330,7 +1620,7 @@ onMounted(async () => {
           overflow: hidden;
         "
       >
-        <div class="chat-container" ref="chatContainer">
+        <div class="chat-container" ref="chatContainer" @scroll="onMessagesScroll">
           <div v-if="!currentSession" class="empty-state">
             <el-empty description="请选择一个会话或创建新会话开始对话" />
             <PresetQuestions
@@ -1354,7 +1644,7 @@ onMounted(async () => {
                 v-if="(message as any).metadata && (message as any).metadata.interrupted"
                 class="run-interrupted-tip"
               >
-                ⚠ 输出在页面刷新时中断，以下为已生成部分
+                ⚠ 输出在页面刷新时中断（{{ interruptedAtText(message) }}），以下为已生成部分
               </div>
               <div
                 v-if="message.messageType === 'html'"
@@ -1367,9 +1657,13 @@ onMounted(async () => {
                   :content="(message as any).thinking"
                   :duration-ms="(message as any).thinkingMs"
                   :has-content="true"
-                  :streaming="false"
+                  :streaming="!!(message as any).streaming"
                 />
-                <div class="md-card" v-html="message.content"></div>
+                <div
+                  v-if="String(message.content ?? '').trim()"
+                  class="md-card"
+                  v-html="message.content"
+                ></div>
               </div>
               <div
                 v-else-if="message.messageType === 'result-set'"
@@ -1460,9 +1754,10 @@ onMounted(async () => {
                     :content="(message as any).thinking"
                     :duration-ms="(message as any).thinkingMs"
                     :has-content="true"
-                    :streaming="false"
+                    :streaming="!!(message as any).streaming"
                   />
                   <div
+                    v-if="String(message.content ?? '').trim()"
                     class="message-text"
                     v-html="formatMessageContent(message)"
                   ></div>
@@ -1478,7 +1773,7 @@ onMounted(async () => {
                 :has-content="nodeBlocks.length > 0"
                 :streaming="isStreaming"
               />
-              <div class="agent-response-container">
+              <div v-if="nodeBlocks.length > 0" class="agent-response-container">
                 <template v-for="(nodeBlock, index) in nodeBlocks" :key="index">
                   <div
                     v-if="
@@ -1533,6 +1828,7 @@ onMounted(async () => {
                   <span class="streaming-dot"></span>
                   <span class="streaming-dot"></span>
                 </div>
+                <span v-if="streamElapsedText" class="streaming-elapsed">{{ streamElapsedText }}</span>
               </div>
             </div>
           </div>
@@ -1669,11 +1965,11 @@ onMounted(async () => {
               type="textarea"
               :rows="3"
               placeholder="请输入您的问题..."
-              :disabled="isStreaming || showHarnessConfirm"
+              :disabled="isStreaming || remoteRunning || showHarnessConfirm"
               @keydown.enter.exact.prevent="sendMessage"
             />
             <el-button
-              v-if="!isStreaming && !showHarnessConfirm"
+              v-if="!isStreaming && !remoteRunning && !showHarnessConfirm"
               type="primary"
               @click="sendMessage"
               circle
@@ -1682,7 +1978,7 @@ onMounted(async () => {
               <el-icon><Promotion /></el-icon>
             </el-button>
             <el-button
-              v-if="isStreaming"
+              v-if="isStreaming || remoteRunning"
               type="danger"
               @click="stopStreaming"
               circle
@@ -1918,6 +2214,12 @@ onMounted(async () => {
   display: flex;
   gap: 6px;
   align-items: center;
+}
+
+.streaming-elapsed {
+  margin-left: 8px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
 }
 
 .streaming-footer {

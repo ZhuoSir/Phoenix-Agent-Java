@@ -72,6 +72,19 @@ public class FrontSkillAccessServiceImpl implements FrontSkillAccessService {
             return ReturnVo.fail(SkillErrorCodeEnm.SKILL_AGENT_NOT_FOUND.getMsg(),
                 SkillErrorCodeEnm.SKILL_AGENT_NOT_FOUND.getCode());
         }
+        // agent-publish-group-grant R-03 双分支：无任何授权行 = 全公开（仅 published；草稿不享公开待遇，防反向漏洞）
+        Object grants = Db.selectObject(
+            "select count(*) from tbl_platform_group_agent_info where agent_id = ? and del_flag = 0",
+            String.valueOf(agentId));
+        if (grants != null && ((Number) grants).longValue() == 0) {
+            Object pub = Db.selectObject(
+                "select count(*) from tbl_data_agent where id = ? and status = 'published'", agentId);
+            if (pub != null && ((Number) pub).longValue() > 0) {
+                return ReturnVo.ok(true);
+            }
+            return ReturnVo.fail("该智能体未发布且未授权，前台不可见", SkillErrorCodeEnm.SKILL_ACCESS_DENIED.getCode());
+        }
+        // 有授权行 → 组交集判定（现状原样）
         // 注意：tbl_platform_group_agent_info.agent_id 为 varchar，按字符串比较避免 varchar=bigint 报错
         Object visible = Db.selectObject("""
                 select count(*)

@@ -53,8 +53,8 @@ public class HarnessAgentRegistry {
     @Value("${phoenix.agent.runtime.max-instances:200}")
     private int maxInstances = 200;
 
-    /** LRU：accessOrder=true，最近使用移到队尾，淘汰队首 */
-    private final Map<Long, CacheEntry> cache = new LinkedHashMap<>(16, 0.75f, true);
+    /** LRU：accessOrder=true，最近使用移到队尾，淘汰队首。键=agentId[@sessionId]（R-06 会话级实例） */
+    private final Map<String, CacheEntry> cache = new LinkedHashMap<>(16, 0.75f, true);
 
     private final AtomicLong hitCount = new AtomicLong();
 
@@ -64,12 +64,25 @@ public class HarnessAgentRegistry {
 
     private final AtomicLong evictCount = new AtomicLong();
 
+    /** R-06：会话级缓存键——同一智能体不同会话各持一个实例（工作区随之独立） */
+    private static String cacheKey(Long agentId, String sessionId) {
+        return sessionId == null || sessionId.isBlank() ? String.valueOf(agentId) : agentId + "@" + sessionId;
+    }
+
     /**
-     * 取得该智能体的可用运行实例（含来源与摘要，供对话入口与构建预演共用）。
-     *
-     * @param agentId 智能体ID（R-08 统一寻址）
+     * 取得该智能体的可用运行实例（智能体级；管理端预演/无会话场景）。
      */
     public RuntimeHandle acquire(Long agentId) {
+        return acquire(agentId, null);
+    }
+
+    /**
+     * 取得该智能体在该会话下的可用运行实例（含来源与摘要，供对话入口与构建预演共用）。
+     *
+     * @param agentId 智能体ID（R-08 统一寻址）
+     * @param sessionId 会话ID（R-06：决定工作区与实例缓存键；空=智能体级存量行为）
+     */
+    public RuntimeHandle acquire(Long agentId, String sessionId) {
         Agent agent = agentId == null ? null : agentService.findById(agentId);
         if (agent == null) {
             throw new NoSuchElementException("智能体不存在: " + agentId);
@@ -87,22 +100,23 @@ public class HarnessAgentRegistry {
         // 路径②：库配置驱动
         AgentRuntimeConfig config = agentRuntimeConfigService.resolve(agentId);
         String fingerprint = fingerprint(agent, config);
+        String key = cacheKey(agentId, sessionId);
         synchronized (cache) {
-            CacheEntry cached = cache.get(agentId);
+            CacheEntry cached = cache.get(key);
             if (cached != null && cached.fingerprint().equals(fingerprint)) {
                 hitCount.incrementAndGet();
-                log.info("运行实例命中缓存: agentId={}, hits={}, builds={}, evictions={}", agentId,
-                    hitCount.get(), buildCount.get(), evictCount.get());
+                log.info("运行实例命中缓存: agentId={}, session={}, hits={}, builds={}, evictions={}", agentId,
+                    sessionId, hitCount.get(), buildCount.get(), evictCount.get());
                 return cached.toHandle("cached");
             }
         }
-        HarnessAgentFactory.BuildResult built = harnessAgentFactory.buildWithSummary(agent);
+        HarnessAgentFactory.BuildResult built = harnessAgentFactory.buildWithSummary(agent, sessionId);
         buildCount.incrementAndGet();
         CacheEntry entry = new CacheEntry(agentId, fingerprint, built.agent(), built.summary(), built.toolNames());
         List<HarnessAgent> evicted = new ArrayList<>();
         boolean reuseWinner = false;
         synchronized (cache) {
-            CacheEntry current = cache.get(agentId);
+            CacheEntry current = cache.get(key);
             if (current != null && current.fingerprint().equals(fingerprint)) {
                 // 并发构建竞争：已有同指纹实例，放弃本次构建产物
                 reuseWinner = true;
@@ -111,20 +125,20 @@ public class HarnessAgentRegistry {
             else {
                 if (current != null) {
                     evicted.add(current.agent());
-                    log.info("运行配置已变更，重建实例: agentId={}, 旧指纹={}, 新指纹={}", agentId,
-                        current.fingerprint(), fingerprint);
+                    log.info("运行配置已变更，重建实例: agentId={}, session={}, 旧指纹={}, 新指纹={}", agentId,
+                        sessionId, current.fingerprint(), fingerprint);
                 }
-                cache.put(agentId, entry);
+                cache.put(key, entry);
                 while (cache.size() > maxInstances) {
-                    Iterator<Map.Entry<Long, CacheEntry>> it = cache.entrySet().iterator();
+                    Iterator<Map.Entry<String, CacheEntry>> it = cache.entrySet().iterator();
                     if (!it.hasNext()) {
                         break;
                     }
-                    Map.Entry<Long, CacheEntry> eldest = it.next();
+                    Map.Entry<String, CacheEntry> eldest = it.next();
                     it.remove();
                     evicted.add(eldest.getValue().agent());
                     evictCount.incrementAndGet();
-                    log.info("运行实例超 LRU 上限({})淘汰: agentId={}, evictions={}", maxInstances, eldest.getKey(),
+                    log.info("运行实例超 LRU 上限({})淘汰: cacheKey={}, evictions={}", maxInstances, eldest.getKey(),
                         evictCount.get());
                 }
             }
@@ -136,20 +150,56 @@ public class HarnessAgentRegistry {
         return entry.toHandle(reuseWinner ? "cached" : "built");
     }
 
-    /** 对话入口：只要实例 */
+    /** 对话入口：只要实例（智能体级） */
     public HarnessAgent get(Long agentId) {
         return acquire(agentId).agent();
     }
 
-    /** 主动失效（如智能体被删除/下线）；下次访问重建 */
-    public void invalidate(Long agentId) {
-        CacheEntry removed;
-        synchronized (cache) {
-            removed = cache.remove(agentId);
+    /** 对话入口：只要实例（R-06 会话级） */
+    public HarnessAgent get(Long agentId, String sessionId) {
+        return acquire(agentId, sessionId).agent();
+    }
+
+    /**
+     * MCP 变体专用（mcp-client-tools T-05 路线乙）：绕过主缓存构建全新实例，
+     * 由 McpMountService 按 (agentId+交集签名) 自行缓存与淘汰。
+     * 存量自注册实例不支持变体（工具面由 Java 类固定），原样返回并 WARN。
+     */
+    public HarnessAgent buildUncached(Long agentId) {
+        return buildUncached(agentId, null);
+    }
+
+    /** R-06：MCP 变体同样按会话构建（工作区不回落共享根）。 */
+    public HarnessAgent buildUncached(Long agentId, String sessionId) {
+        Agent agent = agentId == null ? null : agentService.findById(agentId);
+        if (agent == null) {
+            throw new java.util.NoSuchElementException("智能体不存在: " + agentId);
         }
-        if (removed != null) {
-            log.info("运行实例已主动失效: agentId={}", agentId);
-            closeQuietly(removed.agent(), agentId);
+        HarnessAgent legacy = harnessStaticLoader.findAgent(agent.getSn());
+        if (legacy != null) {
+            log.warn("存量自注册实例不支持 MCP 变体挂载，按无 MCP 处理: agentId={}", agentId);
+            return legacy;
+        }
+        return harnessAgentFactory.buildWithSummary(agent, sessionId).agent();
+    }
+
+    /** 主动失效（如智能体被删除/下线）；下次访问重建。R-06：连带清掉该智能体全部会话实例。 */
+    public void invalidate(Long agentId) {
+        List<CacheEntry> removed = new ArrayList<>();
+        synchronized (cache) {
+            Iterator<Map.Entry<String, CacheEntry>> it = cache.entrySet().iterator();
+            while (it.hasNext()) {
+                Map.Entry<String, CacheEntry> en = it.next();
+                CacheEntry v = en.getValue();
+                if (agentId != null && agentId.equals(v.agentId())) {
+                    it.remove();
+                    removed.add(v);
+                }
+            }
+        }
+        if (!removed.isEmpty()) {
+            log.info("运行实例已主动失效: agentId={}, 会话实例数={}", agentId, removed.size());
+            removed.forEach(v -> closeQuietly(v.agent(), agentId));
         }
     }
 
@@ -179,6 +229,8 @@ public class HarnessAgentRegistry {
             String.valueOf(config.getModelConfigId()), String.valueOf(config.getPlanMode()),
             String.valueOf(config.getMemoryEnabled()), String.valueOf(config.getKnowledgeEnabled()),
             String.valueOf(config.getDbQueryEnabled()), String.valueOf(config.getDbDeepAnalysisEnabled()),
+            String.valueOf(config.getCompactionTriggerTokens()), String.valueOf(config.getCompactionKeepMessages()),
+            String.valueOf(config.getToolResultMaxChars()),
             String.valueOf(config.getDatasourceId()), String.valueOf(config.getFilesystemPolicy()),
             String.valueOf(agent.getPrompt() == null ? null : agent.getPrompt().hashCode()), bindingVersion);
     }
