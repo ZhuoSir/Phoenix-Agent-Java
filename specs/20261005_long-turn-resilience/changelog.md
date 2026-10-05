@@ -1,5 +1,11 @@
 # Changelog: long-turn-resilience
 
+## 部署完成 + BUG-78 验证 + BUG-80 入册（2026-10-05）
+- **部署**：后端 4 项（BUG-77 重试/根治 · BUG-78 扫描补根 · T-11 地基）+ 前端 2 项（两面改造 · think 贴底）全部上线；后端 healthy、nginx 重建、首页 200；部署前活跃轮=0（未打断任何人）
+- **BUG-78 已验证**：会话 a467aecf 文件列表 **0 → 82 条**（preview.html/a-sparkle.svg/c-human-ai.svg/applications.png 等 owl-kids 交付物全部出现，登记表同步 82 行）
+- 小瑕疵：82 条混入 `call_*` 工具调用 ID 命名的中间条目（扫描面放宽后 isInternal 未过滤）→ 下次加过滤
+- **BUG-80 新入册**：面板删除失效——实测 `DELETE /api/agent/files/{id}` 返回 42031「无权访问该文件」；根因=归属校验挡住 admin（文件属前台用户）；修复方向=admin 可管理放行（推荐）
+
 ## T-04 十刀（2026-10-05）think 框刷新后停在顶部 → 挂载即贴底（用户实测反馈）
 - 用户原话：「刷新后，Think模块从第一行显示，这个改成最下面的一行（最新的）显示，要不然还得手动拉下去」
 - 根因：`ThinkingBlock` 的贴底跟随**只在 props.content 变化时触发**；刷新后挂载时已有内容不再变化 → 停在第一行；新增 `scrollThinkingToBottom()` 在 **onMounted** 与 **expanded 变真**时各调一次（共享组件，运行页与前台聊天页同时受益）
