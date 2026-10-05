@@ -1,5 +1,9 @@
 # Changelog: agent-publish-group-grant
 
+## T-04~T-07 收口（2026-10-04）实现完成 7/7，合并进 v1.6.0（不冻结）
+- 用户走查通过（原话「我已经测过了没问题」）→ T-04/T-05 勾选；completion/artifacts 落盘；MILESTONE 翻实现完成
+- 用户指令：「先把BL04收尾…合并到版本；然后BL-01也合并到版本；但是1.6.0不冻结」→ 双 feature 分支合并 v1.6.0（先 MCP 后本支），版本保持在途续收
+
 ## BUG-68 勘察记（2026-10-04）跨智能体记忆污染——根因锁定共享 workspace
 - 用户报告：不同智能体不同会话串记忆。勘察链：①持久层排除（store_state 键=userId:sessionId 会话隔离✓、user_memory 表空✓）②UI 排除（admin/前台会话列表均按 agentId 过滤✓）③Redis 分布式存储键解剖（NUL 分隔：agents␀HumanInTheLoop␀users␀uid␀sessions␀path——含 agentName 维，为存量 Java 智能体遗留键）④**真凶=HarnessAgentFactory:110 workspace 固定共享目录**——所有库驱动智能体记忆文件/产物同目录互读互写
 - 与 BUG-67 同根认定：文件面板跨会话污染=共享 workspace 的另一症状；修复应同刃（workspace 按 agent 分目录后，BUG-67 的时间窗补扫再收窄为轮次归属即双收口）
