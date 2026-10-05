@@ -51,6 +51,9 @@ const config = ref<AgentRuntimeConfig>({
   datasourceId: null,
   filesystemPolicy: 'local',
   maxIterations: null,
+  compactionTriggerTokens: null,
+  compactionKeepMessages: null,
+  toolResultMaxChars: null,
 });
 
 const dbToolOn = computed(
@@ -208,6 +211,63 @@ onMounted(load);
               <p class="mt-1 text-xs text-gray-400">
                 按模型推理轮次计（单轮可并行多个工具调用）；复杂任务（多文件产出、图形绘制/转换）建议
                 20~40；留空沿用系统默认
+              </p>
+            </div>
+          </ElCol>
+        </ElRow>
+        <!-- R-05 上下文治理三输入（T-06）：留空=全局默认；三项均进配置指纹 → 改值即重建实例 -->
+        <ElRow :gutter="16" class="mt-4">
+          <ElCol :span="8">
+            <div class="mb-4">
+              <label class="mb-2 block text-sm font-medium text-gray-700">
+                压缩触发 token 数
+              </label>
+              <ElInputNumber
+                v-model="config.compactionTriggerTokens"
+                :min="1000"
+                :max="2000000"
+                :step="1024"
+                class="w-full"
+                placeholder="留空=全局默认（102400）"
+              />
+              <p class="mt-1 text-xs text-gray-400">
+                对话历史超过该 token 数即压缩（保留最近若干条）。默认 102400 ≈ 0.8×128k 上下文；
+                长轮/多文件任务可下调，留空沿用全局默认
+              </p>
+            </div>
+          </ElCol>
+          <ElCol :span="8">
+            <div class="mb-4">
+              <label class="mb-2 block text-sm font-medium text-gray-700">
+                压缩保留消息条数
+              </label>
+              <ElInputNumber
+                v-model="config.compactionKeepMessages"
+                :min="4"
+                :max="200"
+                class="w-full"
+                placeholder="留空=全局默认（20）"
+              />
+              <p class="mt-1 text-xs text-gray-400">
+                压缩后原样保留的最近消息条数（其余交给摘要）。调小省 token，调大更保真；留空沿用全局默认
+              </p>
+            </div>
+          </ElCol>
+          <ElCol :span="8">
+            <div class="mb-4">
+              <label class="mb-2 block text-sm font-medium text-gray-700">
+                工具结果最大字符数
+              </label>
+              <ElInputNumber
+                v-model="config.toolResultMaxChars"
+                :min="512"
+                :max="1048576"
+                :step="1024"
+                class="w-full"
+                placeholder="留空=全局默认（8192）"
+              />
+              <p class="mt-1 text-xs text-gray-400">
+                单个工具返回超过该长度即回收为预览（原文落盘、可回读，不丢数据）。留空沿用全局默认
               </p>
             </div>
           </ElCol>
