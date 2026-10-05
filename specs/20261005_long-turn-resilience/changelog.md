@@ -1,5 +1,12 @@
 # Changelog: long-turn-resilience
 
+## T-04 三刀（2026-10-05）BUG-73 刷新后进行中态丢失（用户实测）
+- 用户原话：「刷新后，任务还在进行中，输入窗口的可编辑且可发送了…应该是没执行完的时候不可编辑，但是可以终止，现在终止按钮变成了发送按钮」
+- 根因：detached-stream T-05 轮询只刷新消息（currentMessages），**从不置 isStreaming** → 刷新后按空闲态渲染：textarea `:disabled="isStreaming"` 为假、发送按钮 `v-if="!isStreaming"` 显示、终止按钮隐藏
+- 修复：turnStatus 为真即 `isStreaming=true`（输入禁用+终止按钮恢复）；tick 检测到轮次结束置 false 并做末次拉取收敛终稿；异常路径同样收敛防卡死
+- 证据：typecheck 213=基线；新 run 分片 `run-BmwtWO69.js` 已上线容器；首页 200；**行为面待用户走查（L-07）**
+- 运行页刷新态三连修齐：BUG-71家族(Think Done 误判)+BUG-72(思考块消失)+BUG-73(进行中态丢失)
+
 ## T-04 二刀（2026-10-05）BUG-72 思考块自行消失（用户实测）
 - 用户原话：「think窗口有时候自己会消失，刷新后就有，过几秒钟又消失」
 - 根因（实证定位）：运行页刷新首载路径会解析 `metadata.thinking` 写入消息（故可见），但 **5s 轮询 tick 只调用 `applyServerRowRender`**——该函数只处理 content/streaming，**不解析 thinking** → tick 覆盖消息即丢 thinking 字段 → 模板 `v-if="message.thinking"` 为假 → 思考块卸载消失

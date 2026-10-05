@@ -312,13 +312,24 @@ async function selectSession(session: ChatSession | null) {
     void (async () => {
       try {
         if (!(await harnessTurnStatusApi(session.id))) return;
+        // BUG-73：刷新后在跑的轮次须恢复"进行中"态——输入区禁用、显示终止按钮
+        // （此前轮询只刷新消息、从不置 isStreaming → 刷新后误判空闲：可编辑可发送、终止按钮变发送）
+        isStreaming.value = true;
         const tick = async () => {
           try {
             currentMessages.value = applyServerRowRender(await getSessionMessagesApi(session.id) as any[]) as any;
           } catch { /* 忽略单次 */ }
           try {
-            if (await harnessTurnStatusApi(session.id)) setTimeout(tick, 5000);
-          } catch { /* 停 */ }
+            if (await harnessTurnStatusApi(session.id)) {
+              setTimeout(tick, 5000);
+            } else {
+              // 轮次已结束：收敛为完成态（末次拉取刷新终稿）
+              isStreaming.value = false;
+              try {
+                currentMessages.value = applyServerRowRender(await getSessionMessagesApi(session.id) as any[]) as any;
+              } catch { /* ignore */ }
+            }
+          } catch { isStreaming.value = false; /* 停 */ }
         };
         setTimeout(tick, 5000);
       } catch { /* ignore */ }
