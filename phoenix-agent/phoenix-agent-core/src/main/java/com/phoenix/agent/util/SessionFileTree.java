@@ -23,16 +23,23 @@ public final class SessionFileTree {
     private SessionFileTree() {
     }
 
-    /** 归属：本会话 / 历史（无会话维度或他会话） */
+    /**
+     * 归属三态（v1.1.0）：
+     * <ul>
+     *   <li>{@link #SESSION} 本会话（store_key 会话段 == 本会话）</li>
+     *   <li>{@link #OTHER_SESSION} 他会话段 → 面板单列「历史文件」（隔离，不混入本会话树）</li>
+     *   <li>{@link #NO_SESSION} 无会话段（二代/一代/其他旧形态）→ **以行 session_id 为权威**归本会话</li>
+     * </ul>
+     */
     public enum Attribution {
-        SESSION, HISTORY
+        SESSION, OTHER_SESSION, NO_SESSION
     }
 
     /**
      * 解析结果。
      *
-     * @param attribution 归属
-     * @param relativePath 会话内相对路径（斜杠分隔；历史件为尽力还原的相对路径或原始键）
+     * @param attribution 归属（本会话 / 他会话 / 无会话段）
+     * @param relativePath 会话内相对路径（斜杠分隔；旧件为尽力还原的相对路径或原始键）
      * @param fileName 文件名（末段）
      * @param sizeBytes store_key 尾部大小；缺失=-1
      */
@@ -40,6 +47,16 @@ public final class SessionFileTree {
 
         public boolean isSession() {
             return attribution == Attribution.SESSION;
+        }
+
+        /** 他会话段（面板「历史文件」节点承载） */
+        public boolean isOtherSession() {
+            return attribution == Attribution.OTHER_SESSION;
+        }
+
+        /** 无会话段的旧行（按行 session_id 归本会话，仅展示口径） */
+        public boolean isLegacyNoSession() {
+            return attribution == Attribution.NO_SESSION;
         }
 
         /** 中间目录段（不含文件名）；供内部件判定使用 */
@@ -69,7 +86,7 @@ public final class SessionFileTree {
      */
     public static Parsed parse(String storeKey, String agentKey, String sessionId) {
         if (storeKey == null || storeKey.isBlank()) {
-            return new Parsed(Attribution.HISTORY, "", "", -1L);
+            return new Parsed(Attribution.NO_SESSION, "", "", -1L);
         }
         long size = -1L;
         String path = storeKey.trim();
@@ -102,10 +119,13 @@ public final class SessionFileTree {
         if (sessionAt >= 0) {
             return build(Attribution.SESSION, segments, sessionAt + 1, size);
         }
-        // 历史件：剥掉可能存在的 agentKey 前缀便于展示（不改归属语义）
+        // 旧件：剥掉可能存在的 agentKey 前缀便于展示（不改归属语义）
         int from = (!segments.isEmpty() && agentKey != null && !agentKey.isBlank()
                 && agentKey.equals(segments.get(0))) ? 1 : 0;
-        return build(Attribution.HISTORY, segments, from, size);
+        // 第 0/1 段是否为**他会话** UUID：是 → 历史文件（隔离）；否 → 无会话段旧行（归本会话）
+        boolean otherSession = (!segments.isEmpty() && SessionWorkspaceFilters.looksLikeSessionId(segments.get(0)))
+                || (segments.size() >= 2 && SessionWorkspaceFilters.looksLikeSessionId(segments.get(1)));
+        return build(otherSession ? Attribution.OTHER_SESSION : Attribution.NO_SESSION, segments, from, size);
     }
 
     private static Parsed build(Attribution attribution, List<String> segments, int from, long size) {
@@ -115,6 +135,18 @@ public final class SessionFileTree {
         String relative = String.join("/", segments.subList(from, segments.size()));
         String fileName = segments.get(segments.size() - 1);
         return new Parsed(attribution, relative, fileName, size);
+    }
+
+    /**
+     * v1.1.0 R-02.7：折叠**首段用户命名空间**（`{uid}`，15 位以上纯数字；实测存在双层 `{uid}/{uid}/…`）。
+     * 仅用于**展示层**——`store_key`、row id、下载/删除口径完全不变。
+     */
+    public static List<String> foldUserNamespace(List<String> segments) {
+        int i = 0;
+        while (i < segments.size() - 1 && segments.get(i).matches("\\d{15,}")) {
+            i++;
+        }
+        return i == 0 ? segments : new ArrayList<>(segments.subList(i, segments.size()));
     }
 
     private static List<String> segments(String path) {

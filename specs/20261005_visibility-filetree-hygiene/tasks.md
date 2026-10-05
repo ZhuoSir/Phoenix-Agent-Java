@@ -31,10 +31,18 @@
   验收标准: 三代解析全绿 + 同源引用可证
   **收口(2026-10-05)**：新增 `SessionWorkspaceFilters`（判定单一实现）+ `SessionFileTree`（三代解析）；扫描器删 5 个局部名单常量并全部委托共享工具（`grep` 零残留=同源可证）；`fixture/TreeProbe.java` **13/13 PASS**（含他会话隔离 2 例、前缀不匹配 1 例、空键不抛 1 例）；编译绿。实现细化：归属改为**会话段锚定**（前缀不参与判定），仅记 changelog 未回改已确认 plan
 
-- [ ] T-05 树接口：`GET /api/agent/files/tree?sessionId=&path=&scan=` **单层**返回（含目录 `dirCount/fileCount` 一次性分组计数；隐藏项不出现；历史行归「历史文件」节点）；属主/管理员校验复用 `canAccessSession`；`scan=true` 保留抽屉补扫语义
+- [x] T-05 树接口：`GET /api/agent/files/tree?sessionId=&path=&scan=` **单层**返回（含目录 `dirCount/fileCount` 一次性分组计数；隐藏项不出现；历史行归「历史文件」节点）；属主/管理员校验复用 `canAccessSession`；`scan=true` 保留抽屉补扫语义
   关联: R-02.1, R-02.2, R-02.4, R-02.6 | 依赖: T-04
   验证方式: 夹具会话实测（层级进入/返回、隐藏项、历史节点、计数正确）；越权负对照（前台 token 访问他会话 → 42031）；大目录用会话 `0690b2d0`（594 件真产物）测首层时延与 payload 大小并留档
   验收标准: 三场景（正常/隐藏/历史）+ 性能口径（首层 ≤1s、展开 ≤500ms，dev 栈）
+  **收口(2026-10-05, v1.1.0 口径落地)**：`GET /api/agent/files/tree` 已部署（health 200 / 0 轮误伤）
+  - 新会话 `6e9c09e0` 根层 = 1 目录(`messi-personal-logo` 113 文件) + 1 文件，**uid 层已折叠**（原为 dirs=1 且唯一节点名=uid）
+  - 老会话不再塌成单节点：`3ccf0341`→[chen-logo, logo-chen]；`0690b2d0`→4 目录+1 文件；`c11a9ae7`→[logo-chen]（原均只有「历史文件」）
+  - 逐层进入 + 目录计数：`messi-personal-logo` → deliverables 84 / concepts 10 / presentations 8 / tools 8 / renders 3
+  - 越权负对照 **42031**；大目录 `0690b2d0`（594 行）**51ms / 1017B**（口径 ≤1s）
+  - 隐藏内部件：遍历 20 层全树 **0 泄漏**
+  - 夹具探针 14/14 PASS（含双层 uid 折叠、他会话隔离、无会话段旧行三态）
+  - 双次部署留痕：19:41（v1.0.0 口径，暴露问题）→ 20:0x（v1.1.0 口径，达标）
 
 - [ ] T-06 前端树 UI（`ChatFilesPanel.vue`，run 页与前台**共用同一组件**）：面包屑 + 文件夹优先 + 进入/返回 + 懒加载 + `FILES_CHANGED_EVENT` 刷新当前层；下载/删除/空面板提示保持不变
   关联: R-02.2, R-02.5, R-02.6 | 依赖: T-05

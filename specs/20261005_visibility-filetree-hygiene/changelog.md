@@ -1,5 +1,11 @@
 # Changelog: visibility-filetree-hygiene
 
+## T-05 收口：v1.1.0 归属/折叠口径落地（2026-10-05）
+- 用户重确认「确认」→ requirements/plan **v1.1.0 已确认（陈卓）**
+- 实现落地：`SessionFileTree` 归属改**三态**（SESSION / OTHER_SESSION / NO_SESSION）；新增 `foldUserNamespace`（**循环折叠双层 uid**，展示层单一实现）；`AgentFileServiceImpl` 按「他会话→历史文件；无会话段→归本会话」归位 + 折叠 uid
+- 复测（新部署 health 200）：新会话根层 = `messi-personal-logo`(113 文件) + `harness-讲义.md`（**uid 噪音消失**）；老会话出真目录（`3ccf0341`→chen-logo/logo-chen、`0690b2d0`→4 目录+1 文件、`c11a9ae7`→logo-chen）；逐层计数正确（deliverables 84/concepts 10/presentations 8/tools 8/renders 3）；越权 42031；594 行会话 **51ms/1017B**；隐藏件 20 层遍历 0 泄漏；夹具探针 **14/14 PASS**
+- 遗留观察（不阻塞）：同一会话内 shell 产物（会话根）与 file 工具产物（原 `{uid}/` 下）折叠后可能同名并列（各带各的 row id，下载/删除按 id 不受影响）
+
 ## T-05 实现中实测发现 → 回改文档 v1.1.0（待重确认），暂停 T-05 收口（2026-10-05）
 - 已实现并部署：`GET /api/agent/files/tree`（单层懒加载 + 目录计数 + 隐藏内部件 + 复用属主/管理员校验 + `scan` 补扫同源抽取为 `maybeScan`）；部署 19:41 health=200、0 轮误伤
 - **实测暴露两处显示口径问题（非代码缺陷，是 v1.0.0 文档口径）**：

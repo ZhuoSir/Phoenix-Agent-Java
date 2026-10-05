@@ -291,7 +291,8 @@ public class AgentFileServiceImpl implements AgentFileService {
             }
             com.phoenix.agent.util.SessionFileTree.Parsed parsed =
                     com.phoenix.agent.util.SessionFileTree.parse(f.getStoreKey(), agentKey, sessionId);
-            boolean history = !parsed.isSession();
+            // v1.1.0 归属口径：他会话段 → 「历史文件」；**无会话段旧行 → 归本会话**（行 session_id 为权威）
+            boolean history = parsed.isOtherSession();
             if (history) {
                 historyTotal++;
                 if (!historyLevel) {
@@ -305,13 +306,14 @@ public class AgentFileServiceImpl implements AgentFileService {
             if (parsed.internal()) {
                 continue;
             }
-            List<String> segs = segments(parsed.relativePath());
+            // v1.1.0 R-02.7：折叠 {uid} 展示层（单一实现见 SessionFileTree）
+            List<String> segs = com.phoenix.agent.util.SessionFileTree.foldUserNamespace(segments(parsed.relativePath()));
             if (segs.size() <= base.size() || !segs.subList(0, base.size()).equals(base)) {
                 continue;
             }
             if (segs.size() == base.size() + 1) {
                 files.add(TreeNode.builder()
-                        .type("file").name(f.getFileName()).path(parsed.relativePath())
+                        .type("file").name(f.getFileName()).path(String.join("/", segs))
                         .id(f.getId()).sizeBytes(f.getSizeBytes()).mime(f.getMime())
                         .source(f.getSource())
                         .createTime(f.getCreateTime())

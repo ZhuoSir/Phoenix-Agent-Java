@@ -22,15 +22,22 @@ public class TreeProbe {
         ck("三代-uid嵌套", AK + "/" + SID + "/461671714812850176/a/b.svg:1234", Attribution.SESSION, "461671714812850176/a/b.svg", 1234, false);
         ck("三代-噪音.pylibs", AK + "/" + SID + "/.pylibs/pandas/core.py:99", Attribution.SESSION, ".pylibs/pandas/core.py", 99, true);
         ck("三代-call_占位", AK + "/" + SID + "/large_tool_results/call_abc.txt:10", Attribution.SESSION, "large_tool_results/call_abc.txt", 10, true);
-        ck("二代-历史", AK + "/461671714812850176/legacy.txt:55", Attribution.HISTORY, "461671714812850176/legacy.txt", 55, false);
-        ck("一代-历史", "461671714812850176/old.txt:7", Attribution.HISTORY, "461671714812850176/old.txt", 7, false);
-        ck("他会话-隔离", AK + "/11111111-2222-3333-4444-555555555555/x.txt:1", Attribution.HISTORY, null, 1, false);
+        ck("二代-无会话段", AK + "/461671714812850176/legacy.txt:55", Attribution.NO_SESSION, "461671714812850176/legacy.txt", 55, false);
+        ck("一代-无会话段", "461671714812850176/old.txt:7", Attribution.NO_SESSION, "461671714812850176/old.txt", 7, false);
+        ck("他会话-隔离", AK + "/11111111-2222-3333-4444-555555555555/x.txt:1", Attribution.OTHER_SESSION, null, 1, false);
         ck("无size后缀", AK + "/" + SID + "/plain.txt", Attribution.SESSION, "plain.txt", -1, false);
         ck("前缀不匹配但含本会话", "owl-kids/" + SID + "/a.md:5", Attribution.SESSION, "a.md", 5, false);
         ck("内部状态文件", AK + "/" + SID + "/MEMORY.md:3", Attribution.SESSION, "MEMORY.md", 3, true);
         ck("内部后缀jsonl", AK + "/" + SID + "/notes.jsonl:2", Attribution.SESSION, "notes.jsonl", 2, true);
-        ck("空键-不抛", "", Attribution.HISTORY, "", -1, false);
-        ck("他会话在首位-隔离", "11111111-2222-3333-4444-555555555555/y.txt:9", Attribution.HISTORY, "11111111-2222-3333-4444-555555555555/y.txt", 9, false);
+        {
+            java.util.List<String> folded = com.phoenix.agent.util.SessionFileTree.foldUserNamespace(
+                    java.util.List.of("461681072489615360", "461681714812850176", "a.txt"));
+            boolean ok = String.join("/", folded).equals("a.txt");
+            if (ok) pass++; else fail++;
+            System.out.printf("%s %-26s folded=%s%n", ok ? "PASS" : "FAIL", "双层uid折叠", String.join("/", folded));
+        }
+        ck("空键-不抛", "", Attribution.NO_SESSION, "", -1, false);
+        ck("他会话在首位-隔离", "11111111-2222-3333-4444-555555555555/y.txt:9", Attribution.OTHER_SESSION, "11111111-2222-3333-4444-555555555555/y.txt", 9, false);
         System.out.println("---- PASS=" + pass + " FAIL=" + fail + " ----");
         if (fail > 0) System.exit(1);
     }

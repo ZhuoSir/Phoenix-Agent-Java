@@ -1,6 +1,6 @@
 # Plan: visibility-filetree-hygiene
 
-> 版本: v1.1.0 | 状态: **待重确认** | 确认人: （待重确认） | 确认日期: - | 更新: 2026-10-05（v1.1.0：归属口径改「无会话段按行 session_id 归本会话」+ uid 层展示折叠）
+> 版本: v1.1.0 | 状态: 已确认 | 确认人: 陈卓 | 确认日期: 2026-10-05 | 更新: 2026-10-05（v1.1.0：归属口径改「无会话段按行 session_id 归本会话」+ uid 层展示折叠）
 > 上游: `requirements.md` v1.0.0（已确认①·陈卓 2026-10-05）｜挂载: v1.7.0｜特性分支: `feature/visibility-filetree-hygiene`
 > Q1~Q6 按 requirements §七 的**暂定口径**设计（Q1 首帧超时 180s/总上限关；Q2 只报秒数；Q3 空文件夹不做；Q4 历史行单列；Q5 fib.py 删·diagrams 入库·bak 删；Q6 心跳覆盖工具期）
 
