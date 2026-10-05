@@ -1,5 +1,14 @@
 # Changelog: workspace-isolation
 
+## T-11~T-14 代码落地（2026-10-05）**未部署**，commit 3b385fb
+- 交付（后端 8 文件；前端/DB/配置零改动）：
+  - T-11 `HarnessAgentFactory.buildWithSummary(agent, sessionId)` → `.workspace({root}/{agentKey}/{sessionId})`（空=存量智能体级，零行为变化）；`HarnessAgentRegistry` 缓存键 `agentId@sessionId`（LRU 键改 String）、`acquire/get/buildUncached` 增会话重载、`invalidate` 连带清全部会话实例；`McpMountService` 变体键含 sessionId；`HarnessChatServiceImpl` 对话+确认续跑均按（智能体,会话）取实例
+  - T-12 **框架原生支持 cwd**（无需包装工具）：`.project(Path)` 即 `LocalFilesystemWithShell.shellCwd`，缺省回落 `project==null → user.dir`（容器内 `/app`，BUG-79 根因一锤）；显式置为会话目录 → shell/文件工具同根。`ShellExecuteTool` 是唯一 shell 入口（本地/交互/后台同走 `ProcessBuilder.directory(shellCwd)`），三入口一次覆盖
+  - T-13 扫描根=会话目录（会话目录存在→**只扫它**，会话间零交叉）；未建立时回落智能体级历史多根只读兼容，受 turnStart 时间窗 + 他会话 UUID 目录排除双约束；`runtimeKey` 改**以库中智能体为准**（请求侧 sn 缺省=BUG-78 真根因）；storeKey 改 `agentKey+智能体根相对路径`（跨会话稳定）；过滤 `call_*` 与 `large_tool_results`
+  - T-14 `/app` 实测清单：仅 `.agentscope/workspace/agents/RulesHarnessAgent/tasks`（存量 Java 智能体遗留）+ jar/logs/uploads，**零业务产物**（BUG-79 的 `probe_sh.txt` 已随容器重建蒸发——正好反证 shell 逃逸产物不持久）
+- BUG-80 同批修复（详见 bugs.md）：`canAccessSession`=属主 或 后台用户表命中的管理员（`tbl_privilege_user`，实测 admin✓/前台✗ 判定正确）+ 孤儿行回落产物创建者；抽屉补扫同步放行
+- 编译：`mvn -pl phoenix-admin/phoenix-admin-manager -am package -DskipTests`（skip format）通过；**运行时验收（T-15 四项）待部署后执行**——本轮按「先改不发布」纪律不部署
+
 ## T-11 起步（2026-10-05）会话级根地基 + 交接点
 - 已落：`WorkspacePaths.sessionRoot(workspaceRoot, runtimeKey, sessionId)` = `{root}/{agentKey}/{sessionId}`（含 {uid} 层注记）；编译通过
 - **下一会话从这三处接续（T-11 主体）**：

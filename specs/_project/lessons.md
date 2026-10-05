@@ -133,6 +133,16 @@
 - 复发: ×1
 - 关联: docker-auto-pipeline fbb20f7(重写前)；用户抓出
 
+## L-19 路径归属必须与写入方同源解析（请求入参 ≠ 库中事实）
+- 现象: BUG-78 我判定为"扫描器漏扫 root 级"，加了候选根兜底（碰巧修好）；本轮查代码发现真因是 **scanner 用请求入参 sn** 算 runtimeKey（admin/前台请求不带 sn → `agent-33`），**factory 用库中 `agent.sn`** 算（`owl-kids`）→ 扫描根与写入根天生错位
+- 防再犯规则: 任何"该去哪个目录找它"的解析必须与**写入方同一数据源**（同实体/同函数）；禁止用调用方透传的可选入参决定落点；候选根兜底是掩盖不是修复——修完要能解释"为什么原来错、现在为什么一定对"
+- 复发: ×1（BUG-78；同族=BUG-67/74 跨会话/跨用户错位）
+
+## L-18 改框架行为前先读规格（本项目框架无源码，字节码就是规格）
+- 现象: BUG-79 规划里我已准备"包装 shell 工具注入 `cd {sessionDir} && `"（还要自己覆盖 shell-local/pwsh/后台 job 三入口）；查 `javap` 发现 `LocalFilesystemSpec.project` 就是 shell cwd 开关（缺省回落 `user.dir`），`IsolationScope` 本身就有 SESSION/USER/AGENT 三档 namespace 工厂——一行配置解决，包装方案脆弱且漏入口
+- 防再犯规则: 需要框架层行为变更时，先 `unzip -l` + `javap -p -c` 读规格类（构造参数/字段/分支），确认**没有**现成开关再考虑包装；框架能力清单沉淀到 spec plan 的"框架规格取证"小节
+- 复发: ×0
+
 ## L-17 优化前先证组件可达（import 链核验）
 - 现象: 2026-10-05 T-03 按"admin 运行页"修渲染管线，改完 `components/run/index.vue` 才发现**全仓零引用=死组件**（真身在 `views/front/chat.vue`+`views/front/api-transport.ts`+`ChatMessages.vue`，核心逻辑还分居共享包 chat-shared）；误改已还原
 - 防再犯规则: 动任何 UI 组件前先跑一次可达性核验（`grep -rn "<相对路径片段>" src` 零命中即死代码）；**入口枚举（L-06）须以 import/路由链实证，不以目录名猜**
