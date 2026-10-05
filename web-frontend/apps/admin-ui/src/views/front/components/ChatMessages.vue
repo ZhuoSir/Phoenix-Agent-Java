@@ -186,6 +186,7 @@ async function handleConfirmAction(
           <div
             v-if="(msg as any).messageType === 'html'"
             class="chat-message__html"
+            v-show="String(msg.content ?? '').trim()"
             v-html="msg.content"
           ></div>
           <div
@@ -239,6 +240,7 @@ async function handleConfirmAction(
               'chat-message__text--markdown': msg.role === 'assistant',
               'chat-message__text--streaming': msg.streaming
             }"
+            v-show="String(msg.content ?? '').trim()"
             v-html="renderMessage(msg)"
           ></div>
           <div v-if="msg.streaming && streamingElapsedText" class="chat-message__elapsed">

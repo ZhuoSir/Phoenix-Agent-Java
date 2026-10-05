@@ -1,5 +1,12 @@
 # Changelog: long-turn-resilience
 
+## T-04 八刀（2026-10-05）空正文框不再渲染（用户实测反馈）
+- 用户原话：「当输出正文没有的时候，那个输入框不要显示，只要有正文才显示，只要显示think就够了」；澄清后确认目标=**智能体输出泡泡中的正文框（非 think 框）**
+- 改动（两面同步，L-06）：
+  - 运行页 `components/run/index.vue` 三处正文容器加闸门：历史 `md-card`、常规 `message-text`、直播区 `agent-response-container` → 仅当 `content.trim()` 非空 / `nodeBlocks.length > 0` 才渲染（think 框不受影响）
+  - 前台 `views/front/components/ChatMessages.vue` 两处用 `v-show`（v-else 链安全）
+- 证据：typecheck 213=基线；`@vben/web-ele` 构建成功；**部署待用户当前轮结束**（L-16 门禁生效：检测到用户在跑，主动中止未部署）
+
 ## BUG-77 二轮取证（2026-10-05）——数据没坏，是报文转换缺 reasoning
 - 用户复现（诊断文案已生效，能直接看到 provider 原文）：同会话「继续」再次 400
 - 二层取证：`tbl_harness_store_state`（注意 session_id 形如 `uid:sessionId`）该会话 29 条消息**结构完全合法**：tool_use/tool_result 成对、每条 assistant 均含 thinking 块 → **否定"状态损坏/悬挂配对"假设**，也否定"reasoning 未持久化"

@@ -1428,7 +1428,11 @@ onMounted(async () => {
                   :has-content="true"
                   :streaming="!!(message as any).streaming"
                 />
-                <div class="md-card" v-html="message.content"></div>
+                <div
+                  v-if="String(message.content ?? '').trim()"
+                  class="md-card"
+                  v-html="message.content"
+                ></div>
               </div>
               <div
                 v-else-if="message.messageType === 'result-set'"
@@ -1522,6 +1526,7 @@ onMounted(async () => {
                     :streaming="!!(message as any).streaming"
                   />
                   <div
+                    v-if="String(message.content ?? '').trim()"
                     class="message-text"
                     v-html="formatMessageContent(message)"
                   ></div>
@@ -1537,7 +1542,7 @@ onMounted(async () => {
                 :has-content="nodeBlocks.length > 0"
                 :streaming="isStreaming"
               />
-              <div class="agent-response-container">
+              <div v-if="nodeBlocks.length > 0" class="agent-response-container">
                 <template v-for="(nodeBlock, index) in nodeBlocks" :key="index">
                   <div
                     v-if="
