@@ -907,6 +907,19 @@ function applyServerRowRender(list: any[]) {
   for (const m of list) {
     const mdRaw = m.metadata;
     const metaStr = typeof mdRaw === 'string' ? mdRaw : JSON.stringify(mdRaw ?? {});
+    // long-turn-resilience T-04：metadata 解析（thinking/thinkingMs/流式态）必须在本函数统一完成——
+    // 5s 轮询 tick 只走本函数；此前仅首载单独解析 thinking，tick 覆盖后即丢
+    // （BUG-72 用户实测：思考块"刷新后有、过几秒又消失"）
+    try {
+      const md = typeof mdRaw === 'string' ? JSON.parse(mdRaw) : mdRaw;
+      if (md && typeof md.thinking === 'string') {
+        (m as any).thinking = md.thinking;
+        (m as any).thinkingMs = typeof md.thinkingMs === 'number' ? md.thinkingMs : undefined;
+      }
+    } catch { /* metadata 非 JSON：静默（旧行无键） */ }
+    // 服务端进行中轮次（status=generating）刷新后须保持流式态，
+    // 否则思考块硬编码 false → 明明是 thinking 却显示 "Think Done"（用户实测）
+    (m as any).streaming = metaStr.includes('generating');
     if (m.role === 'assistant' && (!m.messageType || m.messageType === 'text') && metaStr.includes('turnId')) {
       m.content = markdownToHtml(String(m.content ?? ''));
       m.messageType = 'md-card'; // 专属分支：全宽卡片；'html' 留给 legacy generateNodeHtml 行原样渲染
@@ -1367,7 +1380,7 @@ onMounted(async () => {
                   :content="(message as any).thinking"
                   :duration-ms="(message as any).thinkingMs"
                   :has-content="true"
-                  :streaming="false"
+                  :streaming="!!(message as any).streaming"
                 />
                 <div class="md-card" v-html="message.content"></div>
               </div>
@@ -1460,7 +1473,7 @@ onMounted(async () => {
                     :content="(message as any).thinking"
                     :duration-ms="(message as any).thinkingMs"
                     :has-content="true"
-                    :streaming="false"
+                    :streaming="!!(message as any).streaming"
                   />
                   <div
                     class="message-text"

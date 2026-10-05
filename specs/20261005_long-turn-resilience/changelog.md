@@ -1,5 +1,12 @@
 # Changelog: long-turn-resilience
 
+## T-04 二刀（2026-10-05）BUG-72 思考块自行消失（用户实测）
+- 用户原话：「think窗口有时候自己会消失，刷新后就有，过几秒钟又消失」
+- 根因（实证定位）：运行页刷新首载路径会解析 `metadata.thinking` 写入消息（故可见），但 **5s 轮询 tick 只调用 `applyServerRowRender`**——该函数只处理 content/streaming，**不解析 thinking** → tick 覆盖消息即丢 thinking 字段 → 模板 `v-if="message.thinking"` 为假 → 思考块卸载消失
+- 修复：metadata 解析（thinking/thinkingMs/streaming）**统一收进 `applyServerRowRender`**，首载与轮询同源，杜绝两路不一致；BUG-72 已入册并翻「已验证」
+- 证据：typecheck 213=基线；新 run 分片 `run-B02KaC87.js`；容器内 `thinking===\`string\`&&(n.thinking=...` 实证；首页 200
+- 遗留：**T-03b**（性能三刀需在运行页重做——此前打偏到前台聊天页；运行页才是用户实际界面，见同日 L-17 修正）
+
 ## T-04 首刀（2026-10-05）刷新后"Think Done"误判修复（用户实测）
 - 用户原话：「还有个问题，明明是thinking ，刷新后就think done了」
 - 根因（实证）：刷新走 `loadMessages` → `transport.listMessages` → `toStoreMessage` **从不设置 streaming 标记**；行 metadata 虽有 `status=generating`，但 UI 只看 `msg.streaming` → ThinkingBlock 标签 `streaming ? 'Thinking…' : 'Think Done'` 判成完成态
