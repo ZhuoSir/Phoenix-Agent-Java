@@ -10,13 +10,13 @@
   验证方式: 编译绿；容器内目录实证（新对话后 root 下出现 agent-{id}/ 树，根级零新增散文件）；runtimeKey 规则与 factory 原 name() 逐字一致（同源引用断言）
   验收标准: 目录树实证 + 同源引用（scanner 复用在 T-02 验证）
 
-- [ ] T-02 scanner 新根适配 + 全局首占去重：candidateAgentDirs 根走 WorkspacePaths.agentRoot；登记 storeKey 去重从按会话改全局（任何会话已登记→跳过）（BUG-67 主刀一）
+- [x] T-02 scanner 新根适配 + 全局首占去重：candidateAgentDirs 根走 WorkspacePaths.agentRoot；登记 storeKey 去重从按会话改全局（任何会话已登记→跳过）（BUG-67 主刀一）
   关联: R-01, R-03
   依赖: T-01
   验证方式: 同智能体双会话实测——S1 轮末产物登记 S1；S2 打开面板/轮末扫描**不收编** S1 文件（DB 行归属+面板 API 双侧取证）；S1 面板自身文件仍在（首占不回溯）
   验收标准: 归属双侧取证全绿
 
-- [ ] T-03 抽屉补扫窄窗：AgentFileController windowStart 从 session.createTime 改最近 assistant 消息 create_time（无消息→跳过补扫，轮末兜底）（BUG-67 主刀二）
+- [x] T-03 抽屉补扫窄窗：AgentFileController windowStart 从 session.createTime 改最近 assistant 消息 create_time（无消息→跳过补扫，轮末兜底）（BUG-67 主刀二）
   关联: R-03
   依赖: T-02
   验证方式: 构造 S1 老会话（创建时间早于 S2 产物）→ S1 抽屉 scan=true → 不收编 S2 之后产生的他会话文件；本会话最后一轮尾写文件仍可补捞（窄窗有效性正向断言）

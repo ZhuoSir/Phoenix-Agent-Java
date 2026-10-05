@@ -58,7 +58,10 @@ public class WorkspaceArtifactScanner {
             Instant turnStart) {
         List<AgentFile> registered = new ArrayList<>();
         try {
-            Path root = Paths.get(workspaceRoot).toAbsolutePath().normalize();
+            // workspace-isolation R-01：扫描根=智能体专属根（与 factory 同源 WorkspacePaths，BUG-68 隔离随动）
+            Path root = com.phoenix.agent.util.WorkspacePaths
+                .agentRoot(workspaceRoot, com.phoenix.agent.util.WorkspacePaths.runtimeKey(agentId, sn))
+                .toAbsolutePath().normalize();
             List<Path> agentDirs = candidateAgentDirs(root, userId, agentId, sn);
             for (Path dir : agentDirs) {
                 if (!Files.isDirectory(dir)) {
@@ -151,8 +154,10 @@ public class WorkspaceArtifactScanner {
         try {
             long size = Files.size(file);
             String relFromRoot = root.relativize(file).toString().replace('\\', '/');
-            String storeKey = relFromRoot + ":" + size;
-            if (agentFileService instanceof AgentFileServiceImpl impl && impl.existsByStoreKey(sessionId, storeKey)) {
+            // storeKey 带 runtimeKey 前缀（root 末段）：全局首占不跨智能体误撞（workspace-isolation T-02）
+            String storeKey = root.getFileName() + "/" + relFromRoot + ":" + size;
+            // BUG-67：去重从按会话改全局首占——已被任何会话登记的文件不再收编
+            if (agentFileService instanceof AgentFileServiceImpl impl && impl.existsByStoreKeyAnySession(storeKey)) {
                 return;
             }
             byte[] content = Files.readAllBytes(file);

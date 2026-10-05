@@ -1,5 +1,10 @@
 # Changelog: workspace-isolation
 
+## T-02+T-03 完成（2026-10-05）全局首占+窄窗四证全绿
+- 交付：existsByStoreKeyAnySession 全局首占方法；scanner 扫描根同源下沉（WorkspacePaths）+ storeKey 加 runtimeKey 前缀（防跨智能体相对路径误撞）；AgentFileController 补扫窗=最近 assistant 消息起（无消息不补扫）
+- 夹具实测（免模型）：①S1 补扫登记 w02-new ✓ ②S2 补扫**空**（不收编 S1 已占——BUG-67 主症状毙）✓ ③窄窗证：mtime 窗外文件零登记 ✓ ④归属 DB 双侧=w02-s1 ✓；调用方枚举复核：仅轮末主通道+本抽屉入口两处，前后台共用单端点无漏
+- 工装自记：清场核验 SQL 三犯 bigint||bigint 拼接错（删除本身已执行，::text 修正复核全零）
+
 ## T-01 完成（2026-10-05）factory 换根生效实证
 - 交付：WorkspacePaths（runtimeKey/agentRoot 单一实现）+ factory .workspace 下沉 {root}/{runtimeKey} + runtimeKey 方法同源化委托；build 绿
 - 目录实证：部署后 agent-36 对话轮 → 框架自建 `agent-36/agents/36/tasks/_sweep.marker` 落**专属子树**，根级零新增散文件 ✓；存量旧树（461671…/agents/fonts/散文件）原样未动（待 T-04 迁移归档）

@@ -153,6 +153,17 @@ public class AgentFileServiceImpl implements AgentFileService {
                 .count() > 0;
     }
 
+    /** workspace-isolation T-02（BUG-67）：storeKey 全局首占——任何会话已登记即不再收编。 */
+    public boolean existsByStoreKeyAnySession(String storeKey) {
+        if (storeKey == null || storeKey.isBlank()) {
+            return false;
+        }
+        return QueryChain.of(agentFileMapper)
+                .eq(AgentFile::getStoreKey, storeKey)
+                .eq(AgentFile::getDelFlag, 0)
+                .count() > 0;
+    }
+
     private AgentFile requireLiveFile(String fileId) {
         AgentFile f = agentFileMapper.selectOneById(fileId);
         if (f == null || Integer.valueOf(1).equals(f.getDelFlag())) {
