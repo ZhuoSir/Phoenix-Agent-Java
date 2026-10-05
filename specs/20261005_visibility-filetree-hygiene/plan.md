@@ -1,6 +1,6 @@
 # Plan: visibility-filetree-hygiene
 
-> 版本: v1.0.0 | 状态: 已确认 | 确认人: 陈卓 | 确认日期: 2026-10-05 | 更新: 2026-10-05
+> 版本: v1.1.0 | 状态: **待重确认** | 确认人: （待重确认） | 确认日期: - | 更新: 2026-10-05（v1.1.0：归属口径改「无会话段按行 session_id 归本会话」+ uid 层展示折叠）
 > 上游: `requirements.md` v1.0.0（已确认①·陈卓 2026-10-05）｜挂载: v1.7.0｜特性分支: `feature/visibility-filetree-hygiene`
 > Q1~Q6 按 requirements §七 的**暂定口径**设计（Q1 首帧超时 180s/总上限关；Q2 只报秒数；Q3 空文件夹不做；Q4 历史行单列；Q5 fib.py 删·diagrams 入库·bak 删；Q6 心跳覆盖工具期）
 
@@ -61,12 +61,18 @@ GET /api/agent/files/tree?sessionId=<uuid>&path=<相对目录，默认根>&scan=
 | 代 | store_key 形态 | 取相对路径的规则 |
 |---|---|---|
 | 三代（R-06 后） | `{agentKey}/{sessionId}/{…}:size` | 去掉 `{agentKey}/` + `{sessionId}/` 前缀 |
-| 二代（agent 分根后） | `{agentKey}/{uid}/{…}:size` | 去掉 `{agentKey}/` 前缀 → 归入「历史文件」节点 |
-| 一代（最早） | `{uid}/{…}:size` | 原样 → 归入「历史文件」节点 |
+| 二代（agent 分根后） | `{agentKey}/{uid}/{…}:size` | **无会话段 → 按行 `session_id` 归本会话**（展示时折叠 uid 层，见下） |
+| 一代（最早） | `{uid}/{…}:size` | 同上（无会话段 → 归本会话，折叠 uid 层） |
+| 他会话段 | `{agentKey}/{其他sessionId}/…:size` | **「历史文件」节点**（隔离：不混入本会话树） |
 - 会话 UUID 段用正则识别（36 位、4 个连字符）与 `sessionId` 比对；不是本会话段即视为历史。
 - **隐藏规则**：任意目录段以 `.` 开头 → 隐藏；并复用扫描器同名名单（`sessions/tasks/.index/memory/large_tool_results`）；文件级 `call_*` 前缀隐藏。**两侧共用同一常量**（从 `WorkspaceArtifactScanner` 抽出为公共工具，防两处漂移 → 落实 L-19「同源解析」）。
 - 目录节点计数：为该层每个 dir 顺带统计 `dirCount/fileCount`（一条 SQL 分组即可，避免 N+1）。
 - **空文件夹**（Q3 暂定不做）：库里无行即无节点；若将来要做，再加"扫盘补空目录"开关。
+
+**v1.1.0 归属与 uid 口径（T-05 实测回改）**：
+- 归属权威 = 行 `session_id`（与现行平铺列表同源），`store_key` 只提供**相对路径结构**；无会话段的旧行不再一律丢进「历史文件」（实测旧行占 2124/2317，否则老会话整棵树塌成一个节点）。
+- 展示层**折叠 `{uid}` 首段**（纯数字段；file 工具路径必然插入、shell 产物不插入）：会话根直接呈现用户目录与文件；`store_key`/row id/下载删除口径完全不变。
+- 实测证据：新会话 `6e9c09e0` 根层原为 `dirs=1`（唯一节点名=uid）；老会话 `3ccf0341` 原为 `history=712 dirs=0 files=0`。
 
 ### 3.3 前端（`ChatFilesPanel.vue`，run 页与前台共用 → 天然两面一致）
 - 顶部**面包屑**（会话目录 → 子目录…）+ 返回上级；列表**文件夹在前**（图标+名称+内含文件数）、文件在后（沿用现下载/删除按钮与大小/MIME）。

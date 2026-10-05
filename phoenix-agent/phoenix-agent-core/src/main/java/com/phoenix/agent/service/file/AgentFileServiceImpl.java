@@ -33,6 +33,8 @@ public class AgentFileServiceImpl implements AgentFileService {
 
     private final AgentFileMapper agentFileMapper;
     private final ChatSessionMapper chatSessionMapper;
+    /** v1.7.0 R-02：解析 runtimeKey 以剥离历史行前缀（与扫描器同口径，DB 为准）。 */
+    private final com.phoenix.data.service.agent.AgentService agentService;
 
     /** 与 FileStorageProperties 的 uploads 根同目录（默认 ./uploads；交付包指到卷内）。 */
     @Value("${phoenix.agent.files.root:./uploads}")
@@ -261,5 +263,166 @@ public class AgentFileServiceImpl implements AgentFileService {
             base = "file";
         }
         return base.length() > 200 ? base.substring(0, 200) : base;
+    }
+
+    // ==================== v1.7.0 R-02：会话文件树（单层懒加载） ====================
+
+    @Override
+    public TreeLevel treeLevel(String sessionId, String requestedPath, String requesterUserId) {
+        requireSessionOwner(sessionId, requesterUserId);
+        ChatSession session = chatSessionMapper.selectOneById(sessionId);
+        String agentKey = resolveAgentKey(session);
+        String want = normalizePath(requestedPath);
+        boolean historyLevel = AgentFileService.HISTORY_PATH.equals(want);
+        List<String> base = historyLevel ? List.of() : segments(want);
+
+        List<AgentFile> rows = QueryChain.of(agentFileMapper)
+                .eq(AgentFile::getSessionId, sessionId)
+                .eq(AgentFile::getDelFlag, 0)
+                .orderBy(AgentFile::getCreateTime, false)
+                .list();
+
+        Map<String, DirAgg> dirs = new java.util.LinkedHashMap<>();
+        List<TreeNode> files = new java.util.ArrayList<>();
+        int historyTotal = 0;
+        for (AgentFile f : rows) {
+            if (f.getStoreKey() == null || f.getStoreKey().isBlank()) {
+                continue;
+            }
+            com.phoenix.agent.util.SessionFileTree.Parsed parsed =
+                    com.phoenix.agent.util.SessionFileTree.parse(f.getStoreKey(), agentKey, sessionId);
+            boolean history = !parsed.isSession();
+            if (history) {
+                historyTotal++;
+                if (!historyLevel) {
+                    continue;
+                }
+            }
+            else if (historyLevel) {
+                continue;
+            }
+            // R-02.3：框架内部件一律不出现在树里（与扫描器同源判据）
+            if (parsed.internal()) {
+                continue;
+            }
+            List<String> segs = segments(parsed.relativePath());
+            if (segs.size() <= base.size() || !segs.subList(0, base.size()).equals(base)) {
+                continue;
+            }
+            if (segs.size() == base.size() + 1) {
+                files.add(TreeNode.builder()
+                        .type("file").name(f.getFileName()).path(parsed.relativePath())
+                        .id(f.getId()).sizeBytes(f.getSizeBytes()).mime(f.getMime())
+                        .source(f.getSource())
+                        .createTime(f.getCreateTime())
+                        .build());
+            }
+            else {
+                String dirName = segs.get(base.size());
+                String dirPath = joinPath(base, dirName);
+                DirAgg agg = dirs.computeIfAbsent(dirName, k -> new DirAgg(dirPath));
+                agg.fileCount++;
+                if (segs.size() == base.size() + 2) {
+                    agg.childDirs.add(segs.get(base.size() + 1));
+                }
+            }
+        }
+
+        List<TreeNode> entries = new java.util.ArrayList<>();
+        dirs.values().stream()
+                .sorted(java.util.Comparator.comparing(a -> a.path))
+                .forEach(a -> entries.add(TreeNode.builder()
+                        .type("dir").name(lastSegment(a.path)).path(a.path)
+                        .dirCount(a.childDirs.size()).fileCount(a.fileCount)
+                        .build()));
+        if (historyTotal > 0 && !historyLevel && want.isEmpty()) {
+            entries.add(TreeNode.builder()
+                    .type("history").name(AgentFileService.HISTORY_NAME)
+                    .path(AgentFileService.HISTORY_PATH).fileCount(historyTotal)
+                    .build());
+        }
+        files.sort(java.util.Comparator.comparing(TreeNode::name));
+        entries.addAll(files);
+
+        return TreeLevel.builder()
+                .rootName(sessionId)
+                .path(historyLevel ? AgentFileService.HISTORY_PATH : want)
+                .parentPath(historyLevel ? "" : parentOf(want))
+                .dirTotal(dirs.size())
+                .fileTotal(files.size())
+                .historyTotal(historyTotal)
+                .entries(entries)
+                .build();
+    }
+
+    private String resolveAgentKey(ChatSession session) {
+        if (session == null || session.getAgentId() == null) {
+            return null;
+        }
+        Long agentId = session.getAgentId().longValue();
+        try {
+            com.phoenix.data.entity.Agent agent = agentService.findById(agentId);
+            if (agent != null) {
+                return com.phoenix.agent.util.WorkspacePaths.runtimeKey(agentId, agent.getSn());
+            }
+        }
+        catch (RuntimeException e) {
+            log.warn("文件树 runtimeKey 解析失败，回落 agentId: agentId={}, err={}", agentId, e.toString());
+        }
+        return com.phoenix.agent.util.WorkspacePaths.runtimeKey(agentId, null);
+    }
+
+    private static final class DirAgg {
+        private final String path;
+        private final java.util.Set<String> childDirs = new java.util.LinkedHashSet<>();
+        private int fileCount;
+
+        private DirAgg(String path) {
+            this.path = path;
+        }
+    }
+
+    private static String normalizePath(String p) {
+        if (p == null || p.isBlank()) {
+            return "";
+        }
+        String s = p.trim().replace('\\', '/');
+        while (s.startsWith("/")) {
+            s = s.substring(1);
+        }
+        while (s.endsWith("/")) {
+            s = s.substring(0, s.length() - 1);
+        }
+        return s;
+    }
+
+    private static String parentOf(String path) {
+        if (path == null || path.isEmpty()) {
+            return "";
+        }
+        int idx = path.lastIndexOf('/');
+        return idx < 0 ? "" : path.substring(0, idx);
+    }
+
+    private static String joinPath(List<String> base, String name) {
+        return base.isEmpty() ? name : String.join("/", base) + "/" + name;
+    }
+
+    private static String lastSegment(String path) {
+        int idx = path.lastIndexOf('/');
+        return idx < 0 ? path : path.substring(idx + 1);
+    }
+
+    private static List<String> segments(String path) {
+        List<String> out = new java.util.ArrayList<>();
+        if (path == null) {
+            return out;
+        }
+        for (String part : path.split("/")) {
+            if (!part.isEmpty()) {
+                out.add(part);
+            }
+        }
+        return out;
     }
 }
