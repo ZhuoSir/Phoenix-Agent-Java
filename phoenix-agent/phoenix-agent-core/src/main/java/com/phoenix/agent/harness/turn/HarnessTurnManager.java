@@ -256,11 +256,74 @@ public class HarnessTurnManager {
                     }
                     flush();
                 });
+            // T-03b：100ms 文本合并闸——源帧可达 17 万/轮，合并后下发约 10 帧/秒
+            this.mergeJanitor = Flux.interval(Duration.ofMillis(100), Schedulers.boundedElastic())
+                .subscribe(t -> {
+                    if (!sinkDone.get()) {
+                        flushPendingText();
+                    }
+                });
         }
 
         /** BUG-69 金丝雀计数：帧总数/非空正文帧 */
         final AtomicLong framesSeen = new AtomicLong();
         final AtomicLong framesWithText = new AtomicLong();
+
+        /** T-03b 帧风暴治理：文本/思考增量缓冲（~100ms 合并成一帧下发）与已下发帧计数 */
+        final StringBuilder pendingText = new StringBuilder();
+        final StringBuilder pendingThink = new StringBuilder();
+        final AtomicLong framesEmitted = new AtomicLong();
+        /** T-03b：丢弃的纯空生命周期帧计数（观测用） */
+        final AtomicLong framesDropped = new AtomicLong();
+        /** T-03b：随合并帧捎带的状态快照（技能/文件面板），避免因每帧携带而绕过合并 */
+        private String pendingAgentFiles;
+        private String pendingLoadedSkills;
+        private Disposable mergeJanitor;
+
+        /** T-03b：把缓冲的文本/思考增量合并成一帧下发（无缓冲则空操作） */
+        private void flushPendingText() {
+            if (pendingText.length() == 0 && pendingThink.length() == 0
+                    && pendingAgentFiles == null && pendingLoadedSkills == null) {
+                return;
+            }
+            Map<String, Object> merged = new LinkedHashMap<>(4);
+            merged.put("content", pendingText.toString());
+            merged.put("end", false);
+            if (pendingThink.length() > 0) {
+                merged.put("thinking", pendingThink.toString());
+            }
+            // T-03b：捎带状态快照（客户端幂等处理；不因每帧携带而绕过合并）
+            if (pendingAgentFiles != null) {
+                merged.put("agentFiles", pendingAgentFiles);
+                pendingAgentFiles = null;
+            }
+            if (pendingLoadedSkills != null) {
+                merged.put("loadedSkills", pendingLoadedSkills);
+                pendingLoadedSkills = null;
+            }
+            pendingText.setLength(0);
+            pendingThink.setLength(0);
+            framesEmitted.incrementAndGet();
+            sink.emitNext(merged, Sinks.EmitFailureHandler.busyLooping(Duration.ofMillis(100)));
+        }
+
+        /** T-03b：保序关键帧——这些帧的先后顺序对客户端语义重要，必须先冲批再透传 */
+        private boolean needsOrderingFlush(Map<String, Object> frame) {
+            return Boolean.TRUE.equals(frame.get("end")) || Boolean.TRUE.equals(frame.get("needConfirm"))
+                    || frame.get("toolCalls") != null || frame.get("buttons") != null || frame.get("error") != null;
+        }
+
+        /** T-03b：纯文本/思考增量帧（无 end/确认/文件/技能/工具等语义键）→ 可合并推迟下发 */
+        private boolean isPureTextDelta(Map<String, Object> frame) {
+            if (Boolean.TRUE.equals(frame.get("end")) || Boolean.TRUE.equals(frame.get("needConfirm"))
+                    || frame.get("toolCalls") != null || frame.get("buttons") != null
+                    || frame.get("error") != null) {
+                return false;
+            }
+            Object c = frame.get("content");
+            Object t = frame.get("thinking");
+            return (c instanceof String cs && !cs.isEmpty()) || (t instanceof String ts && !ts.isEmpty());
+        }
 
         private void onFrame(Map<String, Object> frame) {
             try {
@@ -270,6 +333,7 @@ public class HarnessTurnManager {
                 if (c instanceof String s && !s.isEmpty()) {
                     framesWithText.incrementAndGet();
                     content.append(s);
+                    pendingText.append(s);
                 }
                 Object th = frame.get("thinking");
                 if (th instanceof String s && !s.isEmpty()) {
@@ -277,6 +341,15 @@ public class HarnessTurnManager {
                         thinkStart.set(System.currentTimeMillis());
                     }
                     thinking.append(s);
+                    pendingThink.append(s);
+                }
+                Object af = frame.get("agentFiles");
+                if (af instanceof String afs && !afs.isEmpty()) {
+                    pendingAgentFiles = afs;
+                }
+                Object ls = frame.get("loadedSkills");
+                if (ls instanceof String lss && !lss.isEmpty()) {
+                    pendingLoadedSkills = lss;
                 }
                 if (Boolean.TRUE.equals(frame.get("needConfirm"))) {
                     awaitingConfirm.set(true);
@@ -285,6 +358,22 @@ public class HarnessTurnManager {
                 if (isEnd && awaitingConfirm.get()) {
                     return; // P5：待确认期抑制 end，sink 保开
                 }
+                // T-03b：纯增量帧只入缓冲（由合并闸 ~100ms 下发）；语义帧先冲批再原样透传（保序保语义）
+                if (isPureTextDelta(frame)) {
+                    return;
+                }
+                // T-03b：纯空生命周期帧（无内容、无语义、无快照）对客户端零信息量 → 丢弃，不再下发
+                if (!needsOrderingFlush(frame) && (c == null || !(c instanceof String cs2) || cs2.isEmpty())
+                        && (th == null || !(th instanceof String ts2) || ts2.isEmpty())
+                        && pendingAgentFiles == null && pendingLoadedSkills == null) {
+                    framesDropped.incrementAndGet();
+                    return;
+                }
+                // T-03b：只有保序关键帧才冲批；其余帧不打断合并节奏
+                if (needsOrderingFlush(frame)) {
+                    flushPendingText();
+                }
+                framesEmitted.incrementAndGet();
                 sink.emitNext(frame, Sinks.EmitFailureHandler.busyLooping(Duration.ofMillis(100)));
                 if (isEnd) {
                     endForwarded = true; // 双 end 修复：透传过真 end 不再补发合成帧
@@ -333,18 +422,29 @@ public class HarnessTurnManager {
                 return;
             }
             // BUG-69 金丝雀：每轮一行体检；contentLen>0 而 textFrames=0 即用户所见与落库背离，告警级
-            long cl = content.length(), tf = framesWithText.get(), fs = framesSeen.get();
+            long cl = content.length(), tf = framesWithText.get(), fs = framesSeen.get(), fe = framesEmitted.get();
+            long fd = framesDropped.get();
             if (cl > 0 && tf == 0) {
-                log.warn("[b69-canary] 背离告警: session={} status={} contentLen={} frames={} textFrames=0", sessionId,
-                        status, cl, fs);
+                log.warn("[b69-canary] 背离告警: session={} status={} contentLen={} frames={} emitted={} textFrames=0",
+                        sessionId, status, cl, fs, fe);
             }
             else {
-                log.info("[b69-canary] session={} status={} contentLen={} frames={} textFrames={}", sessionId, status,
-                        cl, fs, tf);
+                log.info("[b69-canary] session={} status={} contentLen={} frames={} emitted={} dropped={} textFrames={}",
+                        sessionId, status, cl, fs, fe, fd, tf);
             }
             sinkDone.set(true);
             if (janitor != null) {
                 janitor.dispose();
+            }
+            if (mergeJanitor != null) {
+                mergeJanitor.dispose();
+            }
+            // T-03b：定稿前冲批，确保最后一段增量不丢
+            try {
+                flushPendingText();
+            }
+            catch (Exception ignored) {
+                // sink 可能已关闭，忽略
             }
             if (sourceSub != null) {
                 sourceSub.dispose();
