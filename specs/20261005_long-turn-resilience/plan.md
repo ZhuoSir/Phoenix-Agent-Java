@@ -1,6 +1,6 @@
 # Plan: long-turn-resilience（长轮次可靠性 · DSH 对标）
 
-> 版本: v0.1.0 | 状态: 草稿 | 更新: 2026-10-05
+> 版本: v1.0.0 | 状态: 已确认 | 确认人: 陈卓 | 确认日期: 2026-10-05 | 更新: 2026-10-05
 > 设计蓝本：DSH 源码对标（requirements A-6 清单）；规范路由：code-frontend=none（跟随周边）/code-backend=global/database=global
 
 ## 〇、坑核对（lessons 全 16 条 active 逐条过）

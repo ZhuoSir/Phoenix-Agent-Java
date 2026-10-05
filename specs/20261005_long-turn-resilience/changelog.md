@@ -1,5 +1,11 @@
 # Changelog: long-turn-resilience
 
+## tasks v0.1.0（2026-10-05）
+- Phase 3 拆解：T-01~T-08 三组（后端/前端渲染/收口）；看门狗假死模拟验证、Flyway 重放、DSH stress 风暴灌帧、join 三场景、四面枚举收口、logo 真跑 20 分钟一锤定音；R 全覆盖自检无孤儿
+
+## plan v1.0.0（2026-10-05）—— 确认②通过
+- 用户「确认」；plan v0.1.0→v1.0.0 已确认（陈卓）；进入 Phase 3 Tasks
+
 ## plan v0.1.0（2026-10-05）
 - Phase 2 落盘（DSH 对标设计）：看门狗=TurnManager 单点活性化（onFrame 脉冲 arm+600s 空闲闸+总时长默认关+文案分原因）；渲染=DSH 三件套（批量消费/快照 1s 降频+beforeunload 兜底/尾块增量+完成块冻结）覆盖四面（admin live 零节流实勘/admin join 5s 轮询/front transport 150ms 全量 markdown/pc+mobile 枚举后同治）；join"think done 无正文"列复现定位任务；上下文=V1.6.0_03 三列 nullable+全局 env 默认按 DSH 换算（102400≈0.8×128k、pruner 8192）+factory 两级回退+指纹白拿；被否案 4（含 Worker 化与比例制列 BL 候补）；坑核对 16 条（L-06 四面枚举/L-07 用户可见面验收/L-16 部署避让）
 
