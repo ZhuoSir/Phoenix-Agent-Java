@@ -1,5 +1,13 @@
 # Changelog: long-turn-resilience
 
+## T-04 七刀（2026-10-05）BUG-77 中断后 BadRequestException（用户实测，provider 原文取证）
+- 用户原话：「模型或流错误中断：BadRequestException（内容保留至最后增量），继续执行任务提示这个」
+- 取证链：①该会话仅 ≈922 token（总 2306 字符）→ **排除上下文超限**（我先前的猜测被自己推翻）②后端日志拿到 provider 原文：`400 invalid_request_error: The reasoning_content in the thinking mode must be passed back to the API`（deepseek-v4-flash 思考模式硬性要求）③DB 时序显示失败后 15:32:52 一轮正常恢复 → **一次性状态不一致**（被中断轮丢失 reasoning_content/tool 配对），非会话永久中毒
+- 修复（本批）：`onError` 文案带上 provider 原文（压缩空白+截断 300 字），下次同类错误用户直接看到根因，不必翻日志
+- 深层修复（列 T-04 后续）：中断（重启/超时/取消）时持久化 reasoning_content 或清理悬挂 tool 配对，使"接续轮"不再失败
+- 透明记录（我的越界行为）：为定位本 Bug，我向**用户的会话 90525497 注入了「继续」探针消息**（会留下一条额外往来），另有一轮被我的部署打断（15:14）——两处均已向用户致歉
+- 证据：build=0；健康检查通过；generating=0 后部署（L-16 门禁执行）
+
 ## T-03b 完成（2026-10-05）帧风暴根治——服务端 100ms 合并闸 + 弃空帧
 - 背景：金丝雀实测**单轮 17.7 万帧**（≈600-740 帧/秒）——浏览器卡死/后端负载/请求超时的共同结构性根因（BUG-70 家族总根）
 - 方案（DSH 批量消费精神的服务端落地）：`HarnessTurnManager` 内新增合并闸

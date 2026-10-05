@@ -394,8 +394,13 @@ public class HarnessTurnManager {
 
         private void onError(Throwable err) {
             log.warn("[turn] 源流异常 session={}: {}", sessionId, err.toString());
-            // R-04 文案分类：模型/流错误类（此前与超时共用笼统文案）
-            finish(STATUS_TIMEOUT, "\n\n⚠️ 模型或流错误中断：" + err.getClass().getSimpleName() + "（内容保留至最后增量）");
+            // R-04 文案分类：模型/流错误类；BUG-77 起带上 provider 原文（截断），免去翻日志
+            String detail = err.getMessage() == null ? "" : err.getMessage().replaceAll("\\s+", " ").trim();
+            if (detail.length() > 300) {
+                detail = detail.substring(0, 300) + "…";
+            }
+            finish(STATUS_TIMEOUT, "\n\n⚠️ 模型或流错误中断：" + err.getClass().getSimpleName()
+                    + (detail.isEmpty() ? "" : "：" + detail) + "（内容保留至最后增量）");
         }
 
         private synchronized void flush() {
