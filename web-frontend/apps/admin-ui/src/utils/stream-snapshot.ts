@@ -18,8 +18,18 @@ export function saveStreamSnapshot(sessionId: string, contentHtml: string, think
   const now = Date.now();
   if (now - lastWrite < 400) return;
   lastWrite = now;
+  write(sessionId, contentHtml, thinking, now);
+}
+
+/** T-03②：兜底直写（不受 400ms 节流限制）——页面关闭/切后台时补最后一笔，防"最后一段丢" */
+export function flushStreamSnapshot(sessionId: string, contentHtml: string, thinking?: string) {
+  if (!sessionId) return;
+  write(sessionId, contentHtml, thinking, Date.now());
+}
+
+function write(sessionId: string, contentHtml: string, thinking: string | undefined, ts: number) {
   try {
-    sessionStorage.setItem(KEY_PREFIX + sessionId, JSON.stringify({ contentHtml, thinking, ts: now }));
+    sessionStorage.setItem(KEY_PREFIX + sessionId, JSON.stringify({ contentHtml, thinking, ts }));
   } catch { /* 配额/隐私模式静默 */ }
 }
 

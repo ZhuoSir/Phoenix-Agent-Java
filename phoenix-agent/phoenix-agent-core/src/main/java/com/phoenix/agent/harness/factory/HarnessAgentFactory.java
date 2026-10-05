@@ -9,6 +9,7 @@ import com.phoenix.agent.mapper.HarnessSkillMapper;
 import com.phoenix.agent.model.AgentRuntimeConfig;
 import com.phoenix.agent.service.AgentRuntimeConfigService;
 import com.phoenix.agent.service.harness.HarnessModelRegistry;
+import com.phoenix.agent.util.WorkspacePaths;
 import com.phoenix.data.entity.Agent;
 import io.agentscope.core.skill.repository.postgresql.PostgresSkillRepository;
 import io.agentscope.core.tool.Toolkit;
@@ -52,6 +53,16 @@ public class HarnessAgentFactory {
     /** 工作区（与存量自注册智能体保持一致，避免两套目录） */
     /** BL-19/R-01：workspace 根配置化。默认与历史一致（裸机开发零感知）；
      *  交付包经 env 指向 uploads 卷内路径，使产物持久化可备份。旧常量无外部引用，安全收敛。 */
+    /** R-05 上下文治理全局默认（DSH 对标换算：0.8×128k≈102400 / keep 20 / pruner 8192） */
+    @Value("${phoenix.agent.compaction-trigger-tokens:102400}")
+    private int compactionTriggerTokensDefault;
+
+    @Value("${phoenix.agent.compaction-keep-messages:20}")
+    private int compactionKeepMessagesDefault;
+
+    @Value("${phoenix.agent.tool-result-max-chars:8192}")
+    private int toolResultMaxCharsDefault;
+
     @Value("${phoenix.agent.workspace-root:.agentscope/workspace}")
     private String workspaceRoot = ".agentscope/workspace";
 
@@ -93,12 +104,38 @@ public class HarnessAgentFactory {
      * 构建并返回构建摘要（T-05 验证入口 / 管理端「构建预演」）。
      */
     public BuildResult buildWithSummary(Agent agent) {
+        return buildWithSummary(agent, null);
+    }
+
+    /**
+     * R-06（workspace-isolation v1.1.0）：按**会话**构建。
+     *
+     * <p>sessionId 非空 → workspace 下沉一层到 {@code {root}/{agentKey}/{sessionId}}（框架内再拼 uid），
+     * 会话之间互不可见；sessionId 为空保持存量行为（{@code {root}/{agentKey}}，管理端构建预演等无会话场景）。
+     *
+     * @param agent 智能体（须有 id 与 sn）
+     * @param sessionId 会话ID；空=存量智能体级工作区
+     */
+    public BuildResult buildWithSummary(Agent agent, String sessionId) {
         if (agent == null || agent.getId() == null) {
             throw new IllegalArgumentException("智能体不存在或缺少 id，无法构建运行时实例");
         }
         AgentRuntimeConfig config = agentRuntimeConfigService.resolve(agent.getId());
         OpenAIChatModel model = harnessModelRegistry.getOpenAIChatModel(config.getModelConfigId());
         ToolkitBundle bundle = buildToolkit(agent, config);
+        // R-06：会话级工作区（会话空则回落智能体级，零行为变化）
+        Path workspace = WorkspacePaths.sessionRoot(workspaceRoot, runtimeKey(agent), sessionId);
+        if (StringUtils.hasText(sessionId)) {
+            // T-12 前置：会话目录必须先存在——框架只在 namespace 分支 mkdir，而 shellCwd 命中时直接
+            // 作为 ProcessBuilder.directory()；目录缺失会让**每条 shell 命令**抛 IOException（实测 error=2）
+            Path abs = workspace.toAbsolutePath().normalize();
+            try {
+                java.nio.file.Files.createDirectories(abs);
+            }
+            catch (java.io.IOException e) {
+                log.warn("会话工作区目录创建失败（shell 命令将不可用）: path={}, err={}", abs, e.toString());
+            }
+        }
 
         HarnessAgent.Builder builder = HarnessAgent.builder()
             .name(runtimeKey(agent))
@@ -107,22 +144,30 @@ public class HarnessAgentFactory {
             .sysPrompt(sysPrompt(agent))
             .model(model)
             .toolkit(bundle.toolkit())
-            .workspace(Path.of(workspaceRoot))
+            // workspace-isolation R-01/R-06：根按智能体+会话隔离（{root}/{runtimeKey}/{sessionId}），
+            // 记忆/产物/索引全落专属子树（BUG-68 主刀，R-06 下沉会话层）
+            .workspace(workspace)
             .enablePlanMode(isOn(config.getPlanMode()))
             .distributedStore(redisDistributedStore)
             .stateStore(postgresAgentStateStore)
             .skillRepository(skillRepository(agent))
             .enablePendingToolRecovery(true)
             .middlewares(List.of(new StopOnAllDeniedMiddleware(), new ExplicitSkillMiddleware()))
-            .compaction(defaultCompaction())
-            .toolResultEviction(ToolResultEvictionConfig.defaults());
+            .compaction(compactionFor(config))
+            .toolResultEviction(toolResultEvictionFor(config));
 
         if (FilesystemPolicyEnm.REMOTE.getCode().equals(config.getFilesystemPolicy())) {
             // 远程共享存储不支持 shell（bugs.md B-07），显式关闭而非留给模型试错
             builder.filesystem(pgRemoteFilesystemSpec).disableShellTool();
         }
         else {
-            builder.filesystem(new LocalFilesystemSpec().isolationScope(IsolationScope.USER));
+            LocalFilesystemSpec spec = new LocalFilesystemSpec().isolationScope(IsolationScope.USER);
+            if (StringUtils.hasText(sessionId)) {
+                // T-12/BUG-79：框架 shell cwd 取 LocalFilesystemSpec.project，缺省回落到 user.dir（容器内=/app，
+                // shell 产物逃出工作区且面板不可见）。显式置为会话目录 → shell 与 file 工具同根。
+                spec.project(workspace.toAbsolutePath().normalize());
+            }
+            builder.filesystem(spec);
         }
 
         if (isOn(config.getMemoryEnabled())) {
@@ -139,7 +184,7 @@ public class HarnessAgentFactory {
             builder.maxIters(maxIters);
         }
         HarnessAgent built = builder.build();
-        String summary = describe(agent, config, bundle.toolNames());
+        String summary = describe(agent, config, bundle.toolNames()) + ", workspace=" + workspace;
         log.info("对话智能体构建完成: {}", summary);
         return new BuildResult(built, summary, bundle.toolNames());
     }
@@ -232,7 +277,8 @@ public class HarnessAgentFactory {
      * 用 agentId 派生一个稳定身份（R-08 agentId 寻址），从而不依赖 Java 自注册。
      */
     public String runtimeKey(Agent agent) {
-        return StringUtils.hasText(agent.getSn()) ? agent.getSn() : "agent-" + agent.getId();
+        // 规则单一实现移至 WorkspacePaths（scanner 同源引用，防漂移）
+        return WorkspacePaths.runtimeKey(agent.getId(), agent.getSn());
     }
 
     private String sysPrompt(Agent agent) {
@@ -254,14 +300,33 @@ public class HarnessAgentFactory {
             .build();
     }
 
-    private CompactionConfig defaultCompaction() {
+    /** R-05：智能体配置 → 全局默认 两级回退（DSH compaction 语义对标） */
+    private CompactionConfig compactionFor(AgentRuntimeConfig config) {
+        int triggerTokens = config.getCompactionTriggerTokens() == null ? compactionTriggerTokensDefault
+                : config.getCompactionTriggerTokens();
+        int keepMessages = config.getCompactionKeepMessages() == null ? compactionKeepMessagesDefault
+                : config.getCompactionKeepMessages();
         return CompactionConfig.builder()
             .triggerMessages(50)
+            .triggerTokens(triggerTokens)
             .truncateArgs(CompactionConfig.TruncateArgsConfig.builder()
                 .maxArgLength(2000)
                 .truncationText("... [truncated] ...")
                 .build())
-            .keepMessages(20)
+            .keepMessages(keepMessages)
+            .build();
+    }
+
+    /** R-05：工具结果回收阈值两级回退（其余参数保持框架默认） */
+    private ToolResultEvictionConfig toolResultEvictionFor(AgentRuntimeConfig config) {
+        int maxChars = config.getToolResultMaxChars() == null ? toolResultMaxCharsDefault
+                : config.getToolResultMaxChars();
+        ToolResultEvictionConfig d = ToolResultEvictionConfig.defaults();
+        return ToolResultEvictionConfig.builder()
+            .maxResultChars(maxChars)
+            .previewChars(d.getPreviewChars())
+            .evictionPath(d.getEvictionPath())
+            .excludedToolNames(d.getExcludedToolNames())
             .build();
     }
 

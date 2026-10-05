@@ -38,12 +38,17 @@ public class WorkspaceArtifactScanner {
 
     private final AgentFileService agentFileService;
 
+    /** runtimeKey 以库中智能体为准（请求未必带 sn，BUG-78 根因之一） */
+    private final com.phoenix.data.service.agent.AgentService agentService;
+
     @Value("${phoenix.agent.workspace-root:.agentscope/workspace}")
     private String workspaceRoot;
 
     private static final Set<String> SKIP_NAME_PREFIX = Set.of(".");
-    private static final Set<String> SKIP_DIRS = Set.of("sessions", "tasks", ".index", "memory");
+    private static final Set<String> SKIP_DIRS = Set.of("sessions", "tasks", ".index", "memory", "large_tool_results");
     private static final Set<String> SKIP_SUFFIX = Set.of(".jsonl", ".marker", ".db");
+    /** 工具调用 ID 形态的占位文件（BUG-78 广扫副产物：`call_*` 不是用户产物，面板噪音）。 */
+    private static final Set<String> SKIP_FILE_PREFIX = Set.of("call_");
     /** 框架内部状态文件（记忆固化/会话索引等），不是用户产物（实测 2026-10-01 捕获到 MEMORY.md/consolidation_state）。 */
     private static final Set<String> INTERNAL_FILES = Set.of("MEMORY.md", "consolidation_state", "sessions.json",
             "memory.md", "AGENTS.md.bak");
@@ -58,8 +63,13 @@ public class WorkspaceArtifactScanner {
             Instant turnStart) {
         List<AgentFile> registered = new ArrayList<>();
         try {
-            Path root = Paths.get(workspaceRoot).toAbsolutePath().normalize();
-            List<Path> agentDirs = candidateAgentDirs(root, userId, agentId, sn);
+            // R-06：扫描根=**会话目录**（与 factory 同源 WorkspacePaths）；智能体根用于历史只读回落与 storeKey 归一路径
+            String agentKey = resolveAgentKey(agentId, sn);
+            Path agentRoot = com.phoenix.agent.util.WorkspacePaths.agentRoot(workspaceRoot, agentKey)
+                .toAbsolutePath().normalize();
+            Path sessionRoot = com.phoenix.agent.util.WorkspacePaths.sessionRoot(workspaceRoot, agentKey, sessionId)
+                .toAbsolutePath().normalize();
+            List<Path> agentDirs = candidateAgentDirs(agentRoot, sessionRoot, userId, agentId, sn, sessionId);
             for (Path dir : agentDirs) {
                 if (!Files.isDirectory(dir)) {
                     continue;
@@ -67,9 +77,10 @@ public class WorkspaceArtifactScanner {
                 try (Stream<Path> walk = Files.walk(dir)) {
                     walk.filter(Files::isRegularFile)
                         .filter(f -> !isInternal(f, dir))
+                        .filter(f -> !otherSessionArtifact(agentRoot, f, sessionId))
                         .filter(this::writeSettled)
                         .filter(f -> afterTurn(f, turnStart))
-                        .forEach(f -> registerQuietly(registered, root, f, agentId, sessionId, userId));
+                        .forEach(f -> registerQuietly(registered, agentRoot, agentKey, f, agentId, sessionId, userId));
                 }
             }
         }
@@ -79,12 +90,44 @@ public class WorkspaceArtifactScanner {
         return registered;
     }
 
-    /** 实测(2026-10-01)：LOCAL write_file 相对 workspace 根解析 → 产物直接落 {root}/{userId}/...
-     *  故扫整棵用户目录（含任意子层），并兼容 {root}/agents/{key} 历史布局；agent 归属由调用轮次决定。 */
-    private List<Path> candidateAgentDirs(Path root, String userId, Long agentId, String sn) {
+    /**
+     * runtimeKey 解析：**以库中智能体为准**（factory 用 DB 实体构建工作区；请求侧 sn 可能缺省，
+     * 两者不一致会导致扫描根与写入根错位——BUG-78 根因之一）。查库失败回落入参 sn。
+     */
+    private String resolveAgentKey(Long agentId, String sn) {
+        if (agentId != null) {
+            try {
+                com.phoenix.data.entity.Agent agent = agentService.findById(agentId);
+                if (agent != null) {
+                    return com.phoenix.agent.util.WorkspacePaths.runtimeKey(agentId, agent.getSn());
+                }
+            }
+            catch (RuntimeException e) {
+                log.warn("智能体查询失败，runtimeKey 回落入参 sn: agentId={}, err={}", agentId, e.toString());
+            }
+        }
+        return com.phoenix.agent.util.WorkspacePaths.runtimeKey(agentId, sn);
+    }
+
+    /**
+     * 扫描候选目录（R-06）：
+     * <ol>
+     *   <li>会话目录已建立 → <b>只扫会话目录</b>（递归含框架内部 {uid} 层），会话间零交叉；</li>
+     *   <li>会话目录尚未建立（升级前老会话 / 本轮无落盘）→ 回落智能体级历史多根做只读兼容，
+     *       仍受 turnStart 时间窗 + 他会话目录排除双重约束，不会把老产物灌进新会话。</li>
+     * </ol>
+     */
+    private List<Path> candidateAgentDirs(Path agentRoot, Path sessionRoot, String userId, Long agentId, String sn,
+            String sessionId) {
         List<Path> dirs = new ArrayList<>();
+        if (Files.isDirectory(sessionRoot)) {
+            dirs.add(sessionRoot);
+            return dirs;
+        }
+        // 历史布局兼容（实测 2026-10-01：LOCAL write_file 落 {root}/{userId}/...；亦兼容 {root}/agents/{key}）
+        dirs.add(agentRoot);
         if (userId != null && !userId.isBlank()) {
-            dirs.add(root.resolve(userId));
+            dirs.add(agentRoot.resolve(userId));
         }
         List<String> keys = new ArrayList<>();
         if (agentId != null) {
@@ -95,14 +138,31 @@ public class WorkspaceArtifactScanner {
             keys.add(sn);
         }
         for (String key : keys) {
-            dirs.add(root.resolve("agents").resolve(key));
+            dirs.add(agentRoot.resolve("agents").resolve(key));
         }
         return dirs;
+    }
+
+    /** 回落扫描时排除属于**其他会话**的产物目录（会话ID 为 UUID 形态）；防并发会话互收编。 */
+    private boolean otherSessionArtifact(Path agentRoot, Path file, String sessionId) {
+        Path rel = agentRoot.relativize(file);
+        if (rel.getNameCount() < 2) {
+            return false;
+        }
+        String first = rel.getName(0).toString();
+        if (first.equals(sessionId)) {
+            return false;
+        }
+        return first.length() == 36 && first.indexOf('-') == 8
+                && first.chars().filter(c -> c == '-').count() == 4;
     }
 
     private boolean isInternal(Path file, Path agentDir) {
         String name = file.getFileName().toString();
         if (INTERNAL_FILES.contains(name)) {
+            return true;
+        }
+        if (SKIP_FILE_PREFIX.stream().anyMatch(name::startsWith)) {
             return true;
         }
         if (SKIP_NAME_PREFIX.stream().anyMatch(name::startsWith) && !name.contains(".")) {
@@ -114,8 +174,16 @@ public class WorkspaceArtifactScanner {
             }
         }
         Path rel = agentDir.relativize(file);
-        for (Path p : rel) {
-            if (SKIP_DIRS.contains(p.toString())) {
+        // 末段是文件本身，只判中间的目录段
+        int dirCount = rel.getNameCount() - 1;
+        for (int i = 0; i < dirCount; i++) {
+            String seg = rel.getName(i).toString();
+            if (SKIP_DIRS.contains(seg)) {
+                return true;
+            }
+            // R-06 实测收尾：框架内部目录（.skills-cache 技能包缓存/.index/.agentscope/.pylibs…）不是用户产物。
+            // 漏掉后每个会话都会把整包技能脚本注册成"产物"（实测单会话 28 条噪音：catalog.json/search_library.py…）
+            if (seg.startsWith(".")) {
                 return true;
             }
         }
@@ -146,13 +214,16 @@ public class WorkspaceArtifactScanner {
         }
     }
 
-    private void registerQuietly(List<AgentFile> out, Path root, Path file, Long agentId, String sessionId,
-            String userId) {
+    private void registerQuietly(List<AgentFile> out, Path agentRoot, String agentKey, Path file, Long agentId,
+            String sessionId, String userId) {
         try {
             long size = Files.size(file);
-            String relFromRoot = root.relativize(file).toString().replace('\\', '/');
-            String storeKey = relFromRoot + ":" + size;
-            if (agentFileService instanceof AgentFileServiceImpl impl && impl.existsByStoreKey(sessionId, storeKey)) {
+            String relFromAgentRoot = agentRoot.relativize(file).toString().replace('\\', '/');
+            // storeKey = runtimeKey + 智能体根相对路径 + 大小：与扫描根（会话目录）无关，跨会话/跨扫描稳定，
+            // 全局首占去重语义不因 R-06 换根而漂移（workspace-isolation T-02）
+            String storeKey = agentKey + "/" + relFromAgentRoot + ":" + size;
+            // BUG-67：去重从按会话改全局首占——已被任何会话登记的文件不再收编
+            if (agentFileService instanceof AgentFileServiceImpl impl && impl.existsByStoreKeyAnySession(storeKey)) {
                 return;
             }
             byte[] content = Files.readAllBytes(file);

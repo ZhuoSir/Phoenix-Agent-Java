@@ -1,6 +1,7 @@
 # Requirements: 智能体 workspace 隔离（workspace-isolation）
 
-> 版本: v1.0.0 | 状态: 已确认 | 确认人: 陈卓 | 确认日期: 2026-10-05 | 更新: 2026-10-05
+> 版本: v1.1.0 | 状态: 已确认 | 确认人: 陈卓 | 确认日期: 2026-10-05 | 更新: 2026-10-05
+> v1.0.0→v1.1.0（用户新增要求，铁律3 回退待重确认）：「我要求的是每个智能体每个会话都有单独的文件夹，无论是写入还是读取」——v1.0.0 只做到"按智能体隔离"，实测暴露三种写入深度（file 工具落 `{agent}/{uid}/`、**shell 落 `/app`**、绝对路径落 `{agent}/` 根级），且面板读不到（BUG-78/79）→ 新增 R-06 统一到"每智能体每会话一个文件夹"
 > 挂载: v1.6.0（用户「不冻结续收」现行指令；BUG-67+BUG-68 同刃双修）
 
 ## 背景与目标
@@ -42,6 +43,30 @@ WHEN 构建任何库驱动智能体, 系统 SHALL 以 `{workspaceRoot}/{runtimeK
 
 **验收场景**
 - GIVEN 带存量数据升级 WHEN 启动完成 THEN `_legacy_shared/` 含原 88MB 数据、新根为 per-agent 空树、服务 healthy、二次重启不重复迁移。
+
+### R-06 每会话独立目录（读写统一，v1.1.0 新增 · 用户要求）
+每个「智能体 × 会话」SHALL 拥有**唯一目录**，且**所有读写路径统一**到该目录：
+
+```
+{PHOENIX_AGENT_WORKSPACE_ROOT}/{agentKey}/{sessionId}/
+        agentKey = sn（非空）否则 agent-{id}
+```
+
+- **写**：file 工具（相对路径）、shell/exec（**cwd 必须=该目录**，修复 BUG-79 当前 `/app`）、python/脚本、下载落盘 —— 全部落该目录
+- **读**：file 工具读取、文件面板列表、产物登记与扫描（修复 BUG-78）—— 全部以该目录为唯一根
+- **会话间隔离**：同一智能体的不同会话互相不可见（A 会话文件不出现在 B 会话）
+- **存量兼容**：历史文件不强制迁移；面板对旧会话保留"legacy 只读可见"（不丢数据）
+
+**验收场景**
+- GIVEN 智能体 A 会话 S1 WHEN 分别用 file 工具、shell、脚本各写一个文件 THEN 三者**同处** `{root}/{A}/{S1}/` 且面板三条全可见
+- GIVEN 同智能体另开会话 S2 WHEN 打开面板 THEN 看不到 S1 的任何文件
+- GIVEN 旧会话（隔离前产物）WHEN 打开面板 THEN 旧文件仍可见（legacy 只读兼容）
+- GIVEN shell 执行 `pwd` WHEN 会话 S1 THEN 输出=该会话目录（不再 `/app`）
+
+**实现取舍（必须在确认①裁决）**：框架的 workspace 根在**构建期**绑定，要做到"按会话"须让实例按 (agent, session) 构建（注册表键加入 sessionId）——
+- 代价：每个会话首次对话多一次构建（含 MCP 初始化的智能体约 +0.2~2s），实例缓存改按 (agent, session) LRU
+- 替代：保持按智能体构建，仅 shell cwd 按轮注入（file 工具仍落 `{uid}`）→ **不满足"读写统一"**，故不推荐
+- 推荐：**接受按会话构建成本**（正确性优先；缓存 LRU 控内存）
 
 ### R-05 对面零变化（身份矩阵）
 legacy Java 自注册智能体 workspace（默认根 .agentscope/workspace）、REMOTE 策略 Redis 存储、Postgres stateStore 键、会话转录/任务区既有结构、技能加载/产物下载/HITL/断线续传等全部消费方 SHALL 行为不变（L-06 消费方枚举 plan 全量列）。

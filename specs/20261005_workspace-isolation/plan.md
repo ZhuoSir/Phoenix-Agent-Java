@@ -83,3 +83,34 @@ legacy Java 自注册智能体（自带默认根 .agentscope/workspace）/ REMOT
 
 ## 七、任务预告（Phase 3 细化）
 T-01 WorkspacePaths 工具+factory 换根 → T-02 scanner 新根适配+全局首占去重 → T-03 补扫窗口收窄 → T-04 WorkspaceMigrationRunner+迁移演练 → T-05 E2E 矩阵（暗号/归属/对面五连/回归）→ T-06 台账收尾（含 BUG-67/68 翻已修复→已验证）。
+
+
+---
+
+## v1.1.0 增量方案：每会话独立目录（读写统一，R-06）
+
+> 版本: v1.1.0 | 状态: 已确认 | 确认人: 陈卓 | 确认日期: 2026-10-05 | 更新: 2026-10-05
+
+### 一、坑核对（16 条 active 全过）
+L-06 多入口：本次**必须枚举四面**——写（file 工具 / shell-exec / 脚本 / 下载）、读（file 工具 / 面板 API / 产物扫描 / 清理）；L-07：验收绑用户可见面（面板能看到+shell pwd 实测）；L-16：部署前查活跃轮；L-17：动组件前先证可达；L-18（新）：改工作区根布局必须枚举全部消费者。
+
+### 二、采用方案
+1. **会话级工作区根**：`{PHOENIX_AGENT_WORKSPACE_ROOT}/{agentKey}/{sessionId}`（agentKey=sn 非空否则 agent-{id}）——由 registry 键加入 sessionId、factory 接收会话工作区路径实现；**框架会在其下再拼一层 `{userId}`**（实测 file 工具落 `{root}/{uid}/`），故实际为 `{agentKey}/{sessionId}/{uid}/...`；面板/扫描**递归**扫会话目录即可满足"同处一个文件夹、全可见"
+2. **shell cwd 统一**（BUG-79 主刀）：查框架 shell/exec 规格是否支持 cwd；支持→显式设置；不支持→**包装 shell 工具**（复用 PrefixedAgentTool 包装先例）注入 `cd {sessionDir} && `；`/app` 历史散落文件一次性清理
+3. **读路径统一**（BUG-78 主刀）：产物扫描与面板 API 以会话目录为唯一根递归扫描；旧会话保留 legacy 只读兼容（多根扫描，新根优先）
+4. **实例缓存**：registry 键 (agentId, fingerprint) → (agentId, sessionId, fingerprint)；LRU 容量维持
+### 三、被否替代方案
+| 方案 | 拒绝理由 |
+|---|---|
+| 只注入 shell cwd，file 工具维持 `{agent}/{uid}` | 不满足用户"读写统一"，会话间仍互见 |
+| 进程级 chdir | 多会话并发下全局副作用，线程不安全 |
+| 前端按文件名过滤伪装隔离 | 掩耳盗铃，服务端仍串（用户要的是真隔离） |
+### 四、风险与规避
+| # | 风险 | 规避 |
+|---|---|---|
+| 1 | 按会话构建 → 首轮延迟 +0.2~2s（含 MCP） | 已获用户确认接受；LRU 控内存；构建异步 boundedElastic |
+| 2 | 框架再拼 `{uid}` 层与"会话文件夹"预期不符 | 面板递归扫描；文档写明实际层级；如需去掉 `{uid}` 层另立 BL |
+| 3 | 存量文件"消失"于面板 | 多根扫描 legacy 只读兼容，实测旧会话仍可见 |
+| 4 | shell 包装漏掉 pwsh/其他执行入口 | L-06 四面枚举：shell-local/pwsh/后台 job 三入口逐一核 |
+### 五、测试策略
+四项验收实测（同会话三工具三文件同处且面板全可见 / 跨会话互不可见 / shell pwd=会话目录 / 旧会话仍可见）+ 现有 verify 13/13 + 活跃轮门禁（L-16）

@@ -37,6 +37,10 @@ import java.util.function.Supplier;
 @RequiredArgsConstructor
 public class HarnessTurnManager {
 
+    /** BUG-77 根治：轮次开始前修复状态中缺失 reasoning 的 tool_use 消息 */
+    private final com.phoenix.agent.harness.state.HarnessStateRepairService stateRepairService;
+
+
     public static final String STATUS_GENERATING = "generating";
 
     public static final String STATUS_DONE = "done";
@@ -49,8 +53,13 @@ public class HarnessTurnManager {
 
     private final ChatMessageMapper chatMessageMapper;
 
-    @Value("${phoenix.agent.turn-timeout-seconds:600}")
+    /** 总时长闸：默认 0=关闭（long-turn-resilience R-01/Q2 决议，DSH 轮次层无墙钟强杀）；>0 保留兜底语义 */
+    @Value("${phoenix.agent.turn-timeout-seconds:0}")
     private long turnTimeoutSeconds;
+
+    /** 空闲挂起闸：连续无帧超过此秒数判挂起（R-01/Q1=600s，DSH 工具等待上限对齐；idleWatchdog arm 语义） */
+    @Value("${phoenix.agent.turn-idle-timeout-seconds:600}")
+    private long turnIdleTimeoutSeconds;
 
     @Value("${phoenix.agent.turn-flush-seconds:5}")
     private long flushSeconds;
@@ -102,6 +111,9 @@ public class HarnessTurnManager {
             turns.remove(sessionId);
             throw e;
         }
+        // BUG-77 根治：发请求前修复历史（仅 tool_use 无 thinking 的助手消息会被 provider 拒）
+        stateRepairService.repairMissingReasoning(sessionId);
+        turn.sourceSupplier = source; // BUG-77：留存供应商供自动重试
         turn.wire(source.get());
         return turn.sink.asFlux();
     }
@@ -117,6 +129,8 @@ public class HarnessTurnManager {
         }
         log.info("[turn] confirm 并轮回原轮 session={} turnId={}", sessionId, turn.turnId);
         turn.awaitingConfirm.set(false);
+        stateRepairService.repairMissingReasoning(sessionId); // BUG-77 根治：续流同样先修复
+        turn.sourceSupplier = source; // BUG-77：续流同样留存供应商
         turn.wireConfirm(source.get());
         return turn.sink.asFlux();
     }
@@ -205,6 +219,13 @@ public class HarnessTurnManager {
 
         final long startedAt = System.currentTimeMillis();
 
+        /** R-01：每帧脉冲（=DSH idleWatchdog 的 arm 重置） */
+        volatile long lastActivityAt = System.currentTimeMillis();
+
+        /** BUG-77：源流供应商（可再取一次 = 自动重试能力）与重试标记（每轮至多一次） */
+        private Supplier<Flux<Map<String, Object>>> sourceSupplier;
+        private volatile boolean retryUsed = false;
+
         volatile Long messageId;
 
         volatile Disposable sourceSub;
@@ -231,21 +252,101 @@ public class HarnessTurnManager {
         private void startFlusherAndWatchdog() {
             this.janitor = Flux.interval(Duration.ofSeconds(flushSeconds), Schedulers.boundedElastic())
                 .subscribe(t -> {
-                    if (System.currentTimeMillis() - startedAt > turnTimeoutSeconds * 1000L) {
-                        Turn self = this;
+                    long now = System.currentTimeMillis();
+                    Turn self = this;
+                    // R-01 空闲闸（DSH idleWatchdog 语义）：连续无任何帧超阈值 → 判挂起定稿
+                    if (now - lastActivityAt > turnIdleTimeoutSeconds * 1000L) {
+                        HarnessTurnManager.this.turns.remove(self.sessionId, self);
+                        self.finish(STATUS_TIMEOUT, "\n\n⚠️ 轮次挂起：连续 " + turnIdleTimeoutSeconds
+                                + " 秒无任何模型/工具活动，已定稿至此内容（内容保留至最后增量）");
+                        return;
+                    }
+                    // 总时长闸：默认 0=关闭（Q2 决议，DSH 轮次层无墙钟强杀）；>0 保留兜底
+                    if (turnTimeoutSeconds > 0 && now - startedAt > turnTimeoutSeconds * 1000L) {
                         HarnessTurnManager.this.turns.remove(self.sessionId, self);
                         self.finish(STATUS_TIMEOUT, "\n\n⚠️ 生成超时（>" + turnTimeoutSeconds + "s），已定稿至此内容");
                         return;
                     }
                     flush();
                 });
+            // T-03b：100ms 文本合并闸——源帧可达 17 万/轮，合并后下发约 10 帧/秒
+            this.mergeJanitor = Flux.interval(Duration.ofMillis(100), Schedulers.boundedElastic())
+                .subscribe(t -> {
+                    if (!sinkDone.get()) {
+                        flushPendingText();
+                    }
+                });
+        }
+
+        /** BUG-69 金丝雀计数：帧总数/非空正文帧 */
+        final AtomicLong framesSeen = new AtomicLong();
+        final AtomicLong framesWithText = new AtomicLong();
+
+        /** T-03b 帧风暴治理：文本/思考增量缓冲（~100ms 合并成一帧下发）与已下发帧计数 */
+        final StringBuilder pendingText = new StringBuilder();
+        final StringBuilder pendingThink = new StringBuilder();
+        final AtomicLong framesEmitted = new AtomicLong();
+        /** T-03b：丢弃的纯空生命周期帧计数（观测用） */
+        final AtomicLong framesDropped = new AtomicLong();
+        /** T-03b：随合并帧捎带的状态快照（技能/文件面板），避免因每帧携带而绕过合并 */
+        private String pendingAgentFiles;
+        private String pendingLoadedSkills;
+        private Disposable mergeJanitor;
+
+        /** T-03b：把缓冲的文本/思考增量合并成一帧下发（无缓冲则空操作） */
+        private void flushPendingText() {
+            if (pendingText.length() == 0 && pendingThink.length() == 0
+                    && pendingAgentFiles == null && pendingLoadedSkills == null) {
+                return;
+            }
+            Map<String, Object> merged = new LinkedHashMap<>(4);
+            merged.put("content", pendingText.toString());
+            merged.put("end", false);
+            if (pendingThink.length() > 0) {
+                merged.put("thinking", pendingThink.toString());
+            }
+            // T-03b：捎带状态快照（客户端幂等处理；不因每帧携带而绕过合并）
+            if (pendingAgentFiles != null) {
+                merged.put("agentFiles", pendingAgentFiles);
+                pendingAgentFiles = null;
+            }
+            if (pendingLoadedSkills != null) {
+                merged.put("loadedSkills", pendingLoadedSkills);
+                pendingLoadedSkills = null;
+            }
+            pendingText.setLength(0);
+            pendingThink.setLength(0);
+            framesEmitted.incrementAndGet();
+            sink.emitNext(merged, Sinks.EmitFailureHandler.busyLooping(Duration.ofMillis(100)));
+        }
+
+        /** T-03b：保序关键帧——这些帧的先后顺序对客户端语义重要，必须先冲批再透传 */
+        private boolean needsOrderingFlush(Map<String, Object> frame) {
+            return Boolean.TRUE.equals(frame.get("end")) || Boolean.TRUE.equals(frame.get("needConfirm"))
+                    || frame.get("toolCalls") != null || frame.get("buttons") != null || frame.get("error") != null;
+        }
+
+        /** T-03b：纯文本/思考增量帧（无 end/确认/文件/技能/工具等语义键）→ 可合并推迟下发 */
+        private boolean isPureTextDelta(Map<String, Object> frame) {
+            if (Boolean.TRUE.equals(frame.get("end")) || Boolean.TRUE.equals(frame.get("needConfirm"))
+                    || frame.get("toolCalls") != null || frame.get("buttons") != null
+                    || frame.get("error") != null) {
+                return false;
+            }
+            Object c = frame.get("content");
+            Object t = frame.get("thinking");
+            return (c instanceof String cs && !cs.isEmpty()) || (t instanceof String ts && !ts.isEmpty());
         }
 
         private void onFrame(Map<String, Object> frame) {
             try {
+                lastActivityAt = System.currentTimeMillis();
+                framesSeen.incrementAndGet();
                 Object c = frame.get("content");
                 if (c instanceof String s && !s.isEmpty()) {
+                    framesWithText.incrementAndGet();
                     content.append(s);
+                    pendingText.append(s);
                 }
                 Object th = frame.get("thinking");
                 if (th instanceof String s && !s.isEmpty()) {
@@ -253,6 +354,15 @@ public class HarnessTurnManager {
                         thinkStart.set(System.currentTimeMillis());
                     }
                     thinking.append(s);
+                    pendingThink.append(s);
+                }
+                Object af = frame.get("agentFiles");
+                if (af instanceof String afs && !afs.isEmpty()) {
+                    pendingAgentFiles = afs;
+                }
+                Object ls = frame.get("loadedSkills");
+                if (ls instanceof String lss && !lss.isEmpty()) {
+                    pendingLoadedSkills = lss;
                 }
                 if (Boolean.TRUE.equals(frame.get("needConfirm"))) {
                     awaitingConfirm.set(true);
@@ -261,6 +371,22 @@ public class HarnessTurnManager {
                 if (isEnd && awaitingConfirm.get()) {
                     return; // P5：待确认期抑制 end，sink 保开
                 }
+                // T-03b：纯增量帧只入缓冲（由合并闸 ~100ms 下发）；语义帧先冲批再原样透传（保序保语义）
+                if (isPureTextDelta(frame)) {
+                    return;
+                }
+                // T-03b：纯空生命周期帧（无内容、无语义、无快照）对客户端零信息量 → 丢弃，不再下发
+                if (!needsOrderingFlush(frame) && (c == null || !(c instanceof String cs2) || cs2.isEmpty())
+                        && (th == null || !(th instanceof String ts2) || ts2.isEmpty())
+                        && pendingAgentFiles == null && pendingLoadedSkills == null) {
+                    framesDropped.incrementAndGet();
+                    return;
+                }
+                // T-03b：只有保序关键帧才冲批；其余帧不打断合并节奏
+                if (needsOrderingFlush(frame)) {
+                    flushPendingText();
+                }
+                framesEmitted.incrementAndGet();
                 sink.emitNext(frame, Sinks.EmitFailureHandler.busyLooping(Duration.ofMillis(100)));
                 if (isEnd) {
                     endForwarded = true; // 双 end 修复：透传过真 end 不再补发合成帧
@@ -279,9 +405,36 @@ public class HarnessTurnManager {
             finish(STATUS_DONE, null);
         }
 
+        /** BUG-77：思考模式 reasoning_content 未回传/400 类 provider 错误 → 可原样重试（实测重试即成功） */
+        private boolean isRetryableProviderError(Throwable err) {
+            String msg = err.toString() == null ? "" : err.toString();
+            return msg.contains("reasoning_content") || msg.contains("BadRequestException")
+                    || msg.contains("HTTP request failed with status 400");
+        }
+
         private void onError(Throwable err) {
             log.warn("[turn] 源流异常 session={}: {}", sessionId, err.toString());
-            finish(STATUS_TIMEOUT, "\n\n⚠️ 生成异常中断：" + err.getClass().getSimpleName());
+            // BUG-77：provider 4xx（典型 reasoning_content 未回传）且本轮尚无任何产出 → 自动重试一次，
+            // 让用户感知不到这次中断；仍失败才按原逻辑定稿（内容保留）
+            if (!retryUsed && isRetryableProviderError(err) && content.length() == 0 && thinking.length() == 0
+                    && sourceSupplier != null && !sinkDone.get()) {
+                retryUsed = true;
+                log.warn("[turn] 识别为可重试的 provider 错误，自动重试一次 session={} turnId={}", sessionId, turnId);
+                try {
+                    subscribeCommon(sourceSupplier.get());
+                    return;
+                }
+                catch (Exception e) {
+                    log.warn("[turn] 自动重试订阅失败，转为定稿 session={}: {}", sessionId, e.toString());
+                }
+            }
+            // R-04 文案分类：模型/流错误类；BUG-77 起带上 provider 原文（截断），免去翻日志
+            String detail = err.getMessage() == null ? "" : err.getMessage().replaceAll("\\s+", " ").trim();
+            if (detail.length() > 300) {
+                detail = detail.substring(0, 300) + "…";
+            }
+            finish(STATUS_TIMEOUT, "\n\n⚠️ 模型或流错误中断：" + err.getClass().getSimpleName()
+                    + (detail.isEmpty() ? "" : "：" + detail) + "（内容保留至最后增量）");
         }
 
         private synchronized void flush() {
@@ -307,9 +460,30 @@ public class HarnessTurnManager {
             if (sinkDone.get()) {
                 return;
             }
+            // BUG-69 金丝雀：每轮一行体检；contentLen>0 而 textFrames=0 即用户所见与落库背离，告警级
+            long cl = content.length(), tf = framesWithText.get(), fs = framesSeen.get(), fe = framesEmitted.get();
+            long fd = framesDropped.get();
+            if (cl > 0 && tf == 0) {
+                log.warn("[b69-canary] 背离告警: session={} status={} contentLen={} frames={} emitted={} textFrames=0",
+                        sessionId, status, cl, fs, fe);
+            }
+            else {
+                log.info("[b69-canary] session={} status={} contentLen={} frames={} emitted={} dropped={} textFrames={}",
+                        sessionId, status, cl, fs, fe, fd, tf);
+            }
             sinkDone.set(true);
             if (janitor != null) {
                 janitor.dispose();
+            }
+            if (mergeJanitor != null) {
+                mergeJanitor.dispose();
+            }
+            // T-03b：定稿前冲批，确保最后一段增量不丢
+            try {
+                flushPendingText();
+            }
+            catch (Exception ignored) {
+                // sink 可能已关闭，忽略
             }
             if (sourceSub != null) {
                 sourceSub.dispose();

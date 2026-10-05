@@ -46,25 +46,39 @@ public class McpMountService {
 
     private final Map<String, Variant> variants = new LinkedHashMap<>(16, 0.75f, true);
 
+    /** BUG-69 缓解：变体闲置 TTL——超时即重建，封顶任何陈旧状态的生命周期 */
+    private static final long VARIANT_TTL_MS = 30 * 60 * 1000L;
+
     private static final class Variant {
         final HarnessAgent agent;
         final List<McpClientWrapper> wrappers;
         final List<String> toolNames;
+        volatile long lastAccess = System.currentTimeMillis();
 
         Variant(HarnessAgent agent, List<McpClientWrapper> wrappers, List<String> toolNames) {
             this.agent = agent;
             this.wrappers = wrappers;
             this.toolNames = toolNames;
         }
+
+        boolean expired() {
+            return System.currentTimeMillis() - lastAccess > VARIANT_TTL_MS;
+        }
     }
 
     /** 对话轮次入口：交集空→原实例；否则→变体（boundedElastic 上构建，绝不在事件循环 block）。 */
     public Mono<HarnessAgent> withMcp(HarnessAgent base, Long agentId, List<McpServerInfo> effective) {
+        return withMcp(base, agentId, null, effective);
+    }
+
+    /** R-06：变体同样按会话隔离（会话级工作区；无会话=存量智能体级行为）。 */
+    public Mono<HarnessAgent> withMcp(HarnessAgent base, Long agentId, String sessionId, List<McpServerInfo> effective) {
         if (effective == null || effective.isEmpty() || agentId == null) {
             return Mono.just(base);
         }
         String sig = signature(agentId, effective);
-        return Mono.fromCallable(() -> getOrBuild(agentId, sig, effective)).subscribeOn(Schedulers.boundedElastic());
+        return Mono.fromCallable(() -> getOrBuild(agentId, sessionId, sig, effective))
+            .subscribeOn(Schedulers.boundedElastic());
     }
 
     private String signature(Long agentId, List<McpServerInfo> effective) {
@@ -76,16 +90,27 @@ public class McpMountService {
         return Integer.toHexString(sb.toString().hashCode()) + "-" + effective.size();
     }
 
-    private HarnessAgent getOrBuild(Long agentId, String sig, List<McpServerInfo> effective) {
-        String key = agentId + "@" + sig;
+    private HarnessAgent getOrBuild(Long agentId, String sessionId, String sig, List<McpServerInfo> effective) {
+        String key = agentId + (sessionId == null || sessionId.isBlank() ? "" : "@" + sessionId) + "@" + sig;
+        List<Variant> stale = new ArrayList<>();
         synchronized (variants) {
             Variant cached = variants.get(key);
             if (cached != null) {
-                log.debug("MCP 变体命中: key={}", key);
-                return cached.agent;
+                if (!cached.expired()) {
+                    cached.lastAccess = System.currentTimeMillis();
+                    log.debug("MCP 变体命中: key={}", key);
+                    return cached.agent;
+                }
+                // BUG-69 缓解：闲置超 TTL——弃旧重建（旧 wrapper 关闭）
+                variants.remove(key);
+                stale.add(cached);
+                log.info("MCP 变体闲置超 TTL，重建: key={}", key);
             }
         }
-        HarnessAgent fresh = harnessAgentRegistry.buildUncached(agentId);
+        for (Variant v : stale) {
+            closeQuietly(v);
+        }
+        HarnessAgent fresh = harnessAgentRegistry.buildUncached(agentId, sessionId);
         List<McpClientWrapper> wrappers = new ArrayList<>();
         List<String> toolNames = new ArrayList<>();
         Toolkit toolkit = fresh.getToolkit();

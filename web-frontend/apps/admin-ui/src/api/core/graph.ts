@@ -402,6 +402,132 @@ export function streamHarnessChat(
   };
 }
 
+/**
+ * long-turn-resilience T-04：admin 域**追流**（join）——刷新/重进运行中的轮次时，
+ * 用服务端 replay（已累积全量帧）+ live 替换 5s 轮询，实现"接着流"而非"跳着看"。
+ * 帧协议与 chat 同源，故复用同一套 SSE 解析；无进行中轮时服务端回单 end 帧。
+ */
+export function streamHarnessTurnJoin(
+  sessionId: string,
+  agentId: number | string | null,
+  onMessage: (response: GraphNodeResponse) => Promise<void>,
+  onError?: (error: Error) => Promise<void>,
+  onComplete?: () => Promise<void>,
+): () => void {
+  const url = `${API_BASE_URL}/api/admin/harness/turn/stream?sessionId=${encodeURIComponent(sessionId)}`;
+  const controller = new AbortController();
+
+  const doFetch = async () => {
+    let completed = false;
+    try {
+      const token = localStorage.getItem('phoenix-token');
+      const response = await fetch(url, {
+        headers: { 'phoenix-token': token || '', Accept: 'text/event-stream' },
+        signal: controller.signal,
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      await consumeHarnessSse(
+        response,
+        (parsed) => ({
+          agentId: String(agentId ?? ''),
+          threadId: sessionId,
+          nodeName: 'Harness',
+          textType: TextType.MARK_DOWN,
+          text: parsed.content || '',
+          error: false,
+          complete: false,
+          needConfirm: parsed.needConfirm || false,
+          toolCalls: parsed.toolCalls || undefined,
+          buttons: parsed.buttons || undefined,
+          thinking: parsed.thinking || undefined,
+        }),
+        onMessage,
+        onError,
+        async () => {
+          completed = true;
+          await onComplete?.();
+        },
+      );
+      // 取消（服务端不补 end 帧）或服务端收尾：同样收敛，避免界面停在"生成中"
+      if (!completed) {
+        await onComplete?.();
+      }
+    } catch (error: any) {
+      if (error.name === 'AbortError') return;
+      // BUG-76 语义：连接异常=不确定态，交给调用方重探/重连，绝不在此当作"轮次已结束"
+      await onError?.(new Error('Stream connection failed'));
+    }
+  };
+
+  doFetch();
+
+  return () => {
+    controller.abort();
+  };
+}
+
+/** chat/join 共用的 SSE 帧读取循环（帧协议同源，避免两处漂移） */
+async function consumeHarnessSse(
+  response: Response,
+  build: (parsed: any) => GraphNodeResponse,
+  onMessage: (response: GraphNodeResponse) => Promise<void>,
+  onError?: (error: Error) => Promise<void>,
+  onComplete?: () => Promise<void>,
+): Promise<void> {
+  const reader = response.body?.getReader();
+  const decoder = new TextDecoder();
+  if (!reader) {
+    throw new Error('No reader available');
+  }
+
+  let buffer = '';
+  let currentData = '';
+
+  const dispatchEvent = async () => {
+    if (currentData) {
+      try {
+        const parsed = JSON.parse(currentData);
+        if (parsed.end) {
+          await onComplete?.();
+          return;
+        }
+        await onMessage(build(parsed));
+      } catch {
+        await onError?.(new Error('Failed to parse server response'));
+      }
+    }
+    currentData = '';
+  };
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    if (!(value instanceof Uint8Array)) {
+      console.error('[SSE] admin-core: received non-Uint8Array chunk', typeof value);
+      continue;
+    }
+    buffer += decoder.decode(value, { stream: true });
+    const parts = buffer.split('\n');
+    buffer = parts.pop() || '';
+    for (const line of parts) {
+      if (line === '') {
+        await dispatchEvent();
+      } else if (line.startsWith('data:')) {
+        currentData = line.slice(5).trim();
+      }
+    }
+  }
+  if (buffer) {
+    const line = buffer.trim();
+    if (line.startsWith('data:')) {
+      currentData = line.slice(5).trim();
+      await dispatchEvent();
+    }
+  }
+}
+
 /** BL-22 架构修正：确认只发放行信号——原 chat 流在等待期保持打开并续播，禁止二开消费流 */
 export async function confirmHarnessSignalApi(sessionId: string, agentId: number | string | null, allowed: boolean): Promise<void> {
   const token = localStorage.getItem('phoenix-token') || '';
