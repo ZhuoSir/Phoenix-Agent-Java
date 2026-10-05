@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { watch } from 'vue';
 import ChatFilesPanel from '#/views/front/components/ChatFilesPanel.vue';
 import ThinkingBlock from '#/views/front/components/ThinkingBlock.vue';
 
@@ -216,6 +217,28 @@ function getMessageFormat(messageId: number | undefined): 'markdown' | 'html' {
 const inputControlsCollapsed = ref(false);
 const autoScroll = ref(true);
 const chatContainer = ref<HTMLElement | null>(null);
+
+// long-turn-resilience：长轮活性指示（每秒刷新已用时，证明"在跑"而非卡死）
+const streamElapsedText = ref('');
+let streamElapsedStart = 0;
+let streamElapsedTimer: ReturnType<typeof setInterval> | null = null;
+watch(isStreaming, (on: boolean) => {
+  if (streamElapsedTimer) {
+    clearInterval(streamElapsedTimer);
+    streamElapsedTimer = null;
+  }
+  if (!on) {
+    streamElapsedText.value = '';
+    return;
+  }
+  streamElapsedStart = Date.now();
+  streamElapsedTimer = setInterval(() => {
+    const sec = Math.floor((Date.now() - streamElapsedStart) / 1000);
+    const mm = String(Math.floor(sec / 60)).padStart(2, '0');
+    const ss = String(sec % 60).padStart(2, '0');
+    streamElapsedText.value = `正在执行（已用时 ${mm}:${ss}）`;
+  }, 1000);
+});
 const showHumanFeedback = ref(false);
 const showHarnessConfirm = ref(false);
 const pendingConfirmButtons = ref<ConfirmButton[]>([]);
@@ -1115,7 +1138,16 @@ function resetReportState(
   sessionState.markdownReportContent = '';
 }
 
-function scrollToBottom() {
+// long-turn-resilience：消息区贴底跟随（用户上翻即暂停，回底自动恢复；流式内容增长也跟随）
+let stickToBottom = true;
+function onMessagesScroll() {
+  const el = chatContainer.value;
+  if (!el) return;
+  stickToBottom = el.scrollHeight - el.scrollTop - el.clientHeight <= 40;
+}
+
+function scrollToBottom(force = true) {
+  if (!force && !stickToBottom) return;
   nextTick(() => {
     requestAnimationFrame(() => {
       if (chatContainer.value) {
@@ -1124,6 +1156,18 @@ function scrollToBottom() {
     });
   });
 }
+
+// 流式正文/思考增长 → 贴底跟随（原实现不跟随内容增长，需手动下拉）
+watch(
+  () => [
+    nodeBlocks.value.length,
+    nodeBlocks.value[nodeBlocks.value.length - 1]?.length ?? 0,
+    thinkingMap.get(currentSession.value?.id ?? '')?.text?.length ?? 0,
+  ],
+  () => {
+    scrollToBottom(false);
+  },
+);
 
 
 async function handleHarnessButtonClick(btn: ConfirmButton) {
@@ -1389,7 +1433,7 @@ onMounted(async () => {
           overflow: hidden;
         "
       >
-        <div class="chat-container" ref="chatContainer">
+        <div class="chat-container" ref="chatContainer" @scroll="onMessagesScroll">
           <div v-if="!currentSession" class="empty-state">
             <el-empty description="请选择一个会话或创建新会话开始对话" />
             <PresetQuestions
@@ -1597,6 +1641,7 @@ onMounted(async () => {
                   <span class="streaming-dot"></span>
                   <span class="streaming-dot"></span>
                 </div>
+                <span v-if="streamElapsedText" class="streaming-elapsed">{{ streamElapsedText }}</span>
               </div>
             </div>
           </div>
@@ -1982,6 +2027,12 @@ onMounted(async () => {
   display: flex;
   gap: 6px;
   align-items: center;
+}
+
+.streaming-elapsed {
+  margin-left: 8px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
 }
 
 .streaming-footer {
