@@ -1,5 +1,12 @@
 # Changelog: long-turn-resilience
 
+## T-04 四刀（2026-10-05）BUG-74 跨会话串消息（用户实测，高危）
+- 用户原话：「当前任务执行中，我新建个会话，就会把执行中的这个会话的当前的内容显示在新建的会话里，这个不对，不同会话肯定是不能消息串通的」
+- 根因：detached-stream T-05 轮询闭包**无会话守卫**——`tick` 无条件执行 `currentMessages.value = applyServerRowRender(旧会话消息)`；切会话/新建会话后旧 tick 仍在跑 → 直接把旧会话内容写进新会话视图；BUG-73 新增的 `isStreaming=true` 同为全局无条件（会顺带把新会话标成进行中）
+- 修复：闭包入口 + 每 tick 拉取前后 + 结束收敛处共**三处会话守卫**（`currentSession.id === session.id`）；一旦切走立即终止轮询、不再触碰任何视图态 → 会话内容严格隔离
+- 证据：typecheck 213=基线；新 run 分片 `run-BopHG054.js` 上线容器；首页 200；行为面待用户走查（L-07）
+- 若仍串：下一嫌疑=直播流回调写视图（现有 16 处守卫覆盖 currentMessages/nodeBlocks，需逐点核）+ 将加临时会话标签埋点定位
+
 ## T-04 三刀（2026-10-05）BUG-73 刷新后进行中态丢失（用户实测）
 - 用户原话：「刷新后，任务还在进行中，输入窗口的可编辑且可发送了…应该是没执行完的时候不可编辑，但是可以终止，现在终止按钮变成了发送按钮」
 - 根因：detached-stream T-05 轮询只刷新消息（currentMessages），**从不置 isStreaming** → 刷新后按空闲态渲染：textarea `:disabled="isStreaming"` 为假、发送按钮 `v-if="!isStreaming"` 显示、终止按钮隐藏

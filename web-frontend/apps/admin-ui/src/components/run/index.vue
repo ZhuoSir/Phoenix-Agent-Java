@@ -312,24 +312,33 @@ async function selectSession(session: ChatSession | null) {
     void (async () => {
       try {
         if (!(await harnessTurnStatusApi(session.id))) return;
+        // BUG-74：轮询闭包必须带会话守卫——切会话/新建会话后严禁把旧会话内容写进当前视图
+        if (currentSession.value?.id !== session.id) return;
         // BUG-73：刷新后在跑的轮次须恢复"进行中"态——输入区禁用、显示终止按钮
         // （此前轮询只刷新消息、从不置 isStreaming → 刷新后误判空闲：可编辑可发送、终止按钮变发送）
         isStreaming.value = true;
         const tick = async () => {
+          // BUG-74：已切走则终止轮询（不同会话消息绝不允许串通）
+          if (currentSession.value?.id !== session.id) return;
           try {
             currentMessages.value = applyServerRowRender(await getSessionMessagesApi(session.id) as any[]) as any;
           } catch { /* 忽略单次 */ }
+          if (currentSession.value?.id !== session.id) return;
           try {
             if (await harnessTurnStatusApi(session.id)) {
               setTimeout(tick, 5000);
             } else {
               // 轮次已结束：收敛为完成态（末次拉取刷新终稿）
-              isStreaming.value = false;
-              try {
-                currentMessages.value = applyServerRowRender(await getSessionMessagesApi(session.id) as any[]) as any;
-              } catch { /* ignore */ }
+              if (currentSession.value?.id === session.id) {
+                isStreaming.value = false;
+                try {
+                  currentMessages.value = applyServerRowRender(await getSessionMessagesApi(session.id) as any[]) as any;
+                } catch { /* ignore */ }
+              }
             }
-          } catch { isStreaming.value = false; /* 停 */ }
+          } catch {
+            if (currentSession.value?.id === session.id) isStreaming.value = false;
+          }
         };
         setTimeout(tick, 5000);
       } catch { /* ignore */ }
