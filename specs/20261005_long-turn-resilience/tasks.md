@@ -60,3 +60,12 @@
 - R 覆盖：R-01(T-01/07) R-02(T-03/05/07) R-03(T-04/07) R-04(T-01/07) R-05(T-02/06/07) R-06(T-07 对面)——全覆盖无孤儿
 - 依赖无循环；L-06 四面在 T-03/T-04/T-05 逐一收口；L-16 部署纪律贯穿各部署批次
 - 粒度：8 任务各一次会话可完成可独立验证
+
+## 进展对账（2026-10-05 · agent 记，勾选**待用户确认后**回填）
+- T-01/T-02：已勾（看门狗活性化+中断文案；Flyway `V1.6.0_03` 三列 + compaction 两级回退 + 指纹）
+- T-03 渲染管线：**实际交付方式与任务书不同**——帧合并落在**服务端**（`HarnessTurnManager` 100ms mergeJanitor，实测 600→6.6 帧/s）+ 前端统一 `applyServerRowRender`；据此闭环 BUG-70/72/75（三条均已验证）。客户端 150ms flush / 快照 1s 节流未单独实现 → 是否按「等价达成」收口待你裁决
+- T-04 join/重进：BUG-73/74/75/76 已验证（轮询双态 + 会话守卫 + 重试收敛）；**BUG-71（Think Done）仍为「新建」未修** → 本任务不能整体收
+- T-05 多端 transport 同治：前台 `api-transport` 增量渲染（incrementalMarkdown + 400ms 节流）已落地；`pc-ui`/其它端未核对 → 部分完成
+- T-06 运行时配置 UI 三输入：**未做**（前端全仓 grep `compactionTriggerTokens|compactionKeepMessages|toolResultMaxChars` 零命中）
+- T-07 E2E 全矩阵（logo ≥20 分钟长轮不被腰斩）：无整轮留档（今日长任务实测由用户侧进行，未按本任务矩阵记录）
+- T-08 台账收尾：未开始（本 spec `completion.md` 为空）
