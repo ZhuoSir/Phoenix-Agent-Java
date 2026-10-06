@@ -55,3 +55,32 @@
 2. runtime PoC（需重启，与 T-10/T-11 合并）：用 `PermissionContextState.addDenyRule("execute", ruleContent=原件路径模式)`
    实测"命令里含原件路径 → 被拒绝 + 审计日志"。
 3. 结论落盘后按 T-01 定档实施（T-10），并如实记录未拦住项（T-09）。
+
+--- 第三轮（离线实证：真正跑通三档打印的一部分，2026-10-06）---
+做法：本地仓库全量 jar 拼 classpath（799 个 jar）→ 编译并运行桩程序
+  `new WorkspaceContextMiddleware(new WorkspaceManager(Path.of("/tmp/spike/ws")))
+     .onSystemPrompt(反射桩 Agent, RuntimeContext.empty(), "MY_SYS").block()`
+（脚本与源码留档：`/tmp/spike/PromptSpike.java`，本轮为一次性 spike，不随仓库提交）
+
+【实测结果（默认档）】
+- 输出长度 **2391** 字；四个断言全为 true：
+  `hasDomainKnowledge=true`、`hasKnowledgeDirMention=true`、`hasMemoryRecall=true`、`hasMemoryPersist=true`
+- 逐字确认矛盾指引原文（与容器内会话上下文里看到的一致）：
+  "## Domain Knowledge / The workspace `knowledge/` tree holds many detailed reference documents … treat that directory
+   as the source of truth … injected `knowledge/KNOWLEDGE.md` (if present) plus a **full list of knowledge file paths** …"
+- **结论 1（风险落地）**：Domain Knowledge 与 `## Memory Recall` / `## Memory Persistence` **由同一段输出产出**
+  ⇒ `disableWorkspaceContext()`（整体关掉该 middleware）**必然连带关掉记忆指路与工作区文件提示**（不是"可能"，是同一块文本）。
+- **结论 2**：`setAdditionalContextFiles(...)` 是**追加**语义（本轮输出长度不变 2391，因无附加文件可读），**不能**用来"替换/删除"矛盾段。
+- **结论 3**：4 参构造 `(wm, "knowledge", "KNOWLEDGE.md", 8000)` 输出 2401 字、内容基本相同 ⇒ 它只影响注入的上下文文件名等参数，**不改变矛盾的指路本身**。
+- 类结构（javap）：引导文本是**单一私有常量** `GUIDANCE_TEMPLATE`；类内**没有** legacy 变体方法
+  ⇒ ② legacy 档与 ③ disable 档的行为由 **Builder** 决定，离线无法再往前推（需 runtime）。
+
+【T-01 定档建议（供组 4 批次执行时采用，带取舍）】
+| 档 | 做法 | 代价/风险 |
+|---|---|---|
+| **候选 A（推荐先试）** | **自定义 `HarnessRuntimeMiddleware` 替换**：不复用框架那 2391 字块，改由我们输出"准确且精简"的上下文（工作区根、memory 文件位置、**知识库只能经 `getRagInfo`**、**禁止 shell/文件工具读知识库原件**） | 需复刻少量有用信息（工作区/记忆指路）；好处是**矛盾段被彻底移除**，且 R-04 的"唯一指路 + 禁止条款"可直接满足 |
+| 候选 B | `disableWorkspaceContext()` + `additionalContextFile` **自注入补偿**（补 memory 与工作区指路） | 补偿要写全，否则模型丢失记忆/工作区认知；改动最小 |
+| 候选 C | 保留默认段 + 注入强指令**覆盖**（"工作区无 `knowledge/`；知识库只经 `getRagInfo`"） | 存在**两段互相矛盾**的指引，模型服从性不保证（最不推荐，仅作兜底） |
+
+**组 4 批次必须补齐的两件事**：① 实测 `useLegacyXmlWorkspaceContext(true)` 的文本是否仍含 `knowledge/`（若是，可作更省事的替代）；
+② 用 `PermissionContextState.addDenyRule("execute", ruleContent=原件路径模式)` 做"命令里含原件路径 → 拒绝 + 审计"的 runtime PoC（并验证 `ruleContent` 匹配语义，供 T-07）。
