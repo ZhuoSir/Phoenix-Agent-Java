@@ -3,13 +3,12 @@ package com.phoenix.platform.service.front.impl;
 import cn.dev33.satoken.stp.StpUtil;
 import cn.hutool.core.collection.CollStreamUtil;
 import cn.hutool.core.collection.CollUtil;
-import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.crypto.SecureUtil;
-import cn.hutool.jwt.JWTUtil;
 import com.mybatisflex.core.paginate.Page;
 import com.mybatisflex.core.query.QueryChain;
 import com.mybatisflex.core.query.QueryWrapper;
+import com.mybatisflex.core.row.Db;
 
 import com.mybatisflex.spring.service.impl.ServiceImpl;
 import com.phoenix.common.model.platform.PlatformInfo;
@@ -35,7 +34,9 @@ import com.phoenix.platform.service.thirdparty.ThirdPartyLoginFactory;
 import com.phoenix.platform.service.thirdparty.ThirdPartyLoginStrategy;
 import com.phoenix.common.vo.front.LoginVO;
 import com.phoenix.privilege.constant.LoginConstant;
+import com.phoenix.privilege.entity.PrivilegeUser;
 import com.phoenix.privilege.service.IPrivilegeDepartmentService;
+import com.phoenix.privilege.service.IPrivilegeUserService;
 import com.phoenix.tools.vo.ReturnVo;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -64,6 +65,8 @@ public class AccountInfoServiceImpl extends ServiceImpl<AccountInfoMapper, Accou
     private final PlatformInfoService platformInfoService;
     private final ThirdPartyLoginFactory thirdPartyLoginFactory;
     private final IPrivilegeDepartmentService departmentService;
+    /** T-03（统一账号中心）：统一账号源 tbl_privilege_user —— 前台入口与后台共用同一校验实现与口令盐 */
+    private final IPrivilegeUserService privilegeUserService;
 
     @Override
     public List<Agent> getMyAgents() {
@@ -232,25 +235,100 @@ public class AccountInfoServiceImpl extends ServiceImpl<AccountInfoMapper, Accou
         if (!hashedOld.equals(user.getPassword())) {
             return false;
         }
-        user.setPassword(dto.getNewPassword());
+        // BUG-95（T-04）：原实现直接 setPassword(明文) 落库 ⇒ 改密后按哈希比对必然失败。
+        // 统一口径：与后台一致，写入 MD5(盐 + 明文)；盐取统一常量 LoginConstant.PASSWORD_SALT（值同 PlatformConstant）。
+        user.setPassword(SecureUtil.md5(LoginConstant.PASSWORD_SALT + dto.getNewPassword()));
         return updateById(user);
     }
 
     @Override
     public ReturnVo<LoginVO> login(AccountLoginDTO loginDTO) {
-        AccountInfo account = getByUsername(loginDTO.getUsername());
+        String username = loginDTO.getUsername();
+        String rawPassword = loginDTO.getPassword();
+        // T-03 统一账号中心：优先按统一账号源（tbl_privilege_user）校验——与后台同一实现、同一口令盐
+        PrivilegeUser unified = privilegeUserService.getByUsername(username);
+        if (unified != null) {
+            if (unified.getStatus() != null && unified.getStatus() == 1) {
+                return ReturnVo.fail("账户已被禁用");
+            }
+            String unifiedHashed = SecureUtil.md5(LoginConstant.PASSWORD_SALT + rawPassword);
+            if (unifiedHashed.equals(unified.getPassword())) {
+                return loginByUnifiedAccount(unified);
+            }
+            // D9 过渡期（迁移后不可达）：统一源同名但口令不符 → 允许回退旧前台口令，并记 WARN 备查
+            AccountInfo legacy = getByUsername(username);
+            if (legacy == null || !legacyPasswordMatched(legacy, rawPassword)) {
+                return ReturnVo.fail("用户名或密码错误");
+            }
+            if ("0".equals(legacy.getStatus())) {
+                return ReturnVo.fail("账户已被禁用");
+            }
+            log.warn("[统一账号][过渡期] 统一账号口令不符，回退旧前台口令放行: username={}, unifiedId={}, legacyId={}",
+                    username, unified.getId(), legacy.getId());
+            StpUtil.login(legacy.getId());
+            return buildLoginResult(legacy);
+        }
+        // 旧前台账号（尚未迁入统一源）：保持既有行为，记 WARN 便于迁移后确认该分支已死
+        AccountInfo account = getByUsername(username);
         if (account == null) {
             return ReturnVo.fail("用户名或密码错误");
         }
         if ("0".equals(account.getStatus())) {
             return ReturnVo.fail("账户已被禁用");
         }
-        String hashedPassword = SecureUtil.md5(PlatformConstant.PASSWORD_SALT + loginDTO.getPassword());
-        if (!hashedPassword.equals(account.getPassword())) {
+        if (!legacyPasswordMatched(account, rawPassword)) {
             return ReturnVo.fail("用户名或密码错误");
         }
+        log.warn("[统一账号][过渡期] 旧前台账号登录（未迁入统一源）: username={}, legacyId={}", username, account.getId());
         StpUtil.login(account.getId());
         return buildLoginResult(account);
+    }
+
+    /**
+     * 统一账号登录。
+     * D9 过渡期：若该账号仍有"未迁移"的旧前台身份（映射表无记录），暂用旧 id 登录，
+     * 以保证组授权/会话/文件等业务数据仍可见；迁移完成后自动改用统一账号 id（R-01/R-02）。
+     */
+    private ReturnVo<LoginVO> loginByUnifiedAccount(PrivilegeUser unified) {
+        String loginId = unified.getId();
+        AccountInfo legacy = getByUsername(unified.getUsername());
+        if (legacy != null && !accountMigrated(legacy.getId())) {
+            loginId = legacy.getId();
+            log.warn("[统一账号][过渡期] 统一账号校验通过但前台身份未迁移，暂用旧 id 登录: username={}, unifiedId={}, legacyId={}",
+                    unified.getUsername(), unified.getId(), loginId);
+        }
+        StpUtil.login(loginId);
+        AccountInfo carrier = new AccountInfo();
+        carrier.setId(loginId);
+        carrier.setUsername(unified.getUsername());
+        carrier.setCode(unified.getCode());
+        carrier.setRealName(unified.getRealName());
+        carrier.setDeptId(unified.getDeptId());
+        return buildLoginResult(carrier);
+    }
+
+    private boolean legacyPasswordMatched(AccountInfo account, String rawPassword) {
+        return SecureUtil.md5(PlatformConstant.PASSWORD_SALT + rawPassword).equals(account.getPassword());
+    }
+
+    /**
+     * 映射表存在该旧账号行 ⇒ 已迁移；迁移件尚未执行（表不存在）按未迁移处理（过渡期语义）。
+     *
+     * 注意（实测教训）：**不能**直接查不存在的表再 catch——PostgreSQL 会把当前事务整体置为
+     * aborted（SQL state 25P02），后续语句全部失败（曾导致前台登录 500）。这里先用
+     * `to_regclass` 做不抛错的存在性探测。
+     */
+    private boolean accountMigrated(String legacyAccountId) {
+        if (StrUtil.isBlank(legacyAccountId)) {
+            return false;
+        }
+        Object table = Db.selectObject("select to_regclass('public.tbl_unified_account_map')");
+        if (table == null) {
+            return false;
+        }
+        Object count = Db.selectObject(
+                "select count(*) from tbl_unified_account_map where old_account_id = ?", legacyAccountId);
+        return count != null && Long.parseLong(String.valueOf(count)) > 0;
     }
 
     @Override
@@ -315,16 +393,6 @@ public class AccountInfoServiceImpl extends ServiceImpl<AccountInfoMapper, Accou
         }
         StpUtil.getSession().set(ACCOUNT_LOGIN, loginVO);
         return ReturnVo.ok(loginVO);
-    }
-
-    private String generateToken(AccountInfo account) {
-        Map<String, Object> payload = new HashMap<>();
-        payload.put("userId", account.getId());
-        payload.put("username", account.getUsername());
-        long exp = DateUtil.offsetDay(new Date(), 7).getTime();
-        payload.put("exp", exp);
-        String secret = PlatformConstant.PASSWORD_SALT + "_jwt_secret";
-        return JWTUtil.createToken(payload, secret.getBytes());
     }
 
     @Override

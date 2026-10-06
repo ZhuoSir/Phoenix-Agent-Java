@@ -35,13 +35,19 @@ export const useAuthStore = defineStore('auth', () => {
       const result = isUser
         ? await userLoginApi({ username: params.username, password: params.password })
         : await loginApi(params);
-      const { token, userId, username, realName, email, phone, userType } = result;
+      const { token, userId, username, realName, email, phone, userType } =
+        result as typeof result & { hasAdminRole?: boolean };
 
       if (token) {
         localStorage.setItem('phoenix-token', token);
         accessStore.setAccessToken(token);
 
-        const homePath = isUser || userType === 1 ? '/front/chat' : '/agent/list';
+        // T-05（统一账号中心）：落地页按「是否持有后台角色」判定。
+        // 原实现用 userType===1 判「普通用户」，但该列语义是「0 自建 / 1 IDM」（见 BUG-101 同源的语义混淆），
+        // 会把 IDM 来源的后台用户误送前台。前台入口(isUser)仍固定进前台。
+        const hasAdminRole = (result as { hasAdminRole?: boolean }).hasAdminRole;
+        const homePath =
+          isUser || hasAdminRole === false ? '/front/chat' : '/agent/list';
         userInfo = {
           avatar: '',
           desc: '',

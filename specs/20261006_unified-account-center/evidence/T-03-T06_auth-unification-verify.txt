@@ -1,0 +1,18 @@
+=== T-03/T-04/T-05/T-06 实测（2026-10-06 14:15:15，部署后）===
+
+--- ① 前台登录 chenzhuo/12345678 ---
+{"code":"100","data":{"token":"BJ_C9wFSCLWkqxvXI_TPnWDynpCKDNZQb8__","userId":"461671714812850176","userCode":"1002","email":null,"username":"chenzhuo","realName":"陈卓","deptIds":["431990993023381504"],"groups":[{"name":"通用组","sn":"COMMON"}]},"msg":"操作成功!","success":true}
+[HTTP 200]
+  token=BJ_C9wFSCLWkqx…
+
+--- ② 该 token 访问前台需登录接口 ---
+  GET /platform/account-info/username/chenzhuo → HTTP 200
+
+--- ③ 后台登录 admin（应 hasAdminRole=true）---
+  code= 100 userId= 461681072489615360 hasAdminRole= True
+
+--- ④ 错误口令不得放行（负对照）---
+{"code":"101","data":null,"msg":"用户名或密码错误","success":false}
+
+--- ⑤ 演示桩已移除 ---
+  POST /api/privilege/auth/doLogin → HTTP 404

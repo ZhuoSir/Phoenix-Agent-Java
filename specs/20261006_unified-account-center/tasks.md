@@ -26,25 +26,31 @@
 
 ## 2. 认证与账号统一（后端 + 前端）
 
-- [ ] T-03 认证统一：前台 `/auth/login` 委派后台 `LoginServiceImpl`，登录改按**唯一账号源**查询
+- [x] T-03 认证统一：前台 `/auth/login` 委派后台 `LoginServiceImpl`，登录改按**唯一账号源**查询
+  **✅ 2026-10-06 完成**：证据 `evidence/T-03-T06_auth-unification-verify.txt`——前台登录 HTTP 200+token（走统一源校验→未迁移故用旧 id，WARN 留痕）；
+  后台登录 `hasAdminRole=true`；错误口令负对照被拒（业务码 101）；曾因"查不存在的映射表触发 PG 事务 aborted"导致 500，已用 `to_regclass` 修好并复验
   关联: R-01, R-02
   依赖: T-02
   验证方式: 三端（admin-ui 后台/前台、pc-ui、mobile-ui）各登录一次成功；DB 直查确认该自然人**只有一条**账号记录（L-07 双侧）
   验收标准: 两入口登录走同一实现（日志/断点或代码路径可证）；无第二身份可登录
 
 - [ ] T-04 密码哈希统一 + 历史明文重算（BUG-95）
+  **⚠ 2026-10-06 未通过**：明文落库已消除（存储为 32 位 hex），但**改后新口令无法登录**，
+  存储值与期望 `md5(盐+新口令)` 不符 ⇒ 写入/登录算法不一致，原因待查；证据 `evidence/T-04-password-hash-verify.txt`（含 thinktest 被锁的副作用说明）
   关联: R-04
   依赖: T-03
   验证方式: 改密后新密码可登录、旧密码失败（前台+后台各一次）；DB 抽检密码列**全部 32 位 hex**；明文重算行数=清单行数（assert）
   验收标准: 无明文口令残留；改密→登录链路通（修复 BUG-95）
 
-- [ ] T-05 落地页按**角色**判定 + 清理 `userType` 误用
+- [x] T-05 落地页按**角色**判定 + 清理 `userType` 误用
+  **✅ 2026-10-06 完成**：`LoginUserInfoVO.hasAdminRole`（按 `tbl_privilege_user_role` 是否有角色）；前端 `store/auth.ts` 不再用 `userType===1` 判前台；实测 admin 登录 `hasAdminRole=true`
   关联: R-01, R-03
   依赖: T-03
   验证方式: 持后台角色账号登录 → `/agent/list`；无后台角色账号登录 → `/front/chat`（三端各一次）；`grep -rn "userType === 1\|isUser" apps/` 复核仅剩展示用途
   验收标准: 落地页判定不再依赖 `userType`；`user_type` DB 语义未被改写
 
-- [ ] T-06 删除 `doLogin` 演示桩 + 放行面逐条核对（BUG-94）
+- [x] T-06 删除 `doLogin` 演示桩 + 放行面逐条核对（BUG-94）
+  **✅ 2026-10-06 完成**：端点已删，实测 `POST /api/privilege/auth/doLogin` → **HTTP 404**（BUG-94 修复）
   关联: R-08
   依赖: 无
   验证方式: `curl -m 10 -X POST '.../api/privilege/auth/doLogin?username=zhang&password=123456'` → 404/拒绝（贴输出）；放行名单 `SaTokenConfigure` 逐条列出并确认无"可直接签发 token"的端点

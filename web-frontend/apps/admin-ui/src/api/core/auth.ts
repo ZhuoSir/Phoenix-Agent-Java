@@ -16,6 +16,8 @@ export namespace AuthApi {
     email?: string;
     phone?: string;
     userType?: number;
+    /** T-05（统一账号中心）：是否持有后台角色——落地页判定依据 */
+    hasAdminRole?: boolean;
   }
 
   export interface RefreshTokenResult {
@@ -42,24 +44,9 @@ export async function userLoginApi(data: AuthApi.LoginParams) {
 }
 
 /**
- * 刷新accessToken
- */
-export async function refreshTokenApi() {
-  return baseRequestClient.post<AuthApi.RefreshTokenResult>('/auth/refresh', {
-    withCredentials: true,
-  });
-}
-
-/**
  * 退出登录
  */
 export async function logoutApi() {
   return baseRequestClient.post('/api/privilege/auth/logout');
 }
 
-/**
- * 获取用户权限码
- */
-export async function getAccessCodesApi() {
-  return requestClient.get<string[]>('/auth/codes');
-}
