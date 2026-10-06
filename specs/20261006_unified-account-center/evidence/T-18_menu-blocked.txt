@@ -1,0 +1,13 @@
+=== T-18 尝试与受阻（2026-10-06）===
+做法：从「智能体列表」菜单行复制形状，插入 `tbl_privilege_module`（sn=AgentChatCenter, url=/agent/chat,
+component=#/views/front/chat.vue, pid 同 智能体列表），并复制其 ACL 行。
+结果：
+- 菜单行 INSERT 0 1 成功 → 但随后 ACL 复制报
+  `ERROR: duplicate key value violates unique constraint "idx_tbl_privilege_acl_release_module"`
+- 脚本为单事务 + ON_ERROR_STOP ⇒ **全部回滚，生产零改动**（验证：menus 接口仍 26 项、无「智能体中心」）
+根因（新发现）：
+- `tbl_privilege_acl` 是**权限点（pvalue）ACL 表**：`module_sn` 存权限点名（如 PlatformAccount/DepartmentManagement），
+  `module_id` 指向 pvalue 的 id，唯一键 = (release_id, module_id) ⇒ **不是菜单可见性载体**
+- 因此「菜单如何按角色过滤」尚未查清（menus 接口返回 26 项，规则待定）；下一步需查
+  `getUserMenus` 的实现（模块树按什么过滤：role→module 关联表？pvalue？is_show？）
+待续：查清可见性机制 → 重写升级件 03 的 ACL 部分 → 再应用（当前生产无残留，无需清理）
