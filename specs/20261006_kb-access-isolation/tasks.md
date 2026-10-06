@@ -35,8 +35,8 @@
 
 ## 2. HTTP 面收敛（R-01；最高优先）
 
-- [ ] T-04 静态可达面收口：`/uploads` 仅保留图片类白名单，非图片不再直出
-  **⏳ 代码完成（编译通过 MVN_EXIT=0），待部署窗口做行为断言**：实现取"敏感前缀拒绝"而非全类型白名单——
+- [x] T-04 静态可达面收口：`/uploads` 仅保留图片类白名单，非图片不再直出
+  **✅ 2026-10-06 已部署并断言通过**（证据 `evidence/T-04-T-05_deploy-verify.txt`）：实现取"敏感前缀拒绝"而非全类型白名单——
   `WebConfig` 增加 `SensitivePathDenyingResolver`（命中 `data-agent/agent-knowledge`、`agent-workspace` 即返回 `Mono.empty()`＝404、
   响应体无正文；路径归一化后再比对，防反斜杠/点段变形），其余 `/uploads` 用途不变（符合 R-08）。
   自伤：首版误用 MVC 签名 `Resource getResource(...)`，WebFlux 实为 `Mono<Resource>`，编译报错后修正。
@@ -45,7 +45,7 @@
   验证方式: 改 `WebConfig` 资源映射（白名单）→ **内容级**断言（L-37）：未登录直连 KB 原件与会话工作区文件 → 非 200 或响应体**不含正文标记**；
   头像等图片 → 200；`verify.sh` 回归
   验收标准: plan 身份矩阵 **①/KB 原件、②/工作区文件、③/头像图片、④/通用上传回显** 四条身份各有断言且落盘
-- [ ] T-05 受控下载/预览接口（带鉴权 + 归属 + 审计）
+- [x] T-05 受控下载/预览接口（带鉴权 + 归属 + 审计）
   **⏳ 代码完成（编译通过 MVN_EXIT=0），待部署窗口做 allow/deny 双侧断言**：
   `GET /api/agent-knowledge/{id}/raw` —— 登录态由 sa-token 拦截器保证（`/api/**` 在 include 名单内）；
   service `getRawFileIfPermitted(id, userId)` 按 T-03 口径判权（管理员 ∨ 在绑定该库的智能体下有会话）；
