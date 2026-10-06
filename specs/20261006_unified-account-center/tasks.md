@@ -185,13 +185,20 @@
   验证方式: 未登录访问智能体中心 → 跳**同一个**后台登录页；`/auth/login`（前端路由）按 plan 重定向到 admin；`grep` 复核前端无前台专属鉴权分支残留
   验收标准: 全站只有一套登录逻辑（仅 admin 登录页生效）
 
-- [ ] T-20 R-11 验证：单套登录/访问矩阵更新（含 mobile-ui / pc-ui 影响面）
+- [x] T-20 R-11 验证：单套登录/访问矩阵更新（含 mobile-ui / pc-ui 影响面）
+  **✅ 2026-10-06 完成**：Agent 侧断言——未登录访问 5 条入口（`#/front/chat`、`#/front/agent`、`#/agent/list`、
+  `/agent/chat`、`/front/chat`）**全部落同一** `/auth/login`；`#/front/chat` 最终带回跳 `redirect=/agent/chat`
+  （= 前台入口确被重定向到智能体中心）；登录页无双 tab（截图 `evidence/T-19_login-single-form.jpg`）；
+  控制台无应用级报错。**用户实测确认「四项全对」**：侧栏置顶+图标 / chat 可用 / 无 tab 登录正常 / `#/front/chat`→`#/agent/chat`。
+  pc-ui、mobile-ui 未部署（`docker/scripts/build.sh` 只构件 admin-ui），其后端 `/auth/login` 按 plan 一期保留（verify.sh [13] PASS）。
+  证据 `evidence/T-20_matrix-partial.txt`
   关联: R-11
   依赖: T-19
   验证方式: 更新 T-16 身份矩阵：新增"智能体中心（后台登录后可用）"与"未登录跳转一致"两条断言；三端各跑一次登录/进入 chat
   验收标准: 断言全绿并落盘（缺一即不通过）
 
 - [ ] T-21 R-11 回归与收口（文档/台账同步）
+  **⏸ 2026-10-06 用户口令暂缓**：「等我测完再做 T-21」⇒ 现场冻结，不再动生产与前端，等用户通知后执行
   关联: R-11
   依赖: T-20
   验证方式: `docker/scripts/verify.sh` 全绿；typecheck 无新增；completion.md 增 R-11 段
