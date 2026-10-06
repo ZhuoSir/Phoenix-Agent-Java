@@ -154,15 +154,20 @@
 
 ## 6. 智能体中心并入 admin（R-11，v2.0.0 新增）
 
-- [ ] T-18 菜单与路由：后台新增**一级菜单**「智能体中心」（置顶；`/agent/chat` → `#/views/front/chat.vue`）
+- [x] T-18 菜单与路由：后台新增**一级菜单**「智能体中心」（置顶；`/agent/chat` → `#/views/front/chat.vue`）
+  **✅ 2026-10-06 完成（生产已应用，仅改 DB、未重启不掉线）**：一级菜单行 `order_no=-1` + 每角色 1 行 ACL 已落生产；
+  `GET /api/privilege/auth/menus` 根菜单 26→（9 根，含「智能体中心」）；chat 面接口以**同一 token** 可用
+  （chenzhuo: getMyAgents code=100 4 个 → `/api/agent/25/sessions` code=100 7 条会话）；现网前端包已含
+  `views/front/chat.vue` 分包 ⇒ 菜单驱动路由，无需重建前端。证据 `evidence/T-18_prod-apply-verify.txt`
+  （备份 sha256 + 应用输出 + DB/API 回读 + 产物核对）。**待用户硬刷目视确认侧栏位置与 chat 可用性**（UI 项由用户实测）
+  **边界（如实记录，属二期 R-05）**：`getMyAgents` 经**前台授权组**解析 ⇒ 纯后台账号 `admin` 列表为 0（无前台授权组），
+  有授权组的 `chenzhuo` 有 4 个；页面与鉴权可用，列表内容取决于前台授权组（R-05 二期归一）
   关联: R-11
   依赖: T-07
-  验证方式: 登录 admin → 侧栏**最上方**出现「智能体中心」→ 进入后 chat 可用（会话列表/发消息/文件树/预设问题各一次）；`GET /api/privilege/auth/menus` 含该行且位于根菜单首位
+  验证方式: 登录 admin → 侧栏**最上方**出现「智能体中心」→ 进入后 chat 可用（会话列表/发消息/文件树/预设问题各一次）；`GET /api/privilege/auth/menus` 含该行（侧栏次序由前端 `meta.order` 决定，见 `generate-menus.ts:86`，非接口数组序）
   验收标准: 后台登录后可直接用 chat，无需第二次登录
-  **⏳ 2026-10-06 机制已查清，升级件 03 已重写并在演练库通过（生产未应用，等确认后应用）**：
-  一级菜单形状（`pid=''`、`type=1`、`order_no=-1`，继承现有一级菜单「知识库」行的字段形状）；
-  `tbl_privilege_acl` 是「角色 → 菜单」授权表（`module_id → module.id`），按**每角色一行**预置（不再复制 4 行）；
-  旧脚本失败真因 = 照过期冗余列 `module_sn` 复制 4 行撞唯一键。
+  **机制留档**：一级菜单形状（`pid=''`、`type=1`、`order_no=-1`，继承一级菜单「知识库」行）；
+  `tbl_privilege_acl` 是「角色 → 菜单」授权表（`module_id → module.id`）；旧脚本失败真因 = 照过期冗余列 `module_sn` 复制 4 行撞唯一键。
   **可见性口径（v2.0.1 实测纠正）**：现网 `getUserMenus` 为开发期全放开（`getModelTreeByUserId` 被注释）
   ⇒ 本期实际可见性 = **任一登录用户**；ACL 行为二期启用过滤的预置数据，按角色过滤属 R-05 二期。
   证据 `evidence/T-18_menu-mechanism.txt`（drill 应用/幂等/回滚三步）；受阻留痕 `evidence/T-18_menu-blocked.txt`
