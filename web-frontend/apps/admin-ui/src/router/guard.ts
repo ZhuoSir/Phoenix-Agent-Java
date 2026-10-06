@@ -53,11 +53,20 @@ function setupAccessGuard(router: Router) {
     // 基本路由，这些路由不需要进入权限拦截
     if (coreRouteNames.includes(to.name as string)) {
       if (to.path === LOGIN_PATH && accessStore.accessToken) {
-        return decodeURIComponent(
-          (to.query?.redirect as string) ||
-            userStore.userInfo?.homePath ||
-            '/agent/list',
-        );
+        // BUG-89：redirect 可能指向登录页自身（历史自我重定向留下的嵌套值）→ 不可再跳自己，
+        // 否则 vue-router 中止导航 ⇒ 内容区空白（现象：打开页签无内容、强刷才恢复）
+        const raw = (to.query?.redirect as string) || '';
+        let target = '';
+        try {
+          target = raw ? decodeURIComponent(raw) : '';
+        }
+        catch {
+          target = '';
+        }
+        if (!target || target.split('?')[0] === LOGIN_PATH) {
+          target = userStore.userInfo?.homePath || '/agent/list';
+        }
+        return target;
       }
       // Chat 路由需登录，且仅允许 userType === 1 的用户访问
       if (to.name === 'Chat') {
@@ -85,20 +94,22 @@ function setupAccessGuard(router: Router) {
         return true;
       }
 
-      // 没有访问权限，跳转登录页面
-      if (to.fullPath !== LOGIN_PATH) {
-        return {
-          path: LOGIN_PATH,
-          // 如不需要，直接删除 query
-          query:
-            to.fullPath === '/agent/list'
-              ? {}
-              : { redirect: encodeURIComponent(to.fullPath) },
-          // 携带当前跳转的页面，登录后重新跳转该页面
-          replace: true,
-        };
+      // BUG-89：判据从 `to.fullPath` 改为 `to.path`——落在 `/auth/login?redirect=…` 时
+      // fullPath 必然 != LOGIN_PATH，会把**登录页自身**再包一层 redirect（自我重定向 + 嵌套），
+      // 导航被中止 ⇒ 空白页。已在登录页时直接放行渲染（`return true`，不能 `return to`，那同样是"跳自己"）。
+      if (to.path === LOGIN_PATH) {
+        return true;
       }
-      return to;
+      return {
+        path: LOGIN_PATH,
+        // 如不需要，直接删除 query
+        query:
+          to.fullPath === '/agent/list'
+            ? {}
+            : { redirect: encodeURIComponent(to.fullPath) },
+        // 携带当前跳转的页面，登录后重新跳转该页面
+        replace: true,
+      };
     }
 
     // 是否已经生成过动态路由
