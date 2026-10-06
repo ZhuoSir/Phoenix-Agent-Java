@@ -227,7 +227,15 @@ public class AccountInfoServiceImpl extends ServiceImpl<AccountInfoMapper, Accou
 
     @Override
     public boolean updatePassword(UpdatePwdDTO dto) {
-        AccountInfo user = getById(dto.getUserId());
+        String loginId = dto.getUserId();
+        // 迁移后（R-01/R-02）：登录 id 是**统一账号 id**（tbl_privilege_user），必须按统一账号改密；
+        // 否则 getById 在旧前台表查不到 ⇒ 恒返回 false ⇒ 前端提示"原密码错误"（用户实测 2026-10-06 发现的回归）
+        PrivilegeUser unified = privilegeUserService.getById(loginId);
+        if (unified != null) {
+            return privilegeUserService.updatePassword(loginId, dto.getOldPassword(), dto.getNewPassword());
+        }
+        // 旧前台账号（尚未迁入统一源）——保持既有实现
+        AccountInfo user = getById(loginId);
         if (user == null) {
             return false;
         }
