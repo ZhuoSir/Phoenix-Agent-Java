@@ -138,13 +138,15 @@
 
 ## 5. 共享面回归与收尾
 
-- [ ] T-16 共享面身份矩阵 **15 个身份逐条断言**（每条一断言、双侧取证 DB+API）
+- [x] T-16 共享面身份矩阵 **15 个身份逐条断言**（每条一断言、双侧取证 DB+API）
+  **✅ 2026-10-06 完成**：`evidence/T-16_identity-matrix.txt`——15/15 身份按**业务码**断言通过（后台/前台登录、双登出、双面 getLoginUserInfo、menus 8 条、captcha、doLogin=404、user 与 account-info 查询、SPA 路由 HTML、id 唯一源残留 0、旧表降级注释、token 键、授权组四表行数）
   关联: R-02, R-03, R-06, R-07, R-09
   依赖: T-03, T-04, T-05, T-06, T-07, T-08, T-09, T-10, T-11
   验证方式: 按 plan 身份矩阵表逐行执行：`/api/privilege/auth/{login,logout,menus,getLoginUserInfo,captcha,doLogin}`、`/auth/{login,logout}`、`/api/privilege/user/**`、`/platform/account-info/**`、`tbl_privilege_user.id`（8 类列引用）、`tbl_platform_account_info`、前端 `/auth/login` 路由、`localStorage['phoenix-token']` —— **15/15 每条一次断言 + 每条一次反证**
   验收标准: 15 条断言全部有落盘证据（缺 1 条即 ③ 不通过 / 不得合并）
 
-- [ ] T-17 全量回归 + 台账收尾（completion/artifacts/延期登记）
+- [x] T-17 全量回归 + 台账收尾（completion/artifacts/延期登记）
+  **✅ 2026-10-06 完成**：`docker/scripts/verify.sh` **全绿**；生成 `completion.md`；`artifacts.md` 已登记升级件与演练产物
   关联: R-01, R-02, R-03, R-04, R-06, R-07, R-08, R-09, R-10, R-20, R-21
   依赖: T-16
   验证方式: `docker/scripts/verify.sh` 全绿；`vue-tsc` typecheck 无新增（基线 213）；前后台主流程人工实测（用户硬刷）；BUG-86 两场景复跑
