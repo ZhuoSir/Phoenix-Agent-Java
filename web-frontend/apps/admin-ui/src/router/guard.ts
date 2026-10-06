@@ -152,7 +152,12 @@ function setupAccessGuard(router: Router) {
     if (userInfo.userType === 1) {
       redirectPath = '/front/chat';
     } else {
-      redirectPath = (from.query.redirect ??
+      redirectPath = (// BUG-91：来源页若为登录页（/auth/login?redirect=…），不得把它当落地目标——否则刚打开的
+        // 目标页（如运行页）会被再踢回登录页，组件卸载 ⇒ 内容区空白。仅接受非登录页来源的 redirect。
+        (from.query.redirect
+          && decodeURIComponent(String(from.query.redirect)).split('?')[0] !== LOGIN_PATH
+          ? from.query.redirect
+          : undefined) ??
         (to.path === '/agent/list'
           ? userInfo.homePath || '/agent/list'
           : to.fullPath)) as string;
