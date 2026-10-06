@@ -92,6 +92,11 @@
   抓取注入原文核对：**指路唯一且不自相矛盾** + 含禁止条款；memory 指引不退化（若退化则补自注入）
   验收标准: 注入原文落盘（前后对比）；无矛盾指路；memory 行为与改造前一致（或已补偿）
 - [ ] T-11 检索失败可见化（治 L-34 的"真因被吞"）
+  **⏳ 代码完成（编译通过 MVN_EXIT=0），待部署窗口构造真实失败验证**：
+  `AbstractHybridRetrievalStrategy`：`ExecutionException` 分支改为 **ERROR 全栈 + 抛出带 rootCause 摘要的异常**
+  （`并行检索失败: <根因类名>: <message>`）；`KnowledgeRetrievalTool`：单关键词检索失败即 catch，
+  返回「检索失败（注意：这不是「没有相关资料」）: <根因摘要>…停止用文件系统工具查找知识库内容」——
+  直接掐掉 BUG-103 实测的退化路径（模型把"服务不可用"误当"没有资料"→ 转去翻文件系统）。
   关联: R-05
   依赖: 无
   验证方式: `AbstractHybridRetrievalStrategy` 包装处补 `log.error(..., e)` + 抛带 cause 摘要的异常；

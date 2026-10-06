@@ -89,7 +89,11 @@ public abstract class AbstractHybridRetrievalStrategy implements HybridRetrieval
 			throw new RuntimeException("Search operation interrupted", e);
 		}
 		catch (ExecutionException e) {
-			throw new RuntimeException("Error during parallel search execution", e);
+			// R-05 / L-34：真因（如 embedding 欠费、模型不存在）必须**落 ERROR 全栈**并**回传给调用方**；
+			// 否则模型只看到"并行检索失败"这种无信息量文案，会退化去翻文件系统（BUG-103 实测）。
+			Throwable root = rootCause(e);
+			log.error("并行检索失败（向量/关键词）: query={}, rootCause={}", request.getQuery(), root.toString(), e);
+			throw new RuntimeException("并行检索失败: " + root.getClass().getSimpleName() + ": " + root.getMessage(), e);
 		}
 
 	}
@@ -100,5 +104,15 @@ public abstract class AbstractHybridRetrievalStrategy implements HybridRetrieval
 	 * @return 文档列表
 	 */
 	public abstract List<Document> getDocumentsByKeywords(HybridSearchRequest request);
+
+
+	/** 取根因（优先最深 cause），用于把可诊断信息带给调用方（R-05）。 */
+	private static Throwable rootCause(Throwable t) {
+		Throwable cur = t;
+		while (cur.getCause() != null && cur.getCause() != cur) {
+			cur = cur.getCause();
+		}
+		return cur;
+	}
 
 }
