@@ -1,4 +1,4 @@
-> 版本: v2.0.0 | 状态: 已确认 | 确认人: 陈卓 | 确认日期: 2026-10-06 | 更新: 2026-10-06（v2.0.0：R-11 引入"智能体中心并入 admin、单套登录/访问" ⇒ 决策 3 与过渡期 D9 被取代） | 更新: 2026-10-06（v1.1.0 变更：T-01 取证后并入三项裁定——M2 匹配规则、M8 测试账号清理、回滚项⑤）
+> 版本: v2.0.1 | 状态: 待重确认 | 确认人: 陈卓 | 确认日期: 2026-10-06 | 更新: 2026-10-06（v2.0.1：决策 7 澄清——「智能体中心」改**一级菜单置顶**；可见性口径按实测纠正：现网 `getUserMenus` 为开发期全放开 ⇒ 本期实际可见性 = 任一登录用户，ACL 行仅作二期启用过滤的预置数据、**按角色过滤属 R-05 二期**） | 更新: 2026-10-06（v2.0.0：R-11 引入"智能体中心并入 admin、单套登录/访问" ⇒ 决策 3 与过渡期 D9 被取代） | 更新: 2026-10-06（v1.1.0 变更：T-01 取证后并入三项裁定——M2 匹配规则、M8 测试账号清理、回滚项⑤）
 
 # 技术方案：unified-account-center（统一账号中心 / 消除双账号体系）
 
@@ -211,10 +211,11 @@ CREATE INDEX IF NOT EXISTS idx_uam_new_user ON tbl_unified_account_map (new_user
 - 理由：调研已排除"绑定错误"，但**未确证越库路径**；先定性再改，避免改错面（L-01/L-06 教训）。
 - 被拒绝：直接按最可能路径（提示面）改（无证据即改 = 违反诚实性；若定性为①则白改）。
 
-### 决策 7（v2.0.0 新增）：chat 以「智能体中心」并入 admin，单套登录/访问
-- 采用：① 复用现 `views/front/chat.vue` 及其子组件（ChatMessages/ChatFilesPanel/预设问题等）作为 admin 路由页；② 菜单表加一行（`url=/agent/chat`、`component=#/views/front/chat.vue`、`name=智能体中心`、`sn=AgentChatCenter`）按**角色**可见；③ 认证/权限/用户信息全走 admin 同一套（token 键 `phoenix-token` 已统一 ✓）；④ 前台独立入口（`/auth/login`、`/front/*`）下线或重定向到 admin（一期先重定向 + 保留页面文件，二期删代码，避免一次性破坏 mobile-ui/pc-ui）
-- 理由：前台与后台请求层/token 已统一（T-03/T-16 已证），挂载成本低；chat 页面本身不依赖前台登录分支
-- 被拒绝：把 chat 代码复制一份进 admin（双份维护 ✗）；保留前台入口并行（违反 R-11 ✗）
+### 决策 7（v2.0.0 新增；v2.0.1 澄清可见性口径与菜单层级）：chat 以「智能体中心」并入 admin，单套登录/访问
+- 采用：① 复用现 `views/front/chat.vue` 及其子组件（ChatMessages/ChatFilesPanel/预设问题等）作为 admin 路由页；② 菜单表加一行**一级菜单**（`pid=''`、`type=1`、`url=/agent/chat`、`component=#/views/front/chat.vue`、`name=智能体中心`、`sn=AgentChatCenter`、`order_no=-1` 置顶；字段形状继承现有一级菜单「知识库」行），并按**每个角色一行**预置 `tbl_privilege_acl` 授权；③ 认证/权限/用户信息全走 admin 同一套（token 键 `phoenix-token` 已统一 ✓）；④ 前台独立入口（`/auth/login`、`/front/*`）下线或重定向到 admin（一期先重定向 + 保留页面文件，二期删代码，避免一次性破坏 mobile-ui/pc-ui）
+- **可见性口径（v2.0.1 澄清，实测取证）**：菜单可见性的唯一载体是 `tbl_privilege_module`；`tbl_privilege_acl` 是「角色 → 菜单」授权表（`module_id → module.id`，唯一键 `(release_id, module_id)`），但现网 `LoginServiceImpl.getUserMenus()` 为**开发期全放开**（`getModelTreeByUserId(...)` 调用被注释，改用 `list()` 全量 + 全权限位）——实测：零 ACL 的「普通角色」账号同样拿到全部 26 个菜单。⇒ **本期实际可见性 = 任一登录用户**（不按角色过滤）；ACL 行为「二期启用过滤即生效」的预置数据，**按角色过滤本身属 R-05 二期**，不在本 spec。
+- 理由：前台与后台请求层/token 已统一（T-03/T-16 已证），挂载成本低；chat 页面本身不依赖前台登录分支；置于一级菜单置顶 = chat 为登录后主入口（用户 2026-10-06 指定）
+- 被拒绝：把 chat 代码复制一份进 admin（双份维护 ✗）；保留前台入口并行（违反 R-11 ✗）；本 spec 内启用 ACL 过滤（要放开被注释的 `getModelTreeByUserId`，影响全部 26 个菜单的可见性、且「普通角色」ACL 零行会只剩个别菜单 —— 属二期 R-05，风险大 ✗）
 - 影响：`mobile-ui`/`pc-ui` 两个 app 直连 `/auth/login` ⇒ 一期保留端点做重定向，二期评估下线；`LoginHelper` 的 `LoginTypeEnm.USER` 空壳可随之清理
 - 风险：chat 页内若有"前台专属"分支（如按前台账号 id 取会话）需改为统一账号 id（已由迁移完成 ✓）
 

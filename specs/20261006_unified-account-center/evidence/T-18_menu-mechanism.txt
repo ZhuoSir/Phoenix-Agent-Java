@@ -42,31 +42,29 @@ join 结果（节选）：module_id = 5db7285051204f81867995e2565931c1 → m_nam
 （附带事实：chenzhuo 用前台口令 12345678 登录统一源成功；持 普通角色 ⇒ hasAdminRole=true ⇒ 落地页 /agent/list）
 
 --- 4. 升级件 03（重写版）演练：phoenix_drill ---
+形态：**一级菜单 + 置顶**（用户 2026-10-06 指定"放在一级目录，最上面"）——
+`pid=''`、`type='1'`、`order_no=-1`，字段形状继承现有一级菜单「知识库」(url='/knowledge-base')。
+（注意 type 必须为 '1'：前端 access.ts 仅在 type==='1' 时取 component，type='0' 会得到空组件 ⇒ 页面空白）
+
 $ docker exec -i phoenix-release-postgres-1 psql -U phoenix -d phoenix_drill -v ON_ERROR_STOP=1 -f - < sql/V1.7.0_03__agent_chat_center_menu.sql
-BEGIN
-DELETE 0
-DELETE 0
-DELETE 0
-DELETE 0
-INSERT 0 1
-INSERT 0 2
-DO
-psql:<stdin>:65: NOTICE:  T-18：菜单行 1（智能体中心 /agent/chat）+ 角色 ACL 2 行（角色数 2）
-COMMIT
+BEGIN / DELETE 0 ×4 / INSERT 0 1 / INSERT 0 2
+psql:<stdin>:70: NOTICE:  T-18：一级菜单行 1（智能体中心 /agent/chat，置顶）+ 角色 ACL 2 行（角色数 2）
+DO / COMMIT
 
 验证（drill）：
-  id=a9c1e7d4f0b34c8e9a1d2b3c4e5f6a70 | 智能体中心 | /agent/chat | AgentChatCenter | state=31 |
-  component=#/views/front/chat.vue | system_id=110 | status=1 | order_no=2 | is_show=1 |
-  pid=741103abe63748749f82fbd2b420061c | category_id=111 | type=1 | del_flag=0
-  父节点核对：pid → 智能体管理 /agent-manager
-  ACL 2 行：428007432736870400 系统管理员 role acl_state=31 / 431285032083144704 普通角色 role acl_state=31
-幂等复跑（同一脚本第 2 次）：INSERT 0 1 / INSERT 0 2 / NOTICE 同上 ⇒ 无重复行
+  a9c1e7d4f0b34c8e9a1d2b3c4e5f6a70 | 智能体中心 | /agent/chat | AgentChatCenter | state=31 |
+  component=#/views/front/chat.vue | system_id=NULL | status=1 | order_no=-1 | is_show=1 |
+  pid='' | category_id=NULL | type=1 | del_flag=0
+  根菜单排序（order_no）：智能体中心(-1) → 智能体管理(0) → 权限管理(1) → 组织管理(10) →
+  知识库(16) → 插件管理(17) → 前台管理(350) → 基础管理(400) → 个人中心(999)  ⇒ 确实在最上面
+  ACL 2 行：428007432736870400 系统管理员 / 431285032083144704 普通角色，acl_state 均 31
+幂等复跑（同一脚本第 2 次）：INSERT 0 1 / INSERT 0 2 / NOTICE 同上 ⇒ 无重复行（m=1 a=2）
 
 --- 5. 回滚演练（drill）---
 $ docker exec -i ... psql -U phoenix -d phoenix_drill -v ON_ERROR_STOP=1 -f - < sql/rollback/V1.7.0_03__agent_chat_center_menu_rollback.sql
 BEGIN / DELETE 2 (acl) / DELETE 1 (module) / DELETE 0 / DELETE 0 / DO
 NOTICE:  回滚完成：菜单行与 ACL 行均已清除 / COMMIT
-回滚后：mod_left=0 acl_left=0 mod_total=27 acl_total=73（与演练前完全一致）
+回滚后：mod=27 acl=73 left=0（与演练前完全一致）
 
 --- 6. 生产状态 ---
 select count(*) from tbl_privilege_module where sn='AgentChatCenter';  → 0（生产零改动，未应用）
