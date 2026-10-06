@@ -10,3 +10,5 @@
 - requirements 写入 EARS 条款：**A 组 R-01~R-10**（身份源/认证/token/两入口一致性/凭据单点生效/权限组织承载/登出/用户信息/放行面收敛/调用面一致/无损迁移回滚）＋ **B 组 R-20~R-21**（BUG-86 隔离与可举证）；含 Non-goals、假设 7 条、待确认问题 3 条
 - 调研发现既有缺陷 **6 条已登记**：BUG-94（P0 安全·认证绕过）/ BUG-95（前台改密明文致无法登录）/ BUG-96（前台登出无效）/ BUG-97（前台用户信息 null）/ BUG-98（前端调用不存在端点）/ BUG-99（硬编码 JWT 死代码）
 - 状态：requirements 仍为 **v0.1.0 草稿**，等用户 ① 确认后升 v1.0.0
+- **BUG-94 实测复核（诚实性更正）**：未带凭据调用 `POST /api/privilege/auth/doLogin?username=zhang&password=123456` → HTTP 200 `登录成功`（服务端确执行 `StpUtil.login(10001)`），但响应**无 `Set-Cookie`/token 头** ⇒ 未证实"外部可直接取得 token"，定级由 **P0 更正为 P1（生产残留演示桩）**；要求=删端点或移出放行名单
+- **新发现并登记 BUG-100**：sa-token 会话**未落 Redis**（`phoenix-platform-core/pom.xml:40` 有依赖、全仓无 `SaTokenDao` 装配、实测 Redis `dbsize=0`）⇒ 会话在进程内存，**后端重启即全员掉线**；已据此收窄"待确认问题 1"（强制重登影响面比预期小），并新增假设 6（是否落 Redis 由用户定，默认不在范围）
