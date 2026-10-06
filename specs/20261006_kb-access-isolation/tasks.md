@@ -46,6 +46,11 @@
   头像等图片 → 200；`verify.sh` 回归
   验收标准: plan 身份矩阵 **①/KB 原件、②/工作区文件、③/头像图片、④/通用上传回显** 四条身份各有断言且落盘
 - [ ] T-05 受控下载/预览接口（带鉴权 + 归属 + 审计）
+  **⏳ 代码完成（编译通过 MVN_EXIT=0），待部署窗口做 allow/deny 双侧断言**：
+  `GET /api/agent-knowledge/{id}/raw` —— 登录态由 sa-token 拦截器保证（`/api/**` 在 include 名单内）；
+  service `getRawFileIfPermitted(id, userId)` 按 T-03 口径判权（管理员 ∨ 在绑定该库的智能体下有会话）；
+  mapper 新增 `canReadKnowledgeSource(userId, kbId)`；路径解析后校验仍在上传根内（防逃逸）；
+  拒绝返回 401/403/404 且**响应体不含正文**；成功记 info 审计（knowledgeId/userId/kbId/file）。
   关联: R-01, R-08
   依赖: T-03, T-04
   验证方式: 新增 `GET /api/agent-knowledge/{id}/raw`（按 T-03 口径鉴权）→ 未登录/无关账号 → 拒绝（**断言业务码，不只看 HTTP**，L-26）；

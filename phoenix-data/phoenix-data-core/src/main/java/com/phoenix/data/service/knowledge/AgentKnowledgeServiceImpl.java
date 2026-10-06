@@ -75,6 +75,23 @@ public class AgentKnowledgeServiceImpl extends ServiceImpl<AgentKnowledgeMapper,
     }
 
     /**
+     * R-01 / T-05：受鉴权取原件——登录用户 + 归属/绑定校验（判定口径见 T-03 取证）。
+     * 无权限或不存在一律返回 {@code null}（调用方按 403/404 处理，**不回任何正文**）。
+     */
+    @Override
+    public AgentKnowledge getRawFileIfPermitted(Integer id, String userId) {
+        if (id == null || userId == null || userId.isBlank()) {
+            return null;
+        }
+        AgentKnowledge knowledge = getMapper().selectById(id);
+        if (knowledge == null || knowledge.getKnowledgeBaseId() == null
+                || knowledge.getFilePath() == null || knowledge.getFilePath().isBlank()) {
+            return null;
+        }
+        return getMapper().canReadKnowledgeSource(userId, knowledge.getKnowledgeBaseId()) == 1 ? knowledge : null;
+    }
+
+    /**
      * 创建知识，如果是文档类型则先存储文件
      *
      * @param createKnowledgeDto 创建知识DTO
