@@ -75,6 +75,8 @@
   表驱动测试：给定路径集合 → 期望"拒绝/放行"矩阵（含工作区路径必须放行）
   验收标准: 矩阵测试全绿；工作区路径零误伤
 - [ ] T-08 护栏接入 + 拒绝审计
+  **🔧 落点已定档（2026-10-06 离线取证）**：候选①「官方 `addDenyRule` + 路径模式」**作废**——字节码实测 `ToolBase.matchRule` 默认实现仅 `return ruleContent == null;` 且**无工具覆盖** ⇒ 带模式的规则永不命中；
+  改为**候选②**：新增 `KnowledgePathGuardMiddleware implements MiddlewareBase`（`onActing` 取 `ToolUseBlock.getName()/getInput()`，交 T-07 的 `KnowledgePathGuard` 判定；命中即拒绝 + **四要素审计**），注册于 `HarnessAgentFactory` 的 `.middlewares(...)`（同 `StopOnAllDeniedMiddleware` 先例）。
   关联: R-02, R-03
   依赖: T-07
   验证方式: 按 T-02 定档钩子接入 → 会话内执行 `cat/ls/grep/sed/head/find` 指向原件 → **被拒绝**且日志含

@@ -103,3 +103,29 @@
 · legacy 档（`useLegacyXmlWorkspaceContext`）：在 `HarnessAgentBuilderSupport` 的字节码里未直接观察到
   "legacy 分支"（该类的可见内容以 subagent 装配为主）⇒ **仍未确证**；
   但 T-10 推荐方案 A（自定义 middleware 替换矛盾段）**不依赖**该项，legacy 仅作"可能更省事"的备选，故不阻塞。
+
+--- 第五轮（离线：T-08 落点定档，2026-10-06）---
+【结论先行】候选①「官方 deny 规则按路径模式」**作废**；T-08 定档 **候选②「自定义 MiddlewareBase 拦截工具调用」**。
+依据（逐条为字节码实测）：
+· `ToolBase.matchRule(String ruleContent, Map args)` 的**默认实现只有一句**：`return ruleContent == null;`
+  ⇒ 只有"ruleContent 为空"的规则才会命中（语义＝**整个工具禁用**）；**带路径/命令模式的规则永远不会命中**。
+· 全量扫描两个 jar：声明/引用 `matchRule` 的类**只有** `ToolBase`（声明）与 `PermissionEngine`（调用），
+  **没有任何具体工具覆盖它** ⇒ 上述默认语义对 `execute` 等所有工具一律生效。
+  ⇒ 若硬用候选①，结果就是"配了规则却毫无效果"（且难以察觉）——这正是必须先用证据否掉它的原因。
+· `MiddlewareBase`（core）签名：`Flux<AgentEvent> onActing(Agent agent, RuntimeContext ctx, ActingInput input,
+  Function<ActingInput, Flux<AgentEvent>> next)` ⇒ 中间件在**工具调用发生前**拿到并**可改写**调用内容。
+· `ActingInput` = record(List<ToolUseBlock> toolCalls)；`ToolUseBlock` 有 `getName()` + `getInput():Map`。
+  ⇒ 可稳定取出"工具名 + 参数"（如 execute 的 command、文件工具的 path）。
+· 落点与先例：本项目 `StopOnAllDeniedMiddleware implements MiddlewareBase`（已注册于
+  `HarnessAgentFactory` 的 `.middlewares(List.of(new StopOnAllDeniedMiddleware(), new ExplicitSkillMiddleware()))`）
+  ⇒ 新增 `KnowledgePathGuardMiddleware` 照同一处注册即可。
+【T-08 实现设计（据此可直接编码）】
+1. 新类 `com.phoenix.agent.harness.middleware.KnowledgePathGuardMiddleware implements MiddlewareBase`；
+2. `onActing`：遍历 `input.toolCalls()`，对每个调用取 `getName()` + `getInput()`，
+   把参数里的路径/命令文本（如 command、path、file_path、pattern 等值）交给
+   **T-07 的 `KnowledgePathGuard.isDenied(text, sessionWorkspaceRoot)`**（已表驱动 16/16 验证）；
+3. 命中 ⇒ 记录审计日志（**四要素**：agentId=`agent.getAgentId()`、sessionId=`ctx.getSessionId()`、路径、命令/工具名），
+   并把该调用改为"被拒绝"的结果（不回正文）；
+4. 未命中 ⇒ 原样 `next.apply(input)`；随后照旧加入 `HarnessAgentFactory` 的 `.middlewares(...)`。
+【遗留（实现期由编译/运行确认，不阻塞设计）】`ToolUseBlock.withState(...)` 的可用状态取值，
+以及"从 `ActingInput` 过滤掉被拒调用"是否为框架接受的做法（若不可，则改为保留调用但把结果改写为拒绝文本）。
