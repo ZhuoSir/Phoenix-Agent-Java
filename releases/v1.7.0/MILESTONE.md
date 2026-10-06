@@ -41,6 +41,15 @@
   - **未并入**：T-13~T-15（BUG-86）—— 用户同日口令记为**延期**（`bugs.md` 已翻「已延期(从v1.7.0移至后续)」，不阻塞本版本）
   - 生产现状：DB 升级 01~04 **已执行**；前端两次重建（nginx），后端自 `06:40:03Z` **未重启**（会话未失效）；
     M3 汇总仍按用户口令**暂缓**；`feature/unified-account-center` 已删除（施工分支收尾完成）
+- **已并入（第三件）**：`feature/kb-access-isolation` → `v1.7.0`，merge commit **`3ef71a6`**（`--no-ff`，无冲突，工作区干净）
+  - 并入内容：spec **v1.0.0**（requirements v1.1.0 / plan v1.0.0 / tasks v1.0.0，确认人 陈卓）+ `completion.md` / `artifacts.md` + **5 份证据**；
+    代码产物：`WebConfig` 静态前缀拒绝、受鉴权原件下载接口、`KnowledgePathGuard`、`KnowledgePathGuardMiddleware`、`KnowledgeGuidanceMiddleware`、
+    检索失败可见化（`AbstractHybridRetrievalStrategy` / `KnowledgeRetrievalTool`）；compose 护栏模式开关 `PHOENIX_KB_PATH_GUARD`（**当前 observe**）
+  - 任务 **12/15 完成**（T-01~T-07、T-10、T-12~T-15）；**待收口 3 项**（如实登记于 completion.md）：
+    T-08/T-09「端到端运行时拒绝未被触发」、T-11「真失败路径未构造」、T-09「绕过面清单待补」
+  - 生产现状：backend `11:43:18Z`（observe；曾按口令短暂翻 enforce，同日按口令退回）；**零 DDL / 零 DML**；`verify.sh` **13 PASS / 0 FAIL**
+  - 台账：BUG-86/108/110 **已验证**、BUG-111 **已推翻**、BUG-112+BL-34 **已延期（用户裁定不修）**、BUG-107/113/114 **待办**、新增 **BL-32/BL-33**
+  - `feature/kb-access-isolation` 已删除；**v1.7.0 合并后尚未推送**（待口令）
 - 部署面：线上前端已是 BUG-93 修复版（入口 hash 与产物一致，`health=200`）；本版本**零 DDL**，无升级动作
 
 ## 六、缺陷挂接（v1.7.0）
