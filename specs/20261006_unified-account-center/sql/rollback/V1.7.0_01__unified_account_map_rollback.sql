@@ -9,5 +9,7 @@
 -- 回滚前置：备份映射表内容（回滚事实锚，务必先做）
 -- \copy (SELECT * FROM tbl_unified_account_map) TO '/tmp/uam_backup.csv' CSV HEADER
 
+DROP INDEX IF EXISTS idx_uamr_new_id;
+DROP TABLE IF EXISTS tbl_unified_account_migration_rows;
 DROP INDEX IF EXISTS idx_uam_new_user;
 DROP TABLE IF EXISTS tbl_unified_account_map;

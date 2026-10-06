@@ -1,4 +1,4 @@
-> 版本: v1.1.1 | 状态: 已确认 | 确认人: 陈卓 | 确认日期: 2026-10-06 | 更新: 2026-10-06（v1.1.1 PATCH：并入两项过渡期澄清 D8/D9，不改语义） | 更新: 2026-10-06（v1.1.0 变更：T-01 取证后并入三项裁定——M2 匹配规则、M8 测试账号清理、回滚项⑤）
+> 版本: v1.2.0 | 状态: 已确认 | 确认人: 陈卓 | 确认日期: 2026-10-06 | 更新: 2026-10-06（v1.2.0：**回滚改为行级精确**——演练发现仅按映射表反向 UPDATE 会误改目标账号自有数据） | 更新: 2026-10-06（v1.1.0 变更：T-01 取证后并入三项裁定——M2 匹配规则、M8 测试账号清理、回滚项⑤）
 
 # 技术方案：unified-account-center（统一账号中心 / 消除双账号体系）
 
@@ -124,7 +124,15 @@ CREATE INDEX IF NOT EXISTS idx_uam_new_user ON tbl_unified_account_map (new_user
 | 7 | `tbl_data_agent_file.creator` | 文件归属 |
 | 8 | `tbl_data_knowledge_base.creator` + `tbl_data_agent_kbase_bind.creator` | 知识库归属 |
 
-**回滚**：`releases/v1.7.0/sql/rollback/V1.7.0_01__unified_account_map_rollback.sql`
+**行级审计（v1.2.0 新增，演练发现的必修项）**：迁移 M4 每类列在 UPDATE **前**先把命中行的主键写入
+`tbl_unified_account_migration_rows(table_name, pk_value, old_id, new_id)` ⇒ 回滚按**行**精确反向。
+
+**回滚（v1.2.0 修正）**：`sql/rollback/V1.7.0_02__unified_account_migration_rollback.sql`
+按行级审计逐行 `SET <col> = old_id WHERE <pk> = pk_value`（**不再**按 id 集合批量反向），随后硬门禁：
+`audit 中每行都已回退` + 逐列行数与迁移前快照一致（如 chat_session 旧 id=28、新 id=115）。原设计（仅映射表反向）
+经演练证伪：会把目标账号自有的 115 条会话误迁到旧 id。
+
+**回滚（DDL 部分）**：`releases/v1.7.0/sql/rollback/V1.7.0_01__unified_account_map_rollback.sql`
 ① 按映射表反向重写 8 类列（`new_user_id` → `old_account_id`）；② 删除分支 B 插入的账号行；③ 恢复前台密码列原值（备份表）；④ **恢复 M8 删除的 `thinktest` 账号行与其组关系行**（从备份回插）；⑤ 校验反向计数 = 迁移前快照。**必须先在备份库演练一次并记录耗时**。
 
 **不加列**：不新增 `account_scope` 等判别列（落地页按角色判定，见决策 4）⇒ 迁移面更小、无"先加后删"负担。

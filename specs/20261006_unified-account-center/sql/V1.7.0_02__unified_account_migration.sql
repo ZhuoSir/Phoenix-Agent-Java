@@ -95,40 +95,64 @@ DO $$
 DECLARE n int;
 BEGIN
   -- 4.1 会话归属
+  INSERT INTO tbl_unified_account_migration_rows (table_name, pk_value, old_id, new_id)
+    SELECT 'tbl_data_chat_session', cs.id::text, m.old_id, m.new_id
+      FROM tbl_data_chat_session cs JOIN tmp_merge m ON cs.user_id = m.old_id;
   UPDATE tbl_data_chat_session cs SET user_id = m.new_id
     FROM tmp_merge m WHERE cs.user_id = m.old_id;
   GET DIAGNOSTICS n = ROW_COUNT; RAISE NOTICE 'M4.1 data_chat_session.user_id 改写 % 行', n;
 
   -- 4.2 文件归属
+  INSERT INTO tbl_unified_account_migration_rows (table_name, pk_value, old_id, new_id)
+    SELECT 'tbl_data_agent_file', f.id::text, m.old_id, m.new_id
+      FROM tbl_data_agent_file f JOIN tmp_merge m ON f.creator = m.old_id;
   UPDATE tbl_data_agent_file f SET creator = m.new_id
     FROM tmp_merge m WHERE f.creator = m.old_id;
   GET DIAGNOSTICS n = ROW_COUNT; RAISE NOTICE 'M4.2 data_agent_file.creator 改写 % 行', n;
 
   -- 4.3 用户-智能体关系
+  INSERT INTO tbl_unified_account_migration_rows (table_name, pk_value, old_id, new_id)
+    SELECT 'tbl_agent_user_agent_info', a.id::text, m.old_id, m.new_id
+      FROM tbl_agent_user_agent_info a JOIN tmp_merge m ON a.user_id = m.old_id;
   UPDATE tbl_agent_user_agent_info a SET user_id = m.new_id
     FROM tmp_merge m WHERE a.user_id = m.old_id;
   GET DIAGNOSTICS n = ROW_COUNT; RAISE NOTICE 'M4.3 agent_user_agent_info.user_id 改写 % 行', n;
 
   -- 4.4 用户记忆 / 档案
+  INSERT INTO tbl_unified_account_migration_rows (table_name, pk_value, old_id, new_id)
+    SELECT 'tbl_agent_user_memory_info', a.id::text, m.old_id, m.new_id
+      FROM tbl_agent_user_memory_info a JOIN tmp_merge m ON a.user_id = m.old_id;
   UPDATE tbl_agent_user_memory_info a SET user_id = m.new_id
     FROM tmp_merge m WHERE a.user_id = m.old_id;
   GET DIAGNOSTICS n = ROW_COUNT; RAISE NOTICE 'M4.4 agent_user_memory_info.user_id 改写 % 行', n;
 
+  INSERT INTO tbl_unified_account_migration_rows (table_name, pk_value, old_id, new_id)
+    SELECT 'tbl_agent_user_profile_info', a.agent_sn||'|'||a.user_id, m.old_id, m.new_id
+      FROM tbl_agent_user_profile_info a JOIN tmp_merge m ON a.user_id = m.old_id;
   UPDATE tbl_agent_user_profile_info a SET user_id = m.new_id
     FROM tmp_merge m WHERE a.user_id = m.old_id;
   GET DIAGNOSTICS n = ROW_COUNT; RAISE NOTICE 'M4.5 agent_user_profile_info.user_id 改写 % 行', n;
 
   -- 4.6 预设问题归属
+  INSERT INTO tbl_unified_account_migration_rows (table_name, pk_value, old_id, new_id)
+    SELECT 'tbl_data_agent_preset_question', q.id::text, m.old_id, m.new_id
+      FROM tbl_data_agent_preset_question q JOIN tmp_merge m ON q.account_id = m.old_id;
   UPDATE tbl_data_agent_preset_question q SET account_id = m.new_id
     FROM tmp_merge m WHERE q.account_id = m.old_id;
   GET DIAGNOSTICS n = ROW_COUNT; RAISE NOTICE 'M4.6 preset_question.account_id 改写 % 行', n;
 
   -- 4.7 授权组成员关系（前台资源授权的事实源，必须一并改，否则统一后前台看不到自己的智能体）
+  INSERT INTO tbl_unified_account_migration_rows (table_name, pk_value, old_id, new_id)
+    SELECT 'tbl_platform_account_group_info', g.id::text, m.old_id, m.new_id
+      FROM tbl_platform_account_group_info g JOIN tmp_merge m ON g.account_id = m.old_id;
   UPDATE tbl_platform_account_group_info g SET account_id = m.new_id
     FROM tmp_merge m WHERE g.account_id = m.old_id;
   GET DIAGNOSTICS n = ROW_COUNT; RAISE NOTICE 'M4.7 platform_account_group_info.account_id 改写 % 行', n;
 
   -- 4.8 租户成员关系
+  INSERT INTO tbl_unified_account_migration_rows (table_name, pk_value, old_id, new_id)
+    SELECT 'tbl_platform_account_tenant_info', t.id::text, m.old_id, m.new_id
+      FROM tbl_platform_account_tenant_info t JOIN tmp_merge m ON t.account_id = m.old_id;
   UPDATE tbl_platform_account_tenant_info t SET account_id = m.new_id
     FROM tmp_merge m WHERE t.account_id = m.old_id;
   GET DIAGNOSTICS n = ROW_COUNT; RAISE NOTICE 'M4.8 platform_account_tenant_info.account_id 改写 % 行', n;

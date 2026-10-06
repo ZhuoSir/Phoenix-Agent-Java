@@ -28,3 +28,19 @@ COMMENT ON COLUMN tbl_unified_account_map.migrated_at IS '迁移时刻';
 COMMENT ON COLUMN tbl_unified_account_map.remark IS '留痕：异常/人工裁定说明';
 
 CREATE INDEX IF NOT EXISTS idx_uam_new_user ON tbl_unified_account_map (new_user_id);
+
+-- 行级审计：记录"哪些行被搬过"——回滚精确反向的唯一事实锚（v1.2.0，演练发现的必修项）
+CREATE TABLE IF NOT EXISTS tbl_unified_account_migration_rows (
+  table_name  varchar(64) NOT NULL,
+  pk_value    varchar(64) NOT NULL,
+  old_id      varchar(64) NOT NULL,
+  new_id      varchar(64) NOT NULL,
+  create_time timestamp   NOT NULL DEFAULT now(),
+  CONSTRAINT pk_tbl_unified_account_migration_rows PRIMARY KEY (table_name, pk_value)
+);
+COMMENT ON TABLE  tbl_unified_account_migration_rows IS '统一账号迁移**行级审计**（v1.7.0；回滚按行精确反向的事实锚）';
+COMMENT ON COLUMN tbl_unified_account_migration_rows.table_name IS '被改写的表名';
+COMMENT ON COLUMN tbl_unified_account_migration_rows.pk_value   IS '被改写行的主键值';
+COMMENT ON COLUMN tbl_unified_account_migration_rows.old_id     IS '改写前归属（前台账号 id）';
+COMMENT ON COLUMN tbl_unified_account_migration_rows.new_id     IS '改写后归属（统一账号 id）';
+CREATE INDEX IF NOT EXISTS idx_uamr_new_id ON tbl_unified_account_migration_rows (new_id);
