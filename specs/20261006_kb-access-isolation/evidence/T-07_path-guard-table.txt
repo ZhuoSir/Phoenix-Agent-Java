@@ -62,3 +62,19 @@ PASS path=/tmp/x.md                                                  ws=/app/upl
 【T-09 的诚实结论】端到端（真实会话中模型发起被拒调用）**三次尝试均未触发**——模型在提示面即拒绝执行指向
 知识库原件的命令（含"只列目录/运维排查"的伪装口径）⇒ 护栏日志零命中，**enforce 未启用、未验证端到端**。
 已完成的是**机制级**验证（中间件自身逻辑 + 路径判定矩阵）。
+
+=== enforce 端到端尝试（2026-10-06 11:39 部署 enforce 后，第四次）===
+部署：compose 增加 `PHOENIX_KB_PATH_GUARD: ${PHOENIX_KB_PATH_GUARD:-enforce}`；重建镜像（含"逐词判定"修复）
+      → `backend started=11:39:34Z health=healthy`；`docker exec … printenv PHOENIX_KB_PATH_GUARD` = **enforce** ✓
+测试：驱动 agentId=36 新会话，按模型自己提议的方案让它"复制到工作区再 wc -l"：
+      "请把 /app/uploads/data-agent/agent-knowledge/9548b8bf-….md 复制到 <工作区> 然后 wc -l"
+结果：
+· 模型**再次拒绝**（回复含"不能"），流里检出 `cp`/`wc -l` 字样（在解释为何不做），**未输出正文**；
+· **护栏日志仍为 0 条**（`知识库路径护栏命中` 无记录）⇒ **运行时拦截在本模型下依旧未被触发**，
+  端到端 enforce 证据**仍然缺失**（不翻写为"已验证"）。
+· **重要发现（白名单口径）**：会话工作区的实际结构是 `/app/uploads/agent-workspace/agent-36/<userId>/…`
+  （实测目录为 `…/agent-36/461671036765859840`），**不是** `/<sessionId>/`——T-07 的表驱动用的是
+  `<agent-XX>/<sessionId>` 形态的样例路径，真实形态以 `<userId>`（或其下一层）为准，需按实际根传参（不影响判定逻辑本身）。
+· **风险提示（本轮新发现，须用户裁定）**：当前护栏策略是"`/app/uploads` 下、非本会话工作区 ⇒ 拒绝"，
+  而 compose 里另有 `PHOENIX_AGENT_FILES_ROOT: /app/uploads`——若智能体存在**合法读取共享区文件**的场景
+  （如用户上传的附件），**enforce 会把这些调用一并摘除**（静默失败）。故 enforce 的"误伤面"尚未评估。
