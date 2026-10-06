@@ -58,31 +58,61 @@ public final class KnowledgePathGuard {
 		if (rawPath == null || rawPath.isBlank()) {
 			return false;
 		}
-		String path = normalize(rawPath);
-		if (path.isEmpty()) {
-			return false;
-		}
 		String workspace = normalize(allowedWorkspaceRoot);
-		// 0) **显式黑名单先判**（相对写法，如 `data-agent/agent-knowledge/x.md`、`agent-workspace/...`）：
-		// 必须排在白名单之前，否则"相对路径按工作区解析"会把它解析进工作区而被白名单短路放行（表驱动已验证）。
+		String root = normalize(uploadRoot);
+		// 逐"词"判定：把文本按空白与 shell 分隔符切分，任一词命中
+		// 【显式黑名单】或【位于上传根下且不在本会话工作区内（含以工作区为 cwd 解析后的相对逃逸）】⇒ 拒绝。
+		// 必须按词判定而不能"整串先按相对路径解析"——后者会把 `cat /app/uploads/data-agent/…/x.md` 这类
+		// **命令串**拼上工作区前缀后误判成"在工作区内"，从而被白名单短路放行（离线中间件级测试发现）。
+		for (String token : tokenize(rawPath)) {
+			String t = normalize(token);
+			if (t.isEmpty()) {
+				continue;
+			}
+			if (isExplicitlyDenied(t)) {
+				return true;
+			}
+			if (isOutsideWorkspaceUnderRoot(t, workspace, root)) {
+				return true;
+			}
+			if (!t.startsWith("/") && !workspace.isEmpty()
+					&& isOutsideWorkspaceUnderRoot(normalize(workspace + "/" + t), workspace, root)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/** 文本切词：按空白与 shell 常见分隔符切分（管道/分号/与或/重定向/引号/反引号/括号/`$( )`/`$`）。 */
+	public static java.util.List<String> tokenize(String raw) {
+		if (raw == null || raw.isBlank()) {
+			return java.util.List.of();
+		}
+		java.util.List<String> tokens = new java.util.ArrayList<>();
+		for (String part : raw.split("[\\s|;&<>`()\"'$]+")) {
+			if (!part.isBlank()) {
+				tokens.add(part);
+			}
+		}
+		return tokens;
+	}
+
+	/** 命中显式黑名单（相对写法，如 `data-agent/agent-knowledge/x.md`、`agent-workspace/...`）。 */
+	private static boolean isExplicitlyDenied(String path) {
 		for (String denied : DENIED_RELATIVE_PREFIXES) {
 			if (path.equals(denied) || path.startsWith(denied + "/")) {
 				return true;
 			}
 		}
-		// 相对路径按「工作目录 = 会话工作区」解析（shell 的 cwd 即工作区）；绝对路径原样
-		String resolved = (path.startsWith("/") || workspace.isEmpty()) ? path : normalize(workspace + "/" + path);
-		if (!workspace.isEmpty() && isSameOrUnder(resolved, workspace)) {
-			return false; // 1) 白名单优先（工作区内读写不误伤）
-		}
-		String root = normalize(uploadRoot);
-		// 2) 上传根收敛：**解析后**的路径落在上传根下（且不在工作区内，上面已判） ⇒ 拒绝。
-		// 覆盖：知识库原件（绝对/相对两种写法）、跨会话工作区目录、以及 `../../data-agent/...` 相对逃逸。
-		// 注意：不可写成"相对路径拼上传根后再判"——那会把 note.md 这类**工作区内**的相对路径全判为拒绝（表驱动已验证）。
-		if (!root.isEmpty() && isSameOrUnder(resolved, root)) {
-			return true;
-		}
 		return false;
+	}
+
+	/** 位于上传根之下、且（有工作区时）不在该工作区之内 ⇒ 视为越权目标。 */
+	private static boolean isOutsideWorkspaceUnderRoot(String path, String workspace, String root) {
+		if (path.isEmpty() || root.isEmpty() || !isSameOrUnder(path, root)) {
+			return false;
+		}
+		return workspace.isEmpty() || !isSameOrUnder(path, workspace);
 	}
 
 	/** 路径归一化：反斜杠转正、折叠 {@code .}/{@code ..}、去重复斜杠、统一小写比较用副本。 */

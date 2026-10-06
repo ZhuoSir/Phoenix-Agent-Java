@@ -40,3 +40,25 @@ PASS path=/tmp/x.md                                                  ws=/app/upl
 
 --- 范围外（本护栏不管，由框架工作区策略负责）---
 /etc/passwd、/tmp/x.md（不在上传根内）；且**不承诺**"权限级不可读"（BUG-109：agent shell 与后端同 UID）。
+
+=== 附：T-08 中间件级验证（离线，2026-10-06）——发现并修掉"命令串绕过" ===
+做法：构造 3 个合成工具调用（`execute {command: cat <KB绝对路径>}`、`execute {command: cat note.md}`、
+`read_file {path: ../../data-agent/agent-knowledge/x.md}`），直接调用中间件 `onActing`，
+用 system property 切 observe / enforce，断言放行条数。
+
+【首轮结果（FAIL）】observe 3→3 ✓；**enforce 3→2 ✗（期望 1）**
+根因（逐词诊断）：`cat /app/uploads/data-agent/agent-knowledge/x.md` 被判 **isDenied=false**——
+该串不以 `/` 开头，被当作"相对路径"拼上工作区前缀后**"看起来在工作区内"**，于是**白名单先短路放行**；
+即：**命令串形态可绕过护栏**（T-07 的表只覆盖了裸路径，故未暴露）。这是本轮最有价值的发现。
+
+【修复】`KnowledgePathGuard.isDenied` 改为**逐词判定**：按空白与 shell 分隔符（`| ; & < > \` ( ) " ' $`）切词，
+任一词命中【显式黑名单】或【位于上传根下且不在本会话工作区内（含以工作区为 cwd 解析后的相对逃逸）】⇒ 拒绝；
+不再有"整串先按相对路径解析"的白名单短路。新增 `tokenize` / `isExplicitlyDenied` / `isOutsideWorkspaceUnderRoot` 辅助方法。
+
+【修复后复测】T-07 表驱动 **16 PASS / 0 FAIL**（无回归）；T-08 中间件 observe **3→3** ✓、enforce **3→1** ✓。
+【部署状态】该修复**尚未部署**（镜像仍为上一版；因当前 observe 模式下修复无运行时行为差异，故不为此单独重启，
+随下次窗口一并上线）。
+
+【T-09 的诚实结论】端到端（真实会话中模型发起被拒调用）**三次尝试均未触发**——模型在提示面即拒绝执行指向
+知识库原件的命令（含"只列目录/运维排查"的伪装口径）⇒ 护栏日志零命中，**enforce 未启用、未验证端到端**。
+已完成的是**机制级**验证（中间件自身逻辑 + 路径判定矩阵）。
