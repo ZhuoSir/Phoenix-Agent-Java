@@ -65,7 +65,10 @@
   验证方式: 三端前台登出后旧 token 调接口 → 401/失效；前台账号调 `getLoginUserInfo` → 返回该账号信息（非 null）；后台侧行为不变（负对照）
   验收标准: 前台登出真失效；用户信息非空；后台不受影响
 
-- [ ] T-08 清理死代码 JWT + 移除前端幽灵端点调用（BUG-99 / BUG-98）
+- [x] T-08 清理死代码 JWT + 移除前端幽灵端点调用（BUG-99 / BUG-98）
+  **✅ 2026-10-06 完成**：源码断言 `generateToken`/`phoenix_jwt_secret`/`getAccessCodesApi`/`refreshTokenApi`/`auth/codes` 全 0；
+  `auth/refresh` 仅存于**注释与错误文案**（非调用）；前端认证调用面 ⊆ 后端已注册端点（`/api/privilege/auth/{login,logout,menus,getLoginUserInfo}`、`/auth/{login,updatePassword}`）
+  BUG-98 更正为死代码（`enableRefreshToken` 默认 false，从未被调用）
   关联: R-08, R-09
   依赖: T-07
   验证方式: `grep -rn "generateToken\|phoenix_jwt_secret"` 零命中；`grep -rn "/auth/refresh\|/auth/codes" apps/` 零命中；前后端认证调用面比对表逐条对齐
