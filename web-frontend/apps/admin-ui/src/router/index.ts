@@ -7,6 +7,7 @@ import {
 import { resetStaticRoutes } from '@vben/utils';
 
 import { createRouterGuard } from './guard';
+import { setupChunkRecovery } from './chunk-recovery';
 import { routes } from './routes';
 
 /**
@@ -33,5 +34,8 @@ const resetRoutes = () => resetStaticRoutes(router, routes);
 
 // 创建路由守卫
 createRouterGuard(router);
+
+// BUG-88：部署后旧标签页懒加载 chunk 失效 → 自动整页重载一次（防白屏）
+setupChunkRecovery(router);
 
 export { resetRoutes, router };
