@@ -235,9 +235,12 @@ public class AccountInfoServiceImpl extends ServiceImpl<AccountInfoMapper, Accou
         if (!hashedOld.equals(user.getPassword())) {
             return false;
         }
-        // BUG-95（T-04）：原实现直接 setPassword(明文) 落库 ⇒ 改密后按哈希比对必然失败。
-        // 统一口径：与后台一致，写入 MD5(盐 + 明文)；盐取统一常量 LoginConstant.PASSWORD_SALT（值同 PlatformConstant）。
-        user.setPassword(SecureUtil.md5(LoginConstant.PASSWORD_SALT + dto.getNewPassword()));
+        // T-04 实测结论（2026-10-06）：本方法**必须传明文**——本类的 updateById() 重写会在落库前统一哈希
+        // （见下方 updateById：password 非空即 md5(盐+明文)）。若此处先哈希一次，updateById 会再哈希一次
+        // ⇒ 库里变成 md5(盐+md5(盐+明文))，改密后必然登不上（我第一版改动正是踩了这个坑，实测值
+        // md5('phoenix'+md5('phoenix'+'testHash2026'))=c3c7534f… 与库值完全吻合）。
+        // 口径：哈希只发生在写入闸口 save()/updateById()，业务方法一律传明文。
+        user.setPassword(dto.getNewPassword());
         return updateById(user);
     }
 

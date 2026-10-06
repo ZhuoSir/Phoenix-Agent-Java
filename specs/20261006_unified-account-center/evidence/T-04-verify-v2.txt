@@ -1,0 +1,26 @@
+=== T-04 复验（2026-10-06 14:22:08；一次性账号 pwcheck2026，验完即删）===
+
+--- ① 建一次性前台账号 ---
+{"code":"100","data":true,"msg":"操作成功!","success":true}
+  id=464964053868003328
+  建号后存储口令 = 9829e85f4ddb6cda2cfd9c4fd2296c34
+  期望 md5(phoenix+init123456) = 9829e85f4ddb6cda2cfd9c4fd2296c34
+
+--- ② 用初始口令前台登录（看业务码）---
+  {"code":"100","data":{"token":"L3_GhYRXbZiH1Ll1K_pSyzMeKYxWHKTTPp__","userId":"464964053868003328","userCode":"PWCHK","email":null,"username":"pwcheck
+
+--- ③ 改密 init123456 → newpass2026 ---
+{"code":"100","data":null,"msg":"密码修改成功","success":true}
+--- ④ 改密后存储值（应为单次哈希）---
+  存储 = a1bf3cffb74f7e3b8c4853262024bfbb
+  期望 = a1bf3cffb74f7e3b8c4853262024bfbb
+  判定 = ✓ 一致（单次哈希）
+
+--- ⑤ 新口令登录（必须业务码 100）---
+  code= 100 msg= 操作成功! token= True
+--- ⑥ 旧口令登录（必须被拒）---
+  code= 101 msg= 用户名或密码错误
+
+--- ⑦ 清理：删除一次性账号 ---
+{"code":"100","data":true,"msg":"操作成功!","success":true}
+  剩余同名账号: 0
