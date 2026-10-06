@@ -2,15 +2,131 @@
 
 # 技术方案：kb-access-isolation（知识库访问面隔离与提示面对齐）
 
-> **待编**：本文件在 requirements **确认①** 之后编写（Phase 2）。
-> 届时必含：① 坑核对节（逐条过 `specs/_project/lessons.md` 全部 active 坑，含本轮新增 L-34~L-37）；
-> ② 采用方案与被拒替代方案；③ 共享面身份矩阵（`/uploads/**` 的既有使用方逐个枚举：知识库原件、会话工作区、头像…）；
-> ④ 数据迁移与回滚设计（drill 先行）；⑤ 风险与规避。
+## 坑核对（必填，确认②审这一节）
 
-## 待 Plan 阶段解决的已知技术未知
+已核对 `specs/_project/lessons.md` **全部 37 条 active 坑**，与本方案相交并已避开的有 **20 条**，
+其余 17 条（L-02/L-04/L-08/L-09/L-10/L-12/L-15/L-17/L-18/L-19/L-20/L-23/L-25/L-27/L-28/L-32/L-33）经核对无相交。
 
-1. **框架提示段能否关闭/覆盖**：`agentscope-harness:2.0.0` 的 "## Domain Knowledge" 段是否由 builder 配置控制；
-   若不可关闭，则只能"物化 `knowledge/`"或"以强指令覆盖"（需实测取证）。
-2. **移出可读面的落点**：凭证/文件位置从 `/app/uploads/data-agent/agent-knowledge` 移到何处，
-   既能被后端读取、又不被 agent 运行时（shell/文件工具）读到；是否需改 `FileStorageProperties.path` 或新增独立挂载。
-3. **shell 护栏钩子点**：框架 `LocalFilesystemWithShell` 是否有可插拔的命令拦截点；若无，评估在工具层包装/白名单实现。
+| 坑 | 本方案如何避开 |
+|---|---|
+| **L-01** 文本补丁静默脱靶 | 迁移/权限/接口改动全部走**文件化脚本与代码 diff**，不用裸 `s.replace` 改生产文件 |
+| **L-03** 部署三段证明 | 每条改动都要"容器 StartedAt + 行为断言 + DB/接口回读"三段；前端改动只用"重建 nginx"形态（不掉线） |
+| **L-05** shell/平台方言雷区 | 迁移 SQL 写文件后 `psql -f`；容器内路径/权限改动写成带 `set -e` 的脚本 |
+| **L-06** 多入口枚举缺失 | 本方案核心即**多入口收敛**：`/uploads/**` 按身份矩阵逐个枚举，矩阵外身份视为未评估 |
+| **L-07** 假阳性验证 | 隔离效果**双侧取证**：未授权"拿不到正文"（内容级）+ 授权路径"仍能拿到" |
+| **L-11** 用户环境 ≠ 我以为的环境 | 提示面/图片显示等行为项一律**用户硬刷实测**（写明 URL 与动作） |
+| **L-13** git add 面过宽 | 提交按文件列举，禁 `git add -A` |
+| **L-14** md 表格错乱 | 每次写台账/文档后跑 `mdtable_check.py`（exit 0 才算完成） |
+| **L-16** 用户实测期间禁止静默部署 | 涉及后端重启（掉线）的步骤先告知并约窗口；优先"只重建 nginx" |
+| **L-21** 逻辑删列隐形过滤 | 读条目/绑定关系按表逐条判读 `del_flag`/`is_deleted` 语义（platform 与 privilege 相反） |
+| **L-22** 构建串行 | 前端/后端构建一律串行 |
+| **L-24** 路由页面必须单根 | 若改前端下载/预览组件，模板保持单根（不新增顶层兄弟节点） |
+| **L-26** 业务失败也返回 200 | 鉴权断言**一律解析业务码/`success`**，不凭 HTTP 状态下结论 |
+| **L-29** 归属判定必须实测 join | 归属校验口径（智能体↔绑定库、会话↔用户）用真实 SQL/接口回读验证，不凭列名推断 |
+| **L-30** 管道吞退出码 | 构建/脚本一律 `set -o pipefail` + 指认成功标志行 |
+| **L-31** 数据驱动抄行须逐列核对 | 改 `file_path` 等字段前 dump 整行、逐列 diff |
+| **L-34** 包装异常吞真因 | R-05 直接治这条：包装处记 ERROR 全栈 + 把 rootCause 摘要回传工具调用方 |
+| **L-35** Agent 行为证据源 | 提示面/越权验收以**会话上下文落库**（thinking + tool_use + tool_result 原文）为证据 |
+| **L-36** `/models` 非权威 | 不基于外部能力清单下全称结论；embedding 相关只记"实测不通" |
+| **L-37** 定性前核对内容身份 | 隔离验收的"拿不到"必须给**内容级**反证（响应体不得含正文标记），不能只看状态码/长度 |
+
+## 方案概述
+
+**一句话**：把"知识库内容"从**三条都能被绕过的通道**，收敛成**一条受控通道**（受鉴权的检索工具 + 受鉴权的下载/预览），
+并让注入模型的说明与实际存储一致。
+
+| 通道 | 现状（实证） | 目标 |
+|---|---|---|
+| HTTP `/uploads/**` | 裸静态映射（不鉴权），可下载 KB 原件与会话工作区文件（BUG-108） | 取消非图片暴露；改**受控接口**（登录 + 归属/绑定 + 审计）；图片走白名单 |
+| 运行时 shell/文件工具 | 原件在共享目录，agent 可 `cat/grep`（BUG-105 ＝ BUG-86 真因） | 原件**移出 agent 可读面** + 禁止路径护栏（拒绝 + 审计） |
+| 提示面 | 框架称"工作区 `knowledge/` 是知识源"，实际从不物化（BUG-104） | 用框架开关消除矛盾段 + 注入**权威指引**（仅经 `getRagInfo`；禁止用 shell 读原件） |
+| 检索失败可见性 | 真因被 `RuntimeException("Error during parallel search execution", e)` 吞掉 | 记 ERROR 全栈 + 向模型回传 rootCause 摘要（R-05） |
+
+## 决策（含被拒替代方案）
+
+### 决策 1：HTTP 面收敛形态 —— 受控接口 + 图片白名单（采纳 Q2 建议）
+- 采用：① 静态资源处理器按**后缀/子路径白名单**收敛（非图片不再直出），或整体改为 Controller 直出；
+  ② 新增受控下载/预览接口（形如 `GET /api/agent-knowledge/{id}/raw`），校验登录态 + **归属/绑定**并记审计；
+  ③ 图片（头像等）继续经白名单直出。
+- 理由：WebFlux 静态处理器**不经过 sa-token 判定**，仅"加鉴权"需额外过滤器且**无法表达归属**；受控接口是唯一能表达"谁能看谁"的形态。
+- 被拒绝：① 整体 `return 403`（打死头像等既有用途，违反 R-08）；② 只在 nginx 层挡（治标，后端直连仍暴露）；
+  ③ 给 `/uploads` 加全局过滤器（无法区分"该文件属于谁"，仍是无归属裸读）。
+- 重新评估条件：身份矩阵出现新消费方（例如某功能依赖裸 URL 回显）。
+
+### 决策 2：知识库原件落点 —— 移出静态/工作区可见范围（R-02）
+- 采用：原件落点从 `{root}/data-agent/agent-knowledge/` 迁到**不在静态映射根下、也不在 agent 可读范围**的位置
+  （候选：独立挂载 `{root}/secure/knowledge/` 且不落在静态根；或容器内收紧权限的目录 + 非 agent 属主）；
+  同步更新 `tbl_data_agent_knowledge.file_path`，含**回滚**与 **drill**。
+- 理由：只要原件"在 `/app/uploads` 下"，就会被 ① 静态映射 ② agent shell **同时命中**；移出去才能一次堵两条。
+- 被拒绝：① 只加 shell 护栏（HTTP 面仍暴露）；② 仅按 `{kbId}` 分目录（仍在静态根下、仍可被遍历）；
+  ③ 直接改 `FileStorageProperties.path`（连带影响头像/工作区落点，影响面过大）。
+- 依赖：确认后端读原件的位置与新路径配置方式（Plan 内 spike）。
+
+### 决策 3：运行时护栏 —— 静态禁止清单 + 会话级动态补充（R-03，采纳 Q4 建议）
+- 采用：shell/文件工具层维护**禁止路径清单**（覆盖原件新老位置、`/app/uploads/**` 的非工作区部分），
+  命中即拒绝并记 `agentId/sessionId/路径/命令`；**白名单 = 本会话工作区**，保证正常读写不变。
+- 钩子点（待 spike 定档，优先官方钩子）：① 框架 `PermissionContextState`/权限中间件；
+  ② `HarnessAgent.Builder.middleware(...)` 注入自定义中间件；③ 最外层在工具注册处包装。
+- 被拒绝：只靠提示面禁令（模型可违抗）；只做会话级动态清单（并发复杂度高，留二期）。
+
+### 决策 4：提示面 —— **不物化 `knowledge/`**，改"屏蔽/替换矛盾段 + 注入权威指引"（R-04，采纳 Q1 建议）
+- **技术前提已探明**（`javap` 于 `agentscope-harness-2.0.0.jar`，2026-10-06）：
+  `HarnessAgent$Builder` 暴露 `disableWorkspaceContext()`、`useLegacyXmlWorkspaceContext(boolean)`、
+  `additionalContextFile(String)`、`disableDefaultWorkspaceSkills()`；含矛盾指引的 "## Domain Knowledge" 段位于
+  `WorkspaceContextMiddleware.onSystemPrompt(...)`（该 middleware 另有 `(WorkspaceManager,String,String,int)` 构造与
+  `setAdditionalContextFiles(List)`）。
+- 采用：用上述开关**去掉或替换**矛盾段 + `additionalContextFile` 注入我们的权威指引
+  （知识库仅经 `getRagInfo`；禁止用 shell/文件工具读原件；检索失败如实报错）；智能体个性化 `sysPrompt` 不变（框架段与业务人设解耦）。
+- **待 spike 的风险**：`disableWorkspaceContext()` 可能**连带关掉 Memory Recall/Persistence 指引**（同一段文本）⇒
+  三档位（默认 / legacyXml / disable+自注入）实测对比"注入内容差异 + memory 行为是否退化"，再定档。
+- 被拒绝：物化 `knowledge/` 到会话工作区（大文件复制与同步成本；"工作区可读"与 R-02 隔离取向冲突；绑定库变更需重物化）。
+
+### 决策 5：检索失败可见（R-05）
+- 采用：包装处 `log.error(..., e)` + 抛出**带 cause 摘要**的异常；`KnowledgeRetrievalTool` 捕获后返回可诊断文本
+  （`检索失败: <rootCause 类名 + message>`），使模型与用户都能看到真因。
+- 被拒绝：只加日志（模型侧仍只见"并行检索失败"，会继续退化去翻文件）。
+
+## 共享面身份矩阵（触碰 `/uploads/**`，逐身份评估）
+
+| # | 身份 | 调用方 | 现有形态 | 变更后预期行为 | 断言（T 层落地） |
+|---|---|---|---|---|---|
+| 1 | 知识库原件下载 | 浏览器直连（代码无引用，但可直连） | `GET /uploads/data-agent/agent-knowledge/*` | **拒绝**；改走 `GET /api/agent-knowledge/{id}/raw`（校验归属/绑定） | 未登录直连 → 响应体不含正文标记；授权接口 → 200 + 正文 |
+| 2 | 会话工作区文件 | 浏览器直连 | `GET /uploads/agent-workspace/**` | **拒绝**；面板既有 API（`/api/agent/files/*`）不受影响 | 未登录直连 → 拒绝；面板列/下载仍正常 |
+| 3 | 头像等图片 | 前端 `<img src=DB 值>` | `GET /uploads/data-agent/avatars/*.{jpg,png,bmp}` | **继续 200**（白名单） | 图片 200；后台页面头像正常 |
+| 4 | 通用上传回显 | `FileUploadController` 返回 url | `GET /uploads/<path>` | 图片类放行；其它类型按新口径（受控或明确不放行） | 上传图片 → 回显 200；上传非图片 → 按新口径断言 |
+| 5 | 后端内部读取 | `LocalFileStorageServiceImpl` 等 | 文件系统直读（不经 HTTP） | **不变** | 上传/下载/向量化链路回归通过 |
+| 6 | 智能体运行时读取 | agent shell/文件工具 | 直接读 `/app/uploads/data-agent/agent-knowledge/*` | **失败**（原件移出 + 护栏） | 会话内 `cat/grep/find` → 失败；工作区读写正常 |
+
+## 数据迁移与回滚设计
+
+1. **前置**：清点原件（`tbl_data_agent_knowledge.file_path` 全量 + 磁盘实数），产出"迁移清单"（id/file_path/size/sha256）。
+2. **升级件**：若仅改"存储根/权限"（配置层）则**无 SQL**；若需改写 `file_path`，则新增
+   `V1.7.0_05__kb_source_relocate.sql` + rollback（**逐行改写 + 行级审计**，沿用 V1.7.0_02 的行级精确反向做法）。
+3. **顺序**：① 演练目录/演练库 drill（复制 → 校验 → 切路径 → 断言 → 回滚 → 复原）；
+   ② 生产：先复制（不动原件）→ 校验计数/大小 → 切读路径 → 断言"新路径可读 + 旧路径不可读" → 稳定后再清理旧副本（保留一个版本周期）。
+4. **回滚**：`file_path` 反向 UPDATE + 配置回退 +（若已清理旧副本）从备份恢复。
+5. **不变量**：向量库 `tbl_vector_store_simple_data` 与既有条目**不动**；检索命中不因迁移变化（R-07 断言）。
+
+## 风险与规避
+
+| 风险 | 规避 |
+|---|---|
+| 提示面开关副作用（memory 指引被一起关掉） | 三档位实测对比（决策 4 spike）；必要时"disable + 自注入 memory 指引"补偿 |
+| 护栏误伤 agent 正常读写 | 白名单 = 本会话工作区；断言"工作区读写不变"；拒绝日志可观测 |
+| 图片/头像回归（R-08） | 白名单按后缀 + 前端实测（用户硬刷） |
+| 迁移中文件丢失/不一致 | 先复制再切换 + 计数/大小/哈希校验 + 回滚 drill 先行 |
+| 框架无官方拦截点（护栏只能包装工具） | spike 先验证 `PermissionContextState`/middleware；退路＝工具层包装 + 提示面禁令 |
+| 后端重启致全员重登 | 优先"只重建 nginx"；必须重启时按 L-16 先告知并约窗口 |
+| 归属校验口径错（谁能看谁的） | 按 `tbl_data_agent_kbase_bind`（智能体↔库）与 `tbl_data_chat_session`（会话↔用户）**实测 join** 取证（L-29） |
+
+## 依赖与前置
+
+- **必须前置（Plan 内 spike，T 层第一批）**：① 提示面三档位实测（决策 4）；② 护栏钩子点验证（决策 3）；③ 原件新落点与配置方式确认（决策 2）。
+- 需要用户配合：涉及后端重启的窗口；提示面行为与图片显示的硬刷实测。
+- 不依赖外部服务；**不改向量库、不改框架 jar**。
+
+## 二期/另议（不在本 spec 交付）
+
+- 禁止路径清单**按绑定库动态生成**（多智能体/多会话并发下的精细隔离）。
+- embedding 选型与开通（BUG-103/BUG-107）——本 spec 只保证"失败可见"。
+- 全站文件存储鉴权重构（本 spec 只覆盖知识库原件与会话工作区两类）。
