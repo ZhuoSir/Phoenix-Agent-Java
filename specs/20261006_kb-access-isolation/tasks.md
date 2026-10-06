@@ -96,7 +96,11 @@
 
 ## 4. 提示面对齐 + 检索失败可见（R-04/R-05）
 
-- [ ] T-10 提示面定档实施（按 T-01 结论）
+- [x] T-10 提示面定档实施（按 T-01 结论）
+  **✅ 2026-10-06 代码完成 + 已部署 + 注入文本离线验证通过**（证据 `evidence/T-08-T-10_deploy-verify.txt`）：
+  新增 `KnowledgeGuidanceMiddleware implements HarnessRuntimeMiddleware`（`onSystemPrompt` 在**末尾追加**权威指引：
+  "工作区没有 `knowledge/`、上文相关说法均不适用" + "知识库只能经 `getRagInfo`" + "禁止 shell 读原件" + "检索失败须如实告知"；
+  幂等；已注册于 `HarnessAgentFactory.middlewares(...)`。**未整体关框架段**（离线证其与 Memory 段同源同块）。
   关联: R-04
   依赖: T-01
   验证方式: 按定档开关改造 + 注入权威指引文件（内容：知识库仅经 `getRagInfo`；**禁止用 shell/文件工具读取原件**；检索失败如实报错）→

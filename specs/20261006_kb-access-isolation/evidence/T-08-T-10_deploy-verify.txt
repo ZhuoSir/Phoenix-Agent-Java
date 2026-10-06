@@ -1,0 +1,26 @@
+=== T-08（护栏中间件，observe）/ T-10（提示面权威指引）部署与验证（2026-10-06 窗口）===
+用户口令：「还有几步要完成啊，你一次行写完吧」⇒ 授权本窗口部署（重启使在线会话失效一次）
+
+--- 部署三段证明 ---
+jar：phoenix-admin/phoenix-admin-manager/target/phoenix-admin.jar（含 T-08 + T-10 + T-11）
+镜像重建 → 容器重建：`backend started=2026-10-06T11:01:02Z  health=healthy`；`GET /echo/ok` = 200
+回归门禁：`sh docker/scripts/verify.sh` → **全 PASS、无 FAIL**（计数见提交说明）
+
+--- T-10 注入文本（离线确定性验证，无需对话）---
+桩程序调用 `new KnowledgeGuidanceMiddleware().onSystemPrompt(null, null, "BASE_PROMPT").block()`：
+· 追加后长度 **669**；含「知识库访问规则」节 = true；含「只能**通过检索工具」= true；
+  含「禁止**用 shell」= true；含「检索失败」须如实告知 = true；
+· **幂等**：把已注入的文本再喂一次，输出不变（不会重复叠加）= true。
+· 自伤留痕：我另一条断言写成 `contains("没有** `knowledge/` 目录".replace("**","*"))`（探针字符串写错）⇒ 显示 false；
+  指引正文本身用的是 `**没有**`，属**我的探针错误**，非产品问题（保留记录，避免误读）。
+· 设计说明（为何不整体关掉框架段）：离线实证框架的 "## Domain Knowledge" 与 "## Memory Recall/Persistence" **同源同块**，
+  整体 `disableWorkspaceContext()` 会连带关掉记忆指路 ⇒ 改为在提示词**末尾追加**权威指引（位置最靠后、优先级最高，
+  且在文本中显式声明"上文任何关于工作区 knowledge/ 的描述均不适用"）。
+
+--- T-08 状态（本轮只上 observe 模式，enforce 待 T-09）---
+· 默认 `observe`：命中仅记四要素审计日志（agentId/sessionId/工具名/命中路径+参数），**不改变任何行为** ⇒ 零风险；
+· `enforce`（摘除被拒调用）**未启用**，待 T-09 的绕过面与误伤验证通过后再翻（避免未经运行验证的拦截静默掐断正常工具调用）。
+
+--- 仍需"真实对话"才能完成的验证（下一步，需一次会话）---
+T-09 enforce 生效性与绕过面（`python3 -c`/base64/符号链接/`find -exec`…，拦住与未拦住都记）；
+T-11 构造一次真实检索失败看模型收到的文案；T-12 行为回归（是否还先翻工作区）；T-13 BUG-86 原场景复测 + 翻账。

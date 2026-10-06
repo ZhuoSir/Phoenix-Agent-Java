@@ -4,6 +4,7 @@ import com.phoenix.agent.constant.AgentRuntimeConstant;
 import com.phoenix.agent.enums.FilesystemPolicyEnm;
 import com.phoenix.agent.harness.middleware.StopOnAllDeniedMiddleware;
 import com.phoenix.agent.harness.middleware.KnowledgePathGuardMiddleware;
+import com.phoenix.agent.harness.middleware.KnowledgeGuidanceMiddleware;
 import com.phoenix.agent.harness.skill.AgentScopedSkillRepository;
 import com.phoenix.agent.harness.skill.ExplicitSkillMiddleware;
 import com.phoenix.agent.mapper.HarnessSkillMapper;
@@ -155,7 +156,9 @@ public class HarnessAgentFactory {
             .enablePendingToolRecovery(true)
             .middlewares(List.of(new StopOnAllDeniedMiddleware(), new ExplicitSkillMiddleware(),
                 // T-08/R-02/R-03：知识库原件访问护栏（默认 observe 只记日志；PHOENIX_KB_PATH_GUARD=enforce 执行拒绝）
-                new KnowledgePathGuardMiddleware(workspace.toString())))
+                new KnowledgePathGuardMiddleware(workspace.toString()),
+                // T-10/R-04/R-05：在系统提示词末尾注入本项目权威知识库指引（对抗框架"工作区 knowledge/ 是事实源"的矛盾段）
+                new KnowledgeGuidanceMiddleware()))
             .compaction(compactionFor(config))
             .toolResultEviction(toolResultEvictionFor(config));
 
