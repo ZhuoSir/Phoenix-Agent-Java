@@ -1,5 +1,12 @@
 # Changelog: visibility-filetree-hygiene
 
+## 收口：12/12 完成 + BUG-85 翻已验证（2026-10-06）
+- **T-11 E2E/回归矩阵**：`verify 13/13`、typecheck 213=基线、技能链 100/100、树（新/老会话）、越权 42031、平铺 code=100 n=112、下载 200/117B、MCP code=100、取消 `cancelled`（内容保留）、删除不复活、**真实多步长轮**产出 `icons/`(8)+`index.md` 并在树中按文件夹呈现
+- **T-12 台账**：新增 `completion.md`（12/12 + 矩阵 + 需求兑现 + 偏差去向）与 `artifacts.md`；`releases/v1.7.0/MILESTONE.md` 记 M2 勾 + 审计记录；**BUG-85 → 已验证(v1.7.0)**
+- 如实偏差：长轮实测约 4 分钟（非 ≥10 分钟，由用户真实长轮同类覆盖）；HITL confirm 未新验（无改动面）；超时/心跳粒度跟随 `TURN_FLUSH_SECONDS`（生产 5s）
+- 试验残留：7 个 scratch 会话（含长轮/取消/超时/负对照）与旁路容器全清；**保留**长轮演示会话（`43312352-eb5e-4a94-8007-cc6972fb3188`，含 `icons/`+`index.md`）供用户走查，可随时删除
+- 待发版翻账：`BL-11/12/15/28 → 已交付(v1.7.0)`
+
 ## 组 3 收口：T-07~T-10 全部实测通过（2026-10-05）
 - **T-07 阶段标记**：实测 `MODEL → TOOL(execute) → 12s → IDLE → MODEL → IDLE`；两次实测修正（ToolCallEnd 不等于执行结束；`ToolResultStartEvent` 才是执行起点）
 - **T-08 静默心跳**：SSE 实测 `silenceMs=18451/23452`（5s 节流）+ 标签按阶段正确 + 金丝雀 `heartbeats=N`
