@@ -1,0 +1,11 @@
+=== 迁移后行为验证（2026-10-06 14:29:19）===
+--- ① 前台登录 chenzhuo（期望 userId=统一账号 461671036765859840）---
+  code= 100 userId= 461671036765859840 username= chenzhuo
+--- ② 前台 token 访问需登录接口 ---
+  GET /platform/account-info/username/chenzhuo → HTTP 200
+--- ③ T-07：前台账号取当前用户信息（期望非 null）---
+  code= 100 userId= None username= chenzhuo hasAdminRole= None
+--- ④ 过渡期 WARN 应消失（迁移后 accountMigrated=true → 直接用统一 id）---
+  「暂用旧 id」日志次数: 0
+--- ⑤ T-11：旧表降级注释已生效 ---
+前台账号信息表【v1.7.0 起：统一账号后降级为只读历史表，新写入请勿使用；账号唯一源=tbl_privilege_user】

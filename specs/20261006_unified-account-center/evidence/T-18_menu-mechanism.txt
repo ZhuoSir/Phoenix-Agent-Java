@@ -1,0 +1,71 @@
+=== T-18 菜单可见性机制调查 + 升级件 03 演练（2026-10-06）===
+结论一句话：菜单可见性只由 tbl_privilege_module 决定；tbl_privilege_acl 是「角色 → 菜单」授权表
+（module_id 指向 tbl_privilege_module.id），但**运行时未参与过滤**（现网为开发期"全放开"）。
+旧脚本的失败根因已定位：把「智能体列表」的 4 行 ACL 原样复制 ⇒ 4 行同 release_id + 同新 module_id ⇒
+撞唯一键 idx_tbl_privilege_acl_release_module（并非"ACL 是 pvalue 表"——该结论系误判，已在 blocked 记录里更正）。
+
+--- 1. 调用链（只读代码事实）---
+phoenix-privilege-rest/.../LoginController.java:68   @GetMapping("/menus") → authService.getUserMenus()
+phoenix-privilege-core/.../LoginServiceImpl.java:118 getUserMenus():
+    128:  // TODO 开发阶段全部放开 生产的时候就采用acl的授权机制
+    129:  // List<ModuleTreeVO> modules = privilegeModuleService.getModelTreeByUserId(user.getId(), acls);
+    131:  List<PrivilegeModule> modules = privilegeModuleService.list();          ← 全量菜单，无角色过滤
+    132:  buildModuleTree(modules, buildAdminAclMap(modules, allPvalues))
+    173:  buildAdminAclMap(): 对**每个** module 令 state = 全部 pvalue 位或（即全权限位）
+对照：PrivilegeModuleServiceImpl.java:37 getModelTreeByUserId() 才是按 ACL 过滤的实现
+      （仅取 acl.getPermission(3) > 0 的 moduleId）——**当前被注释、未启用**。
+
+--- 2. DB 事实（tbl_privilege_acl）---
+\d tbl_privilege_acl → UNIQUE "idx_tbl_privilege_acl_release_module" btree (release_id, module_id)
+select release_sn, count(*) from tbl_privilege_acl group by release_sn;  → role: 73
+join 结果（节选）：module_id = 5db7285051204f81867995e2565931c1 → m_name=部门管理；
+                  module_id = f0c0d2d3a7bb452cb5ff98328575b41a → m_name=智能体列表
+  ⇒ module_id 指向 tbl_privilege_module.id（菜单），不是 pvalue id
+坑：module_sn 是过期标签——「智能体列表/技能管理/MCP/插件管理」4 行 module_sn 全写 'agentManagerIndex'
+    select release_id, count(*) from tbl_privilege_acl where module_sn='agentManagerIndex' group by release_id;
+    → 428007432736870400 | 4      ← 旧脚本按 module_sn 复制这 4 行 ⇒ 同一 release_id 撞新 module_id 唯一键
+
+--- 3. 运行时可见性实证（curl，业务码断言）---
+脚本 /tmp/probe_menus.py（POST /api/privilege/auth/login → GET /api/privilege/auth/menus）：
+--- login chenzhuo/12345678: code=100 hasAdminRole=True
+    menus: code=100 roots=8 all=26
+    含「智能体列表」=True 含「智能体中心」=False
+    根菜单=['组织管理', '权限管理', '智能体管理', '个人中心', '前台管理', '基础管理', '知识库', '插件管理']
+--- login chenzhuo/123456: code=23009 hasAdminRole=None
+    resp: {"code": "23009", "data": null, "msg": "密码错误", "success": false}
+--- login admin/123456: code=100 hasAdminRole=True
+    menus: code=100 roots=8 all=26
+    含「智能体列表」=True 含「智能体中心」=False
+    根菜单=['组织管理', '权限管理', '智能体管理', '个人中心', '前台管理', '基础管理', '知识库', '插件管理']
+⇒ chenzhuo 仅持「普通角色」(431285032083144704)，该角色在 tbl_privilege_acl 中**零行**，却照样拿到全部 26 个菜单
+  ⇒ 实证"ACL 未参与过滤"（不是推断）
+（附带事实：chenzhuo 用前台口令 12345678 登录统一源成功；持 普通角色 ⇒ hasAdminRole=true ⇒ 落地页 /agent/list）
+
+--- 4. 升级件 03（重写版）演练：phoenix_drill ---
+形态：**一级菜单 + 置顶**（用户 2026-10-06 指定"放在一级目录，最上面"）——
+`pid=''`、`type='1'`、`order_no=-1`，字段形状继承现有一级菜单「知识库」(url='/knowledge-base')。
+（注意 type 必须为 '1'：前端 access.ts 仅在 type==='1' 时取 component，type='0' 会得到空组件 ⇒ 页面空白）
+
+$ docker exec -i phoenix-release-postgres-1 psql -U phoenix -d phoenix_drill -v ON_ERROR_STOP=1 -f - < sql/V1.7.0_03__agent_chat_center_menu.sql
+BEGIN / DELETE 0 ×4 / INSERT 0 1 / INSERT 0 2
+psql:<stdin>:70: NOTICE:  T-18：一级菜单行 1（智能体中心 /agent/chat，置顶）+ 角色 ACL 2 行（角色数 2）
+DO / COMMIT
+
+验证（drill）：
+  a9c1e7d4f0b34c8e9a1d2b3c4e5f6a70 | 智能体中心 | /agent/chat | AgentChatCenter | state=31 |
+  component=#/views/front/chat.vue | system_id=NULL | status=1 | order_no=-1 | is_show=1 |
+  pid='' | category_id=NULL | type=1 | del_flag=0
+  根菜单排序（order_no）：智能体中心(-1) → 智能体管理(0) → 权限管理(1) → 组织管理(10) →
+  知识库(16) → 插件管理(17) → 前台管理(350) → 基础管理(400) → 个人中心(999)  ⇒ 确实在最上面
+  ACL 2 行：428007432736870400 系统管理员 / 431285032083144704 普通角色，acl_state 均 31
+幂等复跑（同一脚本第 2 次）：INSERT 0 1 / INSERT 0 2 / NOTICE 同上 ⇒ 无重复行（m=1 a=2）
+
+--- 5. 回滚演练（drill）---
+$ docker exec -i ... psql -U phoenix -d phoenix_drill -v ON_ERROR_STOP=1 -f - < sql/rollback/V1.7.0_03__agent_chat_center_menu_rollback.sql
+BEGIN / DELETE 2 (acl) / DELETE 1 (module) / DELETE 0 / DELETE 0 / DO
+NOTICE:  回滚完成：菜单行与 ACL 行均已清除 / COMMIT
+回滚后：mod=27 acl=73 left=0（与演练前完全一致）
+
+--- 6. 生产状态 ---
+select count(*) from tbl_privilege_module where sn='AgentChatCenter';  → 0（生产零改动，未应用）
+本次仅只读查询 + 登录探针（写 1 行登录日志），未改任何生产数据。

@@ -76,12 +76,16 @@ public class LoginServiceImpl implements LoginService {
 			StpUtil.getSession().set(LOGIN_ACLS, acls);
 			StpUtil.getSession().set(LOGIN_USER_INFO, user);
 			String tokenValue = StpUtil.getTokenValue();
+			// T-05：落地页判定依据——该账号是否持有后台角色（userType 语义为自建/IDM，不得用于此判定）
+			List<PrivilegeUserRole> userRoles = privilegeUserRoleService.getByUserId(user.getId());
+			boolean hasAdminRole = userRoles != null && !userRoles.isEmpty();
 			LoginUserInfoVO loginVO = LoginUserInfoVO.builder()
 				.token(tokenValue)
 				.userId(user.getId())
 				.username(user.getUsername())
 				.realName(user.getRealName())
 				.userType(user.getUserType())
+				.hasAdminRole(hasAdminRole)
 				.build();
 			PrivilegeLoginLog loginLog = PrivilegeLoginLog.builder()
 				.operationId(user.getId())

@@ -55,3 +55,7 @@ clean-deploy-all-local.bat
 
 ### dsh browser-skill 本机配置指针（含绝对路径，不入库）
 /.dsh/
+
+### 统一账号迁移的备份/演练产物（v1.7.0 unified-account-center；含生产数据快照，永不入库）
+/backups/
+*.dump

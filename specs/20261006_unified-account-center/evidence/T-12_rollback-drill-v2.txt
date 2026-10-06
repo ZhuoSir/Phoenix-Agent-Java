@@ -1,0 +1,27 @@
+=== T-12 回滚演练 v2（行级精确；2026-10-06 14:26:59）===
+迁移前基线：旧id会话=28，新id自有会话=2，旧id文件=213，旧id组关系=1，审计=243
+
+--- 执行回滚 ---
+NOTICE:  R0 审计行数=243（按行精确反向）
+NOTICE:  R1 回滚 tbl_data_chat_session.user_id → 28 行
+NOTICE:  R1 回滚 tbl_data_agent_file.creator → 213 行
+NOTICE:  R1 回滚 tbl_agent_user_agent_info.user_id → 1 行
+NOTICE:  R1 回滚 tbl_agent_user_memory_info.user_id → 0 行
+NOTICE:  R1 回滚 tbl_agent_user_profile_info.user_id → 0 行
+NOTICE:  R1 回滚 tbl_data_agent_preset_question.account_id → 0 行
+NOTICE:  R1 回滚 tbl_platform_account_group_info.account_id → 1 行
+NOTICE:  R1 回滚 tbl_platform_account_tenant_info.account_id → 0 行
+<stdin>:45: NOTICE:  R2 门禁通过：审计中每一行均已回到旧归属
+NOTICE:  R3 旧 id=461671714812850176 会话数=28（应=迁移前快照）
+NOTICE:  R3 新 id=461671036765859840 会话数=2（应含其自有数据）
+NOTICE:  R3 旧 id=461671714812850176 授权组关系=1
+
+--- 回滚后核对（须与基线逐项一致）---
+         k         |  n  
+-------------------+-----
+ 旧id会话(期望28)  |  28
+ 新id会话(期望2)   |   2
+ 旧id文件(期望213) | 213
+ 旧id组关系(期望1) |   1
+(4 rows)
+

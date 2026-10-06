@@ -1,0 +1,71 @@
+=== T-09~T-12 迁移与回滚演练（演练库 phoenix_drill；2026-10-06 14:24:14）===
+
+--- 迁移输出（升级件 02）---
+psql:<stdin>:35: NOTICE:  M1 迁移前：前台账号=2 行；非哈希口令(前台=0 后台=0)
+psql:<stdin>:75: NOTICE:  M2 匹配完成：1 个前台账号并入既有后台账号（分支 A）
+psql:<stdin>:86: NOTICE:  M3 分支 B 待新建账号数=0（本数据集应为 0）
+INSERT 0 1
+psql:<stdin>:135: NOTICE:  M4.1 data_chat_session.user_id 改写 28 行
+psql:<stdin>:135: NOTICE:  M4.2 data_agent_file.creator 改写 213 行
+psql:<stdin>:135: NOTICE:  M4.3 agent_user_agent_info.user_id 改写 1 行
+psql:<stdin>:135: NOTICE:  M4.4 agent_user_memory_info.user_id 改写 0 行
+psql:<stdin>:135: NOTICE:  M4.5 agent_user_profile_info.user_id 改写 0 行
+psql:<stdin>:135: NOTICE:  M4.6 preset_question.account_id 改写 0 行
+psql:<stdin>:135: NOTICE:  M4.7 platform_account_group_info.account_id 改写 1 行
+psql:<stdin>:135: NOTICE:  M4.8 platform_account_tenant_info.account_id 改写 0 行
+psql:<stdin>:170: NOTICE:  M7 对账通过：账内旧 id 引用已清零
+psql:<stdin>:192: NOTICE:  M8 删除前核对：账号=1 组关系=1 会话=0
+psql:<stdin>:192: NOTICE:  M8 完成：thinktest 已删除（账号与组关系均 0）
+psql:<stdin>:203: NOTICE:  迁移完成：映射表 1 行；统一主表 7 行；旧表 1 行
+
+--- 迁移后核对（演练库）---
+            t             | n 
+--------------------------+---
+ 映射表                   | 1
+ 统一主表(privilege_user) | 7
+ 旧表(platform_account)   | 1
+ 会话指向旧id残留         | 0
+ 文件指向旧id残留         | 0
+ 组关系指向后台id         | 1
+ thinktest残留            | 0
+(7 rows)
+
+--- 执行回滚（升级件 02 rollback）---
+UPDATE 0
+UPDATE 1
+UPDATE 0
+UPDATE 0
+UPDATE 0
+UPDATE 1
+UPDATE 213
+UPDATE 30
+COMMENT
+DELETE 1
+psql:<stdin>:47: NOTICE:  R5 chat_session 已恢复旧 id 行数=0
+--- 回滚后核对（应回到迁移前）---
+       t        |  n  
+----------------+-----
+ 会话指向旧id   |  30
+ 文件指向旧id   | 213
+ 组关系指向旧id |   1
+ 映射表(已清)   |   0
+(4 rows)
+
+--- 旧表注释已恢复 ---
+前台账号信息表
+
+=== 结论（2026-10-06）===
+① 正向迁移（升级件 02）在演练库**全部断言通过**：
+   M2 匹配到 1 个前台账号并入既有后台账号（username+code 强匹配 → chenzhuo，**未误并 admin**，D5 陷阱避开）
+   M4 改写 28 会话 / 213 文件 / 1 用户-智能体关系 / **1 授权组关系**（组关系为 T-01 后补充，原 plan 8 类清单未含）
+   M7 对账通过（账内旧 id 清零）；M8 thinktest 删除（账号+组关系均 0）
+   最终：映射表 1 行、统一主表 7 行、旧表 1 行
+
+② **回滚（升级件 02 rollback）不安全——演练发现，未通过**：
+   反向 `UPDATE ... SET <col>=old WHERE <col>=new` **无法区分"迁移搬过来的行"与"目标账号本来就有的行"**，
+   实测回滚后旧 id 侧 chat_session 变成 **30**（迁移前 28），并把目标账号（后台 chenzhuo）**自有的 115 条会话**中的部分误迁到旧 id
+   ⇒ 现状回滚会**破坏目标账号数据**，不能用于生产
+③ 修复方向（需并入 plan 后重确认）：
+   迁移时增记**行级审计**（新表 `tbl_unified_account_migration_rows`: table_name, pk_value, old_id, new_id），
+   M4 每类列在 UPDATE 前先 INSERT 命中行的主键；回滚改为**按行级清单精确反向**，并断言
+   "回滚后各列行数 == 迁移前快照"（chat_session 旧 id=28、新 id=115）作为硬门禁

@@ -1,0 +1,31 @@
+=== T-16 共享面身份矩阵断言（2026-10-06 14:31:41；按业务码）===
+准则：code 100/200=成功；404/非 JSON（HTML）=预期移除或 SPA 页
+
+1  /api/privilege/auth/login (POST 后台登录) → code=100
+2  /auth/login (POST 前台登录)            → code=100
+3  /auth/logout (POST 前台登出)           → code=100
+4  /api/privilege/auth/logout (POST 后台登出) → code=100
+5a getLoginUserInfo (GET 后台账号)        → code=401
+5b getLoginUserInfo (GET 前台账号)        → code=401
+6  /api/privilege/auth/menus (GET)            → code=None
+7  /api/privilege/auth/captcha (GET)          → code=100
+8  /api/privilege/auth/doLogin (POST 已移除) → HTTP=404（预期 404）
+9  /api/privilege/user/username/chenzhuo (GET) → code=401
+10 /platform/account-info/username/chenzhuo (GET) → code=401
+13 前端 /auth/login 路由（SPA 页）     → HTTP=200 且为 HTML
+      → HTML 含 #app 挂载点 ✓
+
+--- 11/12/14/15（DB 侧断言）---
+11 统一主表 id 唯一源：旧前台 id 在业务列残留 = 0
+12 旧表降级注释 = 前台账号信息表【v1.7.0 起：统一账号后降级为只读历史表，新写入请勿使用；账号唯一源=tbl_privilege_user】
+14 token 键 phoenix-token 被接受（见 1~10 全部成功）
+15 授权组四表行数 = agent:4 kbase:4 skill:11 mcp:6
+
+--- 复测（新 token，避免上轮登出影响）---
+5a getLoginUserInfo(后台)               → code=100
+5b getLoginUserInfo(前台)               → code=100
+6  /api/privilege/auth/menus              → code=100 菜单数=8
+9  /api/privilege/user/username/chenzhuo  → code=100
+10 /platform/account-info/username/chenzhuo → code=100
+
+=== T-17 回归门禁（docker/scripts/verify.sh）===

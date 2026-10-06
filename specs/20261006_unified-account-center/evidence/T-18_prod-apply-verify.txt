@@ -1,0 +1,69 @@
+=== T-18 生产应用与验证（2026-10-06 15:00 前后）===
+前置：三份文档 v2.0.1 已确认（用户 2026-10-06 回「确认 v2.0.1」，确认人：陈卓）—— commit d81bacf
+
+--- 0. 备份（改前）---
+$ docker exec phoenix-release-postgres-1 pg_dump -U phoenix -d phoenix \
+    -t tbl_privilege_module -t tbl_privilege_acl --data-only --column-inserts > backups/pre_menu_acl_20261006_145936.sql
+  size=40953  sha256=6190838fef4f1f8c59da34ad9b1e36fec21d2ed71bd88f9d93fd518f59b0ba2f  INSERT 行数=100
+
+--- 1. 应用（生产）---
+$ docker exec -i phoenix-release-postgres-1 psql -U phoenix -d phoenix -v ON_ERROR_STOP=1 -f - \
+    < specs/20261006_unified-account-center/sql/V1.7.0_03__agent_chat_center_menu.sql
+BEGIN / DELETE 0 ×4 / INSERT 0 1 / INSERT 0 2 / DO
+psql:<stdin>:70: NOTICE:  T-18：一级菜单行 1（智能体中心 /agent/chat，置顶）+ 角色 ACL 2 行（角色数 2）
+COMMIT      EXIT=0
+本次只改 DB：未重建、未重启后端/nginx ⇒ 会话不失效、无用户被踢下线
+
+--- 2. DB 回读（生产）---
+select id,name,url,sn,state,component,system_id,status,order_no,is_show,coalesce(pid,'(空)'),category_id,type,del_flag
+  from tbl_privilege_module where sn='AgentChatCenter';
+ a9c1e7d4f0b34c8e9a1d2b3c4e5f6a70 | 智能体中心 | /agent/chat | AgentChatCenter | 31 |
+ #/views/front/chat.vue | (NULL) | 1 | -1 | 1 | (空) | (NULL) | 1 | 0
+ACL：428007432736870400 系统管理员 31 / 431285032083144704 普通角色 31
+
+--- 3. 接口回读（业务码断言，/tmp/probe_t18_verify.py）---
+=== admin: login code=100 hasAdminRole=True userId=461681072489615360
+    menus code=100 根菜单数=9
+    顺序(接口数组序)=['组织管理','权限管理','智能体管理','个人中心','前台管理','基础管理','知识库','插件管理','智能体中心']
+    首位: name=组织管理 url=/organization component=None type=0 orderNo=10
+    getMyAgents code=100 success=True 数量=0
+=== chenzhuo: login code=100 hasAdminRole=True userId=461671036765859840
+    menus code=100 根菜单数=9（含「智能体中心」）
+    getMyAgents code=100 success=True 数量=4
+    首智能体 id=25 name=智能体01 → GET /api/agent/25/sessions code=100 success=True sessions=7
+
+★ 顺序说明（别误判）：接口数组序**不决定**侧栏顺序——后端 buildModuleTree 用 `list()`（无 ORDER BY），
+  数组序 = DB 物理序，故新菜单出现在数组末尾。侧栏顺序由**前端**决定：
+  `web-frontend/packages/utils/src/helpers/generate-menus.ts:86`
+      menus = sortTree(menus, (a, b) => (a?.order ?? 999) - (b?.order ?? 999));
+  而 `order` 来自 access.ts 的 `meta.order = module.orderNo`（路由生成时赋值）⇒ order_no=-1 ⇒ 置顶。
+  该结论为**代码级证明**；实际视觉位置待用户硬刷后目视确认（T-18 验收含此项）。
+
+--- 4. 前端产物核对（是否需重建）---
+$ docker exec phoenix-release-nginx-1 sh -c "grep -roh 'views/front/chat[^\"]*' /usr/share/nginx/html/js/ | sort -u"
+views/front/chat.vue
+⇒ 现网已部署的前端包里**已含** `../views/front/chat.vue` 动态导入（/js/bootstrap-5ybHNkcx.js），
+  另见同目录 ChatComposer/ChatFilesPanel/ChatHistoryPanel/ChatMessages/ChatSessionSidebar 等分包
+  ⇒ 菜单驱动路由，插菜单行即可生效，**无需重新构建前端**（本次也确实没重建）
+
+--- 5. 已知边界（如实记录，属二期 R-05）---
+`getMyAgents`（chat 页数据源）经**前台授权组**解析：`tbl_platform_account_group_info`(account_id) → 组 → 智能体，
+再并上"公开智能体"（published ∧ 无授权行 ∧ sn 空）。
+  · chenzhuo（有前台授权组）→ 4 个智能体、7 个会话 ⇒ 页面有内容
+  · admin（纯后台账号，id=461681072489615360，无前台授权组）→ 0 个智能体 ⇒ 页面打开但列表为空
+  这不是本次引入的回归（admin 历史上也不在 tbl_platform_account_info，用不了前台），
+  根因是"后台角色"与"前台授权组"两套授权未归一 —— 正是 **R-05（二期）** 的范围。
+  本期交付口径：智能体中心**页面与鉴权可用**（同一 token、同一套接口，code=100）；列表内容取决于该账号的前台授权组。
+
+--- 6. 升级件 03 v2（补图标）重跑 —— 用户实测反馈"没有图标" ---
+根因：首版把 `image` 置 NULL 是我**漏看该列**（现网 27 行里 24 行都有 iconify 图标名，如
+      AgentManager=meteor-icons:robot、KnowledgeBase=lucide:book-open），不是设计取舍。
+处置：升级件 03 改为 `image='lucide:message-square'`（iconify 名，与既有菜单同格式）并**重跑**（脚本幂等）：
+  ① drill 复跑：INSERT 0 1 / INSERT 0 2 → NOTICE 一级菜单行 1 + 角色 ACL 2 行；image=lucide:message-square
+     drill 回滚：DELETE 2 + DELETE 1 → NOTICE 回滚完成（干净）
+  ② 生产复跑：同上 COMMIT；DB 回读 image=lucide:message-square / order_no=-1 / type=1 / is_show=1 / pid=''
+  ③ 接口回读（/api/privilege/auth/menus, admin token, code=100）：
+     {"name":"智能体中心","url":"/agent/chat","component":"#/views/front/chat.vue",
+      "image":"lucide:message-square","orderNo":-1,"type":"1","isShow":1}   根菜单数=9
+说明：本次为"已应用升级件的内容修订"，按纪律**重跑使生产回读 == 文件内容**（03 幂等：先删后插），
+      证据链保留 v1（无图标）与 v2（有图标）两次执行记录。
