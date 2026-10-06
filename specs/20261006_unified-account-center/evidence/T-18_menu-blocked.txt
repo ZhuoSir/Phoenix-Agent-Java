@@ -11,3 +11,13 @@ component=#/views/front/chat.vue, pid 同 智能体列表），并复制其 ACL 
 - 因此「菜单如何按角色过滤」尚未查清（menus 接口返回 26 项，规则待定）；下一步需查
   `getUserMenus` 的实现（模块树按什么过滤：role→module 关联表？pvalue？is_show？）
 待续：查清可见性机制 → 重写升级件 03 的 ACL 部分 → 再应用（当前生产无残留，无需清理）
+
+=== 【更正 2026-10-06，同日查清后回填】上面「根因」段是**误判**，保留原文以留痕（L-29）===
+- 误判：由 `module_sn` 列值（PlatformAccount/DepartmentManagement…）推断"ACL 是权限点(pvalue)表"，
+  并把该推断当根因写进本文件。
+- 实况（实测 join 取证，见 `evidence/T-18_menu-mechanism.txt`）：
+  `tbl_privilege_acl.module_id` **指向 `tbl_privilege_module.id`（菜单）**，是「角色 → 菜单」授权表；
+  `module_sn` 是**过期冗余标签**——「智能体列表/技能管理/MCP/插件管理」4 行的 module_sn 全写着
+  'agentManagerIndex'，旧脚本照它复制 4 行 ⇒ 同 release_id + 同新 module_id ⇒ 撞唯一键（真正根因）。
+- 结论：菜单可见性载体 = `tbl_privilege_module`；ACL 仅决定"角色是否被授权看到该菜单"，
+  且**现网运行时未启用过滤**（getUserMenus 为开发期全放开，实测 零 ACL 的普通角色也拿到全部 26 菜单）。

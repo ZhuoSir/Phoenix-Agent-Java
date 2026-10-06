@@ -159,8 +159,11 @@
   依赖: T-07
   验证方式: 登录 admin → 侧栏出现「智能体中心」→ 进入后 chat 可用（会话列表/发消息/文件树/预设问题各一次）；`GET /api/privilege/auth/menus` 含该行
   验收标准: 后台登录后可直接用 chat，无需第二次登录
-  **⏸ 2026-10-06 受阻（未落库）**：菜单行可插入，但 `tbl_privilege_acl` 经查是**权限点表**而非菜单可见性载体（唯一键 release_id+module_id），
-  复制 ACL 撞唯一键 → 事务整体回滚、生产零改动。待查清"菜单按角色过滤"的实现后重写升级件 03 的 ACL 部分（见 `evidence/T-18_menu-blocked.txt`）
+  **⏳ 2026-10-06 机制已查清，升级件 03 已重写并在演练库通过（生产未应用）**：可见性载体 = `tbl_privilege_module`；
+  `tbl_privilege_acl` 是「角色 → 菜单」授权表（module_id 指向 module.id），但**现网运行时未启用过滤**
+  （`getUserMenus` 开发期全放开；实测：零 ACL 的「普通角色」也拿到全部 26 菜单）⇒ 本期实际可见性 = 任一登录用户，
+  ACL 行为二期 R-05 预置数据。旧脚本失败真因 = 照过期列 `module_sn` 复制 4 行撞唯一键。
+  证据 `evidence/T-18_menu-mechanism.txt`（含 drill 应用/幂等/回滚）；受阻留痕 `evidence/T-18_menu-blocked.txt`
 
 - [ ] T-19 单套访问逻辑收敛：前台入口下线或重定向，清理第二套鉴权分支
   关联: R-11
