@@ -27,6 +27,8 @@
 ## v0.1.0（2026-10-06）Phase 3 草稿 · tasks
 - 17 个任务 / 5 组（前置与迁移准备 / 认证与账号统一 / 数据迁移 / B 组 BUG-86 / 共享面回归与收尾）
 - 共享面身份矩阵 **15 个身份**由 T-16 逐条断言（每条一断言、双侧取证）
+- **③ 确认通过（2026-10-06，确认人 陈卓）** → tasks **v1.0.0 已确认**
+- **三重门全绿（requirements/plan/tasks 均 v1.0.0 已确认）** → spec 版本 = **v1.0.0**；开施工分支 `feature/unified-account-center`（基点 `v1.7.0`）
 - R-05（前台授权组纳管）按裁定 D3 **一期不含任务**，tasks.md 记「延期→二期」不勾不删
 - **BUG-94 实测复核（诚实性更正）**：未带凭据调用 `POST /api/privilege/auth/doLogin?username=zhang&password=123456` → HTTP 200 `登录成功`（服务端确执行 `StpUtil.login(10001)`），但响应**无 `Set-Cookie`/token 头** ⇒ 未证实"外部可直接取得 token"，定级由 **P0 更正为 P1（生产残留演示桩）**；要求=删端点或移出放行名单
 - **新发现并登记 BUG-100**：sa-token 会话**未落 Redis**（`phoenix-platform-core/pom.xml:40` 有依赖、全仓无 `SaTokenDao` 装配、实测 Redis `dbsize=0`）⇒ 会话在进程内存，**后端重启即全员掉线**；已据此收窄"待确认问题 1"（强制重登影响面比预期小），并新增假设 6（是否落 Redis 由用户定，默认不在范围）
