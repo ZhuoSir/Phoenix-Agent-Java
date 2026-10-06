@@ -1,0 +1,28 @@
+=== T-01 / T-02 框架能力取证（离线，javap/jar，2026-10-06）===
+状态：**部分完成**（API 面已确定；runtime PoC 需后端重启窗口，见文末申请）
+
+--- T-01 提示面：矛盾指引段的位置与可用开关（已确证）---
+· jar：`io.agentscope:agentscope-harness:2.0.0`
+· 含 "## Domain Knowledge"（称"工作区 `knowledge/` 树是事实源、会注入 `KNOWLEDGE.md` 与全量路径清单"）的类 =
+  `io.agentscope.harness.agent.middleware.WorkspaceContextMiddleware`，出口方法 `onSystemPrompt(Agent, RuntimeContext, String)`。
+· `HarnessAgent$Builder` 暴露的可用开关（javap 实证）：`disableWorkspaceContext()`、`useLegacyXmlWorkspaceContext(boolean)`、
+  `additionalContextFile(String)`、`disableDefaultWorkspaceSkills()`。
+· `WorkspaceManager` 构造简单（`WorkspaceManager(Path)` 等 4 个）⇒ **离线实例化该 middleware 打印三档提示词是可行的**；
+  但仍需 `Agent` / `RuntimeContext` 实例（属 agentscope-core），故离线 spike 的下一步是补 core jar + 构造最小桩。
+· **仍未确证（待 runtime 或离线 spike）**：① `disableWorkspaceContext()` 是"整段不注入"还是"改用其它文本"；
+  ② Memory Recall/Persistence 指引是否与该段同生共死（若同死 → T-10 需自注入补偿）；
+  ③ `useLegacyXmlWorkspaceContext(true)` 的文本里是否仍含 `knowledge/` 字样。
+
+--- T-02 护栏钩子点：可行性（已确证一条，另一条待补 jar）---
+· **确定可用**：harness 侧存在中间件扩展点 —— `WorkspaceContextMiddleware implements HarnessRuntimeMiddleware`（同一包），
+  即"自定义 `HarnessRuntimeMiddleware` + `HarnessAgent.Builder.middleware(...)`"这条钩子**在框架设计内**，可作为护栏落点（参考实现就在 jar 里）。
+· **待补证据**：`io.agentscope.core.permission.PermissionContextState` **不在** harness jar 内（报"找不到类"）⇒ 属 agentscope-core；
+  需取该 jar 后判定它能否承载"路径规则 + 命令拦截"，以及能否拿到命令字符串/cwd。
+· **未验证**：`LocalFilesystemWithShell` 是否有官方的命令拦截回调（需 javap 该类 + core jar）。
+· runtime PoC（拒绝一次 `cat <原件路径>` 并打印拒绝日志）**需要后端重启**（改 `HarnessAgentFactory` 装配）⇒ 见申请。
+
+--- 申请（阻塞 T-01/T-02 的 runtime 部分）---
+1. **后端重启窗口**：runtime PoC 必须重建并重启 backend ⇒ **会强制全员重登**（会话在进程内存）。
+   建议与你的实测时间窗合并执行；期间我会先把能离线做的（core jar 取证、离线提示词三档打印）做完。
+2. 若你希望**完全不重启**，替代路线是：先做离线 spike（补 core jar + 反射构造桩）把三档文本与 hook API 面钉死，
+   把 runtime 验证推迟到组 4 的部署批次（T-10/T-11 本来就要重启一次）。
