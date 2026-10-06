@@ -44,14 +44,8 @@ public class WorkspaceArtifactScanner {
     @Value("${phoenix.agent.workspace-root:.agentscope/workspace}")
     private String workspaceRoot;
 
-    private static final Set<String> SKIP_NAME_PREFIX = Set.of(".");
-    private static final Set<String> SKIP_DIRS = Set.of("sessions", "tasks", ".index", "memory", "large_tool_results");
-    private static final Set<String> SKIP_SUFFIX = Set.of(".jsonl", ".marker", ".db");
-    /** 工具调用 ID 形态的占位文件（BUG-78 广扫副产物：`call_*` 不是用户产物，面板噪音）。 */
-    private static final Set<String> SKIP_FILE_PREFIX = Set.of("call_");
-    /** 框架内部状态文件（记忆固化/会话索引等），不是用户产物（实测 2026-10-01 捕获到 MEMORY.md/consolidation_state）。 */
-    private static final Set<String> INTERNAL_FILES = Set.of("MEMORY.md", "consolidation_state", "sessions.json",
-            "memory.md", "AGENTS.md.bak");
+    // v1.7.0 T-04：内部件判定**上移为单一实现** SessionWorkspaceFilters（面板树与扫描器同源引用，L-19）。
+    // 本类不再持有名单常量，只负责"文件系统遍历 + 归属"，规则判据一律走共享工具。
 
     /** 扫描并登记本会话新产物；返回新登记的 AgentFile 列表（空=无新文件）。异常吞掉只 WARN，不阻断会话。 */
     public List<AgentFile> scanAndRegister(Long agentId, String sn, String userId, String sessionId) {
@@ -153,41 +147,20 @@ public class WorkspaceArtifactScanner {
         if (first.equals(sessionId)) {
             return false;
         }
-        return first.length() == 36 && first.indexOf('-') == 8
-                && first.chars().filter(c -> c == '-').count() == 4;
+        // v1.7.0 T-04：会话 UUID 判据与树解析器同源
+        return com.phoenix.agent.util.SessionWorkspaceFilters.looksLikeSessionId(first);
     }
 
     private boolean isInternal(Path file, Path agentDir) {
         String name = file.getFileName().toString();
-        if (INTERNAL_FILES.contains(name)) {
-            return true;
-        }
-        if (SKIP_FILE_PREFIX.stream().anyMatch(name::startsWith)) {
-            return true;
-        }
-        if (SKIP_NAME_PREFIX.stream().anyMatch(name::startsWith) && !name.contains(".")) {
-            return true;
-        }
-        for (String s : SKIP_SUFFIX) {
-            if (name.endsWith(s)) {
-                return true;
-            }
-        }
         Path rel = agentDir.relativize(file);
-        // 末段是文件本身，只判中间的目录段
+        // 末段是文件本身，只判中间的目录段；判据一律取自共享工具（与面板树同源，L-19）
+        java.util.List<String> dirSegments = new java.util.ArrayList<>();
         int dirCount = rel.getNameCount() - 1;
         for (int i = 0; i < dirCount; i++) {
-            String seg = rel.getName(i).toString();
-            if (SKIP_DIRS.contains(seg)) {
-                return true;
-            }
-            // R-06 实测收尾：框架内部目录（.skills-cache 技能包缓存/.index/.agentscope/.pylibs…）不是用户产物。
-            // 漏掉后每个会话都会把整包技能脚本注册成"产物"（实测单会话 28 条噪音：catalog.json/search_library.py…）
-            if (seg.startsWith(".")) {
-                return true;
-            }
+            dirSegments.add(rel.getName(i).toString());
         }
-        return false;
+        return com.phoenix.agent.util.SessionWorkspaceFilters.isInternalPath(dirSegments, name);
     }
 
     /** turnStart 窗口：仅收本轮（或补登全量）产出；容差 3s 吸收时钟抖动。 */

@@ -49,6 +49,20 @@ public class HarnessTurnManager {
 
     public static final String STATUS_CANCELLED = "cancelled";
 
+    // ===== T-07（v1.7.0 R-01）：轮次阶段标记 =====
+    /** 无在飞调用（帧间隔/待模型下一步） */
+    public static final String PHASE_IDLE = "IDLE";
+    /** 模型调用在飞（今天 503s 静默就发生在此阶段） */
+    public static final String PHASE_MODEL = "MODEL";
+    /** 工具/子代理执行中 */
+    public static final String PHASE_TOOL = "TOOL";
+
+    /** T-09：新增定稿状态——**模型调用首帧超时**（与既有 done/timeout/cancelled 并存） */
+    public static final String STATUS_MODEL_TIMEOUT = "model_timeout";
+
+    /** T-08：心跳最小间隔（节流 ≤1 帧/5s，防重演帧风暴） */
+    private static final long HEARTBEAT_MIN_GAP_MS = 5000L;
+
     private static final int THINKING_CLIP = 65536;
 
     private final ChatMessageMapper chatMessageMapper;
@@ -61,6 +75,14 @@ public class HarnessTurnManager {
     @Value("${phoenix.agent.turn-idle-timeout-seconds:600}")
     private long turnIdleTimeoutSeconds;
 
+    /** T-08：静默心跳阈值（秒）——静默达该值起按 ≤1 帧/5s 下发心跳帧 */
+    @Value("${phoenix.agent.silence-heartbeat-seconds:15}")
+    private long silenceHeartbeatSeconds;
+
+    /** T-09：模型调用**首帧超时**（秒）——MODEL 阶段自调用发起起算；0=关闭 */
+    @Value("${phoenix.agent.model-first-frame-timeout-seconds:180}")
+    private long modelFirstFrameTimeoutSeconds;
+
     @Value("${phoenix.agent.turn-flush-seconds:5}")
     private long flushSeconds;
 
@@ -68,6 +90,42 @@ public class HarnessTurnManager {
     private int bufferFrames;
 
     private final Map<String, Turn> turns = new ConcurrentHashMap<>();
+
+    /**
+     * T-07：标记轮次阶段（由 {@code HarnessChatServiceImpl} 在模型/工具生命周期事件上回灌）。
+     *
+     * <p>用途：① 静默心跳按阶段给出"模型调用中/工具执行中"（T-08）；
+     * ② 首帧超时**仅在 MODEL 阶段**生效，避免误杀长工具（T-09）。
+     */
+    /** 仅当当前阶段**不等于** avoidPhase（可空=不限制）时才切阶段（T-07 实测修正用）。 */
+    public void onPhaseIfNot(String sessionId, String phase, String detail, String avoidPhase) {
+        Turn turn = sessionId == null ? null : turns.get(sessionId);
+        if (turn == null) {
+            return;
+        }
+        if (avoidPhase != null && avoidPhase.equals(turn.phase)) {
+            return;
+        }
+        onPhase(sessionId, phase, detail);
+    }
+
+    public void onPhase(String sessionId, String phase, String detail) {
+        if (sessionId == null || phase == null) {
+            return;
+        }
+        Turn turn = turns.get(sessionId);
+        if (turn == null) {
+            return;
+        }
+        boolean changed = !phase.equals(turn.phase);
+        turn.phase = phase;
+        turn.phaseDetail = detail;
+        turn.phaseSince = System.currentTimeMillis();
+        if (changed) {
+            log.info("[turn-phase] session={} -> {}{}", sessionId, phase,
+                    detail == null || detail.isBlank() ? "" : " (" + detail + ")");
+        }
+    }
 
     /** 重启残留清扫（Non-goals：在跑轮次接受丢失，标 timeout 由 A′/DB 可见） */
     @PostConstruct
@@ -222,6 +280,19 @@ public class HarnessTurnManager {
         /** R-01：每帧脉冲（=DSH idleWatchdog 的 arm 重置） */
         volatile long lastActivityAt = System.currentTimeMillis();
 
+        /** T-07：当前阶段（IDLE/MODEL/TOOL）与其起始时刻；供静默心跳与首帧超时判定 */
+        volatile String phase = PHASE_IDLE;
+
+        volatile long phaseSince = System.currentTimeMillis();
+
+        /** 阶段细节（工具名等，可空） */
+        volatile String phaseDetail;
+
+        /** T-08：心跳计数（进金丝雀体检行）与上次心跳时刻（节流用） */
+        final AtomicLong heartbeats = new AtomicLong(0);
+
+        volatile long lastHeartbeatAt = 0L;
+
         /** BUG-77：源流供应商（可再取一次 = 自动重试能力）与重试标记（每轮至多一次） */
         private Supplier<Flux<Map<String, Object>>> sourceSupplier;
         private volatile boolean retryUsed = false;
@@ -254,6 +325,33 @@ public class HarnessTurnManager {
                 .subscribe(t -> {
                     long now = System.currentTimeMillis();
                     Turn self = this;
+                    // T-09 首帧超时：**仅 MODEL 阶段**（自调用发起起算）——避免误杀长工具
+                    if (PHASE_MODEL.equals(phase) && modelFirstFrameTimeoutSeconds > 0
+                            && now - phaseSince >= modelFirstFrameTimeoutSeconds * 1000L) {
+                        HarnessTurnManager.this.turns.remove(self.sessionId, self);
+                        self.finish(STATUS_MODEL_TIMEOUT, "\n\n⏱ 模型调用超时（" + modelFirstFrameTimeoutSeconds
+                                + " 秒无任何响应），已中止本轮；已生成内容保留。可重试或检查模型服务连通性。");
+                        return;
+                    }
+                    // T-08 静默心跳：静默达阈值 → 按 ≤1 帧/5s 下发进度帧（**不**脉冲 lastActivityAt，
+                    // 保证空闲闸仍按"真实活动"计时；心跳自身独立计数进金丝雀）
+                    long silentMs = now - lastActivityAt;
+                    if (silentMs >= silenceHeartbeatSeconds * 1000L
+                            && now - lastHeartbeatAt >= HEARTBEAT_MIN_GAP_MS && !sinkDone.get()) {
+                        lastHeartbeatAt = now;
+                        heartbeats.incrementAndGet();
+                        Map<String, Object> beat = new java.util.HashMap<>();
+                        beat.put("content", "");
+                        beat.put("thinking", "");
+                        beat.put("silenceMs", silentMs);
+                        beat.put("phase", phase);
+                        beat.put("phaseLabel", PHASE_TOOL.equals(phase) ? "工具执行中"
+                                : (PHASE_MODEL.equals(phase) ? "模型调用中" : "等待响应中"));
+                        if (phaseDetail != null && !phaseDetail.isBlank()) {
+                            beat.put("phaseDetail", phaseDetail);
+                        }
+                        sink.emitNext(beat, Sinks.EmitFailureHandler.busyLooping(Duration.ofMillis(100)));
+                    }
                     // R-01 空闲闸（DSH idleWatchdog 语义）：连续无任何帧超阈值 → 判挂起定稿
                     if (now - lastActivityAt > turnIdleTimeoutSeconds * 1000L) {
                         HarnessTurnManager.this.turns.remove(self.sessionId, self);
@@ -468,8 +566,9 @@ public class HarnessTurnManager {
                         sessionId, status, cl, fs, fe);
             }
             else {
-                log.info("[b69-canary] session={} status={} contentLen={} frames={} emitted={} dropped={} textFrames={}",
-                        sessionId, status, cl, fs, fe, fd, tf);
+                log.info("[b69-canary] session={} status={} contentLen={} frames={} emitted={} dropped={} "
+                        + "textFrames={} heartbeats={}",
+                        sessionId, status, cl, fs, fe, fd, tf, heartbeats.get());
             }
             sinkDone.set(true);
             if (janitor != null) {
@@ -489,7 +588,8 @@ public class HarnessTurnManager {
                 sourceSub.dispose();
             }
             turns.remove(sessionId, this);
-            if (status.equals(STATUS_TIMEOUT) || status.equals(STATUS_CANCELLED)) {
+            if (status.equals(STATUS_TIMEOUT) || status.equals(STATUS_CANCELLED)
+                    || status.equals(STATUS_MODEL_TIMEOUT)) {
                 content.append(suffix == null ? "" : suffix);
             }
             // 模型偶发「工具全执行完但跳过收尾正文」（BUG-59 三报）：诚实注记兜底，不让用户面对空气泡

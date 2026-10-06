@@ -52,28 +52,52 @@ public class AgentFileController {
             @RequestParam(required = false, defaultValue = "false") boolean scan) {
         String userId = StpUtil.getLoginIdAsString();
         return Mono.fromCallable(() -> {
-            // BL-19：抽屉打开即补扫（此前只靠轮末扫描，写尾文件会"看不到"；scan 由 storeKey 幂等去重）
-            if (scan) {
-                ChatSession session = chatSessionMapper.selectOneById(sessionId);
-                // BUG-80：属主本人或后台管理员均可触发补扫（admin 运行页查看前台用户会话）
-                if (session != null && agentFileService.canAccessSession(session, userId)) {
-                    // BUG-67：补扫窗口从"会话创建时间"收窄为"最近一条 assistant 消息以来"——
-                    // 只兜最后一轮尾写，不再全史收编（跨会话污染主通道）；轮末扫描仍是归属主通道
-                    Object lastTurn = com.mybatisflex.core.row.Db.selectObject(
-                            "select max(create_time) from tbl_data_chat_message where session_id = ? and role = 'assistant'",
-                            sessionId);
-                    if (lastTurn instanceof java.util.Date d) {
-                        workspaceArtifactScanner.scanAndRegister(
-                                session.getAgentId() == null ? null : session.getAgentId().longValue(),
-                                null, userId, sessionId, d.toInstant());
-                    }
-                    // 无 assistant 消息：不补扫（无轮次可兜），历史文件靠各自会话的轮末扫描归属
-                }
-            }
+            maybeScan(sessionId, userId, scan);
             return ReturnVo.ok("操作成功!", agentFileService.listBySession(sessionId, userId));
         })
                 .subscribeOn(Schedulers.boundedElastic())
                 .onErrorResume(AgentFileException.class, e -> Mono.just(ReturnVo.fail(e.getMessage(), e.getCode())));
+    }
+
+    /**
+     * v1.7.0 R-02：会话文件树**单层**（{@code path} 为空=会话根；{@code __history__}=历史行聚合）。
+     * 与平铺接口同一属主/管理员校验口径；{@code scan} 补扫语义亦一致。
+     */
+    @GetMapping("/tree")
+    public Mono<ReturnVo<AgentFileService.TreeLevel>> tree(@RequestParam String sessionId,
+            @RequestParam(required = false) String path,
+            @RequestParam(required = false, defaultValue = "false") boolean scan) {
+        String userId = StpUtil.getLoginIdAsString();
+        return Mono.fromCallable(() -> {
+            maybeScan(sessionId, userId, scan);
+            return ReturnVo.ok("操作成功!", agentFileService.treeLevel(sessionId, path, userId));
+        })
+                .subscribeOn(Schedulers.boundedElastic())
+                .onErrorResume(AgentFileException.class, e -> Mono.just(ReturnVo.fail(e.getMessage(), e.getCode())));
+    }
+
+    /** BL-19/BUG-67/BUG-80 补扫口径（平铺与树共用，避免两处漂移）。 */
+    private void maybeScan(String sessionId, String userId, boolean scan) {
+        if (!scan) {
+            return;
+        }
+        // 抽屉打开即补扫（此前只靠轮末扫描，写尾文件会"看不到"；scan 由 storeKey 幂等去重）
+        ChatSession session = chatSessionMapper.selectOneById(sessionId);
+        // BUG-80：属主本人或后台管理员均可触发补扫（admin 运行页查看前台用户会话）
+        if (session == null || !agentFileService.canAccessSession(session, userId)) {
+            return;
+        }
+        // BUG-67：补扫窗口从"会话创建时间"收窄为"最近一条 assistant 消息以来"——
+        // 只兜最后一轮尾写，不再全史收编（跨会话污染主通道）；轮末扫描仍是归属主通道
+        Object lastTurn = com.mybatisflex.core.row.Db.selectObject(
+                "select max(create_time) from tbl_data_chat_message where session_id = ? and role = 'assistant'",
+                sessionId);
+        if (lastTurn instanceof java.util.Date d) {
+            workspaceArtifactScanner.scanAndRegister(
+                    session.getAgentId() == null ? null : session.getAgentId().longValue(),
+                    null, userId, sessionId, d.toInstant());
+        }
+        // 无 assistant 消息：不补扫（无轮次可兜），历史文件靠各自会话的轮末扫描归属
     }
 
     @GetMapping("/{id}/download")
