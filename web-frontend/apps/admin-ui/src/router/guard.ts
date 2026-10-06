@@ -50,35 +50,14 @@ function setupAccessGuard(router: Router) {
     const userStore = useUserStore();
     const authStore = useAuthStore();
 
-    // BUG-90：**两套 token 来源对齐**。请求层（api/request.ts）取 `localStorage['phoenix-token']`，
-    // 而守卫判的是 `accessStore.accessToken`（另一套持久键）。二者不同步时会出现
-    // 「接口全部 200（请求层有凭据）却停在登录页/内容空白」——现场日志实证：
-    // URL 停在 /auth/login?redirect=/auth/login，同时 /api/privilege/auth/menus 与 /api/agent/list 均 200。
-    // 此处做一次**单向回填**（仅当 store 为空且本地有 token），不反向覆盖，避免误清请求层凭据。
-    if (!accessStore.accessToken) {
-      const persisted = localStorage.getItem('phoenix-token');
-      if (persisted) {
-        accessStore.setAccessToken(persisted);
-      }
-    }
-
     // 基本路由，这些路由不需要进入权限拦截
     if (coreRouteNames.includes(to.name as string)) {
       if (to.path === LOGIN_PATH && accessStore.accessToken) {
-        // BUG-89：redirect 可能指向登录页自身（历史自我重定向留下的嵌套值）→ 不可再跳自己，
-        // 否则 vue-router 中止导航 ⇒ 内容区空白（现象：打开页签无内容、强刷才恢复）
-        const raw = (to.query?.redirect as string) || '';
-        let target = '';
-        try {
-          target = raw ? decodeURIComponent(raw) : '';
-        }
-        catch {
-          target = '';
-        }
-        if (!target || target.split('?')[0] === LOGIN_PATH) {
-          target = userStore.userInfo?.homePath || '/agent/list';
-        }
-        return target;
+        return decodeURIComponent(
+          (to.query?.redirect as string) ||
+            userStore.userInfo?.homePath ||
+            '/agent/list',
+        );
       }
       // Chat 路由需登录，且仅允许 userType === 1 的用户访问
       if (to.name === 'Chat') {
@@ -106,22 +85,20 @@ function setupAccessGuard(router: Router) {
         return true;
       }
 
-      // BUG-89：判据从 `to.fullPath` 改为 `to.path`——落在 `/auth/login?redirect=…` 时
-      // fullPath 必然 != LOGIN_PATH，会把**登录页自身**再包一层 redirect（自我重定向 + 嵌套），
-      // 导航被中止 ⇒ 空白页。已在登录页时直接放行渲染（`return true`，不能 `return to`，那同样是"跳自己"）。
-      if (to.path === LOGIN_PATH) {
-        return true;
+      // 没有访问权限，跳转登录页面
+      if (to.fullPath !== LOGIN_PATH) {
+        return {
+          path: LOGIN_PATH,
+          // 如不需要，直接删除 query
+          query:
+            to.fullPath === '/agent/list'
+              ? {}
+              : { redirect: encodeURIComponent(to.fullPath) },
+          // 携带当前跳转的页面，登录后重新跳转该页面
+          replace: true,
+        };
       }
-      return {
-        path: LOGIN_PATH,
-        // 如不需要，直接删除 query
-        query:
-          to.fullPath === '/agent/list'
-            ? {}
-            : { redirect: encodeURIComponent(to.fullPath) },
-        // 携带当前跳转的页面，登录后重新跳转该页面
-        replace: true,
-      };
+      return to;
     }
 
     // 是否已经生成过动态路由
@@ -152,12 +129,7 @@ function setupAccessGuard(router: Router) {
     if (userInfo.userType === 1) {
       redirectPath = '/front/chat';
     } else {
-      redirectPath = (// BUG-91：来源页若为登录页（/auth/login?redirect=…），不得把它当落地目标——否则刚打开的
-        // 目标页（如运行页）会被再踢回登录页，组件卸载 ⇒ 内容区空白。仅接受非登录页来源的 redirect。
-        (from.query.redirect
-          && decodeURIComponent(String(from.query.redirect)).split('?')[0] !== LOGIN_PATH
-          ? from.query.redirect
-          : undefined) ??
+      redirectPath = (from.query.redirect ??
         (to.path === '/agent/list'
           ? userInfo.homePath || '/agent/list'
           : to.fullPath)) as string;

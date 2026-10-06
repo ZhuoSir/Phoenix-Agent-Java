@@ -34,5 +34,4 @@ const resetRoutes = () => resetStaticRoutes(router, routes);
 // 创建路由守卫
 createRouterGuard(router);
 
-
 export { resetRoutes, router };
