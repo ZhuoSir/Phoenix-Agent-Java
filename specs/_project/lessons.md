@@ -266,3 +266,26 @@
 - **防再犯规则**：① 脚本承载中文正文一律用三引号 `'''…'''`，且正文内引号统一写「」；
   ② `old_string` **必须取自当前文件**（先 `grep` 或用 `python -c "print(repr(line))"` 打印真实内容），禁止凭记忆拼；
   ③ 任何脚本化写账：先 `assert count == 1` → 再写 → 写完立刻 `grep` 复核（与 L-25 同源）。
+
+## L-34 包装异常必须"既记日志又把 cause 摘要回传"，否则排障只剩无信息量文案
+- **现象**：知识库检索工具每次都返回给模型 `Error during parallel search execution`——出自
+  `AbstractHybridRetrievalStrategy:92` 的 `catch (ExecutionException e) { throw new RuntimeException("Error during parallel search execution", e); }`：
+  **cause 被包装后既没有 `log.error(…, e)` 落日志，也没有把 cause 摘要回传给工具调用方**，
+  于是模型与人都只能看到"并行检索失败"这句无信息量的话；真实原因（阿里云 embedding **欠费 Arrearage**）
+  要靠我另写 curl 探针才挖出来。
+- **防再犯规则**：① 任何 `catch (X e) { throw new RuntimeException("概述", e) }` 必须同时 `log.error` 打全栈
+  （至少 ERROR 级 + 关键入参摘要）；② **面向模型/外部调用方的错误文本要带可诊断信息**
+  （`"检索失败: " + rootCause.getClass().getSimpleName() + ": " + rootCause.getMessage()`），
+  否则 Agent 只能"盲目重试"或退化到歪路（本次就退化成了直读文件系统）；
+  ③ 多路并行（`CompletableFuture.get()`）的异常必须**分别定位是哪一路**（向量 vs 关键词），别合成一句。
+
+## L-35 Agent 行为类问题的第一手证据在"会话上下文落库"，而不是靠猜
+- **现象**：本次"为什么智能体不去知识库检索"的完整因果链（`domain_knowledge_context` 为空、按框架提示去
+  `knowledge/` 扑空、`getRagInfo` 连续报错、转去 shell 直读共享目录、并把该路径写进长期记忆），
+  全部是**模型自述 + 工具调用/返回原文**里逐条读出来的；而最初我以为"是提示词问题/开关问题"，
+  单看代码与日志都不够。
+- **防再犯规则**：① 排查 Agent 行为偏差，先取**它自己的轨迹**：DB 侧
+  （`tbl_data_chat_message` / AgentStateStore 的 `context` 里含 thinking + tool_use + tool_result 原文），
+  或 `docker logs` 里的 tool 调用/返回；**模型自述当"线索"、当"证据的索引"，不当结论**；
+  ② 每条线索都要用**独立探针**复验（本次：embedding 接口 curl、`tbl_data_model_config` 比对、
+  `find` 容器路径、框架 jar 里 `strings` 抽提示词原文）；③ 结论必须能对齐"现象 ← 触发条件 ← 代码/配置位置"三要素。
