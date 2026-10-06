@@ -1,0 +1,59 @@
+Pager usage is off.
+### B. 8 类列引用计数快照（total / ref_privilege / ref_platform / orphan）
+              target               | total | ref_priv | ref_plat | orphan 
+-----------------------------------+-------+----------+----------+--------
+ 1 agent_user_agent_info.user_id   |     6 |        4 |        1 |      1
+ 2 agent_user_memory_info.user_id  |     0 |        0 |        0 |      0
+ 3 agent_user_profile_info.user_id |     0 |        0 |        0 |      0
+ 4 data_chat_session.user_id       |   152 |      115 |       28 |      9
+ 5 preset_question.account_id      |     0 |        0 |        0 |      0
+ 6 data_agent.admin_id             |    10 |        0 |        0 |      0
+ 7 agent_file.creator              |  4882 |     4669 |      213 |      0
+ 8a knowledge_base.creator         |     5 |        4 |        0 |      1
+ 8b agent_kbase_bind.creator       |     3 |        2 |        0 |      1
+(9 rows)
+
+### C1. 可对应（同自然人）：platform ⟕ privilege
+    platform_id     | platform_user | pa_code |       pa_emp       |    privilege_id    | privilege_user | pu_code |       pu_emp       |        match_keys         
+--------------------+---------------+---------+--------------------+--------------------+----------------+---------+--------------------+---------------------------
+ 461671714812850176 | chenzhuo      | 1002    | 461670914812276736 | 461671036765859840 | chenzhuo       | 1002    | 461670914812276736 | employee_id,code,username
+ 461671714812850176 | chenzhuo      | 1002    | 461670914812276736 | 461681072489615360 | admin          | 1001    | 461670914812276736 | employee_id
+(2 rows)
+
+### C2. 不可对应（分支 B 候选）：platform 无任何匹配
+         id          | username  | code  | employee_id | status | del_flag 
+---------------------+-----------+-------+-------------+--------+----------
+ 9000000000000090001 | thinktest | 90991 | -           | 1      |        0
+(1 row)
+
+### C3. 疑似重复：一个自然人在 privilege 侧有多行
+           employee_id            | n |                                 rows                                 
+----------------------------------+---+----------------------------------------------------------------------
+ 461670914812276736               | 2 | 461671036765859840(chenzhuo,del=0) | 461681072489615360(admin,del=0)
+ 8602614d117642279f32d4993fd4bf7b | 2 | 428011841386577921(xtj,del=0) | 428011841386577920(liufang,del=0)
+(2 rows)
+
+Pager usage is off.
+### D. 孤儿引用明细（既不在 privilege_user 也不在 platform_account 的 id）
+             src             |       ref_id        | n 
+-----------------------------+---------------------+---
+ 1 agent_user_agent_info     | 433383317100486656  | 1
+ 4 data_chat_session         | 1000000000000000001 | 5
+ 4 data_chat_session         | 433383317100486656  | 4
+ 8a knowledge_base.creator   | system              | 1
+ 8b agent_kbase_bind.creator | system              | 1
+(5 rows)
+
+### E. data_agent.admin_id 取值形态（int8，两套 id 均为 varchar）
+ admin_id | n  
+----------+----
+ NULL     | 10
+(1 row)
+
+### F. chat_session 孤儿所属会话样本（判断是否历史/已删账号）
+       user_id       | sessions | first_day  |  last_day  
+---------------------+----------+------------+------------
+ 1000000000000000001 |        5 | 2026-10-01 | 2026-10-03
+ 433383317100486656  |        4 | 2026-07-11 | 2026-10-03
+(2 rows)
+
