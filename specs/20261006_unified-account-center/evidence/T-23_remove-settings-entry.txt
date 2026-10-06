@@ -1,0 +1,37 @@
+=== T-23 独立 chat 页去掉「系统设置」入口（R-13）实施与验证（2026-10-06 15:2x）===
+目标：chat 页左下角用户区**只保留**账号标识（头像/用户名/「当前登录」）与「退出登录」；**移除「系统设置」**
+（含其弹窗——弹窗内还有账号信息与"修改密码"，用户选定方案 B：只删系统设置、保留退出登录）。
+
+--- 1. 改动（1 文件）---
+`src/views/front/components/ChatHistoryPanel.vue`：
+  · 模板：删除 `user-card__menu-item`「系统设置」按钮整块（含齿轮 svg 与 `<span>系统设置</span>`）
+  · 脚本：删除 `import SystemSettingsModal`、`settingsModalRef`、`handleSystemSettings()`
+  · 模板尾部：删除 `<SystemSettingsModal ref="settingsModalRef" />` 挂载，留注释说明（组件文件保留，入口已移除）
+  · **保留**：`user-card__menu-header`（头像 + 用户名 + 当前登录）与 `user-card__menu-item--danger`「退出登录」
+
+--- 2. 自伤与修复（L-32 记录）---
+第一次删除 `handleSystemSettings` 时，我的替换块**覆盖到了下一个函数签名** `async function handleLogout()`，
+而新文本只写 `function handleLogout()` ⇒ 丢了 `async` ⇒ 两处 `await` 报 TS1308、构建 `Exit status 1`。
+定位：typecheck 错误总数 **212 → 214**（增量即暴露）；修复：补回 `async`。
+
+--- 3. 类型检查 + 构建（L-30：pipefail + 指认成功标志）---
+$ pnpm -F @vben/web-ele typecheck
+  修复前 214（ChatHistoryPanel 2 处 TS1308）→ 修复后 **212**（基线 213 ⇒ 无新增；ChatHistoryPanel 命中 0）
+$ pnpm -F @vben/web-ele build → ✓ built in 4.29s（dist.zip 3405078 bytes）  BUILD_EXIT=0
+
+--- 4. 产物核对（本地 dist 与现网一致）---
+本地 `dist/js/ChatHistoryPanel-BTpMzVFa.js`：`系统设置`=0 次、`SystemSettingsModal`=0 次、`退出登录`=1 次
+现网 `GET /js/ChatHistoryPanel-BTpMzVFa.js`：HTTP=200，`系统设置`=0 次、`退出登录`=1 次
+说明：`js/SystemSettingsModal-oyVoBEN-.js` 仍存在，但**无任何代码路径引用**——它只被 `access.ts` 的
+  `import.meta.glob('../views/**/*.vue')` 作为 pageMap 懒加载项打包（glob 覆盖全部 views）。
+  证据：引用它的源码只有它自身的 `defineOptions({name})`（`grep -rn SystemSettingsModal src`），
+  且 ChatHistoryPanel 分包中 `SystemSettingsModal` 出现 0 次 ⇒ **没有入口可触达**，不违反 R-13。
+
+--- 5. 部署（只重建 nginx，不重启后端）---
+  nginx 容器 StartedAt=2026-10-06T07:24:00Z（已重建），health=healthy
+  **后端 StartedAt=2026-10-06T06:40:03Z（未重启）** ⇒ 会话不失效、无用户掉线
+  现网 index.html md5 == 本地 dist/index.html md5（MATCH ✓）
+
+--- 6. 待用户实测（登录需滑块验证码，脚本化登录不可行）---
+  · 在新窗口的 chat 页展开左下角用户卡 ⇒ **只有「退出登录」**，无「系统设置」
+  · 头像/用户名/「当前登录」仍在；点「退出登录」按 R-06 正常登出

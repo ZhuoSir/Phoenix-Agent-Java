@@ -8,11 +8,8 @@ import { Fold, More } from '@element-plus/icons-vue';
 
 
 import { useAuthStore } from '#/store';
-import SystemSettingsModal from './SystemSettingsModal.vue';
 
 const emit = defineEmits(['collapse'])
-
-const settingsModalRef = ref<InstanceType<typeof SystemSettingsModal>>();
 
 const chat = useChatStore();
 const agentStore = useAgentStore();
@@ -217,11 +214,6 @@ function handleEscape(event: KeyboardEvent) {
     userMenuOpen.value = false;
     activeMenuSessionId.value = null;
   }
-}
-
-function handleSystemSettings() {
-  userMenuOpen.value = false;
-  settingsModalRef.value?.open();
 }
 
 async function handleLogout() {
@@ -553,32 +545,6 @@ defineExpose({
           </div>
           <button
             type="button"
-            class="user-card__menu-item"
-            role="menuitem"
-            @click="handleSystemSettings"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
-              <circle
-                cx="12"
-                cy="12"
-                r="3"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="1.6"
-              />
-              <path
-                d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="1.6"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-            </svg>
-            <span>系统设置</span>
-          </button>
-          <button
-            type="button"
             class="user-card__menu-item user-card__menu-item--danger"
             role="menuitem"
             @click="handleLogout"
@@ -607,7 +573,7 @@ defineExpose({
       </transition>
     </footer>
 
-    <SystemSettingsModal ref="settingsModalRef" />
+    <!-- R-13（v2.1.0）：独立 chat 页不提供「系统设置」入口与其弹窗（组件文件保留，入口已移除） -->
   </div>
 </template>
 
