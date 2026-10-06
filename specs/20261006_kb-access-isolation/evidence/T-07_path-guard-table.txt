@@ -1,0 +1,42 @@
+=== T-07 路径护栏匹配器：表驱动验证（2026-10-06，离线，可复现）===
+被测类：phoenix-agent-core/.../harness/security/KnowledgePathGuard.java（纯函数，与框架解耦）
+方法：编译模块后，用临时 harness（/tmp/guard/GuardTable.java）跑 16 条用例矩阵（拒绝侧 9 + 放行侧 7），
+      断言 = KnowledgePathGuard.isDenied(path, workspaceRoot) 与期望值一致。
+会话工作区（白名单）取 /app/uploads/agent-workspace/agent-33/sess-1；上传根 /app/uploads。
+
+--- 最终结果（全部通过）---
+PASS path=/app/uploads/data-agent/agent-knowledge/9548b8bf-x.md      ws=/app/uploads/agent-workspace/agent-33/sess-1 expect=true  got=true
+PASS path=data-agent/agent-knowledge/9548b8bf-x.md                   ws=/app/uploads/agent-workspace/agent-33/sess-1 expect=true  got=true
+PASS path=data-agent\agent-knowledge\x.md                            ws=/app/uploads/agent-workspace/agent-33/sess-1 expect=true  got=true
+PASS path=/app/uploads/data-agent/agent-knowledge/../agent-knowledge/x.md ws=/app/uploads/agent-workspace/agent-33/sess-1 expect=true  got=true
+PASS path=/APP/UPLOADS/DATA-AGENT/AGENT-KNOWLEDGE/x.md               ws=/app/uploads/agent-workspace/agent-33/sess-1 expect=true  got=true
+PASS path=../../data-agent/agent-knowledge/x.md                      ws=/app/uploads/agent-workspace/agent-33/sess-1 expect=true  got=true
+PASS path=../../uploads/data-agent/agent-knowledge/x.md              ws=/app/uploads/agent-workspace/agent-33/sess-1 expect=true  got=true
+PASS path=/app/uploads/agent-workspace/agent-33/other-sess/note.md   ws=/app/uploads/agent-workspace/agent-33/sess-1 expect=true  got=true
+PASS path=/app/uploads/agent-workspace/agent-36/sess/note.md         ws=/app/uploads/agent-workspace/agent-33/sess-1 expect=true  got=true
+PASS path=/app/uploads/agent-workspace/agent-33/sess-1/note.md       ws=/app/uploads/agent-workspace/agent-33/sess-1 expect=false got=false
+PASS path=/app/uploads/agent-workspace/agent-33/sess-1               ws=/app/uploads/agent-workspace/agent-33/sess-1 expect=false got=false
+PASS path=note.md                                                    ws=/app/uploads/agent-workspace/agent-33/sess-1 expect=false got=false
+PASS path=memory/2026-10-05.md                                       ws=/app/uploads/agent-workspace/agent-33/sess-1 expect=false got=false
+PASS path=./sub/../note.md                                           ws=/app/uploads/agent-workspace/agent-33/sess-1 expect=false got=false
+PASS path=/etc/passwd                                                ws=/app/uploads/agent-workspace/agent-33/sess-1 expect=false got=false
+PASS path=/tmp/x.md                                                  ws=/app/uploads/agent-workspace/agent-33/sess-1 expect=false got=false
+
+汇总: PASS=16 FAIL=0
+
+--- 表驱动验证发现的问题（本轮真实修掉 5 处误判，全部由用例暴露）---
+第 1 轮（3 处误伤，均为"该放行却拒绝"）：
+  · note.md / memory/2026-10-05.md / ./sub/../note.md —— 原因：把"相对路径拼上传根后再判"当规则，
+    结果任何相对路径都落进上传根 ⇒ 全判拒绝 ⇒ **会打断 agent 正常工作区读写**（正是 T-07 要防的误伤）。
+    修复：相对路径先按「cwd = 会话工作区」解析，再判白名单/上传根。
+第 2 轮（2 处漏放，均为"该拒绝却放过"）：
+  · data-agent/agent-knowledge/9548b8bf-x.md、data-agent\agent-knowledge\x.md（相对写法）——原因：
+    白名单先执行，相对路径按工作区解析后天然落在工作区内 ⇒ 被短路放行。
+    修复：显式黑名单（data-agent、data-agent/agent-knowledge、agent-workspace）**前置**到白名单之前。
+
+--- 覆盖到的绕过面（拒绝侧 9 条）---
+绝对写法 / 相对写法 / 反斜杠 / `..` 点段 / 全大写 / `../../data-agent/...` 相对逃逸 /
+`../../uploads/...` 相对逃逸 / 跨会话工作区（同 agent 他人会话、他人 agent 会话）。
+
+--- 范围外（本护栏不管，由框架工作区策略负责）---
+/etc/passwd、/tmp/x.md（不在上传根内）；且**不承诺**"权限级不可读"（BUG-109：agent shell 与后端同 UID）。
