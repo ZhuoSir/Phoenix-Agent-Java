@@ -52,3 +52,6 @@ clean-deploy-all-local.bat
 ### 本地构建/缓存与临时产物（v1.7.0 T-01 / BL-12）
 .mvn-home/
 .pnpm-store/
+
+### dsh browser-skill 本机配置指针（含绝对路径，不入库）
+/.dsh/
