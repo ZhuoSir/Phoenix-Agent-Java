@@ -1772,7 +1772,13 @@ document.addEventListener('visibilitychange', () => {
               </div>
               <div v-else :class="['message', message.role]">
                 <div class="message-avatar">
-                  <el-avatar :size="32" style="font-size:16px;font-weight:600;color:#fff;background:#2f6bff">
+                  <!-- BUG-110：助手消息应显示**智能体真实头像**（此前恒为首字圈）。
+                       el-avatar 的 src 加载失败时会自动回落到插槽内容（首字），故无需额外兜底逻辑。 -->
+                  <el-avatar
+                    :size="32"
+                    :src="message.role === 'user' ? undefined : (agent.avatar || undefined)"
+                    style="font-size:16px;font-weight:600;color:#fff;background:#2f6bff"
+                  >
                     {{ message.role === 'user' ? '我' : (agent.name?.charAt(0) || 'AI') }}
                   </el-avatar>
                 </div>
