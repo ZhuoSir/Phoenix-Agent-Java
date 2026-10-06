@@ -47,9 +47,11 @@ const coreRoutes: RouteRecordRaw[] = [
     },
   },
   {
+    // R-11 / T-19（v2.0.1）：前台独立入口下线 —— 旧前台路由重定向到 admin 侧对应页面。
+    // 页面文件保留（一期不删代码；chat.vue 仍被「智能体中心」菜单以 pageMap 动态路由复用）。
     name: 'AgentList',
     path: '/front/agent',
-    component: () => import('#/views/front/agent.vue'),
+    redirect: '/agent/list',
     meta: {
       hideInTab: true,
       hideInMenu: true,
@@ -59,7 +61,7 @@ const coreRoutes: RouteRecordRaw[] = [
   {
     name: 'Chat',
     path: '/front/chat',
-    component: () => import('#/views/front/chat.vue'),
+    redirect: '/agent/chat',
     meta: {
       hideInTab: true,
       hideInMenu: true,

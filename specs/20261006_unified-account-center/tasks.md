@@ -173,7 +173,13 @@
   ⇒ 本期实际可见性 = **任一登录用户**；ACL 行为二期启用过滤的预置数据，按角色过滤属 R-05 二期。
   证据 `evidence/T-18_menu-mechanism.txt`（drill 应用/幂等/回滚三步）；受阻留痕 `evidence/T-18_menu-blocked.txt`
 
-- [ ] T-19 单套访问逻辑收敛：前台入口下线或重定向，清理第二套鉴权分支
+- [x] T-19 单套访问逻辑收敛：前台入口下线或重定向，清理第二套鉴权分支
+  **✅ 2026-10-06 完成（已构建部署，只重建 nginx、后端未重启 ⇒ 不掉线）**：admin-ui 5 文件改动——
+  删 `userLoginApi`（前台登录端点调用）、删登录页「普通用户/管理员」双 tab 与 `roleType`、
+  删 `guard` 的 `userType===1→/front/chat` 旧分支、`/front/chat→/agent/chat`、`/front/agent→/agent/list` 重定向；
+  typecheck 212（基线 213，改动的 5 文件 0 错误）；构建产物含上述重定向且两个 tab 文案 0 命中；
+  现网 index.html md5 与本地 dist 一致；`verify.sh` 13 项全 PASS（含 [13] `/auth/login` 双面共存 = 端点按 plan 一期保留）。
+  证据 `evidence/T-19_single-access-logic.txt`。**浏览器内落点行为（重定向落点/未登录跳转）归 T-20 矩阵，待用户硬刷实测**
   关联: R-11
   依赖: T-18
   验证方式: 未登录访问智能体中心 → 跳**同一个**后台登录页；`/auth/login`（前端路由）按 plan 重定向到 admin；`grep` 复核前端无前台专属鉴权分支残留

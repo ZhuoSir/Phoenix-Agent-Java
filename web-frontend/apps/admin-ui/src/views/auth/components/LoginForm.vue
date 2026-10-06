@@ -10,7 +10,6 @@ import { useAuthStore } from '#/store';
 import PolicyDialog from './PolicyDialog.vue';
 
 type PolicyTab = 'privacy' | 'terms';
-type LoginTab = 'admin' | 'user';
 
 const authStore = useAuthStore();
 
@@ -20,7 +19,6 @@ const form = reactive({
   remember: true,
 });
 
-const activeTab = ref<LoginTab>('user');
 const agreed = ref(true);
 const submitting = ref(false);
 const errorMsg = ref('');
@@ -56,12 +54,6 @@ function handleCapsLock(event: KeyboardEvent) {
   }
 }
 
-function handleTabChange(tab: LoginTab) {
-  activeTab.value = tab;
-  captchaPassed.value = false;
-  sliderRef.value?.resume();
-}
-
 function onCaptchaSuccess() {
   captchaPassed.value = true;
 }
@@ -91,10 +83,11 @@ async function handleSubmit() {
 
   submitting.value = true;
   try {
+    // R-11/T-19：只保留一套登录逻辑 —— 不再区分"普通用户/管理员"两个入口，
+    // 统一走后台统一账号端点（/api/privilege/auth/login）；落地页由 hasAdminRole 决定。
     await authStore.authLogin({
       username: form.username.trim(),
       password: form.password,
-      roleType: activeTab.value,
     });
   } catch {
     resetCaptcha();
@@ -113,25 +106,6 @@ async function handleSubmit() {
     </header>
 
     <form class="login-form" novalidate @submit.prevent="handleSubmit">
-      <div class="login-tabs">
-        <button
-          type="button"
-          class="login-tabs__btn"
-          :class="{ active: activeTab === 'user' }"
-          @click="handleTabChange('user')"
-        >
-          普通用户登录
-        </button>
-        <button
-          type="button"
-          class="login-tabs__btn"
-          :class="{ active: activeTab === 'admin' }"
-          @click="handleTabChange('admin')"
-        >
-          管理员登录
-        </button>
-      </div>
-
       <label class="field">
         <span class="field__label">用户名</span>
         <div class="field__control">
@@ -146,9 +120,6 @@ async function handleSubmit() {
             type="text"
             autocomplete="username"
             placeholder="请输入用户名 / 邮箱"
-            :placeholder="
-              activeTab === 'admin' ? '请输入管理员账号' : '请输入用户名 / 邮箱'
-            "
             maxlength="64"
           />
         </div>
@@ -262,39 +233,6 @@ async function handleSubmit() {
 </template>
 
 <style lang="scss" scoped>
-.login-tabs {
-  display: flex;
-  gap: 0;
-  padding: 3px;
-  margin-bottom: 4px;
-  background: #f1f5f9;
-  border-radius: 10px;
-
-  &__btn {
-    flex: 1;
-    height: 36px;
-    padding: 0 12px;
-    font-size: 13px;
-    font-weight: 500;
-    color: #6b7280;
-    cursor: pointer;
-    background: transparent;
-    border: none;
-    border-radius: 8px;
-    transition: all 0.2s ease;
-
-    &.active {
-      color: #2f6bff;
-      background: #fff;
-      box-shadow: 0 1px 3px rgb(15 23 42 / 10%);
-    }
-
-    &:hover:not(.active) {
-      color: #4b5563;
-    }
-  }
-}
-
 .login-card {
   position: relative;
   display: flex;
@@ -662,23 +600,5 @@ async function handleSubmit() {
   color: #fca5a5;
   background: #442525;
   border-color: #5f2d2d;
-}
-
-.dark .login-tabs {
-  background: #1e1e24;
-
-  &__btn {
-    color: #9ca3af;
-
-    &.active {
-      color: #60a5fa;
-      background: #2a2a32;
-      box-shadow: 0 1px 3px rgb(0 0 0 / 30%);
-    }
-
-    &:hover:not(.active) {
-      color: #e5e7eb;
-    }
-  }
 }
 </style>

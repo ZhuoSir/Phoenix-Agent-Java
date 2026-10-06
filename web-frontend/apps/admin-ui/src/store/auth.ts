@@ -9,7 +9,7 @@ import { resetAllStores, useAccessStore, useUserStore } from '@vben/stores';
 import { ElNotification } from 'element-plus';
 import { defineStore } from 'pinia';
 
-import { loginApi, logoutApi, userLoginApi } from '#/api';
+import { loginApi, logoutApi } from '#/api';
 import { $t } from '#/locales';
 
 export const useAuthStore = defineStore('auth', () => {
@@ -31,10 +31,8 @@ export const useAuthStore = defineStore('auth', () => {
     let userInfo: null | UserInfo = null;
     try {
       loginLoading.value = true;
-      const isUser = params.roleType === 'user';
-      const result = isUser
-        ? await userLoginApi({ username: params.username, password: params.password })
-        : await loginApi(params);
+      // R-11 / T-19（v2.0.1）：单套登录逻辑 —— 不再有"普通用户/管理员"两条分支，统一一个端点
+      const result = await loginApi(params);
       const { token, userId, username, realName, email, phone, userType } =
         result as typeof result & { hasAdminRole?: boolean };
 
@@ -44,10 +42,11 @@ export const useAuthStore = defineStore('auth', () => {
 
         // T-05（统一账号中心）：落地页按「是否持有后台角色」判定。
         // 原实现用 userType===1 判「普通用户」，但该列语义是「0 自建 / 1 IDM」（见 BUG-101 同源的语义混淆），
-        // 会把 IDM 来源的后台用户误送前台。前台入口(isUser)仍固定进前台。
+        // 会把 IDM 来源的后台用户误送前台。
+        // T-19（v2.0.1）：无后台角色者落「智能体中心」(/agent/chat，R-11 新入口)，不再落前台路由 /front/chat。
         const hasAdminRole = (result as { hasAdminRole?: boolean }).hasAdminRole;
         const homePath =
-          isUser || hasAdminRole === false ? '/front/chat' : '/agent/list';
+          hasAdminRole === false ? '/agent/chat' : '/agent/list';
         userInfo = {
           avatar: '',
           desc: '',
