@@ -85,3 +85,21 @@
 
 **组 4 批次必须补齐的两件事**：① 实测 `useLegacyXmlWorkspaceContext(true)` 的文本是否仍含 `knowledge/`（若是，可作更省事的替代）；
 ② 用 `PermissionContextState.addDenyRule("execute", ruleContent=原件路径模式)` 做"命令里含原件路径 → 拒绝 + 审计"的 runtime PoC（并验证 `ruleContent` 匹配语义，供 T-07）。
+
+--- 第四轮（离线：权限引擎与规则匹配语义，2026-10-06）---
+目的：为 T-08（护栏接入）定实现方式，尽量不靠重启验证。
+发现：
+· core jar：`io.agentscope.core.permission.PermissionEngine` 按**工具名**索引 allow/ask/deny 三张规则表
+  （`checkAllowRules/checkAskRules/checkDenyRules` → `rulesFor(map, ToolBase.getName())`）；
+  规则对象 `PermissionRule(toolName, ruleContent, behavior, source)`。
+· **匹配语义是"下放给工具"**：`PermissionEngine.ruleMatches(...)` 只做两件事——
+  ① `ruleContent.isEmpty()` 判空；② 调 **`ToolBase.matchRule(String ruleContent, Map<String,Object> args)`**。
+  ⇒ **`ruleContent` 到底匹配什么（命令串？参数 JSON？）取决于具体工具的实现**，
+    不能凭 `PermissionEngine` 推断；这解释了为什么"配了规则拦不住"是可能发生的。
+· 因此 T-08 需再确认一件窄问题：**实现 `execute` 工具的那个类，其 `matchRule` 匹配的是什么**
+  （本轮按名字 grep `tool/*(shell|exec|bash|command)` 未命中该类，需按工具名 `execute` 反查）。
+  若其 `matchRule` 匹配命令字符串 ⇒ 直接 `addDenyRule("execute", new PermissionRule("execute", "/app/uploads/data-agent/agent-knowledge", DENY, "kb-access-isolation"))` 即可；
+  若匹配不到命令 ⇒ 退到"自定义 HarnessRuntimeMiddleware 否决"或"工具层包装"（候选②/③）。
+· legacy 档（`useLegacyXmlWorkspaceContext`）：在 `HarnessAgentBuilderSupport` 的字节码里未直接观察到
+  "legacy 分支"（该类的可见内容以 subagent 装配为主）⇒ **仍未确证**；
+  但 T-10 推荐方案 A（自定义 middleware 替换矛盾段）**不依赖**该项，legacy 仅作"可能更省事"的备选，故不阻塞。
