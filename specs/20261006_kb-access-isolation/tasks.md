@@ -75,6 +75,11 @@
   表驱动测试：给定路径集合 → 期望"拒绝/放行"矩阵（含工作区路径必须放行）
   验收标准: 矩阵测试全绿；工作区路径零误伤
 - [ ] T-08 护栏接入 + 拒绝审计
+  **⏳ 代码完成（编译通过 MVN_EXIT=0），待部署窗口做 enforce 与 T-09**：新增
+  `KnowledgePathGuardMiddleware implements MiddlewareBase`（`onActing` 取 `ToolUseBlock.getName()/getInput()`，
+  交 T-07 `KnowledgePathGuard` 判定；命中记**四要素审计** agentId/sessionId/工具名/命中路径+参数）；
+  已注册于 `HarnessAgentFactory` 的 `.middlewares(...)`。**模式**：默认 `observe`（只记日志、零行为改变，可安全先上线），
+  `PHOENIX_KB_PATH_GUARD=enforce` 才执行拒绝（摘除被拒调用）——enforce 的生效性与副作用在窗口内验证。
   **🔧 落点已定档（2026-10-06 离线取证）**：候选①「官方 `addDenyRule` + 路径模式」**作废**——字节码实测 `ToolBase.matchRule` 默认实现仅 `return ruleContent == null;` 且**无工具覆盖** ⇒ 带模式的规则永不命中；
   改为**候选②**：新增 `KnowledgePathGuardMiddleware implements MiddlewareBase`（`onActing` 取 `ToolUseBlock.getName()/getInput()`，交 T-07 的 `KnowledgePathGuard` 判定；命中即拒绝 + **四要素审计**），注册于 `HarnessAgentFactory` 的 `.middlewares(...)`（同 `StopOnAllDeniedMiddleware` 先例）。
   关联: R-02, R-03
