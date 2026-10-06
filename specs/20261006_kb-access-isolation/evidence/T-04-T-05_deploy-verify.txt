@@ -1,0 +1,31 @@
+=== T-04 / T-05 部署与断言（2026-10-06 部署窗口）===
+用户口令：部署（本次重启会强制全员重登，已授权）
+
+--- 部署三段证明 ---
+jar：phoenix-admin/phoenix-admin-manager/target/phoenix-admin.jar（2026-10-06 16:51，含 T-04/T-05/T-11 + BUG-106 加固）
+镜像重建 → 容器重建：`backend started=2026-10-06T09:33:29Z  health=healthy`；`GET /echo/ok` = 200
+
+--- T-04 静态面断言（内容级，L-37）---
+GET /uploads/data-agent/agent-knowledge/9548b8bf-…md      → HTTP=404  正文泄漏=False   （修复前：200 / 155,827B 正文）
+GET /uploads/agent-workspace/agent-33/sample-note.txt     → HTTP=404  正文泄漏=False   （修复前：200 正文）
+GET /uploads/data-agent/avatars/542dfa93-…jpg             → HTTP=200                  （R-08 不回归 ✓）
+（身份矩阵 ④"通用上传回显"未逐一实拍：本次只拒绝两个敏感前缀，其余路径行为未变——按设计覆盖，T-06 由用户一并回归）
+
+--- T-05 受控接口断言（业务码/状态双侧）---
+GET /api/agent-knowledge/34/raw  无 token                → HTTP=200 且 **code=401「未授权，请先登录」**（L-26：不凭 HTTP 断定）
+GET /api/agent-knowledge/34/raw  chenzhuo（绑定库+有会话）→ HTTP=200 且正文含 "Harness"（=KB 原件正文，allow 侧 ✓）
+GET /api/agent-knowledge/32/raw  chenzhuo（库已删/条目已删）→ HTTP=403 且**正文无泄漏**（deny 侧 ✓）
+GET /api/agent-knowledge/34/raw  admin（管理员例外）        → HTTP=200 且正文含 "Harness"
+
+--- BUG-106 后端加固实证（同批部署）---
+POST /api/model-config/add **带 id=6**（修复前必主键冲突）→ `success=True「配置已保存」`，落库 **id=12**（服务端置空 id、自增取号）
+清理：DELETE /api/model-config/12 → 「配置已删除」；无残留
+
+--- 回归门禁 ---
+`sh docker/scripts/verify.sh` → **13/13 PASS**
+
+--- 待办（未完成项，如实登记）---
+1. **T-06 既有用途回归**：需用户硬刷实测（后台知识库页 列表/上传/召回开关/重试向量化、头像显示、文件面板列与下载）
+2. **T-11 行为验证**：需构造一次真实检索失败（临时改错 embedding 配置再恢复）并观察模型收到的文案 → 归入组 4 批次
+3. **T-08/T-10**：待 runtime 验证（`PermissionRule.ruleContent` 语义 / legacy 档文本）后再写码，同批第二次重启上齐
+4. 影响告知：本次重启使全部在线会话失效（进程内存），用户需重新登录一次

@@ -1,5 +1,16 @@
 package com.phoenix.data.controller;
 
+import cn.dev33.satoken.stp.StpUtil;
+import com.phoenix.data.entity.AgentKnowledge;
+import com.phoenix.data.properties.FileStorageProperties;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import com.phoenix.data.dto.knowledge.agentknowledge.AgentKnowledgeQueryDTO;
 import com.phoenix.data.dto.knowledge.agentknowledge.CreateKnowledgeDTO;
 import com.phoenix.data.dto.knowledge.agentknowledge.UpdateKnowledgeDTO;
@@ -33,6 +44,48 @@ import java.util.List;
 public class AgentKnowledgeController {
 
 	private final AgentKnowledgeService agentKnowledgeService;
+
+	/** R-01/T-05：受控接口需要按存储根解析原件路径 */
+	private final FileStorageProperties fileStorageProperties;
+
+	/**
+	 * R-01 / T-05：受鉴权下载知识库原件（唯一受控通道）。
+	 *
+	 * <p>登录态由 sa-token 拦截器保证（`/api/**` 在 include 名单内）；本方法再校验**归属/绑定**
+	 * （管理员 或 "在绑定该库的智能体下有会话"，口径见 evidence/T-03_ownership-verdict.txt）。
+	 * 拒绝时返回 401/403/404 且**响应体不含任何正文**（L-37）。
+	 */
+	@GetMapping("/{id}/raw")
+	public Mono<ResponseEntity<Resource>> raw(@PathVariable("id") Integer id) {
+		return Mono.fromCallable(() -> {
+			String userId;
+			try {
+				userId = StpUtil.getLoginIdAsString();
+			}
+			catch (Exception e) {
+				return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+			}
+			AgentKnowledge knowledge = agentKnowledgeService.getRawFileIfPermitted(id, userId);
+			if (knowledge == null) {
+				log.warn("知识库原件访问被拒: knowledgeId={}, userId={}", id, userId);
+				return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+			}
+			Path root = Paths.get(fileStorageProperties.getPath()).toAbsolutePath().normalize();
+			Path file = root.resolve(knowledge.getFilePath()).normalize();
+			// 防目录逃逸：解析后的路径必须仍在上传根之内
+			if (!file.startsWith(root) || !Files.isReadable(file) || !Files.isRegularFile(file)) {
+				log.warn("知识库原件不存在或不可读: knowledgeId={}, path={}", id, file);
+				return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+			}
+			log.info("知识库原件下载: knowledgeId={}, userId={}, kbId={}, file={}", id, userId,
+					knowledge.getKnowledgeBaseId(), knowledge.getFilePath());
+			String filename = knowledge.getSourceFilename() == null ? ("knowledge-" + id) : knowledge.getSourceFilename();
+			return ResponseEntity.ok()
+				.header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + filename + "\"")
+				.contentType(MediaType.APPLICATION_OCTET_STREAM)
+				.body((Resource) new FileSystemResource(file));
+		});
+	}
 
 	/**
 	 * Query knowledge details by ID

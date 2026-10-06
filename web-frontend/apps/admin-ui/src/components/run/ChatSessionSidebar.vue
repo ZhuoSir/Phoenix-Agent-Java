@@ -370,7 +370,12 @@ onUnmounted(() => {
     :style="{ width: collapsed ? '52px' : '300px' }"
   >
     <div v-if="collapsed" class="sidebar-collapsed">
-      <el-avatar size="small" style="font-size:14px;font-weight:600;color:#fff;background:#2f6bff;flex-shrink:0">
+      <!-- BUG-110：显示智能体真实头像（加载失败由 el-avatar 自动回落到首字） -->
+      <el-avatar
+        size="small"
+        :src="agent.avatar || undefined"
+        style="font-size:14px;font-weight:600;color:#fff;background:#2f6bff;flex-shrink:0"
+      >
         {{ agent.name?.charAt(0) || 'A' }}
       </el-avatar>
       <el-tooltip content="展开侧栏" placement="right">
@@ -388,7 +393,12 @@ onUnmounted(() => {
       <div class="sidebar-header">
         <div class="header-controls">
           <span class="header-spacer" />
-          <el-avatar size="large" style="font-size:20px;font-weight:600;color:#fff;background:#2f6bff;flex-shrink:0">
+          <!-- BUG-110：同上（展开态头部头像） -->
+          <el-avatar
+            size="large"
+            :src="agent.avatar || undefined"
+            style="font-size:20px;font-weight:600;color:#fff;background:#2f6bff;flex-shrink:0"
+          >
             {{ agent.name?.charAt(0) || 'A' }}
           </el-avatar>
           <el-tooltip content="收起侧栏" placement="bottom">

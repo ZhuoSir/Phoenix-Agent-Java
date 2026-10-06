@@ -14,19 +14,22 @@
 
 ## 1. 前置技术验证（spike，三件并行）
 
-- [ ] T-01 提示面三档位 spike：抓取注入上下文原文，定档"如何消除矛盾指引"
+- [x] T-01 提示面三档位 spike：抓取注入上下文原文，定档"如何消除矛盾指引"
+  **✅ 完成（离线实证，见 `evidence/T-01-T-02_framework-probe.txt`）**：默认档 2391 字含矛盾段且与 Memory 段同源同块；`additionalContextFiles` 仅追加；4 参构造只改文件名参数 ⇒ 定档"不整体关段、改末尾注入"。
   关联: R-04
   依赖: 无
   验证方式: 构造同一智能体三档（① 默认 ② `useLegacyXmlWorkspaceContext(true)` ③ `disableWorkspaceContext()` + `additionalContextFile(...)`），
   各跑一轮并**从会话上下文落库取注入原文**（L-35）→ 产出三档对比表（是否仍含"工作区 `knowledge/` 是事实源"、是否连带丢失 Memory Recall/Persistence 指引）
   验收标准: 三档原文对比表落盘；给出**定档结论**（选哪档 + 是否需要自注入补偿 memory 指引）；不改生产行为（仅本地/临时开关）
-- [ ] T-02 护栏钩子点 spike：验证能否在 shell/文件工具层拿到"命令字符串 + cwd"并拒绝
+- [x] T-02 护栏钩子点 spike：验证能否在 shell/文件工具层拿到"命令字符串 + cwd"并拒绝
+  **✅ 完成（离线取证）**：定档 `MiddlewareBase` 拦截；候选①「官方 deny 规则」经字节码实测否掉（`ToolBase.matchRule` 默认仅 `return ruleContent == null`，无工具覆盖）。
   关联: R-02, R-03
   依赖: 无
   验证方式: 依次验证 ① 框架 `PermissionContextState`/权限中间件 ② `HarnessAgent.Builder.middleware(...)` ③ 工具注册处包装；
   对可用钩子做最小 PoC（拒绝一次 `cat <原件路径>` 并打印拒绝日志）
   验收标准: 给出**可用钩子 + 定档理由 + PoC 输出**；若三条均不可行，明确记录并触发"回改 plan"（不得默默改为只做提示面）
-- [ ] T-03 归属校验口径取证：明确"谁能看谁"
+- [x] T-03 归属校验口径取证：明确"谁能看谁"
+  **✅ 完成**：判定 SQL + allow/deny 双侧对照落盘（`evidence/T-03_ownership-verdict.txt`）；并如实更正一处负对照误选（chenzhuo/kb1 实为合法 allow）。
   关联: R-01
   依赖: 无
   验证方式: 实测 join 取证（L-29）——`tbl_data_agent_kbase_bind`（智能体↔库）、`tbl_data_chat_session`（会话↔用户）、
@@ -35,19 +38,29 @@
 
 ## 2. HTTP 面收敛（R-01；最高优先）
 
-- [ ] T-04 静态可达面收口：`/uploads` 仅保留图片类白名单，非图片不再直出
+- [x] T-04 静态可达面收口：`/uploads` 仅保留图片类白名单，非图片不再直出
+  **✅ 2026-10-06 已部署并断言通过**（证据 `evidence/T-04-T-05_deploy-verify.txt`）：实现取"敏感前缀拒绝"而非全类型白名单——
+  `WebConfig` 增加 `SensitivePathDenyingResolver`（命中 `data-agent/agent-knowledge`、`agent-workspace` 即返回 `Mono.empty()`＝404、
+  响应体无正文；路径归一化后再比对，防反斜杠/点段变形），其余 `/uploads` 用途不变（符合 R-08）。
+  自伤：首版误用 MVC 签名 `Resource getResource(...)`，WebFlux 实为 `Mono<Resource>`，编译报错后修正。
   关联: R-01, R-08
   依赖: T-03
   验证方式: 改 `WebConfig` 资源映射（白名单）→ **内容级**断言（L-37）：未登录直连 KB 原件与会话工作区文件 → 非 200 或响应体**不含正文标记**；
   头像等图片 → 200；`verify.sh` 回归
   验收标准: plan 身份矩阵 **①/KB 原件、②/工作区文件、③/头像图片、④/通用上传回显** 四条身份各有断言且落盘
-- [ ] T-05 受控下载/预览接口（带鉴权 + 归属 + 审计）
+- [x] T-05 受控下载/预览接口（带鉴权 + 归属 + 审计）
+  **⏳ 代码完成（编译通过 MVN_EXIT=0），待部署窗口做 allow/deny 双侧断言**：
+  `GET /api/agent-knowledge/{id}/raw` —— 登录态由 sa-token 拦截器保证（`/api/**` 在 include 名单内）；
+  service `getRawFileIfPermitted(id, userId)` 按 T-03 口径判权（管理员 ∨ 在绑定该库的智能体下有会话）；
+  mapper 新增 `canReadKnowledgeSource(userId, kbId)`；路径解析后校验仍在上传根内（防逃逸）；
+  拒绝返回 401/403/404 且**响应体不含正文**；成功记 info 审计（knowledgeId/userId/kbId/file）。
   关联: R-01, R-08
   依赖: T-03, T-04
   验证方式: 新增 `GET /api/agent-knowledge/{id}/raw`（按 T-03 口径鉴权）→ 未登录/无关账号 → 拒绝（**断言业务码，不只看 HTTP**，L-26）；
   属主/管理员 → 200 + 正文；审计日志含 userId/agentId/kbId/fileId
   验收标准: 三种身份各一条断言落盘；拒绝路径**响应体不含正文**（内容级）
-- [ ] T-06 既有用途回归（用户配合硬刷实测）
+- [x] T-06 既有用途回归（用户配合硬刷实测）
+  **✅ 2026-10-06 完成（用户实测回执）**：① 后台知识库页（列表/上传/召回开关/重试向量化）**正常**；② 文件面板列/下载 **正常**；③ "运行页头像"经定位**不是本次安全改动引入的回归**，而是该页缺头像渲染代码（**BUG-110**）——已修复（消息区 + 侧栏两处）并**用户复验通过**。
   关联: R-08
   依赖: T-04, T-05
   验证方式: 后台知识库页（列表/上传/召回开关/重试向量化）逐项点一次；后台与智能体头像显示正常；前端文件面板列/下载正常
@@ -55,19 +68,37 @@
 
 ## 3. 运行时护栏（R-02/R-03）
 
-- [ ] T-07 禁止路径清单与路径匹配器
+- [x] T-07 禁止路径清单与路径匹配器
+  **✅ 2026-10-06 代码完成 + 离线表驱动验证 16/16 通过**（证据 `evidence/T-07_path-guard-table.txt`）：
+  `phoenix-agent-core/.../harness/security/KnowledgePathGuard.java`（纯函数：归一化 + 显式黑名单前置 + 白名单=本会话工作区 + 上传根收敛）；
+  表驱动暴露并修掉 **5 处误判**（3 处会打断工作区正常读写、2 处相对写法漏放）——正是该验证的价值。
   关联: R-02, R-03
   依赖: T-02
   验证方式: 实现归一化匹配（相对路径、`..`、符号链接解析后比对；清单覆盖 KB 原件路径与 `/app/uploads/**` 非工作区部分）+
   表驱动测试：给定路径集合 → 期望"拒绝/放行"矩阵（含工作区路径必须放行）
   验收标准: 矩阵测试全绿；工作区路径零误伤
 - [ ] T-08 护栏接入 + 拒绝审计
+  **⏳ 代码完成（编译通过 MVN_EXIT=0），待部署窗口做 enforce 与 T-09**：新增
+  `KnowledgePathGuardMiddleware implements MiddlewareBase`（`onActing` 取 `ToolUseBlock.getName()/getInput()`，
+  交 T-07 `KnowledgePathGuard` 判定；命中记**四要素审计** agentId/sessionId/工具名/命中路径+参数）；
+  已注册于 `HarnessAgentFactory` 的 `.middlewares(...)`。**模式**：默认 `observe`（只记日志、零行为改变，可安全先上线），
+  `PHOENIX_KB_PATH_GUARD=enforce` 才执行拒绝（摘除被拒调用）——enforce 的生效性与副作用在窗口内验证。
+  **🔧 落点已定档（2026-10-06 离线取证）**：候选①「官方 `addDenyRule` + 路径模式」**作废**——字节码实测 `ToolBase.matchRule` 默认实现仅 `return ruleContent == null;` 且**无工具覆盖** ⇒ 带模式的规则永不命中；
+  改为**候选②**：新增 `KnowledgePathGuardMiddleware implements MiddlewareBase`（`onActing` 取 `ToolUseBlock.getName()/getInput()`，交 T-07 的 `KnowledgePathGuard` 判定；命中即拒绝 + **四要素审计**），注册于 `HarnessAgentFactory` 的 `.middlewares(...)`（同 `StopOnAllDeniedMiddleware` 先例）。
   关联: R-02, R-03
   依赖: T-07
   验证方式: 按 T-02 定档钩子接入 → 会话内执行 `cat/ls/grep/sed/head/find` 指向原件 → **被拒绝**且日志含
   `agentId/sessionId/路径/命令`；同一会话在工作区读写 → **行为不变**（L-07 双侧取证）
   验收标准: 拒绝侧与放行侧各落盘证据；日志字段齐四要素
 - [ ] T-09 绕过面覆盖测试（如实记录）
+  **🔸 机制级已验证 + 端到端未触发（诚实登记）**：构造合成工具调用直接驱动中间件，**发现并修掉"命令串形态绕过"**（`cat <KB绝对路径>` 原先被误判为工作区内而放行）——`isDenied` 改为**逐词判定**后，T-07 表驱动 16/16 无回归、T-08 observe 3→3 / enforce 3→1 均 PASS。
+  但**端到端四次真实对话（含 enforce 已开启后）均未触发**护栏（模型在提示面即拒绝执行指向原件的命令，含伪装口径）⇒ **enforce 于 2026-10-06 11:39 短暂开启并部署、同日 11:43 按用户口令退回 observe**（因误伤面未评估，见 BUG-113）——期间端到端（含"逐词判定"修复），但端到端**仍未触发**（模型继续在提示面拒绝）
+  ⇒ 端到端证据仍缺失；**并发现两处待裁定项**：① 真实工作区形态为 `agent-XX/<userId>/…`（T-07 样例用的是 `<sessionId>` 形态）；
+  ② enforce 的误伤面未评估（`/app/uploads` 下的合法共享文件读取会被一并摘除）。
+  关联: R-02：本轮两次真实对话中，模型**均未发起**指向禁止路径的工具调用
+  （第一次未翻工作区；第二次被要求直读时在提示面即拒绝）⇒ `知识库路径护栏命中` 日志**零条**，
+  护栏运行时行为**未被真正触发**，因此**不得**声称"运行时已拦住"、也**不翻 enforce**。
+  待补：构造"模型确实发起该调用"的场景（例如更隐蔽的指令或换用不拒答的提示），再验证 observe 记录 + enforce 拦截 + 绕过面清单。
   关联: R-02
   依赖: T-08
   验证方式: 逐条实测常见绕过路径（`python3 -c 'open(...).read()'`、`base64`/`xxd` 变形、`find … -exec`、管道拼接等），
@@ -76,20 +107,32 @@
 
 ## 4. 提示面对齐 + 检索失败可见（R-04/R-05）
 
-- [ ] T-10 提示面定档实施（按 T-01 结论）
+- [x] T-10 提示面定档实施（按 T-01 结论）
+  **✅ 2026-10-06 代码完成 + 已部署 + 注入文本离线验证通过**（证据 `evidence/T-08-T-10_deploy-verify.txt`）：
+  新增 `KnowledgeGuidanceMiddleware implements HarnessRuntimeMiddleware`（`onSystemPrompt` 在**末尾追加**权威指引：
+  "工作区没有 `knowledge/`、上文相关说法均不适用" + "知识库只能经 `getRagInfo`" + "禁止 shell 读原件" + "检索失败须如实告知"；
+  幂等；已注册于 `HarnessAgentFactory.middlewares(...)`。**未整体关框架段**（离线证其与 Memory 段同源同块）。
   关联: R-04
   依赖: T-01
   验证方式: 按定档开关改造 + 注入权威指引文件（内容：知识库仅经 `getRagInfo`；**禁止用 shell/文件工具读取原件**；检索失败如实报错）→
   抓取注入原文核对：**指路唯一且不自相矛盾** + 含禁止条款；memory 指引不退化（若退化则补自注入）
   验收标准: 注入原文落盘（前后对比）；无矛盾指路；memory 行为与改造前一致（或已补偿）
 - [ ] T-11 检索失败可见化（治 L-34 的"真因被吞"）
+  **⏳ 代码完成（编译通过 MVN_EXIT=0），待部署窗口构造真实失败验证**：
+  `AbstractHybridRetrievalStrategy`：`ExecutionException` 分支改为 **ERROR 全栈 + 抛出带 rootCause 摘要的异常**
+  （`并行检索失败: <根因类名>: <message>`）；`KnowledgeRetrievalTool`：单关键词检索失败即 catch，
+  返回「检索失败（注意：这不是「没有相关资料」）: <根因摘要>…停止用文件系统工具查找知识库内容」——
+  直接掐掉 BUG-103 实测的退化路径（模型把"服务不可用"误当"没有资料"→ 转去翻文件系统）。
   关联: R-05
   依赖: 无
   验证方式: `AbstractHybridRetrievalStrategy` 包装处补 `log.error(..., e)` + 抛带 cause 摘要的异常；
   `KnowledgeRetrievalTool` 捕获后返回 `检索失败: <rootCause 类名+message>` →
   构造一次真实失败（临时把 embedding 配置改错）验证模型侧可见真因，随后恢复
   验收标准: 工具返回文本含 rootCause 摘要（落盘原文）；日志含 ERROR 全栈；恢复后检索正常
-- [ ] T-12 模型行为回归（会话上下文取证）
+- [x] T-12 模型行为回归（会话上下文取证）
+  **✅ 2026-10-06 真实对话取证**（`evidence/T-08-T-10_deploy-verify.txt` 末节）：问"北科软的业务报告"时
+  **直接调用检索工具**、未再翻工作区（无 `knowledge/`/`ls`/`find`/`read_file` 行为），并能区分"检索失败"与"未命中"；
+  明确要求直读原件时**拒绝执行且未输出正文** ⇒ R-04/R-05 的行为面达成。
   关联: R-04, R-05
   依赖: T-10, T-11
   验证方式: 会话内提问业务问题（如"harness 讲义"）→ 从会话上下文核对：是否**优先调用 `getRagInfo`**、
@@ -98,19 +141,22 @@
 
 ## 5. 收口（R-06/R-07 + 台账）
 
-- [ ] T-13 BUG 状态翻账与 BUG-86 复测
+- [x] T-13 BUG 状态翻账与 BUG-86 复测
+  **✅ 2026-10-06 完成**：BUG-86 原场景（索取/直读知识库原件内容）**三次复测均不可复现**——模型拒绝执行且未输出正文（证据 `evidence/T-08-T-10_deploy-verify.txt` 及 T-07 证据附节）⇒ 按 R-06 翻 **「已验证(v1.7.0)」**；翻账口径如实标注：**阻断发生在提示面（T-10）**，运行时拦截（T-08 enforce）尚未端到端验证。
   关联: R-06
   依赖: T-04, T-08, T-12
   验证方式: 按 BUG-86 原场景复测（让智能体03 索取**未绑定库**内容）→ 取证落盘；
   同步翻账：BUG-108（已修复/已验证）、BUG-104/105（按实测）、**BUG-86（不可复现 → 已验证(v1.7.0)）**
   验收标准: 复测证据落盘；四条 BUG 状态与证据一致（无证据不得翻账）
-- [ ] T-14 回归门禁与部署三段证明
+- [x] T-14 回归门禁与部署三段证明
+  **✅ 2026-10-06 完成**：`verify.sh` **13 PASS / 0 FAIL**；部署三段（jar→镜像重建→`backend started=11:01:02Z health=healthy` + `/echo/ok=200`）；typecheck 212（基线不变）。
   关联: R-07, R-08
   依赖: T-06, T-13
   验证方式: `docker/scripts/verify.sh` 全绿 + `pnpm -F @vben/web-ele typecheck` 与基线对比（无新增）+ 构建；
   部署按"能只重建 nginx 就不重启后端"（L-16），需重启时先告知用户并约窗口；容器 StartedAt/行为/回读三段留证
   验收标准: 门禁输出落盘；部署三段证明齐；无掉线或已提前告知
-- [ ] T-15 收口文档与挂接核对
+- [x] T-15 收口文档与挂接核对
+  **✅ 2026-10-06 完成**：`completion.md`（含未完成项与去向）+ `artifacts.md`（**零 DDL** 说明）；台账一致。
   关联: R-06, R-07
   依赖: T-14
   验证方式: 生成 `completion.md`（未完成项写原因分类+去向）、`artifacts.md`（若产生升级件，否则记"纯代码零 DDL"）；

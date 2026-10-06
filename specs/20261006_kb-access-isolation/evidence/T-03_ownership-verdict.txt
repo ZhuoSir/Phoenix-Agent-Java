@@ -1,0 +1,60 @@
+=== T-03 归属校验口径取证（只读，2026-10-06）===
+目标：确定"谁能读知识库原件 / 谁能读会话工作区文件"，供 R-01 的受控接口（T-05）使用。
+
+--- 1. 基础事实（实测 SQL）---
+KB2「产品手册库」绑定智能体：33, 36
+agent33 的会话：64 行；属主集合 = {1000000000000000001（D6 孤儿 id）, 461671036765859840（chenzhuo）, 461681072489615360（admin）}
+系统管理员角色（role_id=428007432736870400, del_flag=0）成员：{428011841386577920（liufang）, 461681072489615360（admin）}
+
+--- 2. 判定口径（一期）---
+【知识库原件（按库 K）】
+  ① 请求者持系统管理员角色（tbl_privilege_user_role.role_id='428007432736870400' ∧ del_flag=0）→ allow:admin
+  ② ∃ 会话 s：s.user_id=请求者 ∧ s.agent_id ∈ {绑定 K 的智能体} → allow:bound-agent-session
+  ③ 否则 deny
+【会话工作区文件（按 sessionId）】
+  ① s.user_id = 请求者 → allow:owner
+  ② 管理员 → allow:admin
+  ③ 否则 deny
+
+SQL（可直接落 T-05）：
+  -- 原件
+  select case
+    when exists (select 1 from tbl_privilege_user_role ur
+                  where ur.user_id = :me and ur.role_id = '428007432736870400' and coalesce(ur.del_flag,0)=0) then 'allow:admin'
+    when exists (select 1 from tbl_data_chat_session s
+                  join tbl_data_agent_kbase_bind b on b.agent_id = s.agent_id
+                 where s.user_id = :me and b.knowledge_base_id = :kb) then 'allow:bound-agent-session'
+    else 'deny' end;
+  -- 会话文件
+  select case
+    when exists (select 1 from tbl_data_chat_session s where s.id = :sid and s.user_id = :me) then 'allow:owner'
+    when exists (select 1 from tbl_privilege_user_role ur
+                  where ur.user_id = :me and ur.role_id = '428007432736870400' and coalesce(ur.del_flag,0)=0) then 'allow:admin'
+    else 'deny' end;
+
+--- 3. 对照实测结果 ---
+
+| 用例 | 结果 |
+|---|---|
+| chenzhuo / kb2（产品手册库） | allow:bound-agent-session |
+| chenzhuo / kb1（制度汇编）——**我原以为是负对照** | allow:bound-agent-session |
+| maliu / kb2 —— 负对照 | **deny** |
+| admin / kb1（管理员例外） | allow:admin |
+| session ac24c3ff… / 属主 chenzhuo | allow:owner |
+| session ac24c3ff… / 无关账号 maliu | **deny** |
+| session ac24c3ff… / 管理员 admin | allow:admin |
+
+**诚实更正**：chenzhuo/kb1 并非负对照——实测 chenzhuo **确实有 agent25（绑定 kb1）的会话** ⇒ 该行 allow 是正确的；
+本组真正的负对照只有 `maliu/kb2 = deny` 与 `maliu/session = deny` 两行（allow/deny 双侧均有覆盖，符合 L-07）。
+
+--- 4. 一期口径的已知宽松面（如实记录，指向二期）---
+- "bound-agent-session" 的语义是：**只要你在某个绑定了该库的智能体下聊过天**，即可下载该库**全部**原件（含此后新上传的）。
+  这是"智能体可用性"的**代理判据**，不是精确的授权模型——精确模型需要"用户↔智能体/组"的正式关系（＝二期 **R-05 / BL-31 三维度用户体系**）。
+- 孤儿 user_id `1000000000000000001` 在 agent33 名下仍有 64 条会话（对应已登记的账号数据质量项 **BL-30**）——
+  按本口径这些会话仅管理员可读（可接受），但也说明历史数据仍有脏引用。
+- 管理员例外是必要的（后台知识库管理面需要），但**管理员的口径只按角色表判定**（不引入新的权限模型）。
+
+--- 5. 对 T-05 的交付要求（从本取证导出）---
+- 接口必须按上表 SQL 判定，**拒绝时响应体不得含正文**（L-37）；
+- 断言要按**业务码/success**（L-26），且必须同时覆盖 allow 与 deny 两侧（L-07）；
+- 二期以 R-05/BL-31 的正式关系替换 `bound-agent-session` 代理判据（在 completion 中标注）。

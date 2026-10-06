@@ -1,0 +1,131 @@
+=== T-01 / T-02 框架能力取证（离线，javap/jar，2026-10-06）===
+状态：**部分完成**（API 面已确定；runtime PoC 需后端重启窗口，见文末申请）
+
+--- T-01 提示面：矛盾指引段的位置与可用开关（已确证）---
+· jar：`io.agentscope:agentscope-harness:2.0.0`
+· 含 "## Domain Knowledge"（称"工作区 `knowledge/` 树是事实源、会注入 `KNOWLEDGE.md` 与全量路径清单"）的类 =
+  `io.agentscope.harness.agent.middleware.WorkspaceContextMiddleware`，出口方法 `onSystemPrompt(Agent, RuntimeContext, String)`。
+· `HarnessAgent$Builder` 暴露的可用开关（javap 实证）：`disableWorkspaceContext()`、`useLegacyXmlWorkspaceContext(boolean)`、
+  `additionalContextFile(String)`、`disableDefaultWorkspaceSkills()`。
+· `WorkspaceManager` 构造简单（`WorkspaceManager(Path)` 等 4 个）⇒ **离线实例化该 middleware 打印三档提示词是可行的**；
+  但仍需 `Agent` / `RuntimeContext` 实例（属 agentscope-core），故离线 spike 的下一步是补 core jar + 构造最小桩。
+· **仍未确证（待 runtime 或离线 spike）**：① `disableWorkspaceContext()` 是"整段不注入"还是"改用其它文本"；
+  ② Memory Recall/Persistence 指引是否与该段同生共死（若同死 → T-10 需自注入补偿）；
+  ③ `useLegacyXmlWorkspaceContext(true)` 的文本里是否仍含 `knowledge/` 字样。
+
+--- T-02 护栏钩子点：可行性（已确证一条，另一条待补 jar）---
+· **确定可用**：harness 侧存在中间件扩展点 —— `WorkspaceContextMiddleware implements HarnessRuntimeMiddleware`（同一包），
+  即"自定义 `HarnessRuntimeMiddleware` + `HarnessAgent.Builder.middleware(...)`"这条钩子**在框架设计内**，可作为护栏落点（参考实现就在 jar 里）。
+· **待补证据**：`io.agentscope.core.permission.PermissionContextState` **不在** harness jar 内（报"找不到类"）⇒ 属 agentscope-core；
+  需取该 jar 后判定它能否承载"路径规则 + 命令拦截"，以及能否拿到命令字符串/cwd。
+· **未验证**：`LocalFilesystemWithShell` 是否有官方的命令拦截回调（需 javap 该类 + core jar）。
+· runtime PoC（拒绝一次 `cat <原件路径>` 并打印拒绝日志）**需要后端重启**（改 `HarnessAgentFactory` 装配）⇒ 见申请。
+
+--- 申请（阻塞 T-01/T-02 的 runtime 部分）---
+1. **后端重启窗口**：runtime PoC 必须重建并重启 backend ⇒ **会强制全员重登**（会话在进程内存）。
+   建议与你的实测时间窗合并执行；期间我会先把能离线做的（core jar 取证、离线提示词三档打印）做完。
+2. 若你希望**完全不重启**，替代路线是：先做离线 spike（补 core jar + 反射构造桩）把三档文本与 hook API 面钉死，
+   把 runtime 验证推迟到组 4 的部署批次（T-10/T-11 本来就要重启一次）。
+
+--- 第二轮（离线：补 agentscope-core jar + javap/jar 深挖，2026-10-06）---
+【T-02 定档：官方权限机制（首选）> 自定义中间件（兜底）】
+· `io.agentscope.core.permission.PermissionContextState`（core jar）提供 `builder()` + `addAllowRule/addAskRule/addDenyRule`
+  ＋ `getWorkingDirectories()` ＋ `getMode()`；规则类型 `PermissionRule(toolName, ruleContent, behavior, source)`（record）。
+· **本项目已有先例**（可直接照抄接线方式）：`phoenix-agent-core/.../harness/agent/human/HumanInTheLoop.java:48-57`
+  用 `PermissionContextState.builder().addAllowRule("query_order", new PermissionRule(...)).addAskRule("refund_order", ...)
+  .addDenyRule("drop_table", new PermissionRule(...))`，并以 `.permissionContext(perms)`（:94）+ `.middleware(new StopOnAllDeniedMiddleware())`（:100）接线。
+· 意义：护栏可**声明式**表达为「对 `execute`/文件工具按 `ruleContent` 拒绝」，无需先改框架或自造拦截层。
+· **待验证（T-07/T-08）**：`ruleContent` 的匹配语义（正则/glob/子串？）与其是否作用于 `execute` 的**命令字符串**（若能，则"命令里含原件路径即拒绝"成立）。
+
+【T-01 进展与风险确认】
+· `HarnessAgent$Builder` 的开关族（javap 实证）：`disableWorkspaceContext`、`useLegacyXmlWorkspaceContext`、
+  `disableFilesystemTools`、`disableSessionPersistence`、`disableAtPathExpansion`、`maxContextTokens`、`additionalContextFile(s)`。
+· `WorkspaceContextMiddleware` 内出现的段标题：`## Domain Knowledge`、`## Workspace Files`、`## Workspace`、
+  `## AgentStateStore Context`；并出现 `domain_knowledge_context` / `memory_context` 占位符。
+· **风险确认（重要）**：`## Memory Recall` 字样**同在该类**（jarc 扫描命中：`io/agentscope/harness/agent/middleware/WorkspaceContextMiddleware.class`）
+  ⇒ `disableWorkspaceContext()` **有可能连带关掉记忆指路**（第一轮列为"待确证"的风险，本轮升级为"高风险"）。
+· 因此 T-01 的档位选择**必须**由"打印三档文本"来定，而不能凭 API 名称推断。
+
+【下一步（已按用户选择 A：合并到组 4 批次，只重启一次后端）】
+1. 离线三档打印（可离线完成）：`mvn dependency:build-classpath` 取全量 classpath →
+   小 Java 程序：`new WorkspaceContextMiddleware(new WorkspaceManager(Path.of("/tmp/ws")))`
+   ＋ 反射桩 `Agent`（接口）＋ `RuntimeContext.empty()` → 分别打印
+   ① 默认 ② `useLegacyXmlWorkspaceContext(true)` ③ `disableWorkspaceContext()` 三档的 `onSystemPrompt` 输出，
+   逐档断言：是否仍含"工作区 `knowledge/` 是事实源"、是否仍含 `## Memory Recall`。
+2. runtime PoC（需重启，与 T-10/T-11 合并）：用 `PermissionContextState.addDenyRule("execute", ruleContent=原件路径模式)`
+   实测"命令里含原件路径 → 被拒绝 + 审计日志"。
+3. 结论落盘后按 T-01 定档实施（T-10），并如实记录未拦住项（T-09）。
+
+--- 第三轮（离线实证：真正跑通三档打印的一部分，2026-10-06）---
+做法：本地仓库全量 jar 拼 classpath（799 个 jar）→ 编译并运行桩程序
+  `new WorkspaceContextMiddleware(new WorkspaceManager(Path.of("/tmp/spike/ws")))
+     .onSystemPrompt(反射桩 Agent, RuntimeContext.empty(), "MY_SYS").block()`
+（脚本与源码留档：`/tmp/spike/PromptSpike.java`，本轮为一次性 spike，不随仓库提交）
+
+【实测结果（默认档）】
+- 输出长度 **2391** 字；四个断言全为 true：
+  `hasDomainKnowledge=true`、`hasKnowledgeDirMention=true`、`hasMemoryRecall=true`、`hasMemoryPersist=true`
+- 逐字确认矛盾指引原文（与容器内会话上下文里看到的一致）：
+  "## Domain Knowledge / The workspace `knowledge/` tree holds many detailed reference documents … treat that directory
+   as the source of truth … injected `knowledge/KNOWLEDGE.md` (if present) plus a **full list of knowledge file paths** …"
+- **结论 1（风险落地）**：Domain Knowledge 与 `## Memory Recall` / `## Memory Persistence` **由同一段输出产出**
+  ⇒ `disableWorkspaceContext()`（整体关掉该 middleware）**必然连带关掉记忆指路与工作区文件提示**（不是"可能"，是同一块文本）。
+- **结论 2**：`setAdditionalContextFiles(...)` 是**追加**语义（本轮输出长度不变 2391，因无附加文件可读），**不能**用来"替换/删除"矛盾段。
+- **结论 3**：4 参构造 `(wm, "knowledge", "KNOWLEDGE.md", 8000)` 输出 2401 字、内容基本相同 ⇒ 它只影响注入的上下文文件名等参数，**不改变矛盾的指路本身**。
+- 类结构（javap）：引导文本是**单一私有常量** `GUIDANCE_TEMPLATE`；类内**没有** legacy 变体方法
+  ⇒ ② legacy 档与 ③ disable 档的行为由 **Builder** 决定，离线无法再往前推（需 runtime）。
+
+【T-01 定档建议（供组 4 批次执行时采用，带取舍）】
+
+| 档 | 做法 | 代价/风险 |
+|---|---|---|
+| **候选 A（推荐先试）** | **自定义 `HarnessRuntimeMiddleware` 替换**：不复用框架那 2391 字块，改由我们输出"准确且精简"的上下文（工作区根、memory 文件位置、**知识库只能经 `getRagInfo`**、**禁止 shell/文件工具读知识库原件**） | 需复刻少量有用信息（工作区/记忆指路）；好处是**矛盾段被彻底移除**，且 R-04 的"唯一指路 + 禁止条款"可直接满足 |
+| 候选 B | `disableWorkspaceContext()` + `additionalContextFile` **自注入补偿**（补 memory 与工作区指路） | 补偿要写全，否则模型丢失记忆/工作区认知；改动最小 |
+| 候选 C | 保留默认段 + 注入强指令**覆盖**（"工作区无 `knowledge/`；知识库只经 `getRagInfo`"） | 存在**两段互相矛盾**的指引，模型服从性不保证（最不推荐，仅作兜底） |
+
+**组 4 批次必须补齐的两件事**：① 实测 `useLegacyXmlWorkspaceContext(true)` 的文本是否仍含 `knowledge/`（若是，可作更省事的替代）；
+② 用 `PermissionContextState.addDenyRule("execute", ruleContent=原件路径模式)` 做"命令里含原件路径 → 拒绝 + 审计"的 runtime PoC（并验证 `ruleContent` 匹配语义，供 T-07）。
+
+--- 第四轮（离线：权限引擎与规则匹配语义，2026-10-06）---
+目的：为 T-08（护栏接入）定实现方式，尽量不靠重启验证。
+发现：
+· core jar：`io.agentscope.core.permission.PermissionEngine` 按**工具名**索引 allow/ask/deny 三张规则表
+  （`checkAllowRules/checkAskRules/checkDenyRules` → `rulesFor(map, ToolBase.getName())`）；
+  规则对象 `PermissionRule(toolName, ruleContent, behavior, source)`。
+· **匹配语义是"下放给工具"**：`PermissionEngine.ruleMatches(...)` 只做两件事——
+  ① `ruleContent.isEmpty()` 判空；② 调 **`ToolBase.matchRule(String ruleContent, Map<String,Object> args)`**。
+  ⇒ **`ruleContent` 到底匹配什么（命令串？参数 JSON？）取决于具体工具的实现**，
+    不能凭 `PermissionEngine` 推断；这解释了为什么"配了规则拦不住"是可能发生的。
+· 因此 T-08 需再确认一件窄问题：**实现 `execute` 工具的那个类，其 `matchRule` 匹配的是什么**
+  （本轮按名字 grep `tool/*(shell|exec|bash|command)` 未命中该类，需按工具名 `execute` 反查）。
+  若其 `matchRule` 匹配命令字符串 ⇒ 直接 `addDenyRule("execute", new PermissionRule("execute", "/app/uploads/data-agent/agent-knowledge", DENY, "kb-access-isolation"))` 即可；
+  若匹配不到命令 ⇒ 退到"自定义 HarnessRuntimeMiddleware 否决"或"工具层包装"（候选②/③）。
+· legacy 档（`useLegacyXmlWorkspaceContext`）：在 `HarnessAgentBuilderSupport` 的字节码里未直接观察到
+  "legacy 分支"（该类的可见内容以 subagent 装配为主）⇒ **仍未确证**；
+  但 T-10 推荐方案 A（自定义 middleware 替换矛盾段）**不依赖**该项，legacy 仅作"可能更省事"的备选，故不阻塞。
+
+--- 第五轮（离线：T-08 落点定档，2026-10-06）---
+【结论先行】候选①「官方 deny 规则按路径模式」**作废**；T-08 定档 **候选②「自定义 MiddlewareBase 拦截工具调用」**。
+依据（逐条为字节码实测）：
+· `ToolBase.matchRule(String ruleContent, Map args)` 的**默认实现只有一句**：`return ruleContent == null;`
+  ⇒ 只有"ruleContent 为空"的规则才会命中（语义＝**整个工具禁用**）；**带路径/命令模式的规则永远不会命中**。
+· 全量扫描两个 jar：声明/引用 `matchRule` 的类**只有** `ToolBase`（声明）与 `PermissionEngine`（调用），
+  **没有任何具体工具覆盖它** ⇒ 上述默认语义对 `execute` 等所有工具一律生效。
+  ⇒ 若硬用候选①，结果就是"配了规则却毫无效果"（且难以察觉）——这正是必须先用证据否掉它的原因。
+· `MiddlewareBase`（core）签名：`Flux<AgentEvent> onActing(Agent agent, RuntimeContext ctx, ActingInput input,
+  Function<ActingInput, Flux<AgentEvent>> next)` ⇒ 中间件在**工具调用发生前**拿到并**可改写**调用内容。
+· `ActingInput` = record(List<ToolUseBlock> toolCalls)；`ToolUseBlock` 有 `getName()` + `getInput():Map`。
+  ⇒ 可稳定取出"工具名 + 参数"（如 execute 的 command、文件工具的 path）。
+· 落点与先例：本项目 `StopOnAllDeniedMiddleware implements MiddlewareBase`（已注册于
+  `HarnessAgentFactory` 的 `.middlewares(List.of(new StopOnAllDeniedMiddleware(), new ExplicitSkillMiddleware()))`）
+  ⇒ 新增 `KnowledgePathGuardMiddleware` 照同一处注册即可。
+【T-08 实现设计（据此可直接编码）】
+1. 新类 `com.phoenix.agent.harness.middleware.KnowledgePathGuardMiddleware implements MiddlewareBase`；
+2. `onActing`：遍历 `input.toolCalls()`，对每个调用取 `getName()` + `getInput()`，
+   把参数里的路径/命令文本（如 command、path、file_path、pattern 等值）交给
+   **T-07 的 `KnowledgePathGuard.isDenied(text, sessionWorkspaceRoot)`**（已表驱动 16/16 验证）；
+3. 命中 ⇒ 记录审计日志（**四要素**：agentId=`agent.getAgentId()`、sessionId=`ctx.getSessionId()`、路径、命令/工具名），
+   并把该调用改为"被拒绝"的结果（不回正文）；
+4. 未命中 ⇒ 原样 `next.apply(input)`；随后照旧加入 `HarnessAgentFactory` 的 `.middlewares(...)`。
+【遗留（实现期由编译/运行确认，不阻塞设计）】`ToolUseBlock.withState(...)` 的可用状态取值，
+以及"从 `ActingInput` 过滤掉被拒调用"是否为框架接受的做法（若不可，则改为保留调用但把结果改写为拒绝文本）。

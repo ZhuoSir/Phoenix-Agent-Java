@@ -89,7 +89,18 @@ public class KnowledgeRetrievalTool {
                 .topK(topK)
                 .similarityThreshold(similarityThreshold)
                 .build();
-            List<Document> found = agentVectorStoreService.search(searchRequest);
+            List<Document> found;
+            try {
+                found = agentVectorStoreService.search(searchRequest);
+            }
+            catch (RuntimeException e) {
+                // R-05 / L-34：把**可诊断**的失败原因回传给模型，避免它把"检索服务不可用"误当成"知识库没有资料"
+                // 而改去翻文件系统（BUG-103 实测的退化路径）。
+                String reason = rootCauseMessage(e);
+                log.error("知识库检索失败: agentId={}, keyword={}, reason={}", agentId, keyword, reason, e);
+                return "检索失败（注意：这不是「没有相关资料」）: " + reason
+                        + "。请如实告知用户知识库检索服务当前不可用，并停止用文件系统工具查找知识库内容。";
+            }
             if (found != null) {
                 documents.addAll(found);
             }
@@ -113,5 +124,15 @@ public class KnowledgeRetrievalTool {
                 找到 %s 条相关文档 无需调用tool，直接输出
                 相关文档如下： \n
                 """.formatted(topDocuments.size()) + sb;
+    }
+
+    /** 取根因摘要（类名 + message），供工具返回给模型（R-05 / L-34）。 */
+    private static String rootCauseMessage(Throwable e) {
+        Throwable cur = e;
+        while (cur.getCause() != null && cur.getCause() != cur) {
+            cur = cur.getCause();
+        }
+        String msg = cur.getMessage();
+        return cur.getClass().getSimpleName() + (msg == null ? "" : (": " + msg));
     }
 }

@@ -21,6 +21,13 @@ public interface AgentKnowledgeService extends IService<AgentKnowledge> {
 	AgentKnowledgeVO getKnowledgeById(Integer id);
 
 	/**
+	 * R-01 / T-05：受鉴权取原件（登录用户 + 归属/绑定校验）。
+	 *
+	 * @return 通过校验时返回条目（含 file_path / knowledge_base_id）；不存在或无权限时返回 {@code null}
+	 */
+	AgentKnowledge getRawFileIfPermitted(Integer id, String userId);
+
+	/**
 	 * 创建知识
 	 * @param createKnowledgeDto 创建知识DTO
 	 * @return 知识视图对象
