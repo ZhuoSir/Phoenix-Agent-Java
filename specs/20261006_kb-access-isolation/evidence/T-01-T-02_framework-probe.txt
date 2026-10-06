@@ -26,3 +26,32 @@
    建议与你的实测时间窗合并执行；期间我会先把能离线做的（core jar 取证、离线提示词三档打印）做完。
 2. 若你希望**完全不重启**，替代路线是：先做离线 spike（补 core jar + 反射构造桩）把三档文本与 hook API 面钉死，
    把 runtime 验证推迟到组 4 的部署批次（T-10/T-11 本来就要重启一次）。
+
+--- 第二轮（离线：补 agentscope-core jar + javap/jar 深挖，2026-10-06）---
+【T-02 定档：官方权限机制（首选）> 自定义中间件（兜底）】
+· `io.agentscope.core.permission.PermissionContextState`（core jar）提供 `builder()` + `addAllowRule/addAskRule/addDenyRule`
+  ＋ `getWorkingDirectories()` ＋ `getMode()`；规则类型 `PermissionRule(toolName, ruleContent, behavior, source)`（record）。
+· **本项目已有先例**（可直接照抄接线方式）：`phoenix-agent-core/.../harness/agent/human/HumanInTheLoop.java:48-57`
+  用 `PermissionContextState.builder().addAllowRule("query_order", new PermissionRule(...)).addAskRule("refund_order", ...)
+  .addDenyRule("drop_table", new PermissionRule(...))`，并以 `.permissionContext(perms)`（:94）+ `.middleware(new StopOnAllDeniedMiddleware())`（:100）接线。
+· 意义：护栏可**声明式**表达为「对 `execute`/文件工具按 `ruleContent` 拒绝」，无需先改框架或自造拦截层。
+· **待验证（T-07/T-08）**：`ruleContent` 的匹配语义（正则/glob/子串？）与其是否作用于 `execute` 的**命令字符串**（若能，则"命令里含原件路径即拒绝"成立）。
+
+【T-01 进展与风险确认】
+· `HarnessAgent$Builder` 的开关族（javap 实证）：`disableWorkspaceContext`、`useLegacyXmlWorkspaceContext`、
+  `disableFilesystemTools`、`disableSessionPersistence`、`disableAtPathExpansion`、`maxContextTokens`、`additionalContextFile(s)`。
+· `WorkspaceContextMiddleware` 内出现的段标题：`## Domain Knowledge`、`## Workspace Files`、`## Workspace`、
+  `## AgentStateStore Context`；并出现 `domain_knowledge_context` / `memory_context` 占位符。
+· **风险确认（重要）**：`## Memory Recall` 字样**同在该类**（jarc 扫描命中：`io/agentscope/harness/agent/middleware/WorkspaceContextMiddleware.class`）
+  ⇒ `disableWorkspaceContext()` **有可能连带关掉记忆指路**（第一轮列为"待确证"的风险，本轮升级为"高风险"）。
+· 因此 T-01 的档位选择**必须**由"打印三档文本"来定，而不能凭 API 名称推断。
+
+【下一步（已按用户选择 A：合并到组 4 批次，只重启一次后端）】
+1. 离线三档打印（可离线完成）：`mvn dependency:build-classpath` 取全量 classpath →
+   小 Java 程序：`new WorkspaceContextMiddleware(new WorkspaceManager(Path.of("/tmp/ws")))`
+   ＋ 反射桩 `Agent`（接口）＋ `RuntimeContext.empty()` → 分别打印
+   ① 默认 ② `useLegacyXmlWorkspaceContext(true)` ③ `disableWorkspaceContext()` 三档的 `onSystemPrompt` 输出，
+   逐档断言：是否仍含"工作区 `knowledge/` 是事实源"、是否仍含 `## Memory Recall`。
+2. runtime PoC（需重启，与 T-10/T-11 合并）：用 `PermissionContextState.addDenyRule("execute", ruleContent=原件路径模式)`
+   实测"命令里含原件路径 → 被拒绝 + 审计日志"。
+3. 结论落盘后按 T-01 定档实施（T-10），并如实记录未拦住项（T-09）。
