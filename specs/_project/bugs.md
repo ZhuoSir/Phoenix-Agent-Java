@@ -111,6 +111,7 @@
 | BUG-98 | **前端调用后端不存在的端点**：`/auth/refresh`（`api/core/auth.ts:48`）、`/auth/codes`（`:64`）后端全仓未见 | P2 | 2026-10-06 双账号体系调研（unified-account-center Phase 1，只读取证） | 新建 | 待定（本 spec 内一并修） | 关联 R-09；需逐条比对前后端认证调用面 |
 | BUG-99 | **死代码内自签 JWT 且密钥硬编码**：`AccountInfoServiceImpl.java:320-327` `generateToken()` 以 `secret="phoenix_jwt_secret"` 自签，全仓无调用者 | P2（安全·清理） | 2026-10-06 双账号体系调研（unified-account-center Phase 1，只读取证） | 新建 | 待定（本 spec 内一并修） | 关联 R-08；与 BUG-94 同属"凭据/密钥硬编码"类，统一时一并清除 |
 | BUG-100 | **sa-token 会话未落 Redis**：pom 引入 `sa-token-redis-template` 但全仓无 `SaTokenDao` 装配，实测 Redis `dbsize=0` ⇒ 会话在**进程内存**，后端重启即全员掉线、多实例无法共享登录态 | P2（运维/架构） | 2026-10-06 双账号调研 + 实测 | 新建 | 待定（建议随 unified-account-center 会话/认证统一一并处置） | 证据：`phoenix-platform/phoenix-platform-core/pom.xml:40` 有依赖；`SaTokenConfigure.java` 仅配 tokenName/timeout/style，**无 Dao bean**；`docker compose exec redis redis-cli dbsize` = 0（同时段无任何键） |
+| BUG-101 | 前台账号 `del_flag` **语义与代码行为不一致**：DB 注释「删除标识 0-已删除 1-未删除」，但 `AccountInfo` 实体**无 delFlag 字段**、查询不读 del_flag ⇒ 被标记"已删除"的两条前台账号（del_flag 均为 0）实际可正常登录 | P3（语义/数据陷阱） | 2026-10-06 unified-account-center T-01 取证 | 新建 | 待定（统一时明确取舍） | **影响**：① 若日后"修好"该过滤，两条在用前台账号会被锁死；② 迁移时**不得**据该标记判定"在用"状态。**证据**：`phoenix-platform-api/.../model/front/AccountInfo.java` 无 delFlag 字段；`AccountInfoServiceImpl.getByUsername` 查询无 del_flag 条件；实测 `chenzhuo`（del_flag=0, status=1）登录成功 |
 ## 明细留档（历史证据，只增不删）
 
 ### BUG-01 `all_schema.sql` 缺 5 个序列 → 全新环境导入必失败

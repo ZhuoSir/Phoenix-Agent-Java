@@ -1,4 +1,4 @@
-> 版本: v1.0.0 | 状态: 已确认 | 确认人: 陈卓 | 确认日期: 2026-10-06 | 更新: 2026-10-06
+> 版本: v1.1.0 | 状态: 待重确认 | 确认人: 陈卓 | 确认日期: 2026-10-06 | 更新: 2026-10-06（v1.1.0 变更：T-01 取证后并入三项裁定——M2 匹配规则、M8 测试账号清理、回滚项⑤）
 
 # 技术方案：unified-account-center（统一账号中心 / 消除双账号体系）
 
@@ -102,12 +102,13 @@ CREATE INDEX IF NOT EXISTS idx_uam_new_user ON tbl_unified_account_map (new_user
 | 步骤 | 动作 | 校验 |
 |---|---|---|
 | M1 | 备份：导出两表全量 + 8 类业务列的**引用计数快照** | 快照文件落盘、行数记录 |
-| M2 | 识别同自然人：`tbl_platform_account_info.employee_id` / `third_party_id` / `username` 与 `tbl_privilege_user` 比对 | 输出三张清单：**可对应 / 不可对应 / 疑似重复**，人工确认后才继续 |
+| M2 | 识别同自然人，**匹配优先级（T-01 裁定 D5，写死）**：① `username`+`code` 全等（强）→ ② `username` 全等 → ③ `employee_id` 全等**且该 employee_id 在后台侧唯一**；三档都不满足 → 人工清单。**禁止仅凭 employee_id 合并**（实测陷阱：`admin` 与 `chenzhuo` 共用 `employee_id=461670914812276736`，前台 chenzhuo 会被并入 admin） | 输出三张清单（可对应 / 不可对应 / 疑似重复）逐条落盘；**人工确认后才继续** |
 | M3 | 分支 B（无对应后台账号）：`INSERT INTO tbl_privilege_user (...) SELECT 原字段` **并沿用原 id** | 插入行数 = 分支 B 清单行数（assert） |
 | M4 | 分支 A（已有后台账号）：把 8 类列中值为旧前台 id 的行 **UPDATE 为新 id**；写入映射表 `merge_type='merged'` | 每类列 UPDATE 行数 = 迁移前引用计数快照（assert，逐列） |
 | M5 | 密码重算：前台来源账号中**非 32 位 hex** 的 `password` → `MD5('phoenix'||明文)` | 迁移后校验"全部为 32 位 hex" |
 | M6 | 旧表标记：`tbl_platform_account_info` 增加只读约束/标记（不删数据，保回滚） | 应用侧读写路径已切至唯一源 |
-| M7 | 对账：8 类列在迁移后的引用**全部命中** `tbl_privilege_user.id`（无孤儿 id） | 孤儿查询必须返回 0 行 |
+| M7 | 对账：8 类列在迁移后的引用**全部命中** `tbl_privilege_user.id`；**孤儿引用按裁定 D6 保持原样不映射**（`433383317100486656` 5 行、`1000000000000000001` 5 行、`system` 哨兵 2 处），登记为历史遗留并挂 BL 待查 | 账内引用孤儿 0 行；**账外孤儿清单与计数落盘**（不视为失败） |
+| M8 | **测试账号清理（T-01 裁定 D7）**：删除前台测试残留 `thinktest`（id `9000000000000090001`，建于 2026-10-02，实测零会话/零文件/零记忆/零预设，仅 1 行 `tbl_platform_account_group_info`）。按 database-design §23：先 `SELECT` 验证行数 → 备份该账号行与其组关系行 → 脚本执行删除 → 计数 assert | 删除前 `SELECT` 行数=1（账号）+1（组关系）；备份文件落盘；删除后两处计数=0 |
 
 **8 类待重写列清单**（来自调研，逐列 assert）：
 
@@ -123,9 +124,19 @@ CREATE INDEX IF NOT EXISTS idx_uam_new_user ON tbl_unified_account_map (new_user
 | 8 | `tbl_data_knowledge_base.creator` + `tbl_data_agent_kbase_bind.creator` | 知识库归属 |
 
 **回滚**：`releases/v1.7.0/sql/rollback/V1.7.0_01__unified_account_map_rollback.sql`
-① 按映射表反向重写 8 类列（`new_user_id` → `old_account_id`）；② 删除分支 B 插入的账号行；③ 恢复前台密码列原值（备份表）；④ 校验反向计数 = 迁移前快照。**必须先在备份库演练一次并记录耗时**。
+① 按映射表反向重写 8 类列（`new_user_id` → `old_account_id`）；② 删除分支 B 插入的账号行；③ 恢复前台密码列原值（备份表）；④ **恢复 M8 删除的 `thinktest` 账号行与其组关系行**（从备份回插）；⑤ 校验反向计数 = 迁移前快照。**必须先在备份库演练一次并记录耗时**。
 
 **不加列**：不新增 `account_scope` 等判别列（落地页按角色判定，见决策 4）⇒ 迁移面更小、无"先加后删"负担。
+
+### T-01 取证后的三项裁定（2026-10-06，用户裁定 → v1.1.0 变更来源）
+
+| 裁定 | 内容 | 依据（T-01 证据） |
+|---|---|---|
+| **D5 匹配规则** | username+code 全等 > username 全等 > employee_id（且后台侧唯一）；其余人工 | 实测 `admin` 与 `chenzhuo` **共用** `employee_id`，仅凭 employee_id 会把前台 chenzhuo 并入 admin |
+| **D6 孤儿引用** | **保持原样不映射**，登记为历史遗留并挂 BL 待查 | 12 行孤儿：`433383317100486656`（1+4）、`1000000000000000001`（5）、`system` 哨兵 2 处；均既不在后台表也不在前台表 |
+| **D7 测试账号** | 删除 `thinktest`（含其 1 行授权组关系），走 M8 脚本化删除（先 SELECT 验行数 + 备份 + assert） | 实测零业务足迹（会话/文件/记忆/档案/预设全为 0），仅 1 行 `tbl_platform_account_group_info` |
+
+**同时确认的正面事实**（缩小改写面）：`data_agent.admin_id` 全为 NULL → 该列零改写；`agent_user_memory_info`、`agent_user_profile_info`、`data_agent_preset_question` **三表为空** → 零改写；实际需改写仅 3 类列（`agent_user_agent_info.user_id` 1 行平台引用、`chat_session.user_id` 28 行、`agent_file.creator` 213 行）。
 
 ## 共享面身份矩阵（触碰共享面必填）
 

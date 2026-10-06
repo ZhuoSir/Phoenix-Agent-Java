@@ -29,6 +29,14 @@
 - 共享面身份矩阵 **15 个身份**由 T-16 逐条断言（每条一断言、双侧取证）
 - **③ 确认通过（2026-10-06，确认人 陈卓）** → tasks **v1.0.0 已确认**
 - **三重门全绿（requirements/plan/tasks 均 v1.0.0 已确认）** → spec 版本 = **v1.0.0**；开施工分支 `feature/unified-account-center`（基点 `v1.7.0`）
+
+## v1.1.0（2026-10-06）状态: 待重确认 · 确认人: 陈卓
+- **变更来源：T-01 只读取证的人工裁定**（三项，用户 2026-10-06 裁定）
+  - D5 **匹配规则**：username+code 全等 > username 全等 > employee_id（且后台侧唯一）；其余人工 — 依据：实测 `admin` 与 `chenzhuo` **共用 employee_id**，仅凭 employee_id 会并错人
+  - D6 **孤儿引用保持原样不映射**（12 行：433383317100486656 / 1000000000000000001 / system 哨兵），登记历史遗留并挂 BL
+  - D7 **删除测试账号 `thinktest`**（零业务足迹，仅 1 行组关系）→ 新增迁移步骤 **M8**（脚本化删除：先 SELECT 验行数 + 备份 + assert）＋ 回滚项 ⑤
+- 同时收窄：`data_agent.admin_id` 全 NULL、三张引用表为空 ⇒ 实际只需改写 3 类列
+- **状态：plan 待重确认**（铁律 4/6：已确认文档内容变更 → bump + 待重确认），等用户增量确认 ②
 - R-05（前台授权组纳管）按裁定 D3 **一期不含任务**，tasks.md 记「延期→二期」不勾不删
 - **BUG-94 实测复核（诚实性更正）**：未带凭据调用 `POST /api/privilege/auth/doLogin?username=zhang&password=123456` → HTTP 200 `登录成功`（服务端确执行 `StpUtil.login(10001)`），但响应**无 `Set-Cookie`/token 头** ⇒ 未证实"外部可直接取得 token"，定级由 **P0 更正为 P1（生产残留演示桩）**；要求=删端点或移出放行名单
 - **新发现并登记 BUG-100**：sa-token 会话**未落 Redis**（`phoenix-platform-core/pom.xml:40` 有依赖、全仓无 `SaTokenDao` 装配、实测 Redis `dbsize=0`）⇒ 会话在进程内存，**后端重启即全员掉线**；已据此收窄"待确认问题 1"（强制重登影响面比预期小），并新增假设 6（是否落 Redis 由用户定，默认不在范围）

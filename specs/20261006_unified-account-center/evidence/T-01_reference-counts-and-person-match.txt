@@ -57,3 +57,32 @@ Pager usage is off.
  433383317100486656  |        4 | 2026-07-11 | 2026-10-03
 (2 rows)
 
+Pager usage is off.
+### G. thinktest 账号本体
+         id          | username  | code  | status | del_flag | employee_id | third_party_id |        create_time         
+---------------------+-----------+-------+--------+----------+-------------+----------------+----------------------------
+ 9000000000000090001 | thinktest | 90991 | 1      |        0 | -           | -              | 2026-10-02 11:58:27.727076
+(1 row)
+
+### H. thinktest 的业务足迹（8 类列 + 授权组 + 租户）
+               ref               | n 
+---------------------------------+---
+ account_group_info.account_id   | 1
+ agent_file.creator              | 0
+ agent_user_agent_info.user_id   | 0
+ agent_user_memory_info.user_id  | 0
+ agent_user_profile_info.user_id | 0
+ preset_question.account_id      | 0
+ chat_session.user_id            | 0
+ account_tenant_info.account_id  | 0
+(8 rows)
+
+### I. thinktest 的会话/文件样本（判断是否测试残留）
+ kind | obj | label | day 
+------+-----+-------+-----
+(0 rows)
+
+ kind | obj | label | day 
+------+-----+-------+-----
+(0 rows)
+
