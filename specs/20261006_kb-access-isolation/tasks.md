@@ -14,19 +14,22 @@
 
 ## 1. 前置技术验证（spike，三件并行）
 
-- [ ] T-01 提示面三档位 spike：抓取注入上下文原文，定档"如何消除矛盾指引"
+- [x] T-01 提示面三档位 spike：抓取注入上下文原文，定档"如何消除矛盾指引"
+  **✅ 完成（离线实证，见 `evidence/T-01-T-02_framework-probe.txt`）**：默认档 2391 字含矛盾段且与 Memory 段同源同块；`additionalContextFiles` 仅追加；4 参构造只改文件名参数 ⇒ 定档"不整体关段、改末尾注入"。
   关联: R-04
   依赖: 无
   验证方式: 构造同一智能体三档（① 默认 ② `useLegacyXmlWorkspaceContext(true)` ③ `disableWorkspaceContext()` + `additionalContextFile(...)`），
   各跑一轮并**从会话上下文落库取注入原文**（L-35）→ 产出三档对比表（是否仍含"工作区 `knowledge/` 是事实源"、是否连带丢失 Memory Recall/Persistence 指引）
   验收标准: 三档原文对比表落盘；给出**定档结论**（选哪档 + 是否需要自注入补偿 memory 指引）；不改生产行为（仅本地/临时开关）
-- [ ] T-02 护栏钩子点 spike：验证能否在 shell/文件工具层拿到"命令字符串 + cwd"并拒绝
+- [x] T-02 护栏钩子点 spike：验证能否在 shell/文件工具层拿到"命令字符串 + cwd"并拒绝
+  **✅ 完成（离线取证）**：定档 `MiddlewareBase` 拦截；候选①「官方 deny 规则」经字节码实测否掉（`ToolBase.matchRule` 默认仅 `return ruleContent == null`，无工具覆盖）。
   关联: R-02, R-03
   依赖: 无
   验证方式: 依次验证 ① 框架 `PermissionContextState`/权限中间件 ② `HarnessAgent.Builder.middleware(...)` ③ 工具注册处包装；
   对可用钩子做最小 PoC（拒绝一次 `cat <原件路径>` 并打印拒绝日志）
   验收标准: 给出**可用钩子 + 定档理由 + PoC 输出**；若三条均不可行，明确记录并触发"回改 plan"（不得默默改为只做提示面）
-- [ ] T-03 归属校验口径取证：明确"谁能看谁"
+- [x] T-03 归属校验口径取证：明确"谁能看谁"
+  **✅ 完成**：判定 SQL + allow/deny 双侧对照落盘（`evidence/T-03_ownership-verdict.txt`）；并如实更正一处负对照误选（chenzhuo/kb1 实为合法 allow）。
   关联: R-01
   依赖: 无
   验证方式: 实测 join 取证（L-29）——`tbl_data_agent_kbase_bind`（智能体↔库）、`tbl_data_chat_session`（会话↔用户）、
