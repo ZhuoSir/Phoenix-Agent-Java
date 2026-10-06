@@ -17,7 +17,8 @@
   验证方式: `psql -f` 执行只读脚本 → 三张清单落盘（可对应/不可对应/疑似重复）+ 8 类列各自 `count(*)` 快照；**同一脚本跑两次结果一致**（L-07）
   验收标准: 清单与计数文件均落盘可复算；疑似重复条目列出待人工裁定
 
-- [ ] T-02 建映射/审计表 `tbl_unified_account_map` + 回滚脚本骨架 + 导出产物入 .gitignore
+- [x] T-02 建映射/审计表 `tbl_unified_account_map` + 回滚脚本骨架 + 导出产物入 .gitignore
+  **✅ 2026-10-06 完成**：证据 `evidence/T-02_ddl-and-rollback-drill.txt`（演练库 phoenix_drill，生产只读复制）；主键防重实测报 duplicate key、回滚后 `table_exists=0`；`/backups/` 与 `*.dump` 已 gitignore；升级件登记见 `artifacts.md`
   关联: R-10
   依赖: T-01
   验证方式: 演练库执行 DDL → `\d tbl_unified_account_map` 核对列/索引/COMMENT；回滚脚本语法可执行（空跑）
