@@ -47,8 +47,7 @@ const coreRoutes: RouteRecordRaw[] = [
     },
   },
   {
-    // R-11 / T-19（v2.0.1）：前台独立入口下线 —— 旧前台路由重定向到 admin 侧对应页面。
-    // 页面文件保留（一期不删代码；chat.vue 仍被「智能体中心」菜单以 pageMap 动态路由复用）。
+    // R-11 / T-19（v2.0.1）：前台独立入口下线 —— 旧前台智能体列表重定向到 admin 侧。
     name: 'AgentList',
     path: '/front/agent',
     redirect: '/agent/list',
@@ -59,9 +58,12 @@ const coreRoutes: RouteRecordRaw[] = [
     },
   },
   {
+    // R-12（v2.1.0）：`/front/chat` **恢复为独立 chat 页**（撤销 T-19 的重定向）——
+    // 它是「智能体中心」菜单在新浏览器窗口里的落地页；不在 BasicLayout 之下 ⇒ 无侧栏/标签栏/页签容器，
+    // 满足"不叠加后台外壳"，同时仍复用同一登录态与同一套接口（不构成第二套登录/访问体系）。
     name: 'Chat',
     path: '/front/chat',
-    redirect: '/agent/chat',
+    component: () => import('#/views/front/chat.vue'),
     meta: {
       hideInTab: true,
       hideInMenu: true,

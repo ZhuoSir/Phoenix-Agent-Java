@@ -1,0 +1,63 @@
+=== T-22 智能体中心改为「新窗口菜单」（R-12）实施与验证（2026-10-06 15:2x）===
+目标：侧栏点「智能体中心」在**新浏览器窗口**打开**独立全屏 chat 页**（无后台外壳），admin 当前页签不变。
+
+--- 1. 机制取证（为什么必须把 link 绝对化）---
+vben `packages/effects/layouts/src/basic/menu/use-navigation.ts`：
+  L40-60  navigation(path) 判定顺序：
+    ① route = routeMetaMap.get(path)；若 route?.meta.link 存在 ⇒ openWindow(link,'_blank')   ← 设计用法
+    ② 否则若 isHttpUrl(path) ⇒ openWindow(path,'_blank')
+    ③ 否则若 meta.openInNewWindow ⇒ openRouteInNewWindow(resolveHref(path))
+    ④ 否则 router.push({path})          ← **相对 `#/...` 会掉到这里**（打不开新窗口）
+  `isHttpUrl`（@core/base/shared/src/utils/inference.ts:62）正则 = `^https?://` ⇒ `#/front/chat` **不满足**
+  另：`utils/helpers/generate-menus.ts:44,85` —— 菜单项的 path 取 `link || path`，即 `meta.link` 会直接成为点击传入的 path。
+⇒ 结论：`meta.link` 必须是**绝对 http(s) URL**，否则点击退化为 SPA 内跳转。故 access.ts 用
+  **运行时 `window.location.origin` + `VITE_BASE`** 把 DB 里的站内相对形式（`#/front/chat`）绝对化
+  —— host/port 不写进 DB（部署无关）。VITE_BASE 生产为 `/`（.env.production:1）。
+
+--- 2. 改动（前端 2 文件）---
+`src/router/access.ts`：
+  + `EXTERNAL_LINK_RE = /^(#\/|https?:\/\/)/`（外链菜单约定）+ `toAbsoluteLink()`
+  · `convertModuleTreeToRoute()`：外链菜单 ⇒ `path = /external/<sn>`（合成路径，避免与独立路由撞路径）、
+    `component = ''`（不渲染 admin 内组件）、`meta.link = toAbsoluteLink(url)`
+`src/router/routes/core.ts`：
+  · `/front/chat` 撤销 T-19 的 `redirect`，恢复为 **component: () => import('#/views/front/chat.vue')**
+    —— 该路由是 coreRoutes 顶层路由，**不在 BasicLayout 之下** ⇒ 独立全屏（无侧栏/标签栏/页签容器）
+  · `/front/agent` 仍 `redirect: '/agent/list'`（不变）
+
+--- 3. 类型检查 + 构建（L-30：pipefail + 指认成功标志）---
+$ pnpm -F @vben/web-ele typecheck   → exit=2（既有类型债）错误行 212（基线 213 ⇒ 无新增）
+   改动文件（router/access.ts、router/routes/core.ts）命中错误 = 0
+$ pnpm -F @vben/web-ele build       → ✓ built in 4.42s（dist.zip 3405411 bytes） BUILD_EXIT=0
+
+--- 4. 升级件 04（菜单行 url 改写）+ 演练 ---
+$ psql -d phoenix_drill -f sql/V1.7.0_03__agent_chat_center_menu.sql   （drill 先补 03，建出菜单行）
+$ psql -d phoenix_drill -f sql/V1.7.0_04__agent_chat_center_new_window.sql
+  BEGIN / DO / **UPDATE 1** / DO / NOTICE: T-22：智能体中心 url = #/front/chat / COMMIT
+  drill 回读：AgentChatCenter | 智能体中心 | #/front/chat | #/views/front/chat.vue | order_no=-1 | type=1 | lucide:message-square
+$ 幂等复跑 04 → **UPDATE 0** + NOTICE（无副作用）
+$ 回滚 04 → UPDATE 1 + NOTICE: url 已恢复 /agent/chat；回滚 03 → DELETE 2+1
+$ drill 终态：mod=27 acl=73 left_over=0（与演练前一致）
+
+--- 5. 生产应用（改前备份）---
+$ pg_dump -t tbl_privilege_module --data-only --column-inserts > backups/pre_url_20261006_152136.sql
+  size=13848  sha256=493575dd0613fbc5531b58e6df0d3e5b59ac6c68a8cbafd38f7972869e7ba2dd
+$ psql -d phoenix -f sql/V1.7.0_04__agent_chat_center_new_window.sql
+  BEGIN / DO / UPDATE 1 / DO / NOTICE（url = #/front/chat）/ COMMIT
+生产回读：AgentChatCenter | 智能体中心 | #/front/chat | #/views/front/chat.vue | -1 | 1 | is_show=1 | lucide:message-square
+
+--- 6. 部署（只重建 nginx，不重启后端）---
+  nginx 容器 StartedAt=2026-10-06T07:21:16Z（已重建，health=starting→healthy）
+  **后端 StartedAt=2026-10-06T06:40:03Z（未重启）** ⇒ 会话不失效、无用户掉线
+  现网 index.html md5 == 本地 dist/index.html md5（MATCH ✓）
+  现网 `js/bootstrap-cZa-8gB1.js` 含 `external/`（1 处）与 `window.location.origin`（1 处）⇒ 交付的正是新逻辑
+
+--- 7. 接口回读（业务码）---
+POST /api/privilege/auth/login (admin) → code=100；GET /api/privilege/auth/menus → 根菜单 9
+  命中：{"name":"智能体中心","url":"#/front/chat","component":"#/views/front/chat.vue",
+        "image":"lucide:message-square","orderNo":-1,"type":"1"}
+
+--- 8. 待用户实测（滑块验证码挡住脚本化登录 ⇒ 点击行为必须人工）---
+  · 已登录 admin，点侧栏「智能体中心」⇒ **弹出新浏览器窗口**且展示独立全屏 chat（无侧栏/标签栏），
+    原窗口页面与页签**不变**；新窗口**无需二次登录**
+  · 直接打开 `#/front/chat` ⇒ 同一登录态下可用（未登录 ⇒ 跳同一个 /auth/login）
+  · 预期变化：`#/agent/chat` 不再是 admin 内路由（深链落 404 兜底页）—— 按 R-12 属预期

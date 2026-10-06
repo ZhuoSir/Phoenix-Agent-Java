@@ -42,22 +42,48 @@ function normalizeMenuTree(modules: ModuleTreeVO[]): ModuleTreeVO[] {
   return roots;
 }
 
+/**
+ * R-12（v2.1.0）「新窗口菜单」约定：菜单行的 `url` 以 `#/`（站内独立页）或 `http(s)://`（外链）开头时，
+ * 该菜单在**新浏览器窗口**打开——不占 admin 内的页签、不叠加后台外壳。
+ * 依据 vben `basic/menu/use-navigation.ts`：菜单 path 命中 `isHttpUrl()`（`^https?://`）或路由 meta.link 时
+ * 走 `openWindow(path, '_blank')`；**相对链接不满足**（会退化成 router.push），故此处把站内 `#/...`
+ * 用**运行时 origin + VITE_BASE** 绝对化（不把 host/port 写进 DB，避免部署绑定）。
+ * 此类菜单生成**合成 path**（`/external/<sn>`），避免与独立路由（如 `/front/chat`）撞路径；真实目标放 `meta.link`。
+ * 例：智能体中心 `url=#/front/chat` ⇒ `path=/external/AgentChatCenter` + `meta.link=http://<当前host>/#/front/chat`。
+ */
+const EXTERNAL_LINK_RE = /^(#\/|https?:\/\/)/;
+
+function toAbsoluteLink(url: string): string {
+  if (/^https?:\/\//.test(url)) {
+    return url;
+  }
+  // VITE_BASE 生产为 '/' ⇒ prefix='' ；若为子路径（如 '/admin/'）也能正确拼出 /admin/#/...
+  const base = import.meta.env.VITE_BASE || '/';
+  const prefix = base.endsWith('/') ? base.slice(0, -1) : base;
+  const suffix = url.startsWith('#') ? `/${url}` : url;
+  return `${window.location.origin}${prefix}${suffix}`;
+}
+
 function convertModuleTreeToRoute(
   modules: ModuleTreeVO[],
 ): RouteRecordStringComponent[] {
   const tree = normalizeMenuTree(modules);
 
   return tree.map((module) => {
+    const isExternalLink = EXTERNAL_LINK_RE.test(module.url ?? '');
     const route: RouteRecordStringComponent = {
       name: module.sn,
-      path: module.url || '',
+      path: isExternalLink ? `/external/${module.sn}` : module.url || '',
       component:
-        module.type === '1' && module.component ? module.component : '',
+        !isExternalLink && module.type === '1' && module.component
+          ? module.component
+          : '',
       meta: {
         icon: module.image || undefined,
         order: module.orderNo,
         title: module.name,
         hideInMenu: module.isShow === 0,
+        link: isExternalLink ? toAbsoluteLink(module.url!) : undefined,
       },
       children: module.children?.length
         ? convertModuleTreeToRoute(module.children)
