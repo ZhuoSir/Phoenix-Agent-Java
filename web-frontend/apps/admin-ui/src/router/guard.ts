@@ -50,6 +50,18 @@ function setupAccessGuard(router: Router) {
     const userStore = useUserStore();
     const authStore = useAuthStore();
 
+    // BUG-90：**两套 token 来源对齐**。请求层（api/request.ts）取 `localStorage['phoenix-token']`，
+    // 而守卫判的是 `accessStore.accessToken`（另一套持久键）。二者不同步时会出现
+    // 「接口全部 200（请求层有凭据）却停在登录页/内容空白」——现场日志实证：
+    // URL 停在 /auth/login?redirect=/auth/login，同时 /api/privilege/auth/menus 与 /api/agent/list 均 200。
+    // 此处做一次**单向回填**（仅当 store 为空且本地有 token），不反向覆盖，避免误清请求层凭据。
+    if (!accessStore.accessToken) {
+      const persisted = localStorage.getItem('phoenix-token');
+      if (persisted) {
+        accessStore.setAccessToken(persisted);
+      }
+    }
+
     // 基本路由，这些路由不需要进入权限拦截
     if (coreRouteNames.includes(to.name as string)) {
       if (to.path === LOGIN_PATH && accessStore.accessToken) {
