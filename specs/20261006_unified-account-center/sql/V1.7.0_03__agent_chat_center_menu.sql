@@ -27,12 +27,13 @@ DELETE FROM tbl_privilege_module WHERE sn        = 'AgentChatCenter';
 
 -- ① 菜单行：一级菜单 + 置顶，字段形状继承现有一级菜单「知识库」(url='/knowledge-base')：
 --    pid=''、type='1'、system_id/category_id 为空 —— 与既有约定同源，避免手写字段漂移（L-01）。
---    image 保持 NULL（现网 26 行菜单均无图标）；state 继承，缺失时兜底 '31'。
+--    image='lucide:message-square'（iconify 名，与既有菜单同格式）—— v2 追加：用户实测反馈"没有图标"；
+--    首版置 NULL 是漏看 image 列（现网 24/27 行都有图标），非设计取舍。
 INSERT INTO tbl_privilege_module
   (id, name, url, sn, state, component, system_id, status, image, order_no, is_show,
    create_time, create_by, del_flag, pid, category_id, type)
 SELECT 'a9c1e7d4f0b34c8e9a1d2b3c4e5f6a70', '智能体中心', '/agent/chat', 'AgentChatCenter',
-       COALESCE(m.state, '31'), '#/views/front/chat.vue', m.system_id, 1, NULL, -1, 1,
+       COALESCE(m.state, '31'), '#/views/front/chat.vue', m.system_id, 1, 'lucide:message-square', -1, 1,
        now(), 'admin', 0, COALESCE(m.pid, ''), m.category_id, m.type
   FROM tbl_privilege_module m
  WHERE m.url = '/knowledge-base';

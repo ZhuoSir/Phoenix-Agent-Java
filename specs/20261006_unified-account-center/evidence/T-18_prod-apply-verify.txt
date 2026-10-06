@@ -54,3 +54,16 @@ views/front/chat.vue
   这不是本次引入的回归（admin 历史上也不在 tbl_platform_account_info，用不了前台），
   根因是"后台角色"与"前台授权组"两套授权未归一 —— 正是 **R-05（二期）** 的范围。
   本期交付口径：智能体中心**页面与鉴权可用**（同一 token、同一套接口，code=100）；列表内容取决于该账号的前台授权组。
+
+--- 6. 升级件 03 v2（补图标）重跑 —— 用户实测反馈"没有图标" ---
+根因：首版把 `image` 置 NULL 是我**漏看该列**（现网 27 行里 24 行都有 iconify 图标名，如
+      AgentManager=meteor-icons:robot、KnowledgeBase=lucide:book-open），不是设计取舍。
+处置：升级件 03 改为 `image='lucide:message-square'`（iconify 名，与既有菜单同格式）并**重跑**（脚本幂等）：
+  ① drill 复跑：INSERT 0 1 / INSERT 0 2 → NOTICE 一级菜单行 1 + 角色 ACL 2 行；image=lucide:message-square
+     drill 回滚：DELETE 2 + DELETE 1 → NOTICE 回滚完成（干净）
+  ② 生产复跑：同上 COMMIT；DB 回读 image=lucide:message-square / order_no=-1 / type=1 / is_show=1 / pid=''
+  ③ 接口回读（/api/privilege/auth/menus, admin token, code=100）：
+     {"name":"智能体中心","url":"/agent/chat","component":"#/views/front/chat.vue",
+      "image":"lucide:message-square","orderNo":-1,"type":"1","isShow":1}   根菜单数=9
+说明：本次为"已应用升级件的内容修订"，按纪律**重跑使生产回读 == 文件内容**（03 幂等：先删后插），
+      证据链保留 v1（无图标）与 v2（有图标）两次执行记录。

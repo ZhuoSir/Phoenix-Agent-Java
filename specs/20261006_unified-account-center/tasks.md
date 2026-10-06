@@ -166,7 +166,8 @@
   依赖: T-07
   验证方式: 登录 admin → 侧栏**最上方**出现「智能体中心」→ 进入后 chat 可用（会话列表/发消息/文件树/预设问题各一次）；`GET /api/privilege/auth/menus` 含该行（侧栏次序由前端 `meta.order` 决定，见 `generate-menus.ts:86`，非接口数组序）
   验收标准: 后台登录后可直接用 chat，无需第二次登录
-  **机制留档**：一级菜单形状（`pid=''`、`type=1`、`order_no=-1`，继承一级菜单「知识库」行）；
+  **机制留档**：一级菜单形状（`pid=''`、`type=1`、`order_no=-1`、`image=lucide:message-square`，继承一级菜单「知识库」行；
+  图标为 v2 补正——用户实测反馈"没有图标"，根因是我首版漏看 `image` 列）；
   `tbl_privilege_acl` 是「角色 → 菜单」授权表（`module_id → module.id`）；旧脚本失败真因 = 照过期冗余列 `module_sn` 复制 4 行撞唯一键。
   **可见性口径（v2.0.1 实测纠正）**：现网 `getUserMenus` 为开发期全放开（`getModelTreeByUserId` 被注释）
   ⇒ 本期实际可见性 = **任一登录用户**；ACL 行为二期启用过滤的预置数据，按角色过滤属 R-05 二期。
