@@ -1,6 +1,6 @@
 # 交付物清单 · 20261007_user-role-group-model（v2.0.0）
 
-> 统计日期: 2026-10-07 | 与 `git log` footer（`Task: T-01~T-17`）可交叉核对
+> 统计日期: 2026-10-07 | 与 `git log` footer（`Task: T-01~T-28`）可交叉核对
 
 ## 一、升级件 SQL（`sql/`）—— 正向 14 件 / 回滚 14 件（**件数配对**）
 
@@ -143,4 +143,4 @@
 
 - 正向 SQL 件数 = 回滚 SQL 件数 = **14** ✅
 - 任务数 28，完成 28（T-17 收口 + T-18 R-12 + T-19 R-13 + T-20 R-14 + T-21 R-15 + T-22 R-16 + T-23 R-17 + T-24~26 R-18/CR-01 + T-27~28 R-19/CR-02）✅
-- 提交 footer `Task: T-xx` 覆盖 T-01~T-17 ✅（`git log --grep="Task: T-"` 可核）
+- 提交 footer `Task: T-xx` 覆盖 **T-01~T-28** ✅（`git log --grep="Task:" | grep -oE "T-[0-9]+" | sort -u` 实测 28 个）
