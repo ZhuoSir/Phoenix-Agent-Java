@@ -1,4 +1,4 @@
-> 版本: v1.7.0 | 状态: 已确认 | 确认人: 陈卓 | 确认日期: 2026-10-07 | 变更源: CR-01 ⇒ R-18 | 变更源: R-17（智能体按创建人可见 + 系统管理员角色不可删）|
+> 版本: v1.8.0 | 状态: 已确认 | 确认人: 陈卓 | 确认日期: 2026-10-07 | 变更源: CR-02 ⇒ R-19 | 变更源: CR-01 ⇒ R-18 | 变更源: R-17（智能体按创建人可见 + 系统管理员角色不可删）|
 >
 > **v1.1.0 变更（铁律 4：已确认文档被改动 ⇒ 回退待重确认）**：**仅订正事实数字**，无设计变更 —— T-01 活库门禁统计（`evidence/T-01_gate-stats.txt`）推翻了两处口径：普通角色 ACL 由「0 行」订正为「**1 行**（智能体中心）」、名下用户由「10」订正为「**5 个存活用户**」；并在 §数据模型一 追加「活库现值复核」表（dump 为迁移前快照）。**决策 1~6、任务拆解 T-01~T-17、需求条款均不受影响。**
 
@@ -570,3 +570,11 @@ COMMIT;
 | 单对象 | 三资源 controller 注入 `AdminRoleGuard`，`assertOwner` 非本人且非超管 → 403 |
 | 选择器 | skill/mcp `options(agentId, viewerId, superAdmin)`、kbase `bindable(agentId, viewerId, superAdmin)`：可见集合 own ∪ myGroups ∪ public；bound 灰显 |
 | 坑 | `QueryChain.and` 占位符必须 `?`（`{0}` 不替换 ⇒ BUG-139 / L-64） |
+
+## R-19 实施方案（v1.8.0 追加，CR-02）
+
+| 层 | 内容 |
+|---|---|
+| SQL | `V2.0.0_14`：DROP CONSTRAINT `tbl_harness_skills_name_key`（**是约束非裸索引**，L-66）+ CREATE UNIQUE `(name, coalesce(creator,''))` |
+| 后端 | `SkillAdminServiceImpl.upload` 判重加 `creator=?`；overwrite 仅本人；insert 捕获 DuplicateKey → 友好 fail |
+| 前端 | 无（Q-D1） |

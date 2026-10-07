@@ -1,5 +1,12 @@
 # Changelog: user-role-group-model
 
+## v2.8.0 = CR-02 合入（2026-10-07，R-19 / T-27~T-28，major 三确认）
+
+- 技能名称唯一性：全局 UNIQUE(name) → 按创建人 UNIQUE(name, coalesce(creator,''))（V2.0.0_14，台账 14 件）
+- upload 判重/覆盖加 creator 维度；overwrite 只覆盖本人；并发撞键友好 fail
+- 端到端：跨用户同名共存 / 同用户互斥 / overwrite 不跨用户 / 清理 0 行
+- 坑记 L-66：唯一"约束"与唯一"索引"不同，DROP INDEX 对约束-backed 索引报错；drill 假通过教训
+
 ## BUG-140 二次修正（2026-10-07）
 
 - 首修（operator 提同步段）仍偶发 `SaTokenContextException`（multipart 同步段也可能在非请求线程）

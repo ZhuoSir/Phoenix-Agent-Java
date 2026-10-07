@@ -412,6 +412,17 @@
   ③ 部署后要专门验一次"**旧会话 + 新代码**"路径（拿改造前就登录的 token 打一次相关接口），
   不能只验"重新登录后是否正常"。
 
+## L-66 唯一"约束"与唯一"索引"不是一回事：改唯一性前先查 pg_constraint，DROP INDEX 对约束-backed 索引必报错
+- **现象**：CR-02 要把 `tbl_harness_skills` 的全局 `UNIQUE(name)` 换成按创建人唯一。首版写 `DROP INDEX name_key`，
+  活库报 `cannot drop index ... because constraint name_key requires it`（它是**约束**，索引只是其支撑物）。
+  更阴的是 **drill 先"通过"了**——因为 drill 库早前被另一版（DROP CONSTRAINT）改过、约束已不在，
+  `DROP INDEX IF EXISTS` 变成 no-op ⇒ 假绿；活库首跑才暴露。
+- **防再犯规则**：① 动唯一性/索引前先 `select conname from pg_constraint where conrelid=... ` +
+  `pg_indexes` 辨清是约束还是裸索引，约束用 `ALTER TABLE ... DROP CONSTRAINT`；
+  ② **drill 库是被反复改过的脏环境**，"drill 通过"不等于" virgin 库通过"——关键 DDL 要在**从未应用过该件**的库
+  （洁净库或新建 scratch）上首跑验证；③ 迁移件里对"可能以约束或索引两种形态存在"的对象，
+  用 `DROP CONSTRAINT IF EXISTS` + `DROP INDEX IF EXISTS` 双保险。
+
 ## L-65 WebFlux 下 Sa-Token 登录态只能在**请求线程同步段**取，进 fromCallable/弹性线程即 NotLoginException
 - **现象**：CR-01 给 `SkillController.upload`（reactive）加 creator 时，把 `me()` 写进
   `Mono.fromCallable(...).subscribeOn(Schedulers.boundedElastic())` 的 lambda 内 ⇒ 弹性线程无 Sa-Token 上下文
