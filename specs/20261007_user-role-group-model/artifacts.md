@@ -1,0 +1,65 @@
+# 交付物清单 · 20261007_user-role-group-model（v2.0.0）
+
+> 统计日期: 2026-10-07 | 与 `git log` footer（`Task: T-01~T-17`）可交叉核对
+
+## 一、升级件 SQL（`sql/`）—— 正向 5 件 / 回滚 5 件（**件数配对**）
+
+| 序号 | 正向件 | 回滚件 | 类型 | 内容 |
+|---|---|---|---|---|
+| 01 | `V2.0.0_01__org_dimension_drop_ddl.sql` | `rollback/V2.0.0_01__org_dimension_drop_ddl_rollback.sql` | DDL | DROP 组织 3 表 + `tbl_platform_platform_info`；DROP 9 列（含解除 `user.company_id/dept_id` NOT NULL）。回滚自包含：结构 + 9 条列值 UPDATE + 内联 T-01 COPY 数据 |
+| 02 | `V2.0.0_02__role_backfill_dml.sql` | `rollback/V2.0.0_02__role_backfill_dml_rollback.sql` | DML | 存量用户补默认角色（`upper(sn)='COMMON'`） |
+| 03 | `V2.0.0_03__org_menu_cleanup_dml.sql` | `rollback/V2.0.0_03__org_menu_cleanup_dml_rollback.sql` | DML | 删 4 条组织菜单 + 4 条 ACL（回滚含原始 8 行保真重建） |
+| 04 | `V2.0.0_04__acl_baseline_rebuild_dml.sql` | `rollback/V2.0.0_04__acl_baseline_rebuild_dml_rollback.sql` | DML | ACL 基线重建（超管全量 + 普通 7），含 JSONB 备份表与脏行清理 |
+| 05 | `V2.0.0_05__three_party_menu_cleanup_dml.sql` | `rollback/V2.0.0_05__three_party_menu_cleanup_dml_rollback.sql` | DML | 删「三方平台」+ 父目录「基础管理」2 行（回滚保真重建） |
+
+**执行序**：01 → 02 → 03 → 04 → 05（幂等，可重跑；全新库重放与 drill 正反向均已演练）
+**数据备份**：`backups/pre_v2.0.0_full_20261007_165618.sql`（迁移前全量）、`backups/pre_v2.0.0_orgdim_20261007_165618.sql`（组织维度专项）
+
+## 二、基线文件（`sql/`）
+
+| 文件 | 变更 |
+|---|---|
+| `sql/all_schema.sql` | 删 10 行（4 组织菜单 + 4 ACL + 三方平台/基础管理 2 行） |
+| `sql/all_data.sql` | 删 10 行（同上）；并**修 BUG-127**：5 处 `DROP TABLE` 后补 `CREATE SEQUENCE IF NOT EXISTS` |
+
+## 三、后端代码（`phoenix-*`）
+
+| 模块 | 变更摘要 |
+|---|---|
+| `phoenix-privilege-core` | `LoginServiceImpl`：菜单/权限位按角色过滤（唯一入口 + 祖先补全 + 按钮级）+ 删 session ACL 快照 + `isSuperAdmin` 双条件；`PrivilegeUserServiceImpl`：事务化建号/更新（roleIds/groupIds）+ **BUG-123 修复**；删 2 个死 XML mapper + `getByCompanyId` 链路 |
+| `phoenix-privilege-api` | 实体/VO/DTO 去组织字段；`PrivilegeUserDTO` 增 roleIds/groupIds |
+| `phoenix-agent-*` | 组侧技能/MCP 授权：`GroupSkillInfoService(+Impl)`、`GroupMcpInfoService(+Impl)`、`GroupSkillController`、`GroupMcpController`、`SkillIdsDTO`/`McpIdsDTO`、`GroupMcpInfo` 补逻辑删 |
+| `phoenix-platform-core/api` | 组授权读侧补 `del_flag=0`（`GroupAgentInfo/AccountGroupInfo/GroupInfo`）；`AccountInfo` 去组织字段 |
+| `phoenix-data-*` | `AdminRoleGuard`（新增）；`AgentPresetQuestionController` 两写接口鉴权 |
+| 删除 | 业务代码 55 个文件（T-02 25 + T-04 30）+ 2 个死 XML mapper |
+
+## 四、前端代码（`web-frontend/`）
+
+| 应用 | 变更摘要 |
+|---|---|
+| `apps/admin-ui` | 删 20 文件（组织三维页面/API/组件 + platform-info 三件）；改 7 文件（引用解除、`ColPage`→`Page`、去组织字段）；新增 `api/core/group-{skill,mcp}.ts`、`assign-{skill,mcp}-form.vue`、组管理页两动作；`assign-menu.vue` 修 R-10；用户表单三维度化 |
+| `apps/mobile-ui` | 删 3 个 SSO 专用文件；`main.ts` 重写为「无 token → 密码登录页」 |
+| 验收 | admin-ui：typecheck **207 < 基线 211**、`pnpm build` exit=0；mobile-ui：typecheck 零新增、`build:prod` exit=0 |
+
+## 五、证据（`evidence/`）
+
+| 类别 | 文件 |
+|---|---|
+| 逐任务结论 | `T-01_result.txt` ~ `T-16_result.txt`（含 T-07/08/09/10/12/13/14/15 的「延期至 T-16」与勘误段） |
+| 真实命令输出 | `T-07_compile.raw.txt`、`T-07_logic-replica.txt`、`T-09_compile.raw.txt`、`T-09_delflag-impact.txt`、`T-10_compile.raw.txt`、`T-10_guard-replica.txt`、`T-13_compile.raw.txt`、`T-13_sql-probe.txt`、`T-14_compile.raw.txt`、`T-14_drill.txt`、`T-14_fresh-replay.txt`、`T-15_drill.txt` |
+| UI 留证 | `T-16_ui-nav-common-user.jpg`（普通角色导航仅 智能体中心/智能体管理/知识库） |
+
+## 六、台账与发布件
+
+| 文件 | 变更 |
+|---|---|
+| `specs/_project/bugs.md` | 新增 BUG-123~129（7 条）；BUG-116/117/118/121/122/123/124/127 翻转「已修复/已验证(v2.0.0)」 |
+| `specs/_project/lessons.md` | 新增 L-43~L-50（8 条，含 L-32 复发记录） |
+| `specs/_project/backlog.md` | BL-31 → 实现完成(v2.0.0，待发版冻结) |
+| `releases/v2.0.0/MILESTONE.md` | 需求挂接表状态、纳入缺陷表、进度与审计记录同步 |
+
+## 七、计数自检
+
+- 正向 SQL 件数 = 回滚 SQL 件数 = **5** ✅
+- 任务数 17，完成 17（T-17 收口即本清单）✅
+- 提交 footer `Task: T-xx` 覆盖 T-01~T-17 ✅（`git log --grep="Task: T-"` 可核）
