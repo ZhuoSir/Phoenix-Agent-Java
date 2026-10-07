@@ -1,0 +1,38 @@
+=== T-12 验收结论（mobile-ui 移除 SSO 自动登录 / R-11 边界 4）===
+日期: 2026-10-07 | 工具链: node v24.21.0 + pnpm（mobile-ui）
+
+[1] 删除 3 个 SSO 专用文件
+  - src/services/platformService.ts（getEnabledPlatform + thirdPartyLogin(→/auth/thirdLogin)）
+  - src/utils/platformDetector.ts（detectPlatform / isInApp / getAuthCode 及 dd/ww/tt 取码逻辑）
+  - src/types/platform.ts（PlatformInfo，仅被 platformService 使用）
+  依据：全仓 grep 证实三者除 main.ts 的 SSO 流程外**无任何其它引用**。
+
+[2] main.ts 重写（去掉免登启动分支）
+  - 删 `trySsoLogin()` 全函数（45~89 行）及其调用
+  - 删 import：`getEnabledPlatform/thirdPartyLogin`、`detectPlatform/getAuthCode`、`User` 类型
+  - 删仅被 SSO 使用的 `TOKEN_KEY`/`USER_KEY` 常量
+  - `bootstrap()` 简化为：有 token → 加载智能体列表；无 token → **不再发起任何免登请求**，
+    直接落密码登录页（LoginPage + POST /auth/login），并加注释说明 R-11 依据
+
+[3] 验证（真实输出）
+  - **基线对照**（git stash 回改动前）：`pnpm typecheck` = **11 个错误**
+    改动后：`pnpm typecheck` = **11 个错误，且集合完全一致**（全在 `views/chat/ChatPage.vue`
+    与 `packages/chat-shared/src/mocks/agents.ts`，**与本次改动无关**）
+    ⇒ **T-12 零新增类型错误**；`src/main.ts` 命中数 = **0**
+  - `pnpm build:prod`（= vite build --mode production，跳过既有 vue-tsc 债）：**exit=0，built in 445ms**
+    （唯一输出为既有的 INEFFECTIVE_DYNAMIC_IMPORT 警告）
+  - 全仓 grep `thirdPartyLogin|getEnabledPlatform|getAuthCode|detectPlatform`：**空**
+
+[4] **偏差记录（不静默）**：`pnpm build` 仍为 exit=2
+  原因：该脚本是 `vue-tsc --noEmit --skipLibCheck && vite build`，被**改动前即存在**的 11 个
+  类型错误拦住（基线已证实 11=11）。本 spec 未修这 11 个既有错误（不属 R-11 范围），
+  故以 `build:prod` 单独证明**打包本身通过**。若需 `pnpm build` 全绿，须另立任务清理 mobile-ui
+  既有类型债 —— 建议记入 backlog。
+
+[5] **延期至 T-16（明确记载）**
+  R-11 的运行期断言（启动**不再出现** `/auth/thirdLogin` 或 `/platform/platform-info/getEnabledPlatform`
+  请求；未登录直接显示密码登录页；密码登录可正常进入）需对**已部署**的 mobile-ui 执行
+  ⇒ **T-12 暂不勾选**，待 T-16 通过后勾选。
+
+[6] 结论：T-12 代码面完成（SSO 链路整体移除、零新增类型错误、vite 打包通过）；
+    启动期网络行为与登录页断言挂 T-16。
