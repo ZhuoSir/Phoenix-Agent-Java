@@ -419,7 +419,12 @@
 - **防再犯规则**：① reactive 端点里凡需登录态/请求头，一律在 **handler 同步段**先取值存局部变量，再传进 Mono/fromCallable
   （同仓 `AgentFileController`/`AgentKnowledgeController` 已是该范式，照抄不要创新）；
   ② 改了哪个端点的签名/调用链，**验证清单必须覆盖该端点的 happy path**（本次漏了 upload）；
-  ③ 报「未能读取到有效 token」先查调用点线程（是否 in fromCallable/subscribeOn/parallel），别先怀疑 token 过期。
+  ③ 报「未能读取到有效 token」先查调用点线程（是否 in fromCallable/subscribeOn/parallel），别先怀疑 token 过期；
+  ④ **二次修正教训**：把 `me()` 提到 handler 同步段仍不够——multipart/reactive 端点的同步段也可能被派发到
+  非请求线程（实测 boundedElastic 上 `SaTokenContext 上下文尚未初始化`）。reactive 端点取登录态的**唯一稳妥**做法是
+  线程无关的 `StpUtil.getLoginIdByToken(token)`（token 从请求头取），或改阻塞端点；
+  ⑤ **编译 exit≠0 时绝不部署**：本次一度把未编译通过的改动"部署"（实际部署了旧 jar），验证"通过"是假象。
+  部署前必须确认 `mvn package` exit=0。
 
 ## L-64 MyBatis-Flex `QueryChain.and(String, Object...)` 只认 `?`，`{0}` 原样进 SQL 且错误被吞
 - **现象**：`KnowledgeBaseServiceImpl` 用 `chain.and("creator = {0}", id)`，生成 SQL 为字面 `creator = {0}`

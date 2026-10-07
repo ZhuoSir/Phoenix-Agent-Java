@@ -23,6 +23,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
@@ -91,15 +92,19 @@ public class SkillController {
      */
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public Mono<ReturnVo<Long>> upload(@RequestPart("file") FilePart filePart,
-                                       @RequestPart(value = "overwrite", required = false) String overwrite) {
+                                       @RequestPart(value = "overwrite", required = false) String overwrite,
+                                       @RequestHeader(value = "phoenix-token", required = false) String tokenHeader) {
         boolean overwriteFlag = "true".equalsIgnoreCase(overwrite);
         String filename = filePart.filename();
         String contentType = filePart.headers().getContentType() != null
             ? filePart.headers().getContentType().toString() : MediaType.APPLICATION_OCTET_STREAM_VALUE;
-        // BUG-140：Sa-Token 登录上下文只在**请求线程（handler 同步段）**有效；
-        // 若在 Mono.fromCallable(...).subscribeOn(boundedElastic) 内调 me() 会抛 NotLoginException。
-        // 故在此同步取 operator，再传入弹性线程。
-        String operator = me();
+        // BUG-140（二次修正）：multipart/reactive 端点的 handler 同步段也可能被派发到非请求线程
+        // （实测 boundedElastic 上 SaTokenContext 未初始化 ⇒ me() 抛 SaTokenContextException）。
+        // 故改用**线程无关**的 token→loginId 反查（StpUtil.getLoginIdByToken 不依赖 SaTokenContext）。
+        String operator = loginIdFromToken(tokenHeader);
+        if (operator == null) {
+            return Mono.just(ReturnVo.fail("未登录或登录已失效"));
+        }
         return DataBufferUtils.join(filePart.content()).flatMap(dataBuffer -> {
             byte[] bytes = new byte[dataBuffer.readableByteCount()];
             dataBuffer.read(bytes);
@@ -109,6 +114,15 @@ public class SkillController {
                 .upload(new ByteArrayMultipartFile(bytes, filename, contentType), overwriteFlag, operator))
                 .subscribeOn(Schedulers.boundedElastic());
         });
+    }
+
+    /** 线程无关地由 token 反查登录 id（不依赖 SaTokenContext）；无效/缺失返回 null */
+    private String loginIdFromToken(String token) {
+        if (token == null || token.isBlank()) {
+            return null;
+        }
+        Object id = cn.dev33.satoken.stp.StpUtil.getLoginIdByToken(token);
+        return id == null ? null : String.valueOf(id);
     }
 
     /** 发布（body.groupIds 为授权组，可为空=仅后台可见） */

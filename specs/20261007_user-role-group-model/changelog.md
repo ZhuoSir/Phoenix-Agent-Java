@@ -1,5 +1,11 @@
 # Changelog: user-role-group-model
 
+## BUG-140 二次修正（2026-10-07）
+
+- 首修（operator 提同步段）仍偶发 `SaTokenContextException`（multipart 同步段也可能在非请求线程）
+- 终修：`StpUtil.getLoginIdByToken(phoenix-token 头)` 线程无关反查；未登录返回 fail 而非 500
+- 端到端复验：上传成功 id=21、creator=chenzhuo、本人/admin 可见、本人可删、清理；日志 0 异常
+
 ## BUG-140 修复（2026-10-07，CR-01 回归）
 
 - `SkillController.upload` 的 `me()` 误置于 `Mono.fromCallable(boundedElastic)` 内 ⇒ NotLoginException、上传必失败
