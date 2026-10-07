@@ -13,6 +13,8 @@ export * from './platform-info';
 export * from './platform-account-tenant-info';
 export * from './platform-group-info';
 export * from './platform-group-agent-info';
+export * from './group-skill';
+export * from './group-mcp';
 export * from './privilege-company';
 export * from './privilege-department';
 export * from './privilege-employee';

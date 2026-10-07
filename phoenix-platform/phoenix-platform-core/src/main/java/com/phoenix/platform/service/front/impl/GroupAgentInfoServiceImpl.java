@@ -20,6 +20,7 @@ public class GroupAgentInfoServiceImpl extends ServiceImpl<GroupAgentInfoMapper,
     @Override
     public List<GroupAgentInfo> getByGroupIds(List<String> groupIds) {
         return QueryChain.of(this.mapper)
+                .eq(GroupAgentInfo::getDelFlag, 0)
                 .in(GroupAgentInfo::getGroupId, groupIds)
                 .list();
     }
@@ -27,6 +28,7 @@ public class GroupAgentInfoServiceImpl extends ServiceImpl<GroupAgentInfoMapper,
     @Override
     public Page<GroupAgentInfo> page(Page<GroupAgentInfo> page, GroupAgentInfo query) {
         return QueryChain.of(getMapper())
+                .eq(GroupAgentInfo::getDelFlag, 0)
                 .eq(GroupAgentInfo::getGroupId, query.getGroupId(), StrUtil.isNotBlank(query.getGroupId()))
                 .eq(GroupAgentInfo::getAgentId, query.getAgentId(), query.getAgentId() != null)
                 .orderBy(GroupAgentInfo::getCreateTime, false)
@@ -36,6 +38,7 @@ public class GroupAgentInfoServiceImpl extends ServiceImpl<GroupAgentInfoMapper,
     @Override
     public List<GroupAgentInfo> getByGroupId(String groupId) {
         return QueryChain.of(getMapper())
+                .eq(GroupAgentInfo::getDelFlag, 0)
                 .eq(GroupAgentInfo::getGroupId, groupId)
                 .orderBy(GroupAgentInfo::getCreateTime, false)
                 .list();
@@ -44,6 +47,7 @@ public class GroupAgentInfoServiceImpl extends ServiceImpl<GroupAgentInfoMapper,
     @Override
     public List<GroupAgentInfo> getByAgentId(String agentId) {
         return QueryChain.of(getMapper())
+                .eq(GroupAgentInfo::getDelFlag, 0)
                 .eq(GroupAgentInfo::getAgentId, agentId)
                 .orderBy(GroupAgentInfo::getCreateTime, false)
                 .list();

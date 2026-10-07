@@ -3,6 +3,7 @@ package com.phoenix.agent.model;
 import java.io.Serializable;
 import java.util.Date;
 
+import com.mybatisflex.annotation.Column;
 import com.mybatisflex.annotation.Id;
 import com.mybatisflex.annotation.KeyType;
 import com.mybatisflex.core.keygen.KeyGenerators;
@@ -26,5 +27,7 @@ public class GroupMcpInfo implements Serializable {
     private Date createTime = new Date();
     private String updator;
     private Date updateTime = new Date();
+    /** 与 GroupSkillInfo 对齐：声明为逻辑删列，读取自动过滤 del_flag<>0（BUG-121） */
+    @Column(value = "del_flag", isLogicDelete = true)
     private Integer delFlag = 0;
 }

@@ -32,8 +32,10 @@ public class GroupInfoServiceImpl extends ServiceImpl<GroupInfoMapper, GroupInfo
 	@Override
 	public List<GroupInfo> getByLoginId(String loginId) {
 		return QueryChain.of(getMapper())
+			.eq(GroupInfo::getDelFlag, 0)
 			.leftJoin(AccountGroupInfo.class).on(GroupInfo::getId, AccountGroupInfo::getGroupId)
 			.where(AccountGroupInfo::getAccountId).eq(loginId)
+			.eq(AccountGroupInfo::getDelFlag, 0)
 			.eq(GroupInfo::getStatus, 0)
 			.list();
 	}
@@ -41,6 +43,7 @@ public class GroupInfoServiceImpl extends ServiceImpl<GroupInfoMapper, GroupInfo
 	@Override
 	public Page<GroupInfo> page(Page<GroupInfo> page, GroupInfo query) {
 		return QueryChain.of(getMapper())
+			.eq(GroupInfo::getDelFlag, 0)
 			.like(GroupInfo::getName, query.getName(), StrUtil.isNotBlank(query.getName()))
 			.eq(GroupInfo::getSn, query.getSn(), StrUtil.isNotBlank(query.getSn()))
 			.orderBy(GroupInfo::getCreateTime, false)
@@ -49,7 +52,7 @@ public class GroupInfoServiceImpl extends ServiceImpl<GroupInfoMapper, GroupInfo
 
 	@Override
 	public GroupInfo getBySn(String sn) {
-		return QueryChain.of(getMapper()).eq(GroupInfo::getSn, sn).one();
+		return QueryChain.of(getMapper()).eq(GroupInfo::getDelFlag, 0).eq(GroupInfo::getSn, sn).one();
 	}
 
 	@Override
