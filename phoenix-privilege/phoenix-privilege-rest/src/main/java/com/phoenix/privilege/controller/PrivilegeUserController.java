@@ -73,7 +73,8 @@ public class PrivilegeUserController {
 	 */
 	@PutMapping
 	public ReturnVo<Boolean> update(@RequestBody PrivilegeUserDTO dto) {
-		return ReturnVo.ok(privilegeUserService.updateById(dto.toEntity()));
+		// R-03（v2.0.0）：改走 updateUser —— 除基本信息外，roleIds/groupIds 非 null 时同步角色与组
+		return ReturnVo.ok(privilegeUserService.updateUser(dto));
 	}
 
 	/**

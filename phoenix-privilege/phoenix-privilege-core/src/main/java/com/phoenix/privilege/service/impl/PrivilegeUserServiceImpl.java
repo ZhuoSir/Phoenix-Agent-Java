@@ -6,6 +6,7 @@ import cn.hutool.crypto.SecureUtil;
 import com.mybatisflex.core.paginate.Page;
 import com.mybatisflex.core.query.QueryChain;
 import com.mybatisflex.core.query.QueryWrapper;
+import com.mybatisflex.core.row.Db;
 import com.mybatisflex.spring.service.impl.ServiceImpl;
 import com.phoenix.privilege.constant.LoginConstant;
 import com.phoenix.privilege.dto.PrivilegeUserDTO;
@@ -19,6 +20,7 @@ import com.phoenix.privilege.service.IPrivilegeUserService;
 import com.phoenix.privilege.vo.PrivilegeRoleVO;
 import com.phoenix.privilege.vo.PrivilegeUserVO;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,6 +31,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.function.Consumer;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(rollbackFor = Exception.class)
@@ -108,19 +111,95 @@ public class PrivilegeUserServiceImpl extends ServiceImpl<PrivilegeUserMapper, P
 		entity.setPwdInit(0);
 		boolean result = save(entity);
 		if (result) {
-			PrivilegeRole role = privilegeRoleService.list(QueryWrapper.create().eq(PrivilegeRole::getSn, "common"))
-				.stream()
-				.findFirst()
-				.orElse(null);
-			if (role != null) {
-				PrivilegeUserRole userRole = PrivilegeUserRole.builder()
-					.userId(entity.getId())
-					.roleId(role.getId())
-					.build();
-				privilegeUserRoleService.save(userRole);
+			// R-03（v2.0.0）：表单显式选了角色就按所选落库（三维度化）；未选才走默认角色兜底
+			List<String> roleIds = dto.getRoleIds();
+			if (roleIds == null || roleIds.isEmpty()) {
+				PrivilegeRole role = findDefaultRole();
+				if (role == null) {
+					log.warn("默认角色(sn=common)不存在，用户 {} 创建后无任何角色", entity.getUsername());
+				}
+				else {
+					saveUserRole(entity.getId(), entity.getCode(), role.getId());
+				}
+			}
+			else {
+				roleIds.stream()
+					.filter(StrUtil::isNotBlank)
+					.distinct()
+					.forEach(roleId -> saveUserRole(entity.getId(), entity.getCode(), roleId));
+			}
+			// R-03：创建时可直接入组
+			addUserGroups(entity.getId(), entity.getCode(), dto.getGroupIds());
+			log.info("用户创建完成: id={}, username={}, roleIds={}, groupIds={}", entity.getId(), entity.getUsername(),
+					roleIds, dto.getGroupIds());
+		}
+		return result;
+	}
+
+	@Override
+	public boolean updateUser(PrivilegeUserDTO dto) {
+		boolean result = updateById(dto.toEntity());
+		if (result) {
+			// null = 不改动（兼容既有「分配角色/分配组」弹窗路径）；空列表 = 清空
+			if (dto.getRoleIds() != null) {
+				privilegeUserRoleService.removeUserRoleByUserId(dto.getId());
+				dto.getRoleIds()
+					.stream()
+					.filter(StrUtil::isNotBlank)
+					.distinct()
+					.forEach(roleId -> saveUserRole(dto.getId(), dto.getCode(), roleId));
+			}
+			if (dto.getGroupIds() != null) {
+				Db.updateBySql("delete from tbl_platform_account_group_info where account_id = ?", dto.getId());
+				addUserGroups(dto.getId(), dto.getCode(), dto.getGroupIds());
 			}
 		}
 		return result;
+	}
+
+	/**
+	 * 默认角色（BUG-123 修复）：库中 sn 实存**大写** 'COMMON'，旧实现按小写 'common' 等值匹配
+	 * ⇒ 永远查不到 ⇒ 「自动补默认角色」从未生效（API 建的用户全部无角色）。
+	 * 改为 Java 侧忽略大小写匹配，与 LoginServiceImpl.isSuperAdmin 同思路，避免再被大小写坑。
+	 */
+	private PrivilegeRole findDefaultRole() {
+		return privilegeRoleService.list()
+			.stream()
+			.filter(r -> r.getSn() != null && "common".equalsIgnoreCase(r.getSn()))
+			.findFirst()
+			.orElse(null);
+	}
+
+	private void saveUserRole(String userId, String userNo, String roleId) {
+		privilegeUserRoleService.save(PrivilegeUserRole.builder()
+			.userId(userId)
+			.userNo(userNo)
+			.roleId(roleId)
+			.build());
+	}
+
+	/**
+	 * 入组（R-03）。account_group_info 属平台域，phoenix-privilege 不依赖平台模块
+	 * ⇒ 沿用同仓跨域裸 SQL 先例（AgentServiceImpl 写 tbl_platform_group_agent_info）。
+	 *
+	 * <p>用 insert...select 一次取到 group_name，并顺带跳过不存在/已删除的组；
+	 * **del_flag 必须显式置 0** —— 该列 DDL 默认值是 1（"已删除"），漏写会插入"出生即删除"的行
+	 * （同一坑见 T-01 实勘记录）。
+	 */
+	private void addUserGroups(String userId, String accountName, List<String> groupIds) {
+		if (groupIds == null || groupIds.isEmpty()) {
+			return;
+		}
+		for (String groupId : groupIds.stream().filter(StrUtil::isNotBlank).distinct().toList()) {
+			int inserted = Db.insertBySql(
+					"insert into tbl_platform_account_group_info (id, group_id, account_id, group_name, account_name, creator, create_time, update_time, del_flag) "
+							+ "select ?, g.id, ?, g.name, ?, ?, now(), now(), 0 from tbl_platform_group_info g "
+							+ "where g.id = ? and coalesce(g.del_flag, 0) = 0",
+					cn.hutool.core.util.IdUtil.getSnowflakeNextIdStr(), userId, accountName, userId, groupId);
+			if (inserted == 0) {
+				log.warn("组不存在或已删除，跳过入组: userId={}, groupId={}", userId, groupId);
+			}
+		}
 	}
 
 	@Override

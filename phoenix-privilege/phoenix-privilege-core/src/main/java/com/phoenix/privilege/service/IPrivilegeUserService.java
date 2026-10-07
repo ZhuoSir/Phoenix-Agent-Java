@@ -24,6 +24,11 @@ public interface IPrivilegeUserService extends IService<PrivilegeUser> {
 
 	boolean saveUser(PrivilegeUserDTO dto);
 
+	/**
+	 * 更新用户（R-03：roleIds/groupIds 非 null 时同步角色与组）。
+	 */
+	boolean updateUser(PrivilegeUserDTO dto);
+
 	boolean deleteUser(String id);
 
 	Page<PrivilegeUserVO> pageByQuery(Page<PrivilegeUserVO> page, PrivilegeUserDTO dto);

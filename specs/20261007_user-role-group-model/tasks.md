@@ -99,6 +99,11 @@
   依赖: T-04, T-05, T-06
   验证方式: `specs/20261007_user-role-group-model/sql/` 落 `V2.0.0_01__org_dimension_drop_ddl.sql`（含 `DROP TABLE tbl_platform_platform_info` 与 `third_party_id` 列）、`V2.0.0_02__role_backfill_dml.sql`、`V2.0.0_03__org_menu_cleanup_dml.sql`、`V2.0.0_04__acl_baseline_rebuild_dml.sql` 及 `rollback/` 配对；**全新库重放 + drill 库正反向演练**
   验收标准: 全新库重放全绿（幂等，重跑无错）；正向 → 三张组织表与配置表不存在、应用启动无 SQL 报错；反向 → 表与列恢复且行数一致（数据由 T-01 专项备份回填）；`rollback/` 件数 == 正向件数
+  ⚠ Implement 期追加（2026-10-07，T-13 实测发现；**不改本条验收口径**，仅锁定顺序依赖）:
+  `tbl_privilege_user` 的 `company_id` / `dept_id` 在库中为 **NOT NULL**（T-13 探针实测直接撞
+  `ERROR: null value in column "company_id" violates not-null constraint`）⇒ 去掉组织字段后的建号路径，
+  必须由本条 DDL 一并解除该约束（DROP COLUMN 或 DROP NOT NULL），否则 T-13 的「只填账号即创建成功」
+  在 T-14 落地前**必然失败**。故 T-13 的运行期验收顺序锁定为 **T-14 → T-16**。
 
 - [ ] T-15 菜单行删除件（两份基线文件 + 升级件）
   关联: R-01

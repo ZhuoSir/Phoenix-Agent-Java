@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 import org.springframework.beans.BeanUtils;
 
 import java.util.Date;
+import java.util.List;
 
 @Data
 @NoArgsConstructor
@@ -56,6 +57,15 @@ public class PrivilegeUserDTO {
 	private Date pwdFtime;
 
 	private Integer pwdInit;
+
+	/**
+	 * R-03（v2.0.0）：创建/更新时一并授予的角色 id 集合。
+	 * null = 不改动（更新场景）；空列表 = 清空；创建时为空则走默认角色兜底。
+	 */
+	private List<String> roleIds;
+
+	/** R-03（v2.0.0）：创建/更新时一并加入的组 id 集合。null = 不改动；空列表 = 清空。 */
+	private List<String> groupIds;
 
 	private Integer userType;
 

@@ -65,6 +65,20 @@ export function useSchema(): VbenFormSchema[] {
       },
     },
     {
+      // R-03 三维度化：角色多选（插槽渲染 ElSelect multiple；不选=后端补默认角色）
+      fieldName: 'roleIds',
+      label: '角色',
+      component: 'Input',
+      formItemClass: 'col-span-2',
+    },
+    {
+      // R-03 三维度化：组多选（插槽渲染 ElSelect multiple）
+      fieldName: 'groupIds',
+      label: '组',
+      component: 'Input',
+      formItemClass: 'col-span-2',
+    },
+    {
       component: 'Input',
       fieldName: 'username',
       label: '用户名',
