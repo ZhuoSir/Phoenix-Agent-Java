@@ -77,52 +77,6 @@ export function useSchema(): VbenFormSchema[] {
     },
     {
       component: 'Input',
-      fieldName: 'deptName',
-      label: 'deptName',
-      dependencies: {
-        triggerFields: [''],
-        show: false,
-      },
-    },
-    {
-      component: 'Input',
-      fieldName: 'deptId',
-      label: 'deptId',
-      dependencies: {
-        triggerFields: [''],
-        show: false,
-      },
-    },
-    {
-      component: 'Input',
-      fieldName: 'employeeId',
-      label: 'employeeId',
-      dependencies: {
-        triggerFields: [''],
-        show: false,
-      },
-    },
-    {
-      component: 'Input',
-      fieldName: 'thirdPartyId',
-      label: 'thirdPartyId',
-      dependencies: {
-        triggerFields: [''],
-        show: false,
-      },
-    },
-    {
-      fieldName: 'employeeSelector',
-      label: '选择人员',
-      component: 'Input',
-      formItemClass: 'col-span-2',
-      dependencies: {
-        triggerFields: ['id'],
-        show: (values: any) => !values.id,
-      },
-    },
-    {
-      component: 'Input',
       fieldName: 'username',
       label: '用户名',
       rules: z.string().min(1, '请输入用户名'),

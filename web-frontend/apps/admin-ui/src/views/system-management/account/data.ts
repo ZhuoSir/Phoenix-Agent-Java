@@ -23,8 +23,6 @@ export function useColumns(): VxeTableGridColumns {
     { field: 'realName', title: '真实姓名', width: 120 },
     { field: 'mobile', title: '手机号', width: 100 },
     { field: 'code', title: '工号', width: 100 },
-    { field: 'companyName', title: '公司名称', width: 140 },
-    { field: 'deptName', title: '部门名称', width: 120 },
     {
       field: 'userType',
       title: '用户类型',
@@ -65,40 +63,6 @@ export function useSchema(): VbenFormSchema[] {
         triggerFields: [''],
         show: false,
       },
-    },
-    {
-      component: 'Input',
-      fieldName: 'employeeId',
-      label: 'employeeId',
-      dependencies: {
-        triggerFields: [''],
-        show: false,
-      },
-    },
-    {
-      component: 'Input',
-      fieldName: 'companyId',
-      label: 'companyId',
-      dependencies: {
-        triggerFields: [''],
-        show: false,
-      },
-    },
-    {
-      fieldName: 'employeeSelector',
-      label: '选择人员',
-      component: 'Input',
-      formItemClass: 'col-span-2',
-      dependencies: {
-        triggerFields: ['id'],
-        show: (values: any) => !values.id,
-      },
-    },
-    {
-      fieldName: 'deptId',
-      label: '选择部门',
-      component: 'Input',
-      formItemClass: 'col-span-2',
     },
     {
       component: 'Input',

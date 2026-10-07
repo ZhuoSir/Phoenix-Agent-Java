@@ -10,8 +10,6 @@ import {
 } from '#/api';
 
 import { useVbenForm } from '#/adapter/form';
-import DepartmentSelector from '#/components/dept/DepartmentSelector.vue';
-import EmployeeSelector from '#/components/dept/EmployeeSelector.vue';
 
 import { useSchema } from './data';
 
@@ -29,17 +27,6 @@ const [Form, formApi] = useVbenForm({
   showDefaultActions: false,
   wrapperClass: 'grid-cols-2',
 });
-
-function handleEmployeeSelect(emp: any) {
-  formApi.setValues({
-    employeeId: emp.id,
-    realName: emp.empName || '',
-    mobile: emp.mobile || '',
-    code: emp.empCode || '',
-    companyId: emp.companyId != null ? emp.companyId : undefined,
-    deptId: emp.deptId != null ? emp.deptId : undefined,
-  });
-}
 
 const [Modal, modalApi] = useVbenModal({
   async onConfirm() {
@@ -83,16 +70,6 @@ const [Modal, modalApi] = useVbenModal({
 <template>
   <Modal :title="getTitle" class="w-200">
     <Form class="mx-4">
-      <template #employeeSelector>
-        <EmployeeSelector @change="handleEmployeeSelect" />
-      </template>
-      <template #deptId>
-        <DepartmentSelector
-          :model-value="formData?.deptId"
-          @update:model-value="(val) => formApi.setValues({ deptId: val })"
-          @change="(data) => { if (data.companyId) formApi.setValues({ companyId: data.companyId }) }"
-        />
-      </template>
     </Form>
   </Modal>
 </template>

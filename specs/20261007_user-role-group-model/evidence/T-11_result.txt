@@ -1,0 +1,42 @@
+=== T-11 验收结论（admin-ui 组织维度与平台配置删除 + 引用解除）===
+日期: 2026-10-07 | 工具链: node v24.21.0 + pnpm（admin-ui）
+
+[1] 删除 20 个文件（git 记录为准）
+  - views/organization/{company,department,employee}/{index.vue,form.vue,data.ts} = 9
+  - api/core/{privilege-company,privilege-department,privilege-employee,platform-sync,platform-info}.ts = 5
+  - components/dept/{DepartmentSelector,EmployeeSelector,DeptTreeSidebar}.vue = 3
+  - views/platform/platform-info/{index.vue,form.vue,data.ts} = 3
+  （较 plan 预估多 1：platform-info 目录实含 data.ts）
+  **DeptTreeSidebar 先解除 3 处引用再删**（两个账号页；员工页随 organization 一起删）
+
+[2] 引用解除（7 个文件）
+  - api/core/index.ts：摘掉 5 行已删模块导出
+  - views/system-management/account/{index.vue,form.vue,data.ts} 与
+    views/account/account-info/{index.vue,form.vue,data.ts}：
+      · `ColPage`+左侧部门树（`#left` 槽与 left-* props）整体换成 `<Page auto-content-height>`
+        —— 与同目录 role/index.vue 的既有写法一致
+      · 删 `import { ref } from 'vue'`（`selectedDeptId` 移除后已无其它 ref 使用）
+      · 删 `selectedDeptId` / 查询参数 `params.deptId` / `handleDeptClick()`
+      · 删两个选择器组件与其回填函数（`handleEmployeeSelect`/`handleDeptChange`）
+      · 表单 schema 去掉：employeeId / companyId / deptId / deptName / employeeSelector
+        / thirdPartyId（**thirdPartyId 属 R-11 范围**，一并摘除）
+      · 列表列去掉：companyName / deptName
+      · 新用户编辑打开时的 `deptName`/`thirdPartyId` 回填一并删除
+
+[3] 验证（真实输出）
+  - `pnpm typecheck`（vue-tsc --noEmit --skipLibCheck）：**207** < 基线 211
+      与 T-08 后基线逐条 diff：**零新增错误**；减少的 4 处来自被删文件自带
+  - `pnpm build`（vite production）：**exit=0，built in 4.39s**（唯一输出为既有的
+      INEFFECTIVE_DYNAMIC_IMPORT 警告，与本次改动无关）
+  - 产物核对：`dist/js` 中**不存在** organization/department/employee/platform-info 相关 chunk
+  - 残留引用 grep（views/organization | components/dept | 三个 privilege-*.ts | platform-sync |
+      api/core/platform-info | 三个组件名 | `/organization`）：**全部为空**
+  - 构建产物 `dist/`、`dist.zip` 已被 `web-frontend/.gitignore` 覆盖 ⇒ 未入库（L-13）
+
+[4] **延期至 T-16（明确记载）**
+  T-11 的导航级断言（左侧无「组织管理」「三方平台」；直接访问 `/organization/*`、
+  `/basic/platform-info` 落 404 或首页）依赖**库内菜单行已被删除**（T-15 的 SQL 件）
+  + 已部署实例 ⇒ 挂 T-16。**注意**：在 T-15 执行前，库里仍存这 5 条菜单行，
+  其 component 指向已删文件 ⇒ 点击会渲染空白（这正是 plan 风险条预警的场景）。
+
+[5] 结论：T-11 代码面完成（typecheck 低于基线、构建通过、零残留引用）；导航级断言挂 T-16。

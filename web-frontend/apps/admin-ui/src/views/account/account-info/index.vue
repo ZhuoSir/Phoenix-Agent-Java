@@ -1,7 +1,5 @@
 <script lang="ts" setup>
-import { ref } from 'vue';
-
-import { ColPage, useVbenModal } from '@vben/common-ui';
+import { Page, useVbenModal } from '@vben/common-ui';
 
 import { useVbenVxeGrid, VbenTableAction } from '#/adapter/vxe-table';
 import type { VxeGridProps } from '#/adapter/vxe-table';
@@ -18,13 +16,10 @@ import {
   deleteAccountInfoApi,
   getAccountInfoPageApi,
 } from '#/api';
-import DeptTreeSidebar from '#/components/dept/DeptTreeSidebar.vue';
 
 import Form from './form.vue';
 import GroupForm from './group-form.vue';
 import { useColumns, useSearchFormSchema } from './data';
-
-const selectedDeptId = ref<string | undefined>(undefined);
 
 const formOptions: VbenFormProps = {
   showCollapseButton: false,
@@ -51,9 +46,6 @@ const gridOptions: VxeGridProps = {
     ajax: {
       query: async ({ page }, formValues) => {
         const params: any = { ...formValues };
-        if (selectedDeptId.value) {
-          params.deptId = selectedDeptId.value;
-        }
         const res = (await getAccountInfoPageApi(
           page.currentPage,
           page.pageSize,
@@ -79,10 +71,6 @@ const [GroupModal, groupModalApi] = useVbenModal({
   connectedComponent: GroupForm,
   destroyOnClose: true,
 });
-
-function handleDeptClick() {
-  gridApi.query();
-}
 
 function onCreate() {
   formModalApi.setData({}).open();
@@ -147,23 +135,7 @@ function refreshGrid() {
 </script>
 
 <template>
-  <ColPage
-    :left-max-width="50"
-    :left-min-width="10"
-    :left-width="15"
-    :split-handle="false"
-    :split-line="false"
-    :resizable="true"
-    :left-collapsible="false"
-    auto-content-height
-  >
-    <template #left>
-      <DeptTreeSidebar
-        v-model="selectedDeptId"
-        no-card
-        @select="handleDeptClick"
-      />
-    </template>
+  <Page auto-content-height>
     <FormModal @success="refreshGrid" />
     <GroupModal @success="refreshGrid" />
     <Grid table-title="账号列表">
@@ -195,5 +167,5 @@ function refreshGrid() {
         <VbenTableAction align="center" :actions="getActions(row)" />
       </template>
     </Grid>
-  </ColPage>
+  </Page>
 </template>

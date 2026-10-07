@@ -1,7 +1,5 @@
 <script lang="ts" setup>
-import { ref } from 'vue';
-
-import { ColPage, useVbenModal } from '@vben/common-ui';
+import { Page, useVbenModal } from '@vben/common-ui';
 
 import { useVbenVxeGrid, VbenTableAction } from '#/adapter/vxe-table';
 import type { VxeGridProps } from '#/adapter/vxe-table';
@@ -18,14 +16,11 @@ import {
   deleteUserApi,
   getUserPageApi,
 } from '#/api';
-import DeptTreeSidebar from '#/components/dept/DeptTreeSidebar.vue';
 
 import Form from './form.vue';
 import PasswordForm from './password-form.vue';
 import RoleForm from './role-form.vue';
 import { useColumns, useSearchFormSchema } from './data';
-
-const selectedDeptId = ref<string | undefined>(undefined);
 
 const formOptions: VbenFormProps = {
   showCollapseButton: false,
@@ -52,9 +47,6 @@ const gridOptions: VxeGridProps = {
     ajax: {
       query: async ({ page }, formValues) => {
         const params: any = { ...formValues };
-        if (selectedDeptId.value) {
-          params.deptId = selectedDeptId.value;
-        }
         const res = (await getUserPageApi(
           page.currentPage,
           page.pageSize,
@@ -84,10 +76,6 @@ const [RoleModal, roleModalApi] = useVbenModal({
   connectedComponent: RoleForm,
   destroyOnClose: true,
 });
-
-function handleDeptClick() {
-  gridApi.query();
-}
 
 function onCreate() {
   formModalApi.setData({}).open();
@@ -161,23 +149,7 @@ function refreshGrid() {
 </script>
 
 <template>
-  <ColPage
-    :left-max-width="50"
-    :left-min-width="10"
-    :left-width="15"
-    :split-handle="false"
-    :split-line="false"
-    :resizable="true"
-    :left-collapsible="false"
-    auto-content-height
-  >
-    <template #left>
-      <DeptTreeSidebar
-        v-model="selectedDeptId"
-        no-card
-        @select="handleDeptClick"
-      />
-    </template>
+  <Page auto-content-height>
     <FormModal @success="refreshGrid" />
     <PasswordModal @success="refreshGrid" />
     <RoleModal @success="refreshGrid" />
@@ -210,5 +182,5 @@ function refreshGrid() {
         <VbenTableAction align="center" :actions="getActions(row)" />
       </template>
     </Grid>
-  </ColPage>
+  </Page>
 </template>
