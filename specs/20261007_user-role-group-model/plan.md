@@ -1,4 +1,4 @@
-> 版本: v1.2.0 | 状态: 已确认 | 确认人: 陈卓 | 确认日期: 2026-10-07 | 确认记录: 用户 2026-10-07 口令「确认执行（确认人：陈卓）」+ URL 一并改为 /system-management | 变更源: R-12（v2.1.0 新增条款，信息架构调整）⇒ 追加 §R-12 实施方案 | 更新: 2026-10-07（v1.1.0 重确认②通过：仅事实数字订正，正文相对待重确认稿无改动）
+> 版本: v1.3.0 | 状态: 已确认 | 确认人: 陈卓 | 确认日期: 2026-10-07 | 确认记录: 同 requirements v2.2.0 | 变更源: R-13（v2.2.0 新增条款，账号集合收敛）⇒ 追加 §R-13 实施方案 | 确认记录: 用户 2026-10-07 口令「确认执行（确认人：陈卓）」+ URL 一并改为 /system-management | 变更源: R-12（v2.1.0 新增条款，信息架构调整）⇒ 追加 §R-12 实施方案 | 更新: 2026-10-07（v1.1.0 重确认②通过：仅事实数字订正，正文相对待重确认稿无改动）
 >
 > **v1.1.0 变更（铁律 4：已确认文档被改动 ⇒ 回退待重确认）**：**仅订正事实数字**，无设计变更 —— T-01 活库门禁统计（`evidence/T-01_gate-stats.txt`）推翻了两处口径：普通角色 ACL 由「0 行」订正为「**1 行**（智能体中心）」、名下用户由「10」订正为「**5 个存活用户**」；并在 §数据模型一 追加「活库现值复核」表（dump 为迁移前快照）。**决策 1~6、任务拆解 T-01~T-17、需求条款均不受影响。**
 
@@ -394,4 +394,42 @@ COMMIT;
 2. **洁净库重放**：`all_schema` + `all_data` → 01~06 两轮全 exit=0；终态菜单 19。
 3. **部署栈**：重建前端镜像 + `docker compose up -d` → 台账应用 `V2.0.0_06`；超管导航只见「系统管理」；
    `/platform-account/account-info` 404；普通角色导航仍 7 条。
+
+## R-13 实施方案（v1.3.0 追加）
+
+> 触发：requirements **v2.2.0** 新增 R-13（账号集合收敛为 admin + chenzhuo；初始化数据同步）。
+> 含**存量清理（DML）**与**种子重写（基线）**，不新增表/列。
+
+### 一、存量清理升级件（`V2.0.0_07__account_prune_dml.sql` + rollback）
+
+| # | 操作 | 对象 |
+|---|---|---|
+| 1 | DELETE | `tbl_privilege_login_log`：`operation_id` 或 `create_by` ∈ 待删账号 id |
+| 2 | DELETE | `tbl_privilege_user_role`：`user_id` ∈ 待删账号 id |
+| 3 | DELETE | `tbl_agent_user_agent_info`：`user_id` ∈ 待删账号 id |
+| 4 | DELETE | `tbl_privilege_user`：liufang / lwj / xtj（存活）+ maliu / wangwu（已软删，物理删） |
+| 5 | 自检 | 存活账号恰为 admin/chenzhuo；无残留账号域行；chenzhuo 角色绑定仍在（L-51：不硬编码环境绝对数） |
+
+- **待删 id（实测）**：liufang `428011841386577920`、lwj `431678413494018048`、xtj `428011841386577921`、
+  maliu `432101006843711488`、wangwu `432061200055025664`
+- **不删**：聊天会话/消息（业务数据；按用户裁定处理）
+- **回滚**：逐行保真重建 5 行用户 + 其角色绑定/登录日志/智能体绑定
+- **审计列**：其他行的 `create_by`/`update_by` 保留原值
+
+### 二、种子/基线重写（全新库 = admin + chenzhuo）
+
+| 表 | 现状 | 改为 |
+|---|---|---|
+| `tbl_privilege_user` | 5 行演示账号 | **1 行 chenzhuo** |
+| `tbl_privilege_user_role` | 19 行（含孤儿） | **仅 chenzhuo 的 1 行** |
+| `tbl_platform_account_info` | lwj | **chenzhuo** |
+| `tbl_platform_account_group_info` | lwj→通用组 | **chenzhuo→通用组** |
+| `tbl_agent_user_agent_info` | 3 行（liufang×2/lwj×1） | **仅 chenzhuo 的 1 行** |
+| `docker/init/10_seed_admin.sql` | 只种 admin | 不变 |
+
+### 三、验证
+
+1. drill：部署时备份重放 01~07 两轮 + 反向 07 + 再正向；存活账号 = 2
+2. 洁净库重放：all_schema/all_data → 01~07 两轮，终态恰为 admin + chenzhuo
+3. 部署：migrator 应用 07 → 存活账号 2；5 旧账号登录失败；admin/chenzhuo 登录成功且菜单 19 / 7
 
