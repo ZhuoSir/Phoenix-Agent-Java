@@ -3,12 +3,10 @@ import type {FormInstance, FormRules} from 'element-plus';
 import {ElButton, ElMessage, ElMessageBox, ElTree,} from 'element-plus';
 import type {Recordable} from '@vben/types';
 
-import type {AclPvalueItem, AclRecord, AclTreeNode, PrivilegeRole} from '#/api';
+import type {AclPvalueItem, AclTreeNode, PrivilegeRole} from '#/api';
 import {
   createRoleApi,
   deleteRoleApi,
-  getAclsByReleaseIdApi,
-  getRoleAclsApi,
   getRolePageApi,
   saveAllAclApi,
   saveModuleAclApi,
@@ -164,9 +162,7 @@ const formRules: FormRules = {
 const assignDialogVisible = ref(false);
 const aclTreeData = ref<AclTreeNode[]>([]);
 const currentRole = ref<null | PrivilegeRole>(null);
-const aclLoading = ref(false);
 const treeRef = ref<InstanceType<typeof ElTree>>();
-const existingAclMap = ref(new Map<string, AclRecord>());
 
 async function loadData(params: Record<string, any> = {}) {
   loading.value = true;
@@ -243,33 +239,10 @@ async function handleDelete(id: string, name: string) {
 }
 
 async function handleAssignMenu(row: PrivilegeRole) {
-
+  // R-10（BUG-116）：授权入口统一走 AssignMenu 弹窗（见上方 connectedComponent: AssignMenu），
+  // 由该组件读取并保存 ACL。此处原先在 open() 之后紧跟 `return;`，其后的旧 ElDialog 加载逻辑
+  // 是不可达死代码——真因 currentRole 从未赋值正是被这段死代码掩盖的，故一并清除。
   assignMenuModalApi.setData(row).open();
-
-  return;
-  currentRole.value = row;
-  assignDialogVisible.value = true;
-  aclLoading.value = true;
-  try {
-    const [treeRes, aclRes] = await Promise.all([
-      getRoleAclsApi(row.id!),
-      getAclsByReleaseIdApi(row.id!),
-    ]);
-    const tree = ((treeRes as any)?.data || treeRes || []) as AclTreeNode[];
-    aclTreeData.value = tree;
-    assignLevels(tree);
-    const aclList = ((aclRes as any)?.data || aclRes || []) as AclRecord[];
-    const map = new Map<string, AclRecord>();
-    for (const item of aclList) {
-      if (item.moduleId) map.set(item.moduleId, item);
-    }
-    existingAclMap.value = map;
-  } catch {
-    aclTreeData.value = [];
-    ElMessage.error('获取菜单权限失败');
-  } finally {
-    aclLoading.value = false;
-  }
 }
 
 const treeProps = {
@@ -304,15 +277,6 @@ function handlePvalueChange(data: AclTreeNode) {
     aclState,
     status: aclState > 0 ? 'check' : 'uncheck',
   });
-}
-
-function assignLevels(nodes: AclTreeNode[], level = 0) {
-  for (const node of nodes) {
-    (node as any)._level = level;
-    if (node.children?.length) {
-      assignLevels(node.children, level + 1);
-    }
-  }
 }
 
 function traversePvalues(nodes: AclTreeNode[]): AclPvalueItem[] {
@@ -453,202 +417,11 @@ onMounted(() => {
     </Grid>
 
 
-<!--    <div class="bg-background-deep">
-      <ElCard class="rounded-xl" :body-style="{ padding: '20px' }">
-        <FilterForm />
-
-        <div class="flex gap-3 mb-4">
-          <ElButton type="primary" @click="showAddDialog">
-            <ElIcon><IconifyIcon icon="lucide:plus" /></ElIcon>
-            新增
-          </ElButton>
-          <ElButton @click="loadData">
-            <ElIcon><IconifyIcon icon="lucide:refresh-cw" /></ElIcon>
-            刷新
-          </ElButton>
-        </div>
-
-        <ElTable
-          :data="tableData"
-          style="width: 100%"
-          border
-          stripe
-          v-loading="loading"
-          empty-text="暂无数据"
-        >
-          <ElTableColumn prop="name" label="角色名称" min-width="150" resizable />
-          <ElTableColumn prop="sn" label="角色标识" width="150" resizable />
-          <ElTableColumn prop="createTime" label="创建时间" width="180" resizable />
-          <ElTableColumn label="操作" width="280" fixed="right">
-            <template #default="scope">
-              <ElButton
-                type="primary"
-                size="small"
-                @click="handleAssignMenu(scope.row as PrivilegeRole)"
-              >
-                分配权限
-              </ElButton>
-              <ElButton
-                type="warning"
-                size="small"
-                @click="handleEdit(scope.row as PrivilegeRole)"
-              >
-                编辑
-              </ElButton>
-              <ElButton
-                type="danger"
-                size="small"
-                @click="
-                  handleDelete(
-                    (scope.row as PrivilegeRole).id!,
-                    (scope.row as PrivilegeRole).name!,
-                  )
-                "
-              >
-                删除
-              </ElButton>
-            </template>
-          </ElTableColumn>
-        </ElTable>
-
-        <div class="flex justify-end mt-4">
-          <ElPagination
-            v-model:current-page="page"
-            v-model:page-size="pageSize"
-            :total="total"
-            :page-sizes="[10, 20, 50, 100]"
-            layout="total, sizes, prev, pager, next, jumper"
-            background
-            @current-change="handlePageChange"
-            @size-change="handleSizeChange"
-          />
-        </div>
-      </ElCard>
-
-      <ElDialog
-        v-model="dialogVisible"
-        :title="isEditMode ? '编辑角色' : '新增角色'"
-        width="500px"
-        :close-on-click-modal="false"
-      >
-        <ElForm
-          ref="formRef"
-          :model="formData"
-          :rules="formRules"
-          label-width="100px"
-          label-position="left"
-        >
-          <ElFormItem label="角色名称" prop="name">
-            <ElInput v-model="formData.name" placeholder="请输入角色名称" />
-          </ElFormItem>
-          <ElFormItem label="角色标识" prop="sn">
-            <ElInput v-model="formData.sn" placeholder="请输入角色标识" />
-          </ElFormItem>
-        </ElForm>
-        <template #footer>
-          <ElButton @click="dialogVisible = false">取消</ElButton>
-          <ElButton type="primary" @click="handleSubmit" :loading="submitting">
-            {{ isEditMode ? '更新' : '创建' }}
-          </ElButton>
-        </template>
-      </ElDialog>
-
-      <ElDialog
-        v-model="assignDialogVisible"
-        :title="`分配权限 - ${currentRole?.name || ''}`"
-        width="1000px"
-        :close-on-click-modal="false"
-      >
-        <div v-loading="aclLoading" class="acl-body max-h-[600px] overflow-y-auto">
-          <div v-if="aclTreeData.length === 0 && !aclLoading" class="py-8 text-center text-gray-400">
-            暂无菜单数据
-          </div>
-          <div v-else>
-            <div class="grid grid-cols-[220px_100px_1fr] items-center px-2 py-2 pl-6 mb-1 text-xs font-semibold text-gray-500 border-b border-gray-200">
-              <div>菜单名称</div>
-              <div class="text-left">
-                <ElCheckbox
-                  :model-value="headerAllSelected"
-                  :indeterminate="headerIndeterminate"
-                  @change="handleHeaderSelectAll"
-                >
-                  {{ headerAllSelected ? '取消全选' : '全选' }}
-                </ElCheckbox>
-              </div>
-              <div>操作权限</div>
-            </div>
-            <ElTree
-              ref="treeRef"
-              :data="aclTreeData"
-              :props="treeProps"
-              node-key="id"
-              :default-expand-all="true"
-            >
-            <template #default="{ data }: { data: AclTreeNode }">
-              <div class="grid grid-cols-[220px_100px_1fr] gap-2 items-center w-full min-w-0">
-                <div class="flex gap-2 items-center min-w-0" :style="{ paddingLeft: ((data as any)._level || 0) * 24 + 'px' }">
-                  <ElIcon class="flex shrink-0 items-center text-base">
-                    <IconifyIcon
-                      :icon="data.image || (data.type === '0' ? 'lucide:folder' : 'lucide:file-text')"
-                    />
-                  </ElIcon>
-                  <span class="truncate text-sm font-medium">{{ data.name }}</span>
-                </div>
-                <div v-if="data.pvalues?.length" class="flex items-center text-xs">
-                  <ElCheckbox
-                    :model-value="data.pvalues.every((pv) => pv.enabled)"
-                    :indeterminate="
-                      data.pvalues.some((pv) => pv.enabled) &&
-                      !data.pvalues.every((pv) => pv.enabled)
-                    "
-                    @click.stop
-                    @change="(val: string | number | boolean) => {
-                      data.pvalues.forEach((pv) => { pv.enabled = !!val; });
-                      updateNodeState(data);
-                      const role = currentRole.value;
-                      if (!role?.id || !role?.sn) return;
-                      const aclState = Number(calcAclState(data.pvalues));
-                      saveModuleAclApi({
-                        releaseId: role.id,
-                        releaseSn: role.sn,
-                        systemSn: '',
-                        moduleId: data.id,
-                        moduleSn: data.sn,
-                        aclState,
-                        status: aclState > 0 ? 'check' : 'uncheck',
-                      });
-                    }"
-                  >
-                    全选
-                  </ElCheckbox>
-                </div>
-                <div v-else class="flex items-center text-xs" />
-                <div v-if="data.pvalues?.length" class="flex flex-wrap gap-1 gap-x-3 items-center">
-                  <ElCheckbox
-                    v-for="pv in data.pvalues"
-                    :key="pv.pvalueId"
-                    :model-value="pv.enabled"
-                    @click.stop
-                    @change="(val: string | number | boolean) => {
-                      pv.enabled = !!val;
-                      handlePvalueChange(data);
-                    }"
-                    class="text-xs"
-                  >
-                    {{ pv.pvalueName || pv.name }}
-                  </ElCheckbox>
-                </div>
-              </div>
-            </template>
-          </ElTree>
-        </div>
-        </div>
-        <template #footer>
-          <ElButton @click="handleCancelAcl">取消</ElButton>
-          <ElButton type="primary" @click="handleSaveAcl">保存</ElButton>
-        </template>
-      </ElDialog>
-    </div>-->
+  <!-- R-10（BUG-116）历史说明：此处原有整套「旧 ElDialog 授权界面」实现
+       （FilterForm + 分配权限对话框 + 其辅助函数调用点）。该路径早已被 AssignMenu 组件
+       （见 useVbenModal connectedComponent）取代，且正是它的存在掩盖了
+       「assign-menu.vue 从未给 currentRole 赋值 ⇒ 授权不落库」这一真因。
+       旧实现整段删除，历史版本见 git。 -->
   </Page>
 </template>
 

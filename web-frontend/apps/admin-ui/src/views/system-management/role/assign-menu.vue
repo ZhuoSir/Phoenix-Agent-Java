@@ -27,6 +27,11 @@ const [Modal, modalApi] = useVbenModal({
     if (isOpen) {
       const data = modalApi.getData<any>();
       if (data) {
+        // R-10 修复（BUG-116）：此前只读 data 却从未写入 currentRole，
+        // 导致 handlePvalueChange / handleHeaderSelectAll 里的 `if (!role?.id ...) return`
+        // 永远提前返回 ⇒ 授权与撤销**都不落库**（界面看着能勾，其实什么都没保存）。
+        currentRole.value = data;
+        aclLoading.value = true;
         try {
           modalApi.lock();
           const [treeRes, aclRes] = await Promise.all([
@@ -41,7 +46,6 @@ const [Modal, modalApi] = useVbenModal({
           for (const item of aclList) {
             if (item.moduleId) map.set(item.moduleId, item);
           }
-          debugger;
           existingAclMap.value = map;
         } catch {
           aclTreeData.value = [];
