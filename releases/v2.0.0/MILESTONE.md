@@ -137,5 +137,8 @@
     部署后实测 **恰 2 账号**、旧 5 账号登录**全部失败**、菜单 19 / 7、残留账号域行 0
   - 过程缺陷修正：① 按行编辑 dump 切断多行 INSERT（记 **L-52**）；② 迁移后库导出的种子缺迁移前 NOT NULL 列
     （记 **L-53**）
-  - 遗留（如实记载）：活库 `tbl_privilege_user_role` 仍有 **12 行孤儿绑定**（user_id 在用户表不存在，
-    BUG-118 家族，不指向本次删除的账号）；基线已不含此类行；建议另立 `V2.0.0_08` 清理，待用户裁定
+  - 遗留处置（用户裁定「不用加 sql，直接数据清理掉就好了」）：**未新增迁移件**，于 2026-10-07 20:20 直接清理活库孤儿账号域数据 ——
+    `tbl_privilege_user_role` 12 行、`tbl_privilege_login_log` 1 行、`tbl_data_chat_message` 39 行、`tbl_data_chat_session` 5 行；
+    清理前已备份至 `backups/orphan_cleanup_20261007_202052.sql`（gitignore，仅本地）；
+    复核：孤儿全为 0，`user_role` 仅两个账号的绑定（admin 活跃+1 墓碑 / chenzhuo 活跃），登录复验 admin ✅ chenzhuo ✅，
+    5 个旧账号全部失败 —— 证据 `evidence/T-19_orphan_cleanup.txt`

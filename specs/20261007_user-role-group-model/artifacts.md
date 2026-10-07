@@ -89,7 +89,7 @@
 | 初始化数据 | `sql/all_data.sql` / `sql/all_schema.sql` 各删 88 条种子语句、注入 chenzhuo 一套 5 条 |
 | 保留 | admin（`docker/init/10_seed_admin.sql`）、chenzhuo（含角色/前台账号/组/智能体绑定） |
 | 验证 | `evidence/T-19_result.txt`、`T-19_drill.txt`、`T-19_deploy-verify.txt` |
-| 遗留 | 活库 12 行孤儿角色绑定（BUG-118 家族），建议 `V2.0.0_08` 清理，待裁定 |
+| 遗留处置 | 用户裁定**不加迁移件**，2026-10-07 直接清理活库孤儿账号域数据（user_role 12 / login_log 1 / chat_message 39 / chat_session 5 行），备份 `backups/orphan_cleanup_20261007_202052.sql`；证据 `evidence/T-19_orphan_cleanup.txt` |
 
 ## 七、计数自检
 
