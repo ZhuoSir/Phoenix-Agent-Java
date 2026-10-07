@@ -520,3 +520,41 @@ COMMIT;
 2. 越权：普通角色直连他人智能体的 详情/编辑/发布/删除/下线/授权 → 全部 403；本人与超管放行。
 3. 创建人：普通角色新建后 `admin_id` = 本人；双方列表随之变化。
 4. 角色：`ROLE_ADMIN` 拒绝、`COMMON`（有持有者）拒绝、无持有者角色可删且行消失。
+
+## R-14 实施方案（v1.4.0 追加）
+
+> 触发：requirements **v2.3.0** 新增 R-14（用户类型/IDM 与工号下线）。**含一条 DDL 迁移件**（V2.0.0_08）。
+
+### 一、数据库（`V2.0.0_08__usertype_code_drop_ddl.sql` + rollback）
+
+| # | 操作 | 对象 |
+|---|---|---|
+| 1 | DROP COLUMN | `tbl_privilege_user.{code, user_type, it_user_id, it_user_name}`、`tbl_privilege_user_role.user_no` |
+| 2 | UPDATE | 组归属 `tbl_platform_account_group_info.account_name` 由「工号」改为「用户名」 |
+| 3 | 自检 | 环境无关不变量：待删列 0 个 / 存活账号 ≥1 且 chenzhuo 在 / chenzhuo 角色绑定在 / 组归属名称已同步（L-51） |
+
+- **保留（非本件范围）**：`tbl_platform_account_info.code` 属**前台账号自身标识**，仍被前台登录响应 `userCode`、
+  `getByCode`、列表筛选与关键字搜索使用。
+
+### 二、后端（17 个文件）
+
+| 项 | 内容 |
+|---|---|
+| 删字段 | `PrivilegeUser.{code,userType,itUserId,itUserName}`、`PrivilegeUserRole.userNo`、`PrivilegeUserDTO.{code,userType}`、`PrivilegeUserVO.{code,userType}`、`LoginUserInfoVO.userType`、`PrivilegeUserRoleDTO/VO.userNo` |
+| 删接口/方法 | `GET /api/privilege/user/code/{code}`、`IPrivilegeUserService.getByCode`（+实现）、`saveUserRole` 的 userNo 形参、`pageByQuery` 的工号搜索与 userType 过滤 |
+| 删死代码 | `enums/UserTypeEnum.java`；`ExceptionEnum` 的 `USERCODE_DUPLICATE_EXCEPTION` / `USER_DELETE_ERROR` / `DEPORTMENT_DELETE_ERROR` |
+| 语义替换（工号 → 用户名） | `PrivilegePvalueController` 审计 `createBy`、`addUserGroups` 的 accountName、`AccountInfoServiceImpl` 前台登录载体 `carrier.setCode`、`ReactAgentController` 的 `UserProfile.userCode` |
+| **兼容加固（关键）** | 4 处从**会话**读取 `PrivilegeUser` 的 Jackson 2 `new ObjectMapper()` 显式 `FAIL_ON_UNKNOWN_PROPERTIES=false`（`HarnessController` / `ReactAgentController` / `PrivilegePvalueController` / `LoginHelper`）—— 旧会话含已删字段，否则抛 `UnrecognizedPropertyException`（记 **L-54**） |
+
+### 三、前端（7 个文件）
+
+账号列表工号列与用户类型列/插槽、表单工号项（必填）与用户类型下拉、组管理「工号」搜索框与工号列、
+`api/core/{privilege-user,auth}.ts` 类型字段、无调用方的 `getUserByCodeApi`、`store/auth.ts` 的 userType、
+`mobile-ui/services/authTransport.ts` 类型声明；`router/guard.ts` 移除 `userType !== 1` 死门（实测该门对所有用户都为真）。
+
+### 四、验证
+
+1. drill：01~08 链跑一次（与 migrator 一致）全 exit=0 + 08 单独幂等 + 反向复原列与原值 + 再正向残留列 0。
+2. 洁净库重放：migrate.sh 首启顺序 → 01~08 全 exit=0；终态 accounts=admin,chenzhuo、残留列 0。
+3. 活库：migrator 应用 08（台账 8 件）；实测 目标列消失 / 登录响应无 userType / 账号列表无 code,userType /
+   `GET /code/{code}` 404 / 前台 `userCode`=用户名 / 菜单 19-7 不变 / typecheck 零新增 / 0 ERROR。

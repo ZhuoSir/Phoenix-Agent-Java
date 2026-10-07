@@ -1,8 +1,10 @@
 # 完成清单 · 20261007_user-role-group-model（用户体系三维度化）
 
-> 版本: v2.0.0（MAJOR，破坏性） | 分支: `feature/user-role-group-model`（基点 `9a4b6c0`）
-> 完成日期: 2026-10-07 | 任务总数: **17**，已完成 **17**（T-01~T-17）
-> 交付状态: **实现完成**；发布（构建 v2.0.0 镜像 + 迁移活库 + 重启 release 栈 + tag/冻结）**待执行**
+> 版本: **v2.6.0**（累计：v2.0.0 MAJOR 破坏性 + R-12~R-17 六条增量） | 分支: `feature/user-role-group-model`（基点 `9a4b6c0`）
+> 完成日期: 2026-10-07 | 任务总数: **23**，已完成 **23**（T-01~T-17 主体 + T-18~T-23 增量，见 §六）
+> 交付状态: **已构建镜像 + 已迁移活库 + 已部署 8090 并逐条实测通过**；剩余为发版流程件（tag / M2 冻结 / M3 汇总：`UPGRADE.md`、`RELEASE-NOTES.md`、`checklist.md`、`config/changes.md`）**待执行**
+>
+> **本文 §一~§五 为 T-01~T-17 阶段的原始清单（保留不改，属历史留痕）**；T-18~T-23 的增量见 **§六**。
 
 ## 一、任务完成情况
 
@@ -53,3 +55,25 @@
 - 表格闸：`mdtable_check` 对 `specs/_project/*.md` 与本 spec 文档全绿 ✅
 - 证据可复核：每条断言均指向 `evidence/` 下真实输出文件（含失败与勘误）✅
 - 提交规范：所有提交带 `Spec: specs/20261007_user-role-group-model vX.Y.Z` + `Task: T-xx` footer ✅
+
+## 六、增量清单（T-18~T-23：R-12~R-17，2026-10-07 追加并全部落地）
+
+| 任务 | 需求 | 内容摘要 | 迁移件 | 证据 |
+|---|---|---|---|---|
+| T-18 | **R-12** 信息架构 | 「权限管理」+「前台管理」合并为「**系统管理**」（`/system-management`），账号管理唯一化；存活菜单 21→19 | `V2.0.0_06`（+rollback） | `evidence/T-18_drill.txt`、`T-18_deploy-verify-r12.txt`、`T-18_result.txt` |
+| T-19 | **R-13** 账号收敛 | 只保留 `admin` + `chenzhuo`（存量清理 + **初始化数据重写**：基线删 88 条种子语句、注入 chenzhuo 一套） | `V2.0.0_07`（+rollback） | `evidence/T-19_result.txt`、`T-19_drill.txt`、`T-19_deploy-verify.txt`、`T-19_orphan_cleanup.txt` |
+| T-20 | **R-14** 用户类型/工号下线 | 删 5 列（`code`/`user_type`/`it_user_id`/`it_user_name`/`user_no`）；后端 17 文件、前端 7 文件；4 处会话读取点 Jackson 加固（L-54） | `V2.0.0_08`（+rollback） | `evidence/T-20_scan.txt`、`T-20_drill.txt`、`T-20_deploy-verify.txt`、`T-20_result.txt` |
+| T-21 | **R-15** 账号操作增强 | 手机号搜索（修 BUG-130：手机号存 `mobile` 而原检索用 `phone`）；行级+批量启用/禁用；自锁与最后超管保护；「分配权限」并入编辑 | **无**（纯代码） | `evidence/T-21_result.txt` |
+| T-22 | **R-16** 内置超管保护 | `admin` 不可禁用/删除/**改名**（服务端强制）；补齐删除端点零保护（BUG-132） | **无**（纯代码） | `evidence/T-22_result.txt` |
+| T-23 | **R-17** 智能体归属 + 角色保护 | 列表按创建人可见（超管看全部）；创建落 `admin_id`；共同入口 `checkAgentExists` 统一归属校验（6 类端点 403）；角色删除按 sn/持有者判定（修 BUG-133/134） | `V2.0.0_09`（+rollback） | `evidence/T-23_result.txt` |
+
+### 六·补 增量阶段的质量门与状态
+
+- 三重确认门：**每条增量都单独走过门**（requirements 逐版 v2.1.0/v2.2.0/v2.3.0/v2.4.0/v2.5.0/v2.6.0 均 `已确认`，确认人陈卓；
+  plan v1.2.0~v1.6.0、tasks v1.1.0~v1.6.0 同步）✅
+- 升级件计数：**正向 9 件 / 回滚 9 件（配对）**，台账（`tbl_phoenix_release`）实测 **9 行已应用** ✅
+- 环境一致性：drill（升级路径）与洁净库（migrate.sh 首启顺序）**双向验证**，含反向可复原 ✅
+- 缺陷账：本轮新登记并修复 BUG-127/130/132/133/134；新登记未修 BUG-131（用户管理端点缺管理员守卫，建议另立）✅
+- 教训：本轮新增 L-48~L-58（含 L-51 环境无关自检、L-52 按语句而非按行编辑 dump、L-54 会话缓存实体删字段、
+  L-56 mobile/phone 语义、L-57 保护按键值并封堵改名绕过、L-58 可见性与归属校验成对实施）✅
+- 前端质量门：`typecheck` 增量阶段始终**零新增错误**（203~204 条为项目既有基线）✅
