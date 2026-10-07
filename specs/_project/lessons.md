@@ -412,6 +412,14 @@
   ③ 部署后要专门验一次"**旧会话 + 新代码**"路径（拿改造前就登录的 token 打一次相关接口），
   不能只验"重新登录后是否正常"。
 
+## L-64 MyBatis-Flex `QueryChain.and(String, Object...)` 只认 `?`，`{0}` 原样进 SQL 且错误被吞
+- **现象**：`KnowledgeBaseServiceImpl` 用 `chain.and("creator = {0}", id)`，生成 SQL 为字面 `creator = {0}`
+  ⇒ PostgreSQL 语法错 ⇒ 被 controller 宽 catch 转成**空列表**（接口 200 但数据空，静默失败）；
+  同方法 name/status 的 `{0}` 同病 ⇒ 知识库按名搜索长期失效无人察觉（BUG-139）。
+- **防再犯规则**：① 本项目拼条件一律 `?`（`SkillAdminServiceImpl.page` 为正确范式），**禁 `{0}`**；
+  ② "接口 200 但列表空" 先看后端 SQL 日志 Preparing/Parameters，别先怀疑数据；
+  ③ 新增查询条件后必须用**非超管账号**实测非空路径（宽 catch 会吞语法错）。
+
 ## L-63 类型判别列（如 ACL 的 release_sn）必须由服务端写死，绝不能信任前端 DTO
 - **现象**：`tbl_privilege_acl.release_sn` 语义是**释放类型**（恒 'role'），但 `saveModuleAcl` 直接
   `setReleaseSn(dto.getReleaseSn())`，前端传了**角色的业务 sn**（'COMMON'）⇒ 登录菜单按 `release_sn='role'`

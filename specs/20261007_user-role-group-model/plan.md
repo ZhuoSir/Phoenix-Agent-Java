@@ -1,4 +1,4 @@
-> 版本: v1.6.0 | 状态: 已确认 | 确认人: 陈卓 | 确认日期: 2026-10-07 | 变更源: R-17（智能体按创建人可见 + 系统管理员角色不可删）|
+> 版本: v1.7.0 | 状态: 已确认 | 确认人: 陈卓 | 确认日期: 2026-10-07 | 变更源: CR-01 ⇒ R-18 | 变更源: R-17（智能体按创建人可见 + 系统管理员角色不可删）|
 >
 > **v1.1.0 变更（铁律 4：已确认文档被改动 ⇒ 回退待重确认）**：**仅订正事实数字**，无设计变更 —— T-01 活库门禁统计（`evidence/T-01_gate-stats.txt`）推翻了两处口径：普通角色 ACL 由「0 行」订正为「**1 行**（智能体中心）」、名下用户由「10」订正为「**5 个存活用户**」；并在 §数据模型一 追加「活库现值复核」表（dump 为迁移前快照）。**决策 1~6、任务拆解 T-01~T-17、需求条款均不受影响。**
 
@@ -558,3 +558,15 @@ COMMIT;
 2. 洁净库重放：migrate.sh 首启顺序 → 01~08 全 exit=0；终态 accounts=admin,chenzhuo、残留列 0。
 3. 活库：migrator 应用 08（台账 8 件）；实测 目标列消失 / 登录响应无 userType / 账号列表无 code,userType /
    `GET /code/{code}` 404 / 前台 `userCode`=用户名 / 菜单 19-7 不变 / typecheck 零新增 / 0 ERROR。
+
+## R-18 实施方案（v1.7.0 追加，CR-01）
+
+> 触发：CR-01（major，三确认）。**含 DDL**（V2.0.0_13 skill 加 creator）。
+
+| 层 | 内容 |
+|---|---|
+| SQL | `V2.0.0_13`：skill ADD creator + 存量回填 admin + kbase 'system'→admin（子查询动态解析） |
+| 管理页 | kbase `queryByConditionsWithPage(dto, ownerId)` / skill `page(+ownerId)` / mcp `page(+ownerId)`；ownerId=null=超管 |
+| 单对象 | 三资源 controller 注入 `AdminRoleGuard`，`assertOwner` 非本人且非超管 → 403 |
+| 选择器 | skill/mcp `options(agentId, viewerId, superAdmin)`、kbase `bindable(agentId, viewerId, superAdmin)`：可见集合 own ∪ myGroups ∪ public；bound 灰显 |
+| 坑 | `QueryChain.and` 占位符必须 `?`（`{0}` 不替换 ⇒ BUG-139 / L-64） |

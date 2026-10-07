@@ -1,5 +1,12 @@
 # Changelog: user-role-group-model
 
+## v2.7.0 = CR-01 合入（2026-10-07，R-18 / T-24~T-26；代码收口 9324bf8）
+
+- CR-01（major）三确认：§S（档位+Q-C1~C3）→ §P（+Q-P1）→ §T；新增 R-18；tasks +T-24/T-25/T-26
+- 升级件 `V2.0.0_13`（skill 加 creator + 回填 + kbase system 归 admin），台账 13 件
+- 管理页 own-only + 单对象 403；选择器 own∪myGroups∪public（bound 灰显）
+- 顺带修 BUG-139（QueryChain.and 的 {0} 占位符不生效）；教训 L-64
+
 ## BUG-138 修复（2026-10-07）
 
 - 根因：`saveModuleAcl` 信任 DTO.releaseSn（前端传角色业务 sn），而 release_sn 语义是释放类型（恒 'role'）；

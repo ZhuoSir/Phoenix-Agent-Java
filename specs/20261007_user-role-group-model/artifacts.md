@@ -2,7 +2,7 @@
 
 > 统计日期: 2026-10-07 | 与 `git log` footer（`Task: T-01~T-17`）可交叉核对
 
-## 一、升级件 SQL（`sql/`）—— 正向 12 件 / 回滚 12 件（**件数配对**）
+## 一、升级件 SQL（`sql/`）—— 正向 13 件 / 回滚 13 件（**件数配对**）
 
 | 序号 | 正向件 | 回滚件 | 类型 | 内容 |
 |---|---|---|---|---|
@@ -10,6 +10,7 @@
 | 02 | `V2.0.0_02__role_backfill_dml.sql` | `rollback/V2.0.0_02__role_backfill_dml_rollback.sql` | DML | 存量用户补默认角色（`upper(sn)='COMMON'`） |
 | 03 | `V2.0.0_03__org_menu_cleanup_dml.sql` | `rollback/V2.0.0_03__org_menu_cleanup_dml_rollback.sql` | DML | 删 4 条组织菜单 + 4 条 ACL（回滚含原始 8 行保真重建） |
 | 04 | `V2.0.0_04__acl_baseline_rebuild_dml.sql` | `rollback/V2.0.0_04__acl_baseline_rebuild_dml_rollback.sql` | DML | ACL 基线重建（超管全量 + 普通 7），含 JSONB 备份表与脏行清理 |
+| 13 | `V2.0.0_13__skill_creator_and_kbase_owner_dml.sql` | `rollback/V2.0.0_13__skill_creator_and_kbase_owner_dml_rollback.sql` | DDL+DML | R-18/T-24：skill 加 creator 列 + 存量回填 admin + kbase `creator='system'` 归 admin |
 | 12 | `V2.0.0_12__acl_release_sn_normalize_dml.sql` | `rollback/V2.0.0_12__acl_release_sn_normalize_dml_rollback.sql` | DML | BUG-138：把角色 ACL 误写的 release_sn（角色业务 sn）归正为类型值 `role` |
 | 11 | `V2.0.0_11__menu_system_category_backfill_dml.sql` | `rollback/V2.0.0_11__menu_system_category_backfill_dml_rollback.sql` | DML | BUG-135 收尾：补齐 5 个空 system_id/category_id 菜单为 110/111（实测对鉴权惰性） |
 | 10 | `V2.0.0_10__menu_state_backfill_dml.sql` | `rollback/V2.0.0_10__menu_state_backfill_dml_rollback.sql` | DML | BUG-135：补齐「存活但 state 为空」菜单的权限位掩码为 `31`（修复技能/插件/MCP/知识库在角色授权树无法勾选） |
@@ -19,7 +20,7 @@
 | 06 | `V2.0.0_06__menu_merge_system_management_dml.sql` | `rollback/V2.0.0_06__menu_merge_system_management_dml_rollback.sql` | DML | R-12：权限管理→系统管理（原地更名，id 不变）+ 组管理迁入相邻 + 5 子菜单 URL 统一为 `/system-management/*` + 删前台「账号管理」与空目录「前台管理」及其 ACL（自检为**环境无关不变量**） |
 | 05 | `V2.0.0_05__three_party_menu_cleanup_dml.sql` | `rollback/V2.0.0_05__three_party_menu_cleanup_dml_rollback.sql` | DML | 删「三方平台」+ 父目录「基础管理」2 行（回滚保真重建） |
 
-**执行序**：01 → 02 → 03 → 04 → 05 → 06 → 07 → 08 → 09 → 10 → 11 → 12（幂等，可重跑；全新库重放与 drill 正反向均已演练）
+**执行序**：01 → 02 → 03 → 04 → 05 → 06 → 07 → 08 → 09 → 10 → 11 → 12 → 13（幂等，可重跑；全新库重放与 drill 正反向均已演练）
 **数据备份**：`backups/pre_v2.0.0_full_20261007_165618.sql`（迁移前全量）、`backups/pre_v2.0.0_orgdim_20261007_165618.sql`（组织维度专项）
 
 ## 二、基线文件（`sql/`）
@@ -139,6 +140,6 @@
 
 ## 七、计数自检
 
-- 正向 SQL 件数 = 回滚 SQL 件数 = **12** ✅
-- 任务数 23，完成 23（T-17 收口 + T-18 R-12 + T-19 R-13 + T-20 R-14 + T-21 R-15 + T-22 R-16 + T-23 R-17）✅
+- 正向 SQL 件数 = 回滚 SQL 件数 = **13** ✅
+- 任务数 26，完成 26（T-17 收口 + T-18 R-12 + T-19 R-13 + T-20 R-14 + T-21 R-15 + T-22 R-16 + T-23 R-17 + T-24~26 R-18/CR-01）✅
 - 提交 footer `Task: T-xx` 覆盖 T-01~T-17 ✅（`git log --grep="Task: T-"` 可核）
