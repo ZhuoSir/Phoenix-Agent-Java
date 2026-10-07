@@ -2,7 +2,7 @@
 
 > 统计日期: 2026-10-07 | 与 `git log` footer（`Task: T-01~T-17`）可交叉核对
 
-## 一、升级件 SQL（`sql/`）—— 正向 5 件 / 回滚 5 件（**件数配对**）
+## 一、升级件 SQL（`sql/`）—— 正向 6 件 / 回滚 6 件（**件数配对**）
 
 | 序号 | 正向件 | 回滚件 | 类型 | 内容 |
 |---|---|---|---|---|
@@ -10,9 +10,10 @@
 | 02 | `V2.0.0_02__role_backfill_dml.sql` | `rollback/V2.0.0_02__role_backfill_dml_rollback.sql` | DML | 存量用户补默认角色（`upper(sn)='COMMON'`） |
 | 03 | `V2.0.0_03__org_menu_cleanup_dml.sql` | `rollback/V2.0.0_03__org_menu_cleanup_dml_rollback.sql` | DML | 删 4 条组织菜单 + 4 条 ACL（回滚含原始 8 行保真重建） |
 | 04 | `V2.0.0_04__acl_baseline_rebuild_dml.sql` | `rollback/V2.0.0_04__acl_baseline_rebuild_dml_rollback.sql` | DML | ACL 基线重建（超管全量 + 普通 7），含 JSONB 备份表与脏行清理 |
+| 06 | `V2.0.0_06__menu_merge_system_management_dml.sql` | `rollback/V2.0.0_06__menu_merge_system_management_dml_rollback.sql` | DML | R-12：权限管理→系统管理（原地更名，id 不变）+ 组管理迁入相邻 + 5 子菜单 URL 统一为 `/system-management/*` + 删前台「账号管理」与空目录「前台管理」及其 ACL（自检为**环境无关不变量**） |
 | 05 | `V2.0.0_05__three_party_menu_cleanup_dml.sql` | `rollback/V2.0.0_05__three_party_menu_cleanup_dml_rollback.sql` | DML | 删「三方平台」+ 父目录「基础管理」2 行（回滚保真重建） |
 
-**执行序**：01 → 02 → 03 → 04 → 05（幂等，可重跑；全新库重放与 drill 正反向均已演练）
+**执行序**：01 → 02 → 03 → 04 → 05 → 06（幂等，可重跑；全新库重放与 drill 正反向均已演练）
 **数据备份**：`backups/pre_v2.0.0_full_20261007_165618.sql`（迁移前全量）、`backups/pre_v2.0.0_orgdim_20261007_165618.sql`（组织维度专项）
 
 ## 二、基线文件（`sql/`）
@@ -69,8 +70,18 @@
 | 迁移前备份 | `backups/pre_v2.0.0_deploy_20261007_183127.sql`（44M） |
 | 部署验证 | `evidence/T-18_deploy-verify.txt` |
 
+## 六·补二、R-12 追加（2026-10-07，T-18）
+
+| 项 | 值 |
+|---|---|
+| 升级件 | `V2.0.0_06__menu_merge_system_management_dml.sql`（+ rollback） |
+| 前端删除 | `apps/admin-ui/src/views/account/account-info/{index.vue,form.vue,data.ts,group-form.vue}` |
+| 前端保留 | `api/core/platform-account-info.ts`、`platform-account-group-info.ts`、`platform-account-tenant-info.ts`（仍被 user.ts / 账号表单 / 组管理页引用） |
+| 基线同步 | `sql/all_data.sql`、`sql/all_schema.sql` 各删 4 行、改写 5 行 URL |
+| 部署验证 | `evidence/T-18_deploy-verify-r12.txt`、`evidence/T-18_drill.txt`、`evidence/T-18_result.txt` |
+
 ## 七、计数自检
 
-- 正向 SQL 件数 = 回滚 SQL 件数 = **5** ✅
-- 任务数 17，完成 17（T-17 收口即本清单）✅
+- 正向 SQL 件数 = 回滚 SQL 件数 = **6** ✅
+- 任务数 18，完成 18（T-17 收口 + T-18 R-12）✅
 - 提交 footer `Task: T-xx` 覆盖 T-01~T-17 ✅（`git log --grep="Task: T-"` 可核）

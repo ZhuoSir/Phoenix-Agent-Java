@@ -1,4 +1,4 @@
-> 版本: v1.1.0 | 状态: 已确认 | 确认人: 陈卓 | 确认日期: 2026-10-07 | 更新: 2026-10-07（v1.1.0 重确认②通过：仅事实数字订正，正文相对待重确认稿无改动）
+> 版本: v1.2.0 | 状态: 已确认 | 确认人: 陈卓 | 确认日期: 2026-10-07 | 确认记录: 用户 2026-10-07 口令「确认执行（确认人：陈卓）」+ URL 一并改为 /system-management | 变更源: R-12（v2.1.0 新增条款，信息架构调整）⇒ 追加 §R-12 实施方案 | 更新: 2026-10-07（v1.1.0 重确认②通过：仅事实数字订正，正文相对待重确认稿无改动）
 >
 > **v1.1.0 变更（铁律 4：已确认文档被改动 ⇒ 回退待重确认）**：**仅订正事实数字**，无设计变更 —— T-01 活库门禁统计（`evidence/T-01_gate-stats.txt`）推翻了两处口径：普通角色 ACL 由「0 行」订正为「**1 行**（智能体中心）」、名下用户由「10」订正为「**5 个存活用户**」；并在 §数据模型一 追加「活库现值复核」表（dump 为迁移前快照）。**决策 1~6、任务拆解 T-01~T-17、需求条款均不受影响。**
 
@@ -359,3 +359,39 @@ COMMIT;
 - 生产库真实数据统计（部署前门禁）：零角色用户数、零组用户数、各角色可用菜单数、`tbl_privilege_group` 行数与非空业务列比例、组织三表行数。
 - `tbl_phoenix_release` 台账现状核对（BUG-115 补登后是否完整）。
 - 迁移器事实（已确认，供 Implement 参照）：`docker/init/migrate.sh` 扫 `/releases/v*/sql/V*.sql`，`sort -V` 顺序，逐文件 `-1` 事务，成功写 `tbl_phoenix_release`；`rollback/` 子目录**不被扫描**（回滚靠人工执行）。
+
+## R-12 实施方案（v1.2.0 追加）
+
+> 触发：requirements **v2.1.0** 新增 R-12（权限管理 + 前台管理 → 「系统管理」；账号管理唯一化）。
+> 本方案**不新增表/列**，只调整菜单数据与前端页面，属**数据 + 前端**变更。
+
+### 一、数据库（新升级件 `V2.0.0_06__menu_merge_system_management_dml.sql` + rollback）
+
+| # | 操作 | 对象 | 说明 |
+|---|---|---|---|
+| 1 | `UPDATE name/url/sn` | 权限管理 `02b733aa08774219a23c2f21f1b3f6b5` | 更名 **系统管理**；建议 `url` → `/system-management`、`sn` → `SystemManagement`；**id 不变**（保 ACL） |
+| 2 | `UPDATE pid/order_no` | 组管理 `8b1a156184cf49fba34389e8caea4269` | 父 → 系统管理；次序与 账号管理 相邻 |
+| 3 | `UPDATE order_no` | 菜单管理 / 权限值管理 / 日志管理 | 依次后移一位，保持 角色→账号→组→菜单→权限值→日志 |
+| 4 | `DELETE` + ACL | 前台 账号管理 `6752c28a59c048cb9d08179ccadb38b4` | 连同 `tbl_privilege_acl` 中 `module_id` 指向它的行 |
+| 5 | `DELETE` + ACL | 前台管理 `638d2319c2d54f3ea36b2a519c9a1d0f` | 空目录清理 |
+
+- **幂等**：全部按固定 id 操作；重复执行影响 0 行。**自检**：存活菜单 = 19；超管 ACL 行数 = 存活菜单数；普通角色 ACL 仍 7。
+- **回滚**：`rollback/V2.0.0_06__..._rollback.sql` —— 保真重建被删 2 行（原文取自 `sql/all_data.sql` 删除前副本或线上 dump）
+  并把改名/搬迁/次序改回原值。
+- **聚合**：与 01~05 同批放入 `releases/v2.0.0/sql/`（部署台账按 seq 自动应用，已部署环境补跑该件即可）。
+
+### 二、前端（admin-ui）
+
+| 操作 | 对象 |
+|---|---|
+| 删除 4 文件 | `views/account/account-info/{index.vue,form.vue,data.ts,group-form.vue}` |
+| **保留** | 全部 3 个 API 模块（`platform-account-info.ts` 的 `getAccountInfoApi` 被 `api/core/user.ts` 使用；<br>`getAccountGroupInfoByAccountInfoApi` 被 `views/system-management/account/form.vue`（T-13）使用；<br>`platform-account-tenant-info.ts` 的 `getGroupAgentInfoListApi` 被组管理页使用） |
+| 连带核对 | 删除后 `pnpm typecheck` 不新增错误（基线 207）、`pnpm build` 通过、无悬空 import |
+
+### 三、验证
+
+1. **drill 库**：正向 → 菜单 19、两目录消失、组管理在系统管理下；反向 → 复原；各跑两次验幂等。
+2. **洁净库重放**：`all_schema` + `all_data` → 01~06 两轮全 exit=0；终态菜单 19。
+3. **部署栈**：重建前端镜像 + `docker compose up -d` → 台账应用 `V2.0.0_06`；超管导航只见「系统管理」；
+   `/platform-account/account-info` 404；普通角色导航仍 7 条。
+
