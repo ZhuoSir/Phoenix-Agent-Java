@@ -58,6 +58,17 @@
 | `specs/_project/backlog.md` | BL-31 → 实现完成(v2.0.0，待发版冻结) |
 | `releases/v2.0.0/MILESTONE.md` | 需求挂接表状态、纳入缺陷表、进度与审计记录同步 |
 
+## 六·补、镜像与部署（2026-10-07）
+
+| 项 | 值 |
+|---|---|
+| 后端镜像 | `phoenix-backend:v2.0.0`（1.57GB；`.stage/phoenix-admin.jar` 413M 为唯一新增层） |
+| 前端镜像 | `phoenix-frontend:v2.0.0`（58.2MB；`.stage/dist` 9.1M） |
+| 部署端口 | **8090**（`docker/.env` 的 `PHOENIX_HTTP_PORT`；compose 参数化，未改 compose 文件） |
+| 迁移执行 | 容器 `phoenix-release-migrator-1` 按 `tbl_phoenix_release` 台账应用 V2.0.0_01~05（5 行） |
+| 迁移前备份 | `backups/pre_v2.0.0_deploy_20261007_183127.sql`（44M） |
+| 部署验证 | `evidence/T-18_deploy-verify.txt` |
+
 ## 七、计数自检
 
 - 正向 SQL 件数 = 回滚 SQL 件数 = **5** ✅

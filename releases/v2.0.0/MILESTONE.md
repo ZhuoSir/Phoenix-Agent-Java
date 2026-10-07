@@ -84,3 +84,28 @@
   - **未做（发版步骤）**：`releases/v2.0.0/` 的 UPGRADE.md / RELEASE-NOTES.md / checklist / config 汇总（M3）、
     活库 `phoenix` 迁移、v2.0.0 镜像构建与 release 栈重启、tag 与冻结
   - `BL-31 → 实现完成(v2.0.0，待发版冻结)`（如实标注，未冒认"已冻结"）
+
+- **2026-10-07 构建与部署（用户口令「整体走个编译，打包镜像，然后部署，8090端口」）**：
+  - 编译：`mvn clean package -DskipTests -Dspring-javaformat.skip=true` → **BUILD SUCCESS / 0 错误**；
+    产物 `phoenix-admin/phoenix-admin-manager/target/phoenix-admin.jar`（413M）→ `docker/.stage/phoenix-admin.jar`
+  - 前端：`pnpm build`（admin-ui）→ `docker/.stage/dist`（9.1M）
+  - 升级件聚合：`specs/.../sql/V2.0.0_0{1..5}.sql` → **`releases/v2.0.0/sql/`**（正向 5 + `rollback/` 5，配对）
+  - 镜像：`phoenix-backend:v2.0.0`（1.57GB，基座 `docker.elastic.co/elasticsearch/elasticsearch:9.2.5`
+    + `JAVA_BIN=/usr/share/elasticsearch/jdk/bin/java`，因 Docker Hub 不可达而走本地缓存基座）、
+    `phoenix-frontend:v2.0.0`（58.2MB，nginx:1.27-alpine）
+  - 迁移前**再次全量备份**：`backups/pre_v2.0.0_deploy_20261007_183127.sql`（44M，安全网）
+  - 部署：`docker compose up -d`（`IMAGE_TAG=v2.0.0`，`PHOENIX_HTTP_PORT=8090`）→ 迁移器按台账应用
+    **V2.0.0_01~05**（5 行入 `tbl_phoenix_release`）→ 后端/nginx 重建为 v2.0.0
+  - **验证**（`specs/20261007_user-role-group-model/evidence/T-18_deploy-verify.txt`）：
+    nginx `0.0.0.0:8090->80` healthy ｜ backend healthy ｜ 容器内 `/echo/ok` 200 ｜ **8090 首页 200** ｜
+    旧 9080 已无监听 ｜ 库终态 **菜单 21 / 组织表 0 / ACL 28 / 零角色用户 0** ｜
+    **启动期 SQL 报错 0** ｜ 普通角色 menus=7（顶层 智能体管理/个人中心/知识库/智能体中心）｜
+    `/auth/thirdLogin` 与 `/platform/platform-info/getEnabledPlatform` 均 **404** ｜
+    前端 chunk 中组织维度残留 **0**
+  - 配置变更（`.env` 被 `docker/.gitignore` 忽略，故不入库，仅登记于此）：`PHOENIX_HTTP_PORT=9080 → 8090`、
+    `IMAGE_TAG=v1.6.0-dev → v2.0.0`
+  - 已知无害告警：迁移器用 `psql -1` 包事务，而升级件自带 `BEGIN/COMMIT` ⇒ 日志出现
+    `WARNING: there is already a transaction in progress` / `there is no transaction in progress`；
+    各件均幂等且自检 NOTICE 通过，台账 5 行齐全（后续可将升级件改为不带显式事务以消除告警）
+  - 仍未做：`UPGRADE.md` / `RELEASE-NOTES.md` / `checklist.md` / `config/changes.md`（M3 汇总件）、
+    合并 main、打 tag 与**冻结**

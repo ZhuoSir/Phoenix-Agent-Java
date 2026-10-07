@@ -8,11 +8,10 @@
 
 | 项 | 值 |
 |---|---|
-| 后台（推荐，构建件） | http://localhost:5778 |
-| 后台（dev 源，可热更） | http://localhost:5777 （登录页须用 hash 路由 `/#/auth/login`，见 BUG-128） |
-| 移动端 | http://localhost:5999 |
-| 后端直连 | http://localhost:8066 （健康检查 `/echo/ok`；日志 `/tmp/t16/backend.log`） |
-| 隔离库容器 | `phoenix-t16-pg`（库 `phoenix`，宿主 55432） |
+| **后台（已部署 v2.0.0，推荐）** | **http://localhost:8090**（镜像 `phoenix-frontend:v2.0.0` + `phoenix-backend:v2.0.0`，连**活库** `phoenix`，已应用 V2.0.0_01~05） |
+| 移动端（dev，未入镜像） | http://localhost:5999 （其 `/api` 代理指向 `localhost:8066`＝**隔离库**后端） |
+| 后端日志（已部署） | `docker logs -f phoenix-release-backend-1` |
+| 隔离环境（备用） | 后端 8066（隔离库 `phoenix-t16-pg`）；admin dev 5777 / dist 5778 |
 | 超管账号 | `admin` / `123456`；`liufang` / `12345678` |
 | 普通角色账号 | `chenzhuo` / `12345678`；`lwj` / `12345678`；`xtj` / `12345678` |
 | 零角色账号 | `t16zero8036` / `12345678` |
@@ -88,9 +87,10 @@
 
 | 现象 | 说明 |
 |---|---|
-| dev（5777）登录页路径报 405/JSON | **BUG-128**：vite 代理 `/auth` 与 SPA 路由冲突；用 5778 或 `/#/auth/login` |
+| dev（5777）登录页路径报 405/JSON | **BUG-128**：vite 代理 `/auth` 与 SPA 路由冲突；**已部署的 8090 无此问题**（nginx 按 method 分流：GET→页面 / POST→后端） |
 | 页面偶发 `504 (Outdated Optimize Dep)` | vite dev 依赖预构建缓存过期，刷新/重启 dev 即消失，与业务无关 |
-| 移动端「模型/聊天」类页面请求失败 | 隔离后端未配置模型密钥（只验证登录与免登下线） |
+| 移动端「模型/聊天」类页面请求失败 | 后端未配置模型密钥（只验证登录与免登下线） |
+| 移动端连的是隔离库 | 部署镜像只含 admin-ui；移动端仍走 dev。若需连**活库**，改 `apps/mobile-ui/vite.config.mts` 的 `targetUrl` 为 `http://localhost:8090`（1 行） |
 
 ## 四、反馈方式
 

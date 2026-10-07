@@ -1,0 +1,39 @@
+########## v2.0.0 部署验证 ##########
+=== ① 容器状态与端口 ===
+NAMES                        IMAGE                     STATUS                    PORTS
+phoenix-release-nginx-1      phoenix-frontend:v2.0.0   Up 29 seconds (healthy)   0.0.0.0:8090->80/tcp
+phoenix-release-backend-1    phoenix-backend:v2.0.0    Up 29 seconds (healthy)   8066/tcp, 9200/tcp, 9300/tcp
+phoenix-release-postgres-1   pgvector/pgvector:pg16    Up 3 days (healthy)       5432/tcp
+phoenix-release-redis-1      redis:7-alpine            Up 3 days (healthy)       6379/tcp
+
+=== ② 迁移台账（应含 V2.0.0_01~05）===
+                   seq                   |          applied_at           
+-----------------------------------------+-------------------------------
+ V2.0.0_01__org_dimension_drop_ddl       | 2026-10-07 18:34:56.152397+08
+ V2.0.0_02__role_backfill_dml            | 2026-10-07 18:34:56.291518+08
+ V2.0.0_03__org_menu_cleanup_dml         | 2026-10-07 18:34:56.381702+08
+ V2.0.0_04__acl_baseline_rebuild_dml     | 2026-10-07 18:34:56.511771+08
+ V2.0.0_05__three_party_menu_cleanup_dml | 2026-10-07 18:34:56.596458+08
+(5 rows)
+
+=== ③ 部署三段证明 ===
+  健康检查(容器内): HTTP 200
+  对外端口 8090 首页: HTTP 200
+  旧端口 9080: HTTP 000000（应已无监听）
+
+=== ④ 数据库终态 ===
+ active_menus | org_tables_left | active_acls | zero_role_users 
+--------------+-----------------+-------------+-----------------
+           21 |               0 |          28 |               0
+(1 row)
+
+=== ⑤ 上线接口抽查（经 8090 反代或容器内直连）===
+  admin token 长度: 36
+  超管 menus=21 pvalues=5
+  GET /auth/thirdLogin                               → HTTP 404
+  GET /platform/platform-info/getEnabledPlatform     → HTTP 404
+=== ⑥ 前端是否为 v2.0.0 新构建（检查是否已无 organization chunk）===
+sed: 1: "s/^/  含组织/平台� ...": bad flag in substitute command: '�'
+  示例 chunk: AccessApi-CRp0c22P.js
+  示例 chunk: AgentDataSourceConfig-PsJvTqvX.js
+  示例 chunk: AgentGroupGrant-97tAKJh6.js
