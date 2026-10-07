@@ -75,6 +75,7 @@ public class PrivilegeUserServiceImpl extends ServiceImpl<PrivilegeUserMapper, P
 		user.setPwdInit(1);
 		return updateById(user);
 	}
+
 	@Override
 	public boolean setPassword(String userId, String newPassword) {
 		PrivilegeUser user = getById(userId);
@@ -153,18 +154,22 @@ public class PrivilegeUserServiceImpl extends ServiceImpl<PrivilegeUserMapper, P
 			return voPage;
 		}
 		List<String> userIds = records.stream().map(PrivilegeUser::getId).toList();
-		List<PrivilegeUserRole> userRoles = privilegeUserRoleService.list(
-				QueryWrapper.create().in(PrivilegeUserRole::getUserId, userIds));
+		List<PrivilegeUserRole> userRoles = privilegeUserRoleService
+			.list(QueryWrapper.create().in(PrivilegeUserRole::getUserId, userIds));
 		List<String> roleIds = userRoles.stream().map(PrivilegeUserRole::getRoleId).distinct().toList();
 		Map<String, String> roleNameMap = new HashMap<>();
 		if (!roleIds.isEmpty()) {
-			roleNameMap = privilegeRoleService.listByIds(roleIds).stream()
-					.collect(HashMap::new, (m, r) -> m.put(r.getId(), r.getName()), HashMap::putAll);
+			roleNameMap = privilegeRoleService.listByIds(roleIds)
+				.stream()
+				.collect(HashMap::new, (m, r) -> m.put(r.getId(), r.getName()), HashMap::putAll);
 		}
 		Map<String, List<PrivilegeRoleVO>> userRolesMap = new HashMap<>();
 		for (PrivilegeUserRole ur : userRoles) {
 			userRolesMap.computeIfAbsent(ur.getUserId(), k -> new ArrayList<>())
-					.add(PrivilegeRoleVO.builder().id(ur.getRoleId()).name(roleNameMap.getOrDefault(ur.getRoleId(), "")).build());
+				.add(PrivilegeRoleVO.builder()
+					.id(ur.getRoleId())
+					.name(roleNameMap.getOrDefault(ur.getRoleId(), ""))
+					.build());
 		}
 		List<PrivilegeUserVO> voList = records.stream().map(e -> {
 			PrivilegeUserVO vo = BeanUtil.copyProperties(e, PrivilegeUserVO.class);
