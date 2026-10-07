@@ -1,0 +1,63 @@
+=== T-06 演练（库 phoenix_drill，2026-10-07 17:10:44）===
+
+[0] 先补做 T-05 正向（保证前置状态）
+psql:<stdin>:71: NOTICE:  [V2.0.0_02] 补角色完成：待补 2 人 / 实际写入 2 行（角色 431285032083144704 / 普通角色）
+psql:<stdin>:86: NOTICE:  [V2.0.0_02] 自检通过：存活用户无角色数 = 0
+psql:<stdin>:56: NOTICE:  [V2.0.0_03] 自检通过：组织菜单与其授权行均为 0
+    前置完成
+  [统计] alive_menu=22  acl=55  admin_ok=19  common_ok=0  orphan_module=30  orphan_role=36  dup=0
+
+[1] 正向执行 V2.0.0_04（ACL 基线重建）
+BEGIN
+CREATE TABLE
+INSERT 0 50
+DELETE 50
+DO
+psql:<stdin>:116: NOTICE:  [V2.0.0_04] 基线重建完成：存活菜单 22 个；超管 22 个；普通角色 6 个（角色 428007432736870400 / 431285032083144704）
+psql:<stdin>:133: NOTICE:  [V2.0.0_04] 终检通过：无「可用菜单为 0」的角色
+DO
+COMMIT
+    → 统计
+  [统计] alive_menu=22  acl=28  admin_ok=22  common_ok=6  orphan_module=0  orphan_role=0  dup=0
+
+[2] 幂等复跑 V2.0.0_04
+psql:<stdin>:32: NOTICE:  relation "tbl_privilege_acl_bak_v200" already exists, skipping
+psql:<stdin>:116: NOTICE:  [V2.0.0_04] 基线重建完成：存活菜单 22 个；超管 22 个；普通角色 6 个（角色 428007432736870400 / 431285032083144704）
+psql:<stdin>:133: NOTICE:  [V2.0.0_04] 终检通过：无「可用菜单为 0」的角色
+    复跑无错
+    → 统计（应与 [1] 一致）
+  [统计] alive_menu=22  acl=28  admin_ok=22  common_ok=6  orphan_module=0  orphan_role=0  dup=0
+
+[3] 备份表内容核对（脏数据留档）
+ bak_rows 
+----------
+       50
+(1 row)
+
+ bak_rows_for_unknown_release 
+------------------------------
+                           50
+(1 row)
+
+
+[4] 反向执行 V2.0.0_04 rollback（撤销基线 + 还原脏数据）
+BEGIN
+psql:<stdin>:31: NOTICE:  [V2.0.0_04-rollback] 撤销授权行 9 行；还原脏数据行 50 行
+DO
+COMMIT
+    → 统计（应为：admin_ok=19 common_ok=0 orphan_module=30 orphan_role=36 acl=55）
+  [统计] alive_menu=22  acl=55  admin_ok=19  common_ok=0  orphan_module=30  orphan_role=36
+
+[5] rollback 幂等复跑
+psql:<stdin>:31: NOTICE:  [V2.0.0_04-rollback] 撤销授权行 0 行；还原脏数据行 0 行
+    复跑无错
+  [统计] alive_menu=22  acl=55  admin_ok=19  common_ok=0  orphan_module=30  orphan_role=36
+
+[6] 继续回滚 T-05 两件，恢复演练库原状
+psql:<stdin>:50: NOTICE:  [V2.0.0_03-rollback] 自检通过：菜单 4 行 + 授权 4 行已恢复
+  03-rollback OK
+psql:<stdin>:19: NOTICE:  [V2.0.0_02-rollback] 已撤销 2 行补角色关系
+  02-rollback OK
+    最终: zero_role=2  org_menu=4  acl=59  user_role=12  (应回到 2/4/59/12)
+
+[7] 备份表保留确认: bak_rows=50

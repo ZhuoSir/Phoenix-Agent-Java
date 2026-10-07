@@ -386,3 +386,14 @@
   `JAVA_HOME=<项目 JDK> <mvn 全路径> … -Dmaven.repo.local="$PWD/.mvn-home"`；③ 证据文件命名带**工具链指纹**
   （JDK 版本 + 仓库路径），配置变更时旧证据改名保留而非删除（本次 `*_WRONGCFG_jdk25_m2repo.raw.txt`）。
 
+## L-47 幂等 DML 的归档条件必须排除「自己写入的行」，回滚必须按业务唯一键兜底
+- **现象**：V2.0.0_04 的设计是「目标对先清冲突（含墓碑）→ 纯插入」，冲突行入 JSONB 备份表供回滚。
+  但**归档条件没排除本件自己写入的行**（`create_by='V2.0.0_04'`）⇒ 幂等复跑时把自己上一轮的 30 行
+  也当冲突行归档，备份表 57→87 行、且**同一 (release_id, module_id) 在备份里出现两行**；
+  回滚时 `ON CONFLICT (id)` 挡不住业务键冲突 ⇒ `duplicate key value violates unique constraint
+  idx_tbl_privilege_acl_release_module`，整个回滚事务中止（演练当场暴露，未流到生产）。
+- **防再犯**：① 幂等脚本的"归档/备份"条件必须显式排除自己的写入标记（`create_by`/`update_by` 或 id 前缀），
+  否则备份会随复跑线性膨胀并污染回滚数据；② 回滚还原一律用**业务唯一键** `ON CONFLICT (业务键) DO NOTHING`
+  兜底（`ON CONFLICT (id)` 只防主键、不防业务唯一索引）；③ 涉及"先删后插"的迁移，**正反向各跑两遍**
+  才算验证过幂等（本次正是第二遍才暴露）。
+
