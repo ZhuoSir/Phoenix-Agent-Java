@@ -17,6 +17,41 @@ export async function listAgentFilesApi(sessionId: string, scan = false) {
   });
 }
 
+/** 会话文件树节点（v1.7.0 R-02）：单层返回；dir/file/history 三型 */
+export const HISTORY_PATH = '__history__';
+
+export interface AgentFileTreeNode {
+  type: 'dir' | 'file' | 'history';
+  name: string;
+  /** 会话内相对路径（已折叠 {uid} 层）；history 型为固定 `__history__` */
+  path: string;
+  dirCount?: number;
+  fileCount?: number;
+  id?: string;
+  sizeBytes?: number;
+  mime?: null | string;
+  source?: string;
+  createTime?: string;
+}
+
+/** 会话文件树单层（payload 只含当前层） */
+export interface AgentFileTreeLevel {
+  rootName: string;
+  path: string;
+  parentPath: string;
+  dirTotal: number;
+  fileTotal: number;
+  historyTotal: number;
+  entries: AgentFileTreeNode[];
+}
+
+export async function getAgentFileTreeApi(sessionId: string, path = '', scan = true) {
+  return requestClient.get<AgentFileTreeLevel>('/api/agent/files/tree', {
+    params: { sessionId, path, scan },
+    responseReturn: 'body',
+  });
+}
+
 /** 下载走原生 fetch（需要 blob + 自定义头），带 token 与错误信封双兼容 */
 export async function downloadAgentFileApi(id: string, fileName: string, inline = false) {
   const token = localStorage.getItem('phoenix-token') || '';

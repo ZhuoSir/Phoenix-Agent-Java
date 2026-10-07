@@ -33,6 +33,8 @@ public class AgentFileServiceImpl implements AgentFileService {
 
     private final AgentFileMapper agentFileMapper;
     private final ChatSessionMapper chatSessionMapper;
+    /** v1.7.0 R-02：解析 runtimeKey 以剥离历史行前缀（与扫描器同口径，DB 为准）。 */
+    private final com.phoenix.data.service.agent.AgentService agentService;
 
     /** 与 FileStorageProperties 的 uploads 根同目录（默认 ./uploads；交付包指到卷内）。 */
     @Value("${phoenix.agent.files.root:./uploads}")
@@ -154,14 +156,23 @@ public class AgentFileServiceImpl implements AgentFileService {
     }
 
     /** workspace-isolation T-02（BUG-67）：storeKey 全局首占——任何会话已登记即不再收编。 */
+    /**
+     * 同 store_key 是否**曾经登记过**（BUG-87：含已逻辑删的行 → 墓碑优先）。
+     *
+     * <p>此前只数 {@code del_flag=0}，导致用户逻辑删掉的文件在下一轮扫描中被当作"新文件"重新登记（复活）；
+     * 本 spec 零 DDL 且表无 update_time，无法做"删后再生成"的时序比较，故取**墓碑优先**：
+     * 只要该 store_key 出现过（无论存活/删除），就不再次登记。
+     * 代价：同名**且同字节数**的再生成文件会被视为已登记（改名/变大小即正常登记）。
+     */
     public boolean existsByStoreKeyAnySession(String storeKey) {
         if (storeKey == null || storeKey.isBlank()) {
             return false;
         }
-        return QueryChain.of(agentFileMapper)
-                .eq(AgentFile::getStoreKey, storeKey)
-                .eq(AgentFile::getDelFlag, 0)
-                .count() > 0;
+        // **必须走原生 SQL**：del_flag 是 MyBatis-Flex 逻辑删列，框架会给一切 QueryChain 查询
+        // 自动追加 `del_flag = 0`（实测日志可见），因此用 QueryChain 永远看不到墓碑行 → 会继续复活。
+        Object cnt = com.mybatisflex.core.row.Db.selectObject(
+                "select count(*) from tbl_data_agent_file where store_key = ?", storeKey);
+        return cnt instanceof Number number && number.longValue() > 0;
     }
 
     @Override
@@ -261,5 +272,180 @@ public class AgentFileServiceImpl implements AgentFileService {
             base = "file";
         }
         return base.length() > 200 ? base.substring(0, 200) : base;
+    }
+
+    // ==================== v1.7.0 R-02：会话文件树（单层懒加载） ====================
+
+    @Override
+    public TreeLevel treeLevel(String sessionId, String requestedPath, String requesterUserId) {
+        requireSessionOwner(sessionId, requesterUserId);
+        ChatSession session = chatSessionMapper.selectOneById(sessionId);
+        String agentKey = resolveAgentKey(session);
+        String want = normalizePath(requestedPath);
+        boolean historyLevel = AgentFileService.HISTORY_PATH.equals(want);
+        List<String> base = historyLevel ? List.of() : segments(want);
+
+        List<AgentFile> rows = QueryChain.of(agentFileMapper)
+                .eq(AgentFile::getSessionId, sessionId)
+                .eq(AgentFile::getDelFlag, 0)
+                .orderBy(AgentFile::getCreateTime, false)
+                .list();
+
+        Map<String, DirAgg> dirs = new java.util.LinkedHashMap<>();
+        List<TreeNode> files = new java.util.ArrayList<>();
+        int historyTotal = 0;
+        for (AgentFile f : rows) {
+            String relPath;
+            boolean history;
+            if (f.getStoreKey() == null || f.getStoreKey().isBlank()) {
+                // v1.1.0 补：**物化文件**（`materialize`，报告「另存为文件」）没有 store_key → 以文件名落在会话根。
+                // 不补则树里丢失（平铺列表本来有 → 属回归），文件名即相对路径。
+                String name = f.getFileName() == null ? "" : f.getFileName();
+                if (name.isEmpty() || com.phoenix.agent.util.SessionWorkspaceFilters.isInternalFile(name)) {
+                    continue;
+                }
+                relPath = name;
+                history = false;
+            }
+            else {
+                com.phoenix.agent.util.SessionFileTree.Parsed parsed =
+                        com.phoenix.agent.util.SessionFileTree.parse(f.getStoreKey(), agentKey, sessionId);
+                // v1.1.0 归属口径：他会话段 → 「历史文件」；**无会话段旧行 → 归本会话**（行 session_id 为权威）
+                history = parsed.isOtherSession();
+                // R-02.3：框架内部件一律不出现在树里（与扫描器同源判据）
+                if (parsed.internal()) {
+                    continue;
+                }
+                relPath = parsed.relativePath();
+            }
+            if (history) {
+                historyTotal++;
+                if (!historyLevel) {
+                    continue;
+                }
+            }
+            else if (historyLevel) {
+                continue;
+            }
+            // v1.1.0 R-02.7：折叠 {uid} 展示层（单一实现见 SessionFileTree）
+            List<String> segs = com.phoenix.agent.util.SessionFileTree.foldUserNamespace(segments(relPath));
+            if (segs.size() <= base.size() || !segs.subList(0, base.size()).equals(base)) {
+                continue;
+            }
+            if (segs.size() == base.size() + 1) {
+                files.add(TreeNode.builder()
+                        .type("file").name(f.getFileName()).path(String.join("/", segs))
+                        .id(f.getId()).sizeBytes(f.getSizeBytes()).mime(f.getMime())
+                        .source(f.getSource())
+                        .createTime(f.getCreateTime())
+                        .build());
+            }
+            else {
+                String dirName = segs.get(base.size());
+                String dirPath = joinPath(base, dirName);
+                DirAgg agg = dirs.computeIfAbsent(dirName, k -> new DirAgg(dirPath));
+                agg.fileCount++;
+                if (segs.size() == base.size() + 2) {
+                    agg.childDirs.add(segs.get(base.size() + 1));
+                }
+            }
+        }
+
+        List<TreeNode> entries = new java.util.ArrayList<>();
+        dirs.values().stream()
+                .sorted(java.util.Comparator.comparing(a -> a.path))
+                .forEach(a -> entries.add(TreeNode.builder()
+                        .type("dir").name(lastSegment(a.path)).path(a.path)
+                        .dirCount(a.childDirs.size()).fileCount(a.fileCount)
+                        .build()));
+        if (historyTotal > 0 && !historyLevel && want.isEmpty()) {
+            entries.add(TreeNode.builder()
+                    .type("history").name(AgentFileService.HISTORY_NAME)
+                    .path(AgentFileService.HISTORY_PATH).fileCount(historyTotal)
+                    .build());
+        }
+        files.sort(java.util.Comparator.comparing(TreeNode::name));
+        entries.addAll(files);
+
+        return TreeLevel.builder()
+                .rootName(sessionId)
+                .path(historyLevel ? AgentFileService.HISTORY_PATH : want)
+                .parentPath(historyLevel ? "" : parentOf(want))
+                .dirTotal(dirs.size())
+                .fileTotal(files.size())
+                .historyTotal(historyTotal)
+                .entries(entries)
+                .build();
+    }
+
+    private String resolveAgentKey(ChatSession session) {
+        if (session == null || session.getAgentId() == null) {
+            return null;
+        }
+        Long agentId = session.getAgentId().longValue();
+        try {
+            com.phoenix.data.entity.Agent agent = agentService.findById(agentId);
+            if (agent != null) {
+                return com.phoenix.agent.util.WorkspacePaths.runtimeKey(agentId, agent.getSn());
+            }
+        }
+        catch (RuntimeException e) {
+            log.warn("文件树 runtimeKey 解析失败，回落 agentId: agentId={}, err={}", agentId, e.toString());
+        }
+        return com.phoenix.agent.util.WorkspacePaths.runtimeKey(agentId, null);
+    }
+
+    private static final class DirAgg {
+        private final String path;
+        private final java.util.Set<String> childDirs = new java.util.LinkedHashSet<>();
+        private int fileCount;
+
+        private DirAgg(String path) {
+            this.path = path;
+        }
+    }
+
+    private static String normalizePath(String p) {
+        if (p == null || p.isBlank()) {
+            return "";
+        }
+        String s = p.trim().replace('\\', '/');
+        while (s.startsWith("/")) {
+            s = s.substring(1);
+        }
+        while (s.endsWith("/")) {
+            s = s.substring(0, s.length() - 1);
+        }
+        return s;
+    }
+
+    private static String parentOf(String path) {
+        if (path == null || path.isEmpty()) {
+            return "";
+        }
+        int idx = path.lastIndexOf('/');
+        return idx < 0 ? "" : path.substring(0, idx);
+    }
+
+    private static String joinPath(List<String> base, String name) {
+        return base.isEmpty() ? name : String.join("/", base) + "/" + name;
+    }
+
+    private static String lastSegment(String path) {
+        int idx = path.lastIndexOf('/');
+        return idx < 0 ? path : path.substring(idx + 1);
+    }
+
+    private static List<String> segments(String path) {
+        List<String> out = new java.util.ArrayList<>();
+        if (path == null) {
+            return out;
+        }
+        for (String part : path.split("/")) {
+            if (!part.isEmpty()) {
+                out.add(part);
+            }
+        }
+        return out;
     }
 }

@@ -1,0 +1,61 @@
+=== T-02 演练记录（演练库 phoenix_drill；生产库只读复制）===
+执行时间: 2026-10-06 14:03:29
+
+--- ① 在演练库执行 DDL ---
+CREATE TABLE
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+CREATE INDEX
+exit=0
+
+--- ② 结构验证（列/主键/索引）---
+                    Table "public.tbl_unified_account_map"
+     Column     |            Type             | Collation | Nullable | Default 
+----------------+-----------------------------+-----------+----------+---------
+ old_account_id | character varying(64)       |           | not null | 
+ new_user_id    | character varying(64)       |           | not null | 
+ merge_type     | character varying(16)       |           | not null | 
+ employee_id    | character varying(64)       |           |          | 
+ migrated_at    | timestamp without time zone |           | not null | now()
+ remark         | character varying(255)      |           |          | 
+ create_time    | timestamp without time zone |           | not null | now()
+ update_time    | timestamp without time zone |           | not null | now()
+Indexes:
+    "pk_tbl_unified_account_map" PRIMARY KEY, btree (old_account_id)
+    "idx_uam_new_user" btree (new_user_id)
+
+--- ③ 注释验证 ---
+      col       |                          comment                          
+----------------+-----------------------------------------------------------
+ old_account_id | 原前台账号 tbl_platform_account_info.id（主键，天然防重）
+ new_user_id    | 统一后账号 tbl_privilege_user.id
+ merge_type     | merged=并入既有后台账号；created=沿用前台 id 新建
+ employee_id    | 自然人键（取自前台账号，可能为空；不作为唯一匹配依据）
+ migrated_at    | 迁移时刻
+ remark         | 留痕：异常/人工裁定说明
+ create_time    | 
+ update_time    | 
+(8 rows)
+
+--- ④ 约束验证：主键防重（第二次插入应失败）---
+INSERT 0 1
+ERROR:  duplicate key value violates unique constraint "pk_tbl_unified_account_map"
+DETAIL:  Key (old_account_id)=(probe-old) already exists.
+--- ⑤ 清理探针行 ---
+-----------
+         0
+(1 row)
+
+
+--- ⑥ 执行回滚脚本 ---
+DROP INDEX
+DROP TABLE
+exit=0
+--- ⑦ 回滚后验证（表应不存在）---
+            0
+

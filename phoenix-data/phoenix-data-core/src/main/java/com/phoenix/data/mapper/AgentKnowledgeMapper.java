@@ -23,6 +23,25 @@ public interface AgentKnowledgeMapper extends BaseMapper<AgentKnowledge> {
 	AgentKnowledge selectById(@Param("id") Integer id);
 
 	/**
+	 * R-01 / T-05（T-03 取证口径）：判断某用户能否读取某知识库的原件。
+	 *
+	 * <p>① 系统管理员（role_id=428007432736870400 且 del_flag=0）→ 允许；
+	 * ② 该用户在"绑定了此知识库的智能体"下存在会话 → 允许（一期代理判据，二期由 R-05/BL-31 的正式关系替换）；
+	 * ③ 否则拒绝。
+	 */
+	@Select("""
+			SELECT CASE
+			  WHEN EXISTS (SELECT 1 FROM tbl_privilege_user_role ur
+			                WHERE ur.user_id = #{userId} AND ur.role_id = '428007432736870400'
+			                  AND COALESCE(ur.del_flag, 0) = 0) THEN 1
+			  WHEN EXISTS (SELECT 1 FROM tbl_data_chat_session s
+			                JOIN tbl_data_agent_kbase_bind b ON b.agent_id = s.agent_id
+			               WHERE s.user_id = #{userId} AND b.knowledge_base_id = #{kbId}) THEN 1
+			  ELSE 0 END
+			""")
+	int canReadKnowledgeSource(@Param("userId") String userId, @Param("kbId") Long kbId);
+
+	/**
 	 * 根据ID查询知识（包含已删除的）
 	 */
 	@Select("""

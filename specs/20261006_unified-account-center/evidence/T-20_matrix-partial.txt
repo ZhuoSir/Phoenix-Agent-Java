@@ -1,0 +1,49 @@
+=== T-20 单套登录/访问矩阵（部分断言：Agent 侧实测，2026-10-06 15:09）===
+环境：生产 nginx http://127.0.0.1:9080（前端已部署 T-19 版本；后端未重启）
+工具：Agent Window（Chromium，扩展 v0.3.2）；debug 捕获 run=d3c321d89089d
+
+★ 前置发现（影响所有"入口 URL"结论）：**生产为 hash 路由**
+  `web-frontend/apps/admin-ui/.env.production:13  VITE_ROUTER_HISTORY=hash   VITE_BASE=/`
+  ⇒ 真实入口形如 `http://127.0.0.1:9080/#/front/chat`（旧前台入口也是这个形态，因为原先也是 router.push 过去的）。
+  无 hash 的 `/front/chat`（历史式路径）在本部署下从来不是有效入口 —— 它只会加载 SPA 的 `/`。
+
+--- 断言 1：未登录访问任意入口 → 都落到**同一个**登录页（R-11 验收场景 2）---
+| 访问 | 最终 URL | 渲染 |
+|---|---|---|
+| `/#/front/chat`（旧前台入口） | `http://127.0.0.1:9080/#/auth/login?redirect=%252Fagent%252Fchat` | 登录页 |
+| `/#/front/agent`（旧前台入口） | `http://127.0.0.1:9080/#/auth/login` | 登录页 |
+| `/#/agent/list`（后台既有页） | `http://127.0.0.1:9080/#/auth/login` | 登录页 |
+| `/agent/chat`（无 hash） | `http://127.0.0.1:9080/agent/chat#/auth/login` | 登录页 |
+| `/front/chat`（无 hash） | `http://127.0.0.1:9080/auth/login?redirect=%2Ffront%2Fchat` | 登录页 |
+⇒ 五条路径**全部**落到同一登录路由 `/auth/login`（同一 `views/auth/LoginPage.vue`），不存在第二套登录页。
+
+  ★ 其中第 1 行还是**前台重定向生效的直接证据**：`redirect=%252Fagent%252Fchat` 双重解码后 = `redirect=/agent/chat`
+  ⇒ 说明 `#/front/chat` 先被静态路由重定向到 `/agent/chat`，再因未登录而带"回跳目标=/agent/chat"送登录页。
+  （T-19 交付的 `path:'/front/chat', redirect:'/agent/chat'` 在 hash 形态下确实生效）
+
+--- 断言 2：登录页只剩一套（无双 tab）---
+证据：`evidence/T-19_login-single-form.jpg`（截图 sha256 451ac136…）
+  截图中表单只有：用户名 / 密码 / 滑块验证 / 记住登录 / 登录 / 协议勾选 —— **没有**「普通用户登录|管理员登录」切换。
+  可访问性树同样确认（RootWebArea "登录 - Phoenix Admin"，form 内无 tab 控件）。
+
+--- 断言 3：控制台/资源无应用级报错 ---
+  console 4 条：2× warning `[StorageManager] empty prefix …`（既有，vben preferences 存储，与本改动无关）
+                2× error `Failed to load resource: net::ERR_FAILED` 来源 `chrome-extension://invalid/`（浏览器扩展，非应用）
+  ⇒ 无 chunk 加载失败、无未捕获异常
+
+--- 待用户实测（阻塞点：登录表单的**滑块验证码**无法脚本化，故登录后行为留在人工）---
+  · 硬刷后登录（admin 与 chenzhuo 各一次）→ 落地页是否符合 `hasAdminRole` 判定
+    （有后台角色 → `/agent/list`；无后台角色 → `/agent/chat`）
+  · 侧栏**最上方**是否「智能体中心」且有图标（lucide:message-square）
+  · 点进「智能体中心」→ chat 页面可用（会话列表/发消息/文件面板/预设问题）
+  · 已登录状态下访问 `#/front/chat` → 是否落到 `#/agent/chat`（重定向第二段）
+  · pc-ui / mobile-ui：本次未部署这两个 app（docker/scripts/build.sh 只构建 admin-ui），
+    其后端 `/auth/login` 端点按 plan 一期保留（verify.sh [13] PASS）⇒ 影响面=仅端点共存，无改动
+
+--- 用户实测确认（2026-10-06，用户回「四项全对」）---
+1 侧栏**最上方**出现「智能体中心」且有图标（lucide:message-square）           → 通过
+2 点进「智能体中心」→ chat 页面可用                                          → 通过
+3 登录表单**没有**「普通用户/管理员」双 tab，chenzhuo 正常登录                → 通过
+4 访问 `#/front/chat` → 落到 `#/agent/chat`                                   → 通过
+⇒ T-20 的 R-11 两条新断言（智能体中心可用 / 未登录跳转一致）与 T-19 行为项全部落盘为"通过"。
+用户同时要求：**T-21 暂缓**（"等我测完再做 T-21"）⇒ 本 spec 自本节点起**冻结现场**，不再动生产与前端。

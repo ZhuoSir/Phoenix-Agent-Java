@@ -118,6 +118,8 @@ interface SessionRuntimeState {
   remoteRunning: boolean;
   /** T-04：join 追流的关闭句柄（切会话/停止时必须关，防泄漏订阅） */
   closeJoin: (() => void) | null;
+  /** T-10：服务端静默心跳提示（按会话记账，如「工具执行中 · 已静默 23s」） */
+  silenceText: string;
   // BUG-81：HITL 确认条同族视图态（全局会让 A 的待确认锁死 B 的输入框）
   showHarnessConfirm: boolean;
   pendingConfirmButtons: ConfirmButton[];
@@ -135,11 +137,27 @@ interface SessionRuntimeState {
 function useSessionStateManager() {
   const sessionStates = reactive<Map<string, SessionRuntimeState>>(new Map());
 
+  /** T-10：心跳帧 → 会话级静默提示；真实增量/结束 → 清除 */
+  const applySilenceFrame = (sid: string, frame: any) => {
+    if (!frame) return;
+    if (frame.silenceMs != null) {
+      const sec = Math.round(Number(frame.silenceMs) / 1000);
+      const st = getSessionState(sid);
+      if (st) st.silenceText = `${frame.phaseLabel || '处理中'} · 已静默 ${sec}s`;
+      return;
+    }
+    if (frame.text || frame.thinking || frame.end) {
+      const st = getSessionState(sid);
+      if (st) st.silenceText = '';
+    }
+  };
+
   const getSessionState = (sessionId: string): SessionRuntimeState => {
     if (!sessionStates.has(sessionId)) {
       sessionStates.set(sessionId, {
         isStreaming: false,
         remoteRunning: false,
+        silenceText: '',
         closeJoin: null,
         showHarnessConfirm: false,
         pendingConfirmButtons: [],
@@ -199,6 +217,7 @@ function useSessionStateManager() {
   return {
     sessionStates,
     getSessionState,
+    applySilenceFrame,
     syncStateToView,
     saveViewToState,
     deleteSessionState,
@@ -217,6 +236,7 @@ const {
   syncStateToView,
   saveViewToState,
   deleteSessionState,
+  applySilenceFrame,
 } = useSessionStateManager();
 const isStreaming = ref(false);
 
@@ -246,6 +266,12 @@ const chatContainer = ref<HTMLElement | null>(null);
 
 // long-turn-resilience：长轮活性指示（每秒刷新已用时，证明"在跑"而非卡死）
 const streamElapsedText = ref('');
+
+/** T-10：当前会话的静默提示（服务端心跳驱动；切会话自动切换） */
+const currentSilenceText = computed(() => {
+  const sid = currentSession.value?.id;
+  return sid ? (getSessionState(sid)?.silenceText ?? '') : '';
+});
 let streamElapsedStart = 0;
 let streamElapsedTimer: ReturnType<typeof setInterval> | null = null;
 watch(isStreaming, (on: boolean) => {
@@ -513,6 +539,7 @@ async function selectSession(session: ChatSession | null) {
             agentId.value,
             async (response) => {
               if (currentSession.value?.id !== session.id) return; // BUG-74 会话守卫
+              applySilenceFrame(session.id, response);
               if ((response as any).agentFiles) notifyFilesChanged();
               const piece = String((response as any).text || '');
               const th = String((response as any).thinking || '');
@@ -834,6 +861,7 @@ async function sendGraphRequest(request: GraphRequest, rejectedPlan: boolean) {
       return streamHarnessChat(
         harnessRequest,
         async (response: GraphNodeResponse) => {
+          applySilenceFrame(sessionId, response);
           // BL-19：本轮产物登记事件 → 刷新文件面板（admin 运行页）
           if ((response as any).agentFiles) notifyFilesChanged();
           if ((response as any).text) {
@@ -1744,7 +1772,13 @@ document.addEventListener('visibilitychange', () => {
               </div>
               <div v-else :class="['message', message.role]">
                 <div class="message-avatar">
-                  <el-avatar :size="32" style="font-size:16px;font-weight:600;color:#fff;background:#2f6bff">
+                  <!-- BUG-110：助手消息应显示**智能体真实头像**（此前恒为首字圈）。
+                       el-avatar 的 src 加载失败时会自动回落到插槽内容（首字），故无需额外兜底逻辑。 -->
+                  <el-avatar
+                    :size="32"
+                    :src="message.role === 'user' ? undefined : (agent.avatar || undefined)"
+                    style="font-size:16px;font-weight:600;color:#fff;background:#2f6bff"
+                  >
                     {{ message.role === 'user' ? '我' : (agent.name?.charAt(0) || 'AI') }}
                   </el-avatar>
                 </div>
@@ -1828,7 +1862,9 @@ document.addEventListener('visibilitychange', () => {
                   <span class="streaming-dot"></span>
                   <span class="streaming-dot"></span>
                 </div>
-                <span v-if="streamElapsedText" class="streaming-elapsed">{{ streamElapsedText }}</span>
+                <span v-if="streamElapsedText" class="streaming-elapsed">
+                  {{ streamElapsedText }}<span v-if="currentSilenceText" class="streaming-silence"> · {{ currentSilenceText }}</span>
+                </span>
               </div>
             </div>
           </div>

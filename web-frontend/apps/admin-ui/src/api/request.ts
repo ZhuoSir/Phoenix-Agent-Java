@@ -19,7 +19,6 @@ import JSONBigInt from 'json-bigint';
 
 import { useAuthStore } from '#/store';
 
-import { refreshTokenApi } from './core';
 
 // BL-18（BUG-33 根治）：不再给 axios 拼 /api 前缀——api/ 下所有路径与 fetch 拼串
 // 一律写成后端真实路径（/api/xxx 或裸域 /platform|/auth/xxx），代理只按前缀透传、不剥层。
@@ -63,14 +62,12 @@ function createRequestClient(baseURL: string, options?: RequestClientOptions) {
   }
 
   /**
-   * 刷新token逻辑
+   * token 刷新：后端**未提供**刷新端点（/auth/refresh 不存在，BUG-98 实测 enableRefreshToken 默认 false
+   * 故从未被调用）。保留此实现仅为满足 request 客户端类型契约；一旦有人打开 enableRefreshToken，
+   * 这里会显式抛错而不是静默打一个 404 端点（R-09：前端只调用后端真实存在的端点）。
    */
-  async function doRefreshToken() {
-    const accessStore = useAccessStore();
-    const resp = await refreshTokenApi();
-    const newToken = resp.data;
-    accessStore.setAccessToken(newToken);
-    return newToken;
+  async function doRefreshToken(): Promise<string> {
+    throw new Error('后端未提供 token 刷新端点（/auth/refresh 不存在），请走重新登录');
   }
 
   function formatToken(token: null | string) {

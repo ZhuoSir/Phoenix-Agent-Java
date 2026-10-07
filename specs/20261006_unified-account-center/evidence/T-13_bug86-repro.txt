@@ -1,0 +1,51 @@
+=== T-13 BUG-86 复现定性（2026-10-06 14:28:06）===
+智能体33 绑定：knowledge_base_id=2（产品手册库）—— 无 KB1（制度汇编）绑定
+提问：请说明技师资格鉴定的申报条件和程序
+（该词仅存在于 KB1：KB1 切片含『技师资格鉴定程序』，KB2 命中 0）
+
+--- SSE 事件（工具调用/检索/回答，截取关键行）---
+"content":"
+"content":"
+"content":"
+"content":"我先
+"content":"查一下工作区知识库中是否有相关的规范文件，确保回答有�
+"content":"
+"content":"
+"content":"
+"content":"
+"content":"
+"content":"
+"content":"
+"content":"
+"content":"
+"content":"
+"content":"
+"content":"
+"content":"
+"content":"
+"content":"
+"content":"
+"content":"
+"content":"
+"content":"
+"content":"
+"content":"
+"content":"
+"content":"
+"content":"
+"content":"
+"content":"
+"content":"
+"content":"
+"content":"
+"content":"
+"content":"
+"content":"
+"content":"
+"content":"
+"content":"
+
+--- 关键判定 ---
+  SSE 中是否出现 KB1 独有词『技师资格鉴定』: 3 次
+  SSE 中是否出现检索工具调用: 0 次
+  SSE 总帧数:      268

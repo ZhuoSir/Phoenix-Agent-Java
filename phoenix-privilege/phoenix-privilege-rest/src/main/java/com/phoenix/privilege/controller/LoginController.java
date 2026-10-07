@@ -31,18 +31,6 @@ public class LoginController {
     private final IPrivilegeUserService privilegeUserService;
 
 
-    @RequestMapping("doLogin")
-    public Mono<String> doLogin(String username, String password) {
-        return SaReactorHolder.sync(() -> {
-            // 此处仅作模拟示例，真实项目需要从数据库中查询数据进行比对
-            if ("zhang".equals(username) && "123456".equals(password)) {
-                StpUtil.login(10001);
-                return "登录成功";
-            }
-            return "登录失败";
-        });
-    }
-
     /**
      * 获取登录验证码
      */

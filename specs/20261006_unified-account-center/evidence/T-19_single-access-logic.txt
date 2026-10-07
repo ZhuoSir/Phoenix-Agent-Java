@@ -1,0 +1,66 @@
+=== T-19 单套访问逻辑收敛（R-11 / v2.0.1）实施与验证（2026-10-06 15:05 前后）===
+目标：只保留一套登录逻辑 + 一套访问逻辑；前台独立入口下线（一期=重定向 + 保留页面文件，二期删代码）
+
+--- 1. 改动（admin-ui，5 文件）---
+① `src/api/core/auth.ts`      ：删 `userLoginApi`（前台端点 `/auth/login`）——只保留 `loginApi`（`/api/privilege/auth/login`）
+② `src/store/auth.ts`         ：删 `isUser` 分支；落地页 `hasAdminRole === false ? '/agent/chat' : '/agent/list'`
+③ `src/views/auth/components/LoginForm.vue`：删「普通用户登录 / 管理员登录」两个 tab、`roleType` 传参、
+                                `handleTabChange` 与 `.login-tabs` 死样式（-84 行）
+④ `src/router/guard.ts`       ：删 `userType === 1 → '/front/chat'` 旧分支（落地页只看 homePath）
+⑤ `src/router/routes/core.ts` ：`/front/chat → redirect /agent/chat`、`/front/agent → redirect /agent/list`
+                                （页面文件保留：chat.vue 仍被「智能体中心」菜单以 pageMap 动态路由复用）
+
+--- 2. 静态复核（无第二套鉴权残留）---
+$ grep -rn "userLoginApi|roleType|LoginTab" src   → 仅注释命中 0 处代码（SystemSettingsModal 的 activeTab 与本改动无关）
+$ grep -o 'post("/auth/login"' dist/js/*.js      → 0 命中（构建产物中已无前台登录调用）
+$ grep -rl "普通用户登录" / "管理员登录" dist/js/*.js → 0 命中（两个 tab 文案已消失）
+
+--- 3. 类型检查（基线对比）---
+$ pnpm -F @vben/web-ele typecheck   → exit=2（项目既有类型债）
+  错误行总数 = 212（基线 213 ⇒ **无新增、少 1**）
+  我改的 5 个文件命中错误 = 0（grep LoginForm.vue|store/auth.ts|api/core/auth.ts|router/guard.ts|router/routes/core.ts）
+  原始输出 /tmp/tsc_t19.txt
+
+--- 4. 构建 ---
+$ pnpm -F @vben/web-ele build   → ✓ built in 5.39s（dist.zip 3405240 bytes）
+  ⚠ 两个过程坑（当场处置）：
+    · 构建脚本内部调用 `pnpm`，本会话 PATH 无 pnpm ⇒ `sh: pnpm: command not found` / `spawn ENOENT`；
+      处置：建 shim `/tmp/pnpmbin/pnpm`（exec node + pnpm.mjs）并置于 PATH 前部。
+    · 首次构建命令用 `| tail` 管道 ⇒ **退出码被 tail 吞掉**（显示 exit=0 但实际失败）；
+      处置：后续命令一律 `set -o pipefail` + `PIPESTATUS[0]`，并核对输出正文。
+
+--- 5. 构建产物核对（改动确实进了包）---
+$ grep -o '.\{60\}/front/chat.\{60\}' dist/js/bootstrap-Dm5RWmXZ.js
+  …{name:`Chat`,path:`/front/chat`,redirect:`/agent/chat`,meta:{hideInTab:!0,hideInMenu:!0,ti…
+$ grep -o '.\{40\}/front/agent.\{60\}' dist/js/bootstrap-Dm5RWmXZ.js
+  …{name:`AgentList`,path:`/front/agent`,redirect:`/agent/list`,meta:{hideInTab:!0,hideInMenu:!0,ti…
+$ grep -o 'views/front/chat.vue' dist/js/bootstrap-Dm5RWmXZ.js
+  "../views/front/chat.vue":()=>V(()=>import(`./chat-Dr5drEFF.js`)…)   ⇒ 菜单路由仍可解析（T-18 不受影响）
+
+--- 6. 部署（只重建 nginx；**不重启后端**）---
+$ rm -rf docker/.stage/dist && cp -R apps/admin-ui/dist docker/.stage/dist
+$ docker compose -f docker/docker-compose.yaml build nginx → up -d nginx
+  nginx 容器：Image=phoenix-frontend:v1.6.0-dev，StartedAt=2026-10-06T07:06:25Z（已重建），health=healthy
+  内容一致性：现网 `GET /index.html` md5 = 1b411f3515abc96b7168deacd40d2e82 = 本地 dist/index.html md5
+  后端：StartedAt=2026-10-06T06:40:03Z（**未重启**）⇒ 会话仍在内存、无用户被踢下线
+
+--- 7. 路由可达性（SPA 兜底）---
+$ for p in /agent/chat /front/chat /front/agent /auth/login; do curl …; done
+  /agent/chat    HTTP=200 HTML=1
+  /front/chat    HTTP=200 HTML=1
+  /front/agent   HTTP=200 HTML=1
+  /auth/login    HTTP=200 HTML=1
+（客户端重定向发生在浏览器内，curl 只能证明路由可达；落点行为见第 9 节）
+
+--- 8. 交付验收脚本 ---
+$ sh docker/scripts/verify.sh   → 13 项全 PASS
+  [1]种子无真实密钥 [2]追踪树无长密钥指纹 [3]仅 nginx 对外 [4]compose 全绿+/echo/ok
+  [5]登录(单前缀 /api/*) [6]迁移台账齐 [7]harness status [8]负断言双前缀 410
+  [9]platform 裸域直连 [10]会话文件面板 [12]知识库模块 [13]/auth/login 双面共存(GET=SPA/POST=后端信封)
+  [14]断线续传轮次端点
+  ★[13] 通过 = 后端 `/auth/login` 端点按 plan **一期保留**（pc-ui/mobile-ui 仍调用），未误删
+
+--- 9. 待用户实测（浏览器内行为，归入 T-20 身份矩阵）---
+  · 硬刷后访问 `/front/chat` / `/front/agent` → 是否落到 `/agent/chat` / `/agent/list`
+  · 未登录访问 `/agent/chat` → 是否跳**同一个** /auth/login 登录页（单套登录）
+  · 登录表单已无 tab：admin 与 chenzhuo 各登录一次，落地页符合 hasAdminRole 判定

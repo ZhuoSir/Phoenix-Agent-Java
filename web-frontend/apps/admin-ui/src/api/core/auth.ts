@@ -16,6 +16,8 @@ export namespace AuthApi {
     email?: string;
     phone?: string;
     userType?: number;
+    /** T-05（统一账号中心）：是否持有后台角色——落地页判定依据 */
+    hasAdminRole?: boolean;
   }
 
   export interface RefreshTokenResult {
@@ -25,7 +27,10 @@ export namespace AuthApi {
 }
 
 /**
- * 管理员登录
+ * 登录（统一账号端点）
+ * R-11 / T-19（v2.0.1）：**只保留一套登录逻辑** —— 原 `userLoginApi`（前台端点 `/auth/login`）已删除；
+ * 前台/后台账号一律走本端点，落地页由返回的 `hasAdminRole` 决定。
+ * 注：后端 `/auth/login` 端点因 pc-ui / mobile-ui 仍在调用而**保留**（一期不删，二期评估下线）。
  */
 export async function loginApi(data: AuthApi.LoginParams) {
   return requestClient.post<AuthApi.LoginResult>(
@@ -35,31 +40,9 @@ export async function loginApi(data: AuthApi.LoginParams) {
 }
 
 /**
- * 普通用户登录
- */
-export async function userLoginApi(data: AuthApi.LoginParams) {
-  return requestClient.post<AuthApi.LoginResult>('/auth/login', data);
-}
-
-/**
- * 刷新accessToken
- */
-export async function refreshTokenApi() {
-  return baseRequestClient.post<AuthApi.RefreshTokenResult>('/auth/refresh', {
-    withCredentials: true,
-  });
-}
-
-/**
  * 退出登录
  */
 export async function logoutApi() {
   return baseRequestClient.post('/api/privilege/auth/logout');
 }
 
-/**
- * 获取用户权限码
- */
-export async function getAccessCodesApi() {
-  return requestClient.get<string[]>('/auth/codes');
-}

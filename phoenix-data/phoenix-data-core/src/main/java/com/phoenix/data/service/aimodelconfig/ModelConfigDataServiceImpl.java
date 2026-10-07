@@ -55,6 +55,10 @@ public class ModelConfigDataServiceImpl extends ServiceImpl<ModelConfigMapper, M
 
 	@Override
 	public void addConfig(ModelConfigDTO dto) {
+		// BUG-106（2026-10-06）：新增必须由服务端生成主键——客户端可能带上旧主键（前端表单残留 id），
+		// 而实体是 @Id(keyType = KeyType.Auto)，id 非空时 MyBatis-Flex 会**显式插入 id** ⇒ 主键冲突、
+		// 新增静默失败。此处强制清空，任何调用方都不会再踩到。
+		dto.setId(null);
 		clean(dto);
 		save(toEntity(dto));
 	}

@@ -50,6 +50,8 @@ public class HarnessChatServiceImpl implements HarnessChatService {
     private final com.phoenix.agent.service.FrontMcpAccessService frontMcpAccessService;
     private final WorkspaceArtifactScanner workspaceArtifactScanner;
     private final com.phoenix.agent.service.AgentRuntimeConfigService agentRuntimeConfigService;
+    /** T-07（v1.7.0 R-01）：轮次阶段回灌（静默心跳/首帧超时的判定输入） */
+    private final com.phoenix.agent.harness.turn.HarnessTurnManager harnessTurnManager;
 
     @Override
     public Mono<Msg> call(String sn, HarnessRequest request) {
@@ -340,6 +342,38 @@ public class HarnessChatServiceImpl implements HarnessChatService {
         String simple = event.getClass().getSimpleName();
         if (simple.startsWith("ModelCall")) {
             log.info("[model-call] {} sessionId={} @{}", simple, sessionId, System.currentTimeMillis());
+            // T-07：模型调用在飞/结束 → 阶段标记（MODEL 阶段才受"首帧超时"约束）
+            if (simple.startsWith("ModelCallStart")) {
+                harnessTurnManager.onPhase(sessionId,
+                        com.phoenix.agent.harness.turn.HarnessTurnManager.PHASE_MODEL, null);
+            }
+            else {
+                // T-07 实测修正：ToolCallEnd 只是"工具调用块"结束，**真正的工具执行在其后**——
+                // 故 ModelCallEnd 若正处于 TOOL 阶段则**保持 TOOL**（长工具期间心跳才显示"工具执行中"），
+                // 否则回 IDLE。TOOL 阶段的结束由下一次 ModelCallStart 自然接管。
+                harnessTurnManager.onPhaseIfNot(sessionId,
+                        com.phoenix.agent.harness.turn.HarnessTurnManager.PHASE_IDLE, null,
+                        com.phoenix.agent.harness.turn.HarnessTurnManager.PHASE_TOOL);
+            }
+        }
+        else if (event instanceof io.agentscope.core.event.ToolCallStartEvent toolStart) {
+            // T-07：工具执行期 → TOOL 阶段（只发心跳，不受首帧超时约束）
+            harnessTurnManager.onPhase(sessionId, com.phoenix.agent.harness.turn.HarnessTurnManager.PHASE_TOOL,
+                    toolStart.getToolCallName());
+        }
+        else if (event instanceof io.agentscope.core.event.ToolCallEndEvent) {
+            // 工具调用块结束 → **保持 TOOL**（执行即将开始；由 ToolResult 或下一次 ModelCallStart 收尾）
+            harnessTurnManager.onPhaseIfNot(sessionId,
+                    com.phoenix.agent.harness.turn.HarnessTurnManager.PHASE_TOOL, null, null);
+        }
+        else if (event instanceof io.agentscope.core.event.ToolResultStartEvent) {
+            // T-07 实测二次修正：`ToolResultStartEvent` 在**工具执行开始**时发出（实测 12s sleep 期间
+            // 该事件已在 :51 到达）→ 这才是"工具执行中"的起点；`ToolResultEndEvent` 才是终点。
+            harnessTurnManager.onPhase(sessionId, com.phoenix.agent.harness.turn.HarnessTurnManager.PHASE_TOOL,
+                    "工具执行中");
+        }
+        else if (event instanceof io.agentscope.core.event.ToolResultEndEvent) {
+            harnessTurnManager.onPhase(sessionId, com.phoenix.agent.harness.turn.HarnessTurnManager.PHASE_IDLE, null);
         }
         if (simple.startsWith("ToolResult") || simple.startsWith("ToolCall") || simple.startsWith("ModelCall")) {
             return NodeOutput.of("harness_agent", "harness", new OverAllState(new HashMap<>()), null);

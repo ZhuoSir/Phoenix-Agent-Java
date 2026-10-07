@@ -207,9 +207,27 @@ async function loadConfigs() {
   }
 }
 
+/**
+ * BUG-106（2026-10-06）：本项目接口信封是 `{success, message, data}`，而请求层用 `responseReturn:'body'`
+ * 拿到的就是**整个信封对象** ⇒ 业务失败时它依然是真值，原先的 `if (result)` 会把失败当成功提示
+ * （用户只看到"添加成功"、列表却没变，无任何报错）。统一在此判定 success，失败即抛出以便上层提示。
+ */
+function assertApiOk(result: unknown, fallbackMsg: string) {
+  if (result && typeof result === 'object' && 'success' in result) {
+    const envelope = result as { message?: string; success?: boolean };
+    if (envelope.success === false) {
+      throw new Error(envelope.message || fallbackMsg);
+    }
+  }
+}
+
 function showAddDialog() {
   isEditMode.value = false;
   Object.assign(formData, defaultFormData);
+  // BUG-106（2026-10-06）：`defaultFormData` **没有 id 字段** ⇒ Object.assign 清不掉上一次「编辑」写入的 id，
+  // 新增时会带着旧主键去 INSERT（id 非空时 MyBatis-Flex 显式插入）⇒ duplicate key、静默失败、列表不刷新。
+  // 与「菜单管理」页 handleAddChild 的既有写法保持一致：
+  delete formData.id;
   dialogVisible.value = true;
 }
 
@@ -228,18 +246,19 @@ async function handleSubmit() {
 
     if (isEditMode.value) {
       const result = await updateModelConfigApi({ ...formData });
-      if (result) {
-        ElMessage.success('配置更新成功');
-        dialogVisible.value = false;
-        await loadConfigs();
-      }
+      assertApiOk(result, '配置更新失败');
+      ElMessage.success('配置更新成功');
+      dialogVisible.value = false;
+      await loadConfigs();
     } else {
-      const result = await addModelConfigApi({ ...formData });
-      if (result) {
-        ElMessage.success('配置添加成功');
-        dialogVisible.value = false;
-        await loadConfigs();
-      }
+      // BUG-106 双保险：新增请求绝不携带主键（主键由服务端生成）
+      const payload = { ...formData };
+      delete (payload as { id?: number }).id;
+      const result = await addModelConfigApi(payload);
+      assertApiOk(result, '配置添加失败');
+      ElMessage.success('配置添加成功');
+      dialogVisible.value = false;
+      await loadConfigs();
     }
   } catch (error: any) {
     if (error?.message) {

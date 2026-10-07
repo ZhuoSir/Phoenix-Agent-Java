@@ -124,16 +124,12 @@ function setupAccessGuard(router: Router) {
     accessStore.setAccessRoutes(accessibleRoutes);
     accessStore.setIsAccessChecked(true);
 
-    // userType === 1 的用户跳转到 chat 页面
-    let redirectPath: string;
-    if (userInfo.userType === 1) {
-      redirectPath = '/front/chat';
-    } else {
-      redirectPath = (from.query.redirect ??
-        (to.path === '/agent/list'
-          ? userInfo.homePath || '/agent/list'
-          : to.fullPath)) as string;
-    }
+    // R-11 / T-19（v2.0.1）：删除 `userType === 1 → /front/chat` 旧分支 ——
+    // 单套访问逻辑：落地页只认 store 算好的 homePath（按 hasAdminRole 判定），userType 不再参与路由决策。
+    const redirectPath = (from.query.redirect ??
+      (to.path === '/agent/list'
+        ? userInfo.homePath || '/agent/list'
+        : to.fullPath)) as string;
 
     return {
       ...router.resolve(decodeURIComponent(redirectPath)),

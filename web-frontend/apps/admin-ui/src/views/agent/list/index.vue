@@ -414,7 +414,6 @@ onMounted(loadAgents);
 
     <FormDrawer @success="loadAgents" />
 
-  </Page>
     <!-- 发布弹窗（发布+组授权一步；空选=全公开警示） -->
     <ElDialog v-model="publishVisible" title="发布智能体" width="480px">
       <p class="mb-2 text-sm">
@@ -451,6 +450,7 @@ onMounted(loadAgents);
         </ElButton>
       </template>
     </ElDialog>
+  </Page>
   </template>
 
 <style scoped>

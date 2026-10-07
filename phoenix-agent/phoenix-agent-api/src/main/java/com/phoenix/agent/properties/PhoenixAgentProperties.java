@@ -9,7 +9,7 @@ import org.springframework.stereotype.Component;
 @ConfigurationProperties("spring.ai.phoenix")
 public class PhoenixAgentProperties {
     private String modelPath;
-    private String skillPath;
+    // v1.7.0 T-02：删死配置 skillPath（全仓零引用，BL-11）
     private Embedding embedding;
     private Skill skill = new Skill();
 
