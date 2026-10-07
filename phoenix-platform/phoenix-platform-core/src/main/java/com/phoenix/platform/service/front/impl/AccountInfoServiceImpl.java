@@ -11,14 +11,11 @@ import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.core.row.Db;
 
 import com.mybatisflex.spring.service.impl.ServiceImpl;
-import com.phoenix.common.model.platform.PlatformInfo;
-import com.phoenix.common.service.platform.PlatformInfoService;
 import com.phoenix.data.entity.Agent;
 import com.phoenix.data.enums.AgentStatusEnm;
 import com.phoenix.data.service.agent.AgentService;
 import com.phoenix.platform.constant.PlatformConstant;
 import com.phoenix.platform.dto.front.AccountLoginDTO;
-import com.phoenix.platform.dto.front.ThirdPartyLoginDTO;
 import com.phoenix.platform.dto.front.UpdatePwdDTO;
 import com.phoenix.platform.mapper.front.AccountInfoMapper;
 import com.phoenix.platform.model.front.AccountGroupInfo;
@@ -30,8 +27,6 @@ import com.phoenix.platform.service.front.AccountGroupInfoService;
 import com.phoenix.platform.service.front.AccountInfoService;
 import com.phoenix.platform.service.front.GroupAgentInfoService;
 import com.phoenix.platform.service.front.GroupInfoService;
-import com.phoenix.platform.service.thirdparty.ThirdPartyLoginFactory;
-import com.phoenix.platform.service.thirdparty.ThirdPartyLoginStrategy;
 import com.phoenix.common.vo.front.LoginVO;
 import com.phoenix.privilege.constant.LoginConstant;
 import com.phoenix.privilege.entity.PrivilegeUser;
@@ -61,8 +56,6 @@ public class AccountInfoServiceImpl extends ServiceImpl<AccountInfoMapper, Accou
     private final GroupInfoService groupInfoService;
     private final GroupAgentInfoService groupAgentInfoService;
     private final AgentService agentService;
-    private final PlatformInfoService platformInfoService;
-    private final ThirdPartyLoginFactory thirdPartyLoginFactory;
     /** T-03（统一账号中心）：统一账号源 tbl_privilege_user —— 前台入口与后台共用同一校验实现与口令盐 */
     private final IPrivilegeUserService privilegeUserService;
 
@@ -176,11 +169,6 @@ public class AccountInfoServiceImpl extends ServiceImpl<AccountInfoMapper, Accou
     @Override
     public AccountInfo getByCode(String code) {
         return QueryChain.of(this.getMapper()).eq(AccountInfo::getCode, code).one();
-    }
-
-    @Override
-    public AccountInfo getByThirdPartyId(String thirdPartyId) {
-        return QueryChain.of(this.getMapper()).eq(AccountInfo::getThirdPartyId, thirdPartyId).one();
     }
 
     @Override
@@ -338,41 +326,6 @@ public class AccountInfoServiceImpl extends ServiceImpl<AccountInfoMapper, Accou
         Object count = Db.selectObject(
                 "select count(*) from tbl_unified_account_map where old_account_id = ?", legacyAccountId);
         return count != null && Long.parseLong(String.valueOf(count)) > 0;
-    }
-
-    @Override
-    public ReturnVo<LoginVO> thirdPartyLogin(ThirdPartyLoginDTO loginDTO) {
-        if (loginDTO == null || StrUtil.isBlank(loginDTO.getPlatform()) || StrUtil.isBlank(loginDTO.getCode())) {
-            return ReturnVo.fail("参数不完整");
-        }
-
-        PlatformInfo platform = platformInfoService.getEnabledByType(loginDTO.getPlatform());
-        if (platform == null) {
-            return ReturnVo.fail("未找到启用的平台配置");
-        }
-
-        ThirdPartyLoginStrategy strategy = thirdPartyLoginFactory.getStrategy(loginDTO.getPlatform());
-        String thirdPartyId;
-        try {
-            thirdPartyId = strategy.resolveUserId(loginDTO.getCode(), platform);
-        } catch (Exception e) {
-            log.error("解析三方用户ID失败, platform: {}, error: ", loginDTO.getPlatform(), e);
-            return ReturnVo.fail("授权验证失败");
-        }
-        if (StrUtil.isBlank(thirdPartyId)) {
-            return ReturnVo.fail("授权验证失败");
-        }
-
-        AccountInfo account = getByThirdPartyId(thirdPartyId);
-        if (account == null) {
-            return ReturnVo.fail("未绑定平台账号，请联系管理员");
-        }
-        if ("0".equals(account.getStatus())) {
-            return ReturnVo.fail("账户已被禁用");
-        }
-
-        StpUtil.login(account.getId());
-        return buildLoginResult(account);
     }
 
     private ReturnVo<LoginVO> buildLoginResult(AccountInfo account) {

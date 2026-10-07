@@ -66,11 +66,6 @@ public class AccountInfoController {
         return ReturnVo.ok(accountInfoService.getByCode(code));
     }
 
-    @GetMapping("/third-party/{thirdPartyId}")
-    public ReturnVo<AccountInfo> getByThirdPartyId(@PathVariable String thirdPartyId) {
-        return ReturnVo.ok(accountInfoService.getByThirdPartyId(thirdPartyId));
-    }
-
     @GetMapping("/status/{status}")
     public ReturnVo<List<AccountInfo>> getByStatus(@PathVariable String status) {
         return ReturnVo.ok(accountInfoService.getByStatus(status));

@@ -50,8 +50,6 @@ public class AccountInfo extends BaseModel {
     private String gender;
     /** 状态 0-禁用 1-启用 */
     private String status;
-    /** 第三方平台ID */
-    private String thirdPartyId;
     /** 关联员工ID */
     private String employeeId;
     /** 部门ID */
