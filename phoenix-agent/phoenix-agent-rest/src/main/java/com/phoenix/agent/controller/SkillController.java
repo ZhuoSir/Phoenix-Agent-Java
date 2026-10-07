@@ -96,13 +96,17 @@ public class SkillController {
         String filename = filePart.filename();
         String contentType = filePart.headers().getContentType() != null
             ? filePart.headers().getContentType().toString() : MediaType.APPLICATION_OCTET_STREAM_VALUE;
+        // BUG-140：Sa-Token 登录上下文只在**请求线程（handler 同步段）**有效；
+        // 若在 Mono.fromCallable(...).subscribeOn(boundedElastic) 内调 me() 会抛 NotLoginException。
+        // 故在此同步取 operator，再传入弹性线程。
+        String operator = me();
         return DataBufferUtils.join(filePart.content()).flatMap(dataBuffer -> {
             byte[] bytes = new byte[dataBuffer.readableByteCount()];
             dataBuffer.read(bytes);
             DataBufferUtils.release(dataBuffer);
             // 阻塞式解析+落库放弹性线程池，避免占用事件循环
             return Mono.fromCallable(() -> skillAdminService
-                .upload(new ByteArrayMultipartFile(bytes, filename, contentType), overwriteFlag, me()))
+                .upload(new ByteArrayMultipartFile(bytes, filename, contentType), overwriteFlag, operator))
                 .subscribeOn(Schedulers.boundedElastic());
         });
     }

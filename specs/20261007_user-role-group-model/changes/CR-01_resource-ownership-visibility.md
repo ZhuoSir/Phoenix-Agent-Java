@@ -173,3 +173,8 @@
 - [x] ⑥ MILESTONE 计数同步（T-01~T-26）+ artifacts 重跑（涉 SQL → 13/13，补第 13 件）
 - [x] ⑦ 关联账联动：BUG-139 登记；教训 L-64
 - [x] ⑧ 合入登记独立 commit `docs(spec): CR-01 合入 …`
+
+## 合入后追加（2026-10-07）
+
+- **BUG-140（CR-01 回归）**：upload 的 `me()` 误入 reactive 异步段 ⇒ NotLoginException。已修（operator 同步段取值），
+  端到端验证通过；教训 L-65。该修复为 CR-01 收口后的**修正 commit**，不改变 R-18 语义。

@@ -412,6 +412,15 @@
   ③ 部署后要专门验一次"**旧会话 + 新代码**"路径（拿改造前就登录的 token 打一次相关接口），
   不能只验"重新登录后是否正常"。
 
+## L-65 WebFlux 下 Sa-Token 登录态只能在**请求线程同步段**取，进 fromCallable/弹性线程即 NotLoginException
+- **现象**：CR-01 给 `SkillController.upload`（reactive）加 creator 时，把 `me()` 写进
+  `Mono.fromCallable(...).subscribeOn(Schedulers.boundedElastic())` 的 lambda 内 ⇒ 弹性线程无 Sa-Token 上下文
+  ⇒ `NotLoginException: 未能读取到有效 token` ⇒ 上传全失败（用户报障才发现；我的 CR-01 验证只测了列表/403/options，**漏测上传**）。
+- **防再犯规则**：① reactive 端点里凡需登录态/请求头，一律在 **handler 同步段**先取值存局部变量，再传进 Mono/fromCallable
+  （同仓 `AgentFileController`/`AgentKnowledgeController` 已是该范式，照抄不要创新）；
+  ② 改了哪个端点的签名/调用链，**验证清单必须覆盖该端点的 happy path**（本次漏了 upload）；
+  ③ 报「未能读取到有效 token」先查调用点线程（是否 in fromCallable/subscribeOn/parallel），别先怀疑 token 过期。
+
 ## L-64 MyBatis-Flex `QueryChain.and(String, Object...)` 只认 `?`，`{0}` 原样进 SQL 且错误被吞
 - **现象**：`KnowledgeBaseServiceImpl` 用 `chain.and("creator = {0}", id)`，生成 SQL 为字面 `creator = {0}`
   ⇒ PostgreSQL 语法错 ⇒ 被 controller 宽 catch 转成**空列表**（接口 200 但数据空，静默失败）；

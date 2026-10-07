@@ -1,5 +1,11 @@
 # Changelog: user-role-group-model
 
+## BUG-140 修复（2026-10-07，CR-01 回归）
+
+- `SkillController.upload` 的 `me()` 误置于 `Mono.fromCallable(boundedElastic)` 内 ⇒ NotLoginException、上传必失败
+- 修复：operator 改在请求线程同步段取值再传入；端到端验证上传成功+creator 落库+本人/admin 可见+本人可删+清理
+- 登记 BUG-140、教训 L-65
+
 ## v2.7.0 = CR-01 合入（2026-10-07，R-18 / T-24~T-26；代码收口 9324bf8）
 
 - CR-01（major）三确认：§S（档位+Q-C1~C3）→ §P（+Q-P1）→ §T；新增 R-18；tasks +T-24/T-25/T-26
