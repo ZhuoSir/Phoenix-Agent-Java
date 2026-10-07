@@ -1,0 +1,51 @@
+########## T-14 DDL 演练（drill=phoenix_drill）##########
+=== ① 正向第 1 次 ===
+  OK
+=== ② 正向第 2 次（幂等）===
+psql:<stdin>:36: NOTICE:  column "company_id" of relation "tbl_privilege_user" does not exist, skipping
+psql:<stdin>:37: NOTICE:  column "dept_id" of relation "tbl_privilege_user" does not exist, skipping
+psql:<stdin>:38: NOTICE:  column "employee_id" of relation "tbl_privilege_user" does not exist, skipping
+psql:<stdin>:41: NOTICE:  column "company_id" of relation "tbl_privilege_role" does not exist, skipping
+psql:<stdin>:44: NOTICE:  column "dept_id" of relation "tbl_platform_account_info" does not exist, skipping
+psql:<stdin>:45: NOTICE:  column "dept_name" of relation "tbl_platform_account_info" does not exist, skipping
+psql:<stdin>:46: NOTICE:  column "employee_id" of relation "tbl_platform_account_info" does not exist, skipping
+psql:<stdin>:47: NOTICE:  column "third_party_id" of relation "tbl_platform_account_info" does not exist, skipping
+psql:<stdin>:50: NOTICE:  column "employee_id" of relation "tbl_unified_account_map" does not exist, skipping
+psql:<stdin>:53: NOTICE:  table "tbl_privilege_employee" does not exist, skipping
+psql:<stdin>:54: NOTICE:  table "tbl_privilege_department" does not exist, skipping
+psql:<stdin>:55: NOTICE:  table "tbl_privilege_company" does not exist, skipping
+psql:<stdin>:58: NOTICE:  table "tbl_platform_platform_info" does not exist, skipping
+  OK
+=== ③ 正向结果：表 0 / 组织列 0 ===
+0
+0
+=== ④ 反向第 1 次 ===
+  OK
+=== ⑤ 反向第 2 次（幂等，应无错）===
+  OK
+=== ⑥ 反向核对：表 4 / 组织列 9 / NOT NULL 2 ===
+表=4
+组织列=9
+ column_name | is_nullable 
+-------------+-------------
+ company_id  | NO
+ dept_id     | NO
+(2 rows)
+
+=== ⑦ 行数一致性（与基线比对）===
+             t              | rows | 基线 
+----------------------------+------+------
+ tbl_privilege_company      |    4 |    4
+ tbl_privilege_department   |   17 |   17
+ tbl_privilege_employee     |   14 |   14
+ tbl_platform_platform_info |    0 |    0
+(4 rows)
+
+=== ⑧ 列值保真（3 类各抽 1 行）===
+    k    |         id         |     company_id     |      dept_id       |    employee_id     
+---------+--------------------+--------------------+--------------------+--------------------
+ user    | 461681072489615360 | 428001009954172928 | 431990993023381504 | 461670914812276736
+ role    | 428007432736870400 | 428001009954172928 |                    | 
+ account | 461671714812850176 | 431990993023381504 | 党委办公室         | 461670914812276736
+(3 rows)
+

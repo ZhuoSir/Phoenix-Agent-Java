@@ -38,12 +38,6 @@ public class PrivilegeRoleVO {
 
 	private Integer delFlag;
 
-	private Long companyId;
-
-	private String companyName;
-
-	private String deptName;
-
 	private String systemId;
 
 }

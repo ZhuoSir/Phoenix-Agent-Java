@@ -9,10 +9,6 @@ export interface PrivilegeUser {
   realName?: string;
   mobile?: string;
   code?: string;
-  companyId?: string;
-  companyName?: string;
-  deptId?: string;
-  deptName?: string;
   userType?: number;
   status?: number;
   secret?: string;

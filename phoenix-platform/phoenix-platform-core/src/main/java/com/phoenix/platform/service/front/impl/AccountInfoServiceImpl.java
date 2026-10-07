@@ -114,8 +114,8 @@ public class AccountInfoServiceImpl extends ServiceImpl<AccountInfoMapper, Accou
 	@Override
 	public Page<AccountInfo> page(Page<AccountInfo> page, AccountInfo query) {
         String keyword = query.getKeyword();
+		// 组织维度已下线（v2.0.0，T-14）：不再按 deptId 过滤
 		QueryWrapper qw = QueryWrapper.create()
-			.eq(AccountInfo::getDeptId, query.getDeptId(), StrUtil.isNotBlank(query.getDeptId()))
 			.eq(AccountInfo::getStatus, query.getStatus(), StrUtil.isNotBlank(query.getStatus()))
 			.orderBy(AccountInfo::getCreateTime, false);
         if (StrUtil.isNotBlank(keyword)) {
@@ -300,7 +300,7 @@ public class AccountInfoServiceImpl extends ServiceImpl<AccountInfoMapper, Accou
         carrier.setUsername(unified.getUsername());
         carrier.setCode(unified.getCode());
         carrier.setRealName(unified.getRealName());
-        carrier.setDeptId(unified.getDeptId());
+        // 组织维度已下线（v2.0.0，T-14）：登录载体不再带 deptId
         return buildLoginResult(carrier);
     }
 

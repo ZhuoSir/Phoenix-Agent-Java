@@ -11,8 +11,6 @@ import java.util.List;
 
 public interface IPrivilegeRoleService extends IService<PrivilegeRole> {
 
-	List<PrivilegeRole> getByCompanyId(Long companyId);
-
 	List<RoleAclVO> getRoleAcls(String roleId);
 
 	Page<PrivilegeRoleVO> pageByQuery(PrivilegeRoleQuery query);

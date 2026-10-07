@@ -45,14 +45,6 @@ public class PrivilegeRoleServiceImpl extends ServiceImpl<PrivilegeRoleMapper, P
 	}
 
 	@Override
-	public List<PrivilegeRole> getByCompanyId(Long companyId) {
-		return QueryChain.of(getMapper())
-			.eq(PrivilegeRole::getCompanyId, companyId)
-			.orderBy(PrivilegeRole::getCreateTime, false)
-			.list();
-	}
-
-	@Override
 	public List<RoleAclVO> getRoleAcls(String roleId) {
 		List<PrivilegeAcl> acls = privilegeAclService.queryChain()
 			.eq(PrivilegeAcl::getReleaseId, roleId)
@@ -109,8 +101,8 @@ public class PrivilegeRoleServiceImpl extends ServiceImpl<PrivilegeRoleMapper, P
 		QueryWrapper qw = QueryWrapper.create()
 			.select("tbl_privilege_role.*")
 			.like(PrivilegeRole::getName, query.getName(), StrUtil.isNotBlank(query.getName()))
-			.eq(PrivilegeRole::getSn, query.getSn(), StrUtil.isNotBlank(query.getSn()))
-			.eq(PrivilegeRole::getCompanyId, query.getCompanyId(), query.getCompanyId() != null);
+			.eq(PrivilegeRole::getSn, query.getSn(), StrUtil.isNotBlank(query.getSn()));
+			// 组织维度已下线（v2.0.0，T-14）：不再按 companyId 过滤
 		qw.orderBy(PrivilegeRole::getCreateTime, false);
 		Page<PrivilegeRole> entityPage = getMapper().paginate(query.getPage(), query.getSize(), qw);
 		Page<PrivilegeRoleVO> voPage = new Page<>(entityPage.getPageNumber(), entityPage.getPageSize(),

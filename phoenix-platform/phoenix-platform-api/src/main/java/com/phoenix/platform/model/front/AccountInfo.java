@@ -50,13 +50,6 @@ public class AccountInfo extends BaseModel {
     private String gender;
     /** 状态 0-禁用 1-启用 */
     private String status;
-    /** 关联员工ID */
-    private String employeeId;
-    /** 部门ID */
-    private String deptId;
-    /** 部门名称 */
-    private String deptName;
-
     /** 关联的用户组列表 */
     @Column(ignore = true)
     private List<UserGroupVO> groups;

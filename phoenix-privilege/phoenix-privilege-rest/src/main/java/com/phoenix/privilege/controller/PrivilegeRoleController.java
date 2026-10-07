@@ -31,15 +31,6 @@ public class PrivilegeRoleController {
 		return ReturnVo.ok(BeanUtil.copyProperties(privilegeRoleService.getById(id), PrivilegeRoleVO.class));
 	}
 
-	@GetMapping("/company/{companyId}")
-	public ReturnVo<List<PrivilegeRoleVO>> getByCompanyId(@PathVariable Long companyId) {
-		List<PrivilegeRoleVO> list = privilegeRoleService.getByCompanyId(companyId)
-			.stream()
-			.map(e -> BeanUtil.copyProperties(e, PrivilegeRoleVO.class))
-			.toList();
-		return ReturnVo.ok(list);
-	}
-
 	@PostMapping
 	public ReturnVo<Boolean> save(@RequestBody PrivilegeRoleDTO dto) {
 		dto.setCreateBy((String) StpUtil.getLoginId());

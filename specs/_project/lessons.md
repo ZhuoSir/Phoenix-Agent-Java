@@ -392,6 +392,16 @@
   `JAVA_HOME=<项目 JDK> <mvn 全路径> … -Dmaven.repo.local="$PWD/.mvn-home"`；③ 证据文件命名带**工具链指纹**
   （JDK 版本 + 仓库路径），配置变更时旧证据改名保留而非删除（本次 `*_WRONGCFG_jdk25_m2repo.raw.txt`）。
 
+## L-49 `DROP COLUMN IF EXISTS` 不保护"表不存在"；跨基线迁移件一律写 `ALTER TABLE IF EXISTS`
+- **现象**：T-14 的 `V2.0.0_01` 在演练库跑得干干净净（两轮幂等全绿），一放到**全新库重放**就
+  `exit=3` 整体中断：`ERROR: relation "tbl_unified_account_map" does not exist`。
+  原因：`ALTER TABLE tbl_unified_account_map DROP COLUMN IF EXISTS employee_id;` 里的 `IF EXISTS`
+  只作用于**列**，表本身不存在时仍报错。该表由另一处迁移创建、**不在基线 `sql/all_schema.sql` 里**
+  ⇒ 演练库（从生产拷贝）有它、全新库没有它，两边结论相反。
+- **防再犯规则**：① 迁移件中所有 `ALTER TABLE` 一律写 `ALTER TABLE IF EXISTS`（正向与 rollback 对称）；
+  ② **演练库通过 ≠ 全新库通过**：升级件必须两类环境都跑（本项目已定为 T-14 验收双条件）；
+  ③ 报错"哪张表不在基线里"要用 `to_regclass()` 逐表探测，而不是假设基线覆盖了全部表。
+
 ## L-48 复刻既有代码行为做验证时，表达式必须与源码**同构**（"意思差不多"会得出反向结论）
 - **现象**：T-13 验证 BUG-123（默认角色大小写）时，我在探针 SQL 里写了一列 `('common' = lower(sn)) AS old_lowercase_match`
   来"代表旧 Java 行为"。但旧 Java 生成的是 `sn = 'common'`（**大小写敏感等值**），而我写的 `lower(sn)` 本身

@@ -19,9 +19,6 @@ import java.util.Date;
 @Table("tbl_privilege_user")
 public class PrivilegeUser extends BaseEntity {
 
-	/** 人员ID */
-	private String employeeId;
-
 	/** 工号 */
 	private String code;
 
@@ -48,19 +45,6 @@ public class PrivilegeUser extends BaseEntity {
 
 	/** 头像 */
 	private byte[] image;
-
-	/** 公司ID */
-	private String companyId;
-
-	/** 部门ID */
-	private String deptId;
-
-	@Column(ignore = true)
-	private String companyName;
-
-	/** 部门名称 */
-	@Column(ignore = true)
-	private String deptName;
 
 	/** it用户ID */
 	private String itUserId;
