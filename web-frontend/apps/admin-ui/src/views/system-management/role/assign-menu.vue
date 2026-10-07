@@ -20,8 +20,12 @@ const getTitle = computed(() => {
 });
 
 const [Modal, modalApi] = useVbenModal({
+  // BUG-136：本弹窗的授权是**勾选即时保存**（handlePvalueChange / 行内全选 / 表头全选
+  // 各自调 saveModuleAclApi / saveAllAclApi），「确定」按钮的职责是**关闭弹窗并刷新父列表**。
+  // 此前 onConfirm 为空实现 ⇒ 点确定毫无反应（弹窗不关、无提示），用户误以为修改未生效。
   async onConfirm() {
-
+    modalApi.close();
+    emit('success');
   },
   async onOpenChange(isOpen) {
     if (isOpen) {

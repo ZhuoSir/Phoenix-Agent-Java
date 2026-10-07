@@ -1,5 +1,10 @@
 # Changelog: user-role-group-model
 
+## BUG-136 修复（2026-10-07）
+
+- 角色列表→「分配权限」弹窗 `onConfirm` 空实现 ⇒ 点确定无反应；补 `modalApi.close(); emit('success')`
+- 登记 BUG-136、教训 L-61（onConfirm 覆盖即替换，空函数=按钮静默失效）
+
 ## BUG-135 收尾（2026-10-07，T-25）
 
 - 升级件 `V2.0.0_11`（+rollback，配对 11/11）：补齐 5 个空 system_id/category_id 菜单为 110/111
