@@ -48,25 +48,25 @@
   验证方式: 编写 `V2.0.0_0x__acl_baseline_rebuild_dml.sql`：超管 `428007432736870400` 授予全部存活菜单；普通角色 `431285032083144704` 授予非管理类基线集合；清理 `71f2934c-d93b-4075-9492-d9cbf22e1bb2` 名下 50 行与 44 行孤儿 `module_id`（先导出）；逐角色统计可用菜单数
   验收标准: 超管菜单数 = 存活菜单全量；普通角色菜单数 > 0；无 `module_id` 落空；`tbl_privilege_acl` 唯一键 `(release_id, module_id)` 无冲突
 
-- [ ] T-07 菜单与权限位按角色过滤生效
+- [x] T-07 菜单与权限位按角色过滤生效
   关联: R-05
   依赖: T-06
   验证方式: 改**唯一入口** `LoginServiceImpl.getUserMenus()`（替换 `list()` 全表 + `buildAdminAclMap` 满权限位）；**共享面逐身份断言**：① 超管登录 → 菜单数 = 全量 ② 普通角色登录 → 菜单数 = 基线集合 ③ **未授权菜单 URL 直接访问 → 404/首页**（动态路由不注册）④ **按钮级**：未授权 pvalue 的 `hasAccessByCodes` 为 false（`buildAdminAclMap` 与 `access.ts:123-126` 同批改造）⑤ 零授权账号登录 → **提示页不白屏** ⑥ 改角色后**无需重登**即生效（禁读 session 旧 ACL 快照）
   验收标准: ①~⑥ 全部实测通过；**任一角色可用菜单数为 0 即判失败**（上线门禁）
 
-- [ ] T-08 角色↔菜单授权界面修复
+- [x] T-08 角色↔菜单授权界面修复
   关联: R-10
   依赖: T-07
   验证方式: 修复 `role/index.vue:245-250` 的提前 `return` 与 `assign-menu.vue:84` 的 `currentRole` 未赋值链；界面操作后断言 `tbl_privilege_acl` 新增对应 `(release_id, module_id)` 行且保存接口业务码成功；再撤销并断言该角色用户菜单减少
   验收标准: 授权与撤销均**真实落库**；`saveModuleAclApi`/`saveAllAclApi` 被实际调用（网络面板或后端日志留证）
 
-- [ ] T-09 组侧技能/MCP 关联补齐 + 组授权读侧 del_flag 口径统一
+- [x] T-09 组侧技能/MCP 关联补齐 + 组授权读侧 del_flag 口径统一
   关联: R-04
   依赖: T-02
   验证方式: ① 为技能与 MCP 补**组侧**读写能力（现有仅资源侧 `PUT /api/skill/{id}/groups` 与 `PUT /api/mcp/{id}/groups`），组管理页可勾选并即时生效；② 统一读侧口径（`BaseModel` 补 `isLogicDelete` 或各读点显式 `del_flag=0`，含 `GroupAgentInfoServiceImpl.getByGroupIds:21-25`）；**共享面断言**：撤销组 G 对资源 X 的授权后，G 内用户 U 刷新即不可见（用生产已有墓碑行数据验证，BUG-121）
   验收标准: 四类资源（智能体/知识库/技能/MCP）均可在组管理页增删；撤销后即时不可见；「无任何授权行的资源维持公开」不变（Q-P4 口径回归）
 
-- [ ] T-10 预设问题接口角色校验（双越权路径）
+- [x] T-10 预设问题接口角色校验（双越权路径）
   关联: R-08
   依赖: T-07
   验证方式: 在 `AgentPresetQuestionController` 的 `POST /{agentId}/preset-questions`(:53-76) 与 `DELETE /{agentId}/preset-questions/{questionId}`(:81-91) 加角色校验；**正负对照断言业务码**：普通角色 POST/DELETE **被拒**且数据未变更，管理员同接口**成功**
@@ -74,19 +74,19 @@
 
 ## 4. 前端
 
-- [ ] T-11 admin-ui 组织维度与平台配置页面删除 + 引用解除
+- [x] T-11 admin-ui 组织维度与平台配置页面删除 + 引用解除
   关联: R-01, R-11
   依赖: T-04
   验证方式: 整删 **18** 个文件（`views/organization/**` 9 + `api/core/{privilege-company,privilege-department,privilege-employee,platform-sync}.ts` 4 + `components/dept/{DepartmentSelector,EmployeeSelector}.vue` 2 + `views/platform/platform-info/**` 2 + `api/core/platform-info.ts` 1）；部分改 10 个（`api/core/index.ts` 删导出行 + 两个账号页面的部门树/选择器/字段）；**先解除 `DeptTreeSidebar` 的 3 处引用**再删
   验收标准: `vue-tsc` 错误数**不高于基线**（看增量，L-32）；`pnpm build` 通过；导航无「组织管理」「三方平台」；直接访问 `/organization/*`、`/basic/platform-info` 落 404 或首页
 
-- [ ] T-12 mobile-ui 移除 SSO 自动登录，密码登录承接
+- [x] T-12 mobile-ui 移除 SSO 自动登录，密码登录承接
   关联: R-11
   依赖: T-11
   验证方式: 删 `main.ts:47-89` 的 `trySsoLogin()` 及其调用、`services/platformService.ts` 的 `getEnabledPlatform`/`thirdPartyLogin`；构建后实测启动流程（浏览器环境）
   验收标准: 启动流程**不再发起** SSO/免登请求；停留密码登录页；`POST /auth/login` 登录成功
 
-- [ ] T-13 用户表单与列表三维度化（角色/组多选，去组织字段）
+- [x] T-13 用户表单与列表三维度化（角色/组多选，去组织字段）
   关联: R-02
   依赖: T-11
   验证方式: 改 `views/system-management/account/{index.vue,form.vue,data.ts}` 与 `api/core/privilege-user.ts`：删企业/部门/员工列与表单项，角色与组为多选；实测新建/编辑用户（断言业务码）
@@ -94,7 +94,7 @@
 
 ## 5. 升级件与回归
 
-- [ ] T-14 升级件 SQL 落盘并在 drill 库演练（DDL + DML + rollback 配对）
+- [x] T-14 升级件 SQL 落盘并在 drill 库演练（DDL + DML + rollback 配对）
   关联: R-03, R-09, R-11
   依赖: T-04, T-05, T-06
   验证方式: `specs/20261007_user-role-group-model/sql/` 落 `V2.0.0_01__org_dimension_drop_ddl.sql`（含 `DROP TABLE tbl_platform_platform_info` 与 `third_party_id` 列）、`V2.0.0_02__role_backfill_dml.sql`、`V2.0.0_03__org_menu_cleanup_dml.sql`、`V2.0.0_04__acl_baseline_rebuild_dml.sql` 及 `rollback/` 配对；**全新库重放 + drill 库正反向演练**
@@ -105,13 +105,13 @@
   必须由本条 DDL 一并解除该约束（DROP COLUMN 或 DROP NOT NULL），否则 T-13 的「只填账号即创建成功」
   在 T-14 落地前**必然失败**。故 T-13 的运行期验收顺序锁定为 **T-14 → T-16**。
 
-- [ ] T-15 菜单行删除件（两份基线文件 + 升级件）
+- [x] T-15 菜单行删除件（两份基线文件 + 升级件）
   关联: R-01
   依赖: T-05
   验证方式: `sql/all_data.sql` 与 `sql/all_schema.sql` **各改一份**（组织菜单 4 行 + ACL 4 行 + 「三方平台」菜单行）；升级件按固定 id 幂等删除
   验收标准: 两份基线文件与升级件均无这些行；重新导入全新库后菜单表无组织/三方平台项
 
-- [ ] T-16 部署与端到端回归
+- [x] T-16 部署与端到端回归
   关联: R-01, R-02, R-03, R-04, R-05, R-06, R-07, R-08, R-09, R-10, R-11
   依赖: T-08, T-09, T-10, T-12, T-13, T-14, T-15
   验证方式: 按 `UPGRADE.md` 顺序部署（备份 → SQL → 应用）并跑回归矩阵：组织维度 404 · 菜单按角色过滤 · 按钮级权限 · 组授权即时生效 · 预设问题越权被拒 · 密码登录（后台/前台）· 三方端点 404 · 零授权用户不白屏

@@ -1,0 +1,67 @@
+=== T-16 验收结论（部署与端到端回归）===
+日期: 2026-10-07 | 环境: **独立隔离栈**（不改动运行中的 v1.6.0-dev 发布栈）
+  后端: 本地 `mvn spring-boot:run -pl phoenix-admin/phoenix-admin-manager`（JDK 23；端口 8066）
+  数据库: 新容器 phoenix-t16-pg（宿主 55432）= **T-01 迁移前全量备份 + 依次应用 V2.0.0_01~05**
+  Redis: 新容器 phoenix-t16-redis（宿主 56379）
+  前端: admin-ui（dev 5777 / 已构建 dist+小代理 5778）· mobile-ui（dev 5999）
+  浏览器: 真实 Chromium（Agent Window），网络与控制台捕获留证
+
+[1] 部署三段证明
+  ① 进程: `spring-boot:run` 在跑（pid 90084）
+  ② 健康: `GET /echo/ok` → **HTTP 200**（body `ok`）
+  ③ 端口: `lsof -nP -iTCP:8066` → `java *:8066`（LISTEN）
+  启动日志: `Started PhoenixAgentApplication in 9.952 seconds`
+  **启动期 SQL 报错 = 0**（grep does not exist / BadSqlGrammar / SQLException / violates 全 0）
+  —— 即 T-14 延期的「应用启动无 SQL 报错」断言 ✅
+
+[2] 真实升级序列（在隔离库上完整复刻「备份 → SQL → 应用」）
+  迁移前: active_menus=27 / acls=61 / org_tables=4 / user_roles=12
+  01~05 依次: **全部 exit=0 且 ERROR 行=0**
+  迁移后: active_menus=**21**（27−4 组织−2 三方平台）/ acls=**28**（超管 21+普通 7）/
+          org_tables=**0** / **zero_role_users=0**
+
+[3] 回归矩阵（关键断言均为真实命令输出）
+  ① 登录（后台密码登录）: admin/123456 ✅ · chenzhuo/12345678 ✅（token 36 位）
+  ② **菜单按角色过滤**（T-07）: 超管 `GET /api/privilege/auth/menus` → **menus=21**；
+     普通角色 → **menus=7**；普通角色顶层仅 智能体管理/个人中心/知识库/智能体中心
+     （**未授权顶层 权限管理/前台管理/插件管理 不出现**）
+  ③ **改角色无需重登**（T-07）: 给 chenzhuo 加超管角色后用**同一 token** → menus=21；
+     撤销后同 token → menus=7
+  ④ **按钮级权限位**（T-07 盲点配方，受控）: 普通角色全部 ACL 改 `acl_state`
+     `'31'`→全局 pvalues=**5**；`'1'`→**1**；`'3'`→**2**；菜单内逐位 `查询=True / 新增·编辑·删除·下载=False`；
+     恢复 '31'→5。**超管豁免**：把超管角色全部 ACL 置 0，仍 menus=21/pvalues=5
+  ⑤ **越权 URL**（T-07/T-11）: 浏览器直访 `/organization/company` → **404 页面**（"哎呀！未找到页面"）
+  ⑥ **零授权不白屏**（T-07，受控）: 临时把 chenzhuo 角色行 del_flag=1 → 同一 token 下
+     API menus=[] 且**登录仍可用**；页面渲染 **404 提示页 + 返回首页按钮（非白屏）**；实验后已恢复
+  ⑦ **授权落库/撤销**（T-08，R-10）: `POST /api/privilege/acl/saveModule` → HTTP 200 且
+     `tbl_privilege_acl` 行 `acl_state` 由 31→0→31 实际变更（新增分支 id 465384768792616960）
+  ⑧ **组侧技能/MCP**（T-09，R-04）: `PUT /platform/group-skill/{gid}/assign`、`/platform/group-mcp/{gid}/assign`
+     → 200；落库 active 各 1；回显端点返回 `[10]` 与 `["464319754570612736"]`；
+     空集撤销后 active 各 **0**
+  ⑨ **预设问题鉴权**（T-10，R-08）: 普通角色 POST → **403**（"权限不足：仅管理员可管理预设问题"）、
+     DELETE → **403**；管理员 POST → **200**（"预设问题保存成功"）
+  ⑩ **免登/平台配置端点已下线**（T-04/R-11，带 token）: `/auth/thirdLogin`→**404**、
+     `/platform/platform-info/getEnabledPlatform`→**404**、`/api/agent/third-party/123`→**404**
+     （无 token 时为 401，亦符合预期）；代码中相关 Mapping 已清零
+  ⑪ **前台密码登录**（R-11）: `POST /auth/login` chenzhuo/12345678 → 200 + token ✅
+  ⑫ **建号三维度**（T-13，R-03）: `POST /api/privilege/user`（只给账号+1 角色+1 组）→ 200；
+     落库 roles=普通角色 / groups=通用组；新用户可登录且 menus=7；
+     `PUT` 改角色为超管并清空组 → role_sn=ROLE_ADMIN / groups=0；
+     **不传 roleIds** → 自动补 普通角色(COMMON)（BUG-123 修复生效）
+  ⑬ **UI 导航**（T-11/T-15）: 普通角色登录后左侧导航仅 **智能体中心 / 智能体管理 / 知识库**
+     （截图 evidence/T-16_ui-nav-common-user.jpg）—— 组织管理/三方平台/基础管理/权限管理/前台管理/插件管理**均不出现**
+  ⑭ **mobile-ui 免登下线**（T-12）: 加载 http://localhost:5999/ → 自动重定向 `/login?redirect=/chat`
+     并渲染**账号密码登录页**；捕获的网络请求中 URL 含 `thirdLogin` = **0 条**、含 `platform-info` = **0 条**
+
+[4] 本轮新发现的既有缺陷（已登记，非本 spec 引入）
+  - **BUG-128（P3，dev 环境）**: admin-ui 的 vite 代理规则 `/auth` 与 SPA 路由 `/auth/login` 冲突
+    ⇒ dev 环境登录页路径被代理到后端（返回 405/JSON），需绕过（生产 nginx 无此问题）
+  - **BUG-129（P2，信息泄露）**: `GET /api/privilege/auth/getLoginUserInfo` 返回体含
+    `password`（MD5 哈希）等敏感列 —— 实测响应中出现 `"password":"149d8a33…"`
+  - 环境性现象（不计缺陷）: vite dev 依赖预构建缓存过期时出现 `504 (Outdated Optimize Dep)`
+    并导致动态 import 失败（重启 dev/`--force` 后消失），与被测代码无关
+
+[5] 说明
+  - 本任务按用户选择在**隔离实例**上验证（不动运行中的发布栈、不动活库 `phoenix`）；
+    真正的发布（构建 v2.0.0 镜像 + 迁移活库 + 重启 release 栈）留给发版步骤。
+  - 受控实验（按钮级/零授权/ACL 撤销）执行后**均已恢复原状**；探测用户（t16*）保留在隔离库。
