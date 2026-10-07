@@ -1,5 +1,12 @@
 # Changelog: user-role-group-model
 
+## BUG-137 修复（2026-10-07，BUG-136 的复核追加）
+
+- 分配权限弹窗保存时机从「勾选即时保存」改为「**确定时批量提交**」：打开做授权位快照，勾选只改本地；
+  onConfirm 计算 dirty 模块 Promise.all 提交，成功关窗+刷新、失败不关窗；取消/ESC 丢弃
+- 用户复核指出：点确定 Network 只有 page 刷新、无提交请求 ⇒ 即本缺陷（确定无提交职责 + 取消不可撤销）
+- 登记 BUG-137、教训 L-62
+
 ## BUG-136 修复（2026-10-07）
 
 - 角色列表→「分配权限」弹窗 `onConfirm` 空实现 ⇒ 点确定无反应；补 `modalApi.close(); emit('success')`

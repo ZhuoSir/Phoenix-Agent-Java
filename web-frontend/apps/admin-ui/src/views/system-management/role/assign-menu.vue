@@ -2,7 +2,7 @@
 import {computed, ref} from 'vue';
 
 import {useVbenModal} from '@vben/common-ui';
-import {getAclsByReleaseIdApi, getRoleAclsApi, saveAllAclApi, saveModuleAclApi,} from '#/api';
+import {getAclsByReleaseIdApi, getRoleAclsApi, saveModuleAclApi,} from '#/api';
 import {IconifyIcon} from '@vben/icons';
 
 import {ElCheckbox, ElIcon, ElMessage, ElTree,} from 'element-plus';
@@ -20,12 +20,62 @@ const getTitle = computed(() => {
 });
 
 const [Modal, modalApi] = useVbenModal({
-  // BUG-136：本弹窗的授权是**勾选即时保存**（handlePvalueChange / 行内全选 / 表头全选
-  // 各自调 saveModuleAclApi / saveAllAclApi），「确定」按钮的职责是**关闭弹窗并刷新父列表**。
-  // 此前 onConfirm 为空实现 ⇒ 点确定毫无反应（弹窗不关、无提示），用户误以为修改未生效。
+  // BUG-137：保存时机从「勾选即时保存」改为「**确定时批量提交**」。
+  // 原实现每个 checkbox 的 change 就发 saveModuleAclApi，导致「确定」无提交职责（只触发父列表 page 刷新）、
+  // 且「取消/关闭」无法撤销已勾选的修改（取消是骗人的）。
+  // 现在：勾选只改本地状态；点「确定」才把**有改动的模块**批量提交，成功后关窗+刷新；失败不关窗可重试。
   async onConfirm() {
-    modalApi.close();
-    emit('success');
+    const role = currentRole.value;
+    if (!role?.id || !role?.sn) {
+      modalApi.close();
+      return;
+    }
+    const dirty: { cur: number; node: any }[] = [];
+    const walk = (nodes: any[]) => {
+      for (const n of nodes || []) {
+        if (n.pvalues?.length) {
+          const cur = Number(calcAclState(n.pvalues));
+          const init = initialStateMap.value.get(n.id);
+          if (init !== undefined && init !== cur) dirty.push({ node: n, cur });
+        }
+        if (n.children?.length) walk(n.children);
+      }
+    };
+    walk(aclTreeData.value);
+    // 无改动：直接关闭（不发提交请求）
+    if (dirty.length === 0) {
+      modalApi.close();
+      emit('success');
+      return;
+    }
+    modalApi.lock();
+    try {
+      const results = await Promise.all(
+        dirty.map(({ node, cur }) =>
+          saveModuleAclApi({
+            releaseId: role.id,
+            releaseSn: role.sn,
+            systemSn: '',
+            moduleId: node.id,
+            moduleSn: node.sn,
+            aclState: cur,
+            status: cur > 0 ? 'check' : 'uncheck',
+          }),
+        ),
+      );
+      const failed = results.some((r: any) => r && r.success === false);
+      if (failed) {
+        ElMessage.error('部分权限保存失败，请重试');
+        return;
+      }
+      ElMessage.success(`权限保存成功（${dirty.length} 项）`);
+      modalApi.close();
+      emit('success');
+    } catch {
+      ElMessage.error('权限保存失败');
+    } finally {
+      modalApi.unlock();
+    }
   },
   async onOpenChange(isOpen) {
     if (isOpen) {
@@ -45,6 +95,7 @@ const [Modal, modalApi] = useVbenModal({
           const tree = ((treeRes as any) || []) as any[];
           aclTreeData.value = tree;
           assignLevels(tree);
+          snapshotInitialStates(tree);
           const aclList = ((aclRes as any) || []) as any[];
           const map = new Map<string, any>();
           for (const item of aclList) {
@@ -90,6 +141,20 @@ const headerIndeterminate = computed(() => {
   return list.some((pv) => pv.enabled) && !headerAllSelected.value;
 });
 const currentRole = ref<null | any>(null);
+// BUG-137：打开弹窗时对每个模块的初始授权位做快照，「确定」时据此算出**有改动的模块**再批量提交
+const initialStateMap = ref(new Map<string, number>());
+
+function snapshotInitialStates(nodes: any[]) {
+  const map = new Map<string, number>();
+  const walk = (ns: any[]) => {
+    for (const n of ns || []) {
+      if (n.pvalues?.length) map.set(n.id, Number(calcAclState(n.pvalues)));
+      if (n.children?.length) walk(n.children);
+    }
+  };
+  walk(nodes);
+  initialStateMap.value = map;
+}
 
 
 function handleHeaderSelectAll(val: string | number | boolean) {
@@ -108,10 +173,7 @@ function handleHeaderSelectAll(val: string | number | boolean) {
     }
   }
   traverse(aclTreeData.value);
-  const roleId = currentRole.value?.id;
-  if (roleId) {
-    saveAllAclApi(roleId, checked);
-  }
+  // BUG-137：表头全选只改本地状态，提交统一在「确定」时批量进行（不再即时 saveAllAclApi）
 }
 function calcAclState(pvalues: any[]): string {
   let state = 0;
@@ -134,18 +196,8 @@ const treeProps = {
 };
 
 function handlePvalueChange(data: any) {
+  // BUG-137：只更新本地位掩码；提交统一在「确定」时批量进行（不再即时 saveModuleAclApi）
   updateNodeState(data);
-  const role = currentRole.value;
-  if (!role?.id || !role?.sn) return;
-  const aclState = Number(calcAclState(data.pvalues));
-  saveModuleAclApi({
-    releaseId: role.id,
-    releaseSn: role.sn,
-    moduleId: data.id,
-    moduleSn: data.sn,
-    aclState,
-    status: aclState > 0 ? 'check' : 'uncheck',
-  });
 }
 </script>
 
@@ -197,20 +249,9 @@ function handlePvalueChange(data: any) {
                     "
                     @click.stop
                     @change="(val: string | number | boolean) => {
+                      // BUG-137：行内全选只改本地状态，提交统一在「确定」时批量进行
                       data.pvalues.forEach((pv) => { pv.enabled = !!val; });
                       updateNodeState(data);
-                      const role = currentRole.value;
-                      if (!role?.id || !role?.sn) return;
-                      const aclState = Number(calcAclState(data.pvalues));
-                      saveModuleAclApi({
-                        releaseId: role.id,
-                        releaseSn: role.sn,
-                        systemSn: '',
-                        moduleId: data.id,
-                        moduleSn: data.sn,
-                        aclState,
-                        status: aclState > 0 ? 'check' : 'uncheck',
-                      });
                     }"
                 >
                   全选
