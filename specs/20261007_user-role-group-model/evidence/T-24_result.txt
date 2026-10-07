@@ -1,0 +1,24 @@
+=== T-24 验证结论（BUG-135：技能/插件/MCP/知识库 角色授权树无法勾选）===
+日期: 2026-10-07 | 类型: 缺陷修复（无新增需求条款）
+
+[根因·三段证据链]
+  ① 数据：tbl_privilege_module.state（varchar 位掩码）这 4 行 = NULL；其余 15 个存活菜单 = '31'
+  ② 后端：PrivilegeModuleServiceImpl.tree()  `moduleState = state ?: 0` → `filter(p -> (moduleState & (1<<pos))!=0)`
+     → NULL 时 pvalues 返回空数组
+  ③ 前端：assign-menu.vue 复选框 `v-if="data.pvalues?.length"` → 空数组 → 整行不画复选框（菜单名照常显示）
+  来源：这 4 菜单由功能迁移 V1.2.0_02(技能)/V1.3.0_02(知识库)/V1.6.0_02(MCP/插件) 插入时漏写 state；不在基线 all_data.sql
+
+[修复] 升级件 V2.0.0_10（+rollback，配对 10/10）
+  UPDATE tbl_privilege_module SET state='31' WHERE del_flag=0 AND (state IS NULL OR state='')
+  不写死 id、幂等、软删行不动；回滚件按 4 个 id 复位置空
+
+[验证]
+  ① drill：正向补齐(存活19/state空0) → 幂等再跑 → 反向(空 state 回到4) → 再正向(4菜单=31)，全 exit=0
+  ② 活库：migrator 应用 V2.0.0_10，台账 10 件，自检「state 空 0 个」
+  ③ 授权树实测（/api/privilege/module/tree/acl?roleId=普通角色）：
+     技能管理/插件管理/MCP/知识库 各返回 pvalues=5（查询/新增/编辑/删除/下载）✅；树内 pvalues 为空的存活菜单 = 0
+  ④ 分配闭环：技能管理 勾选"查询"→ saveModule HTTP200 → 库内 acl_state=1 → 读回 enabled=True → 还原 acl_state=0
+  ⑤ 后端 0 ERROR
+
+[未做（用户未点，另属一类）]
+  这 4 菜单的 system_id/category_id 仍为 NULL（其它为 110/111）—— 不影响本 bug（树查询未按其过滤），未擅自动。
