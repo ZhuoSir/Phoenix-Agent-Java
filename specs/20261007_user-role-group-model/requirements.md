@@ -1,10 +1,11 @@
-> 版本: v1.1.0 | 状态: 待重确认 | 更新: 2026-10-07 | 确认人: （待重确认；前次 陈卓 v1.0.0 / 2026-10-07） | 挂载: v2.0.0（在途）
+> 版本: v2.0.0 | 状态: 待重确认 | 更新: 2026-10-07 | 确认人: （待重确认；前次 陈卓 v1.0.0 / 2026-10-07） | 挂载: v2.0.0（在途；与本文档版本号同号属巧合，勿混）
 >
-> **v1.1.0 变更（铁律 4：已确认文档被改动 ⇒ 前次确认作废，待重确认）**：① 新增 **R-10 角色↔菜单授权可维护**（修复 BUG-116，Q-P2 裁定纳入）；② 修订 **R-04 可见性口径**（Q-P4：无任何授权行的资源维持公开）；③ 修订 **R-05 边界**（超管豁免 + 零授权兜底，Q-P1）；④ 修订 **R-06 边界**（保留 3 个 `*SyncConstants` 常量文件的编译约束）；⑤ **范围澄清**：组织列横跨 `tbl_privilege_user` / `tbl_privilege_role` / `tbl_platform_account_info` 三表（Q-P3 全删）。变更明细见 `changelog.md`。 | 确认日期: 2026-10-07 | 更新: 2026-10-07（v1.0.0：三重确认第①重通过，正文相对 v0.2.0 无改动，仅版本头转正） | 挂载: v2.0.0（在途）
+> **v2.0.0 变更（改范围 ⇒ MAJOR；铁律 4：已确认文档被改动 ⇒ 前次 v1.0.0 确认作废，待重确认）**
+>
+> ① **范围变更**（用户 2026-10-07 口令「扫码登录去掉，不要，只保留现在的密码登录」，并经 Q-P5/Q-P6 追问裁定）：第三方免登与三方平台配置**整体下线** ⇒ 新增 **R-11**；R-06 原「保留第三方免登」边界**作废**，其边界 4 的 `*SyncConstants` 保留约束**自动解除**（连登录策略一并删除）；Non-goals 相应反转。
+> ② 本版**同时包含未获确认的 v1.1.0 全部内容**（v1.1.0 因未经确认，不单独留版）：新增 R-10 角色↔菜单授权可维护（Q-P2）、R-04 可见性口径（Q-P4）、R-05 边界（Q-P1）、R-02/R-03 三表范围（Q-P3）。
+> ③ **术语纠错**：原文「扫码登录」实为**第三方免登（应用内 SSO）**，已按实测订正（明细见 `changelog.md` 事件记录与 `lessons.md` L-44）。
 
-# 需求规格：user-role-group-model
-
-## 背景与目标
 
 ### 背景（立项调研事实，2026-10-07）
 
@@ -27,7 +28,7 @@
 - `tbl_privilege_user` 的 `company_id`、`dept_id` 是 **NOT NULL** 列——组织维度是用户表的**强约束**；另有组织衍生列 `employee_id`、`it_user_id`、`it_user_name`、`is_leader`。
 - 前端 `web-frontend/apps/admin-ui`：独立「组织管理」菜单族四条路由（`/organization`、`/organization/company`、`/organization/department`、`/organization/employee`）+ 选择器组件（`src/components/dept/DepartmentSelector.vue`、`EmployeeSelector.vue`）+ 三个 API 客户端（`src/api/core/privilege-{company,department,employee}.ts`）。
 - 权限设施（`role` / `user_role` / `module` / `acl` / `pvalue`）**不依赖**企业/部门，可原样保留。
-- **同步与登录必须分开看**：`service/sync/**`（`AbstractPlatformSyncStrategy` + 钉钉/飞书/微信 策略）+ `PlatformSyncController`（`/platform/sync`）+ 前端 `api/core/platform-sync.ts` 是**用户/组织同步**；而 `thirdparty/strategy/{DingTalk,Feishu,WeCom}ThirdPartyLoginStrategy`（第三方免登）共用 `PlatformInfo`（`tbl_platform_platform_info`，企业 ID/密钥）与 SDK 服务 ⇒ **移除同步不得连带删除平台配置与登录策略**。
+- **三方集成有三层，本版整体下线**：① **同步**——`service/sync/**`（`AbstractPlatformSyncStrategy` + 钉钉/飞书/微信策略）+ `PlatformSyncController`（`/platform/sync`）+ 前端 `api/core/platform-sync.ts`；② **免登**——`thirdparty/strategy/{DingTalk,Feishu,WeCom}ThirdPartyLoginStrategy` + `POST /auth/thirdLogin`（唯一调用方为 `apps/mobile-ui` 启动时的 `trySsoLogin()`）；③ **平台配置**——`tbl_platform_platform_info` + `PlatformInfoController` + 三个 SDK 服务 + 前端「三方平台」菜单（`/basic/platform-info`）。三层的**仅存消费方就是彼此**（前两层的存在意义是同步/免登，第三层只被前两层读）⇒ 须**同批下线**，否则留下无消费方的死表与死页面；**账号密码登录（`POST /auth/login`）是唯一保留的登录方式**。
 
 **结论**：组织维度对目标模型（一个用户、若干角色、若干组、组直接授权资源）是**净负担**——它不参与任何权限判定，却强制每个用户必须挂在一个企业和部门上，并让「组」的语义分散在两套表里（其中一套已是死代码）。
 
@@ -37,7 +38,7 @@
 2. 建用户只需填账号信息 + 勾角色 + 勾组。
 3. 「组」只有一套（平台侧资源授权组），能直接关联**智能体 / 技能 / 知识库 / MCP 插件**四类资源，组内用户据此获得可见性——前台授权不再是「任一登录用户可见」。
 4. 菜单按角色过滤生效（不再 26 个菜单对全员可见）。
-5. 三方平台的**用户/组织同步**能力整体下线；**第三方免登（应用内 SSO）不受影响**。
+5. 系统**只保留账号密码登录**；三方平台集成（**用户/组织同步** + **客户端内免登** + **平台配置**）整体下线。
 
 ## 需求条款
 
@@ -144,10 +145,10 @@ WHEN 新版本部署完成,
 
 边界（**共享面保护，必须成立**）：
 
-1. **第三方免登 SHALL 继续可用**——机制实测（2026-10-07，用户质疑后复核纠正）：`apps/mobile-ui` 启动时 `trySsoLogin()` 在**钉钉/企业微信/飞书客户端内**经 JS-SDK 取得**免登授权码** `code`，再 `POST /auth/thirdLogin` → `ThirdPartyLoginStrategy.resolveUserId(code, platform)` 用 code 换平台 userid（钉钉 `/topapi/v2/user/getuserinfo`、企微 `/cgi-bin/user/getuserinfo`、飞书 `/authen/v1/oauth_access_token`）；**与"扫码"无关**（admin-ui 侧该入口被显式关闭：`layouts/basic.vue:156 :show-third-party-login="false"`）。`thirdparty/strategy/**` 与 `tbl_platform_platform_info`（企业 ID/密钥）SHALL 保留，不得因本次变更而失效。
+1. ~~第三方免登 SHALL 继续可用~~ **【已作废 v2.0.0】**：经用户 2026-10-07 口令与 Q-P5/Q-P6 裁定，第三方免登与平台配置**一并下线**，不再属于本条款的保留范围 ⇒ 见 **R-11**。（机制实测记录：免登为 `apps/mobile-ui` 在钉钉/企微/飞书客户端内经 JS-SDK 取免登授权码后 `POST /auth/thirdLogin`，**与"扫码"无关**；admin-ui 侧入口本就关闭：`layouts/basic.vue:156 :show-third-party-login="false"`。）
 2. 后端全量构建 SHALL 通过，不得残留对已删同步类的引用。
 3. `/platform/sync` 端点 SHALL 返回 404（不存在），不是 500。
-4. 同步模块对**第三方免登存在一处硬编译耦合**：三个登录策略 import 了 `service/sync/{dingtalk,feishu,weixin}/*SyncConstants` 的 URL 常量 ⇒ 移除同步时 SHALL 保留这 3 个纯常量文件（或等价迁移常量后同步改 3 处 import），**不得整包盲删导致第三方免登编译失败**。
+4. **【v2.0.0 变更】** 前版此处要求「保留 3 个 `*SyncConstants` 常量文件」以保住免登编译——因 R-11 将三个登录策略一并删除，该约束**自动解除**：`service/sync/**`（含 `*SyncConstants`）SHALL **整包删除**，后端全量构建 SHALL 通过。
 
 #### 验收场景
 
@@ -158,11 +159,11 @@ WHEN 新版本部署完成,
   **WHEN** 全量构建后端
   **THEN** 编译通过（无对 `service/sync/**` 的悬空引用）
 - **GIVEN** 同步模块已删除
-  **WHEN** 在钉钉/飞书/企业微信客户端内触发免登（`mobile-ui` 启动 SSO）（应用内 SSO）
-  **THEN** **仍可正常登录**（回归断言——证明「移除同步」未误伤登录）
-- **GIVEN** 管理员打开后台
-  **WHEN** 查看平台信息页
-  **THEN** 无任何「同步」入口，平台配置项本身仍可见可改
+  **WHEN** 在组织管理相关页面（部门/人员）上查找
+  **THEN** 页面与菜单均已不存在（见 R-01），且**全站无任何「同步」按钮或入口**
+- **GIVEN** 同步模块已删除
+  **WHEN** 用账号密码登录
+  **THEN** **仍可正常登录**（回归断言——证明移除同步未误伤密码登录）
 
 ### R-07 存量账号的角色与组归属补齐
 
@@ -233,13 +234,48 @@ WHEN 管理员在后台为一个角色配置可见菜单,
   **WHEN** 该角色用户重新登录
   **THEN** 该菜单不再出现
 
+### R-11 第三方免登与三方平台配置整体下线（仅保留账号密码登录）
+
+WHEN 新版本部署完成,
+系统 SHALL 只提供**账号密码登录**一种登录方式；第三方免登（钉钉 / 飞书 / 企业微信客户端内 SSO）与三方平台配置管理能力 SHALL 整体下线。
+
+边界（下线清单，逐项可验；**v2.0.0 范围变更**，经 Q-P5 / Q-P6 裁定）：
+
+1. **后台免登链路**：`ThirdPartyLoginFactory`、`ThirdPartyLoginStrategy`、`thirdparty/strategy/{DingTalk,Feishu,WeCom}ThirdPartyLoginStrategy`、`AccountInfoServiceImpl.thirdPartyLogin`（:346-378）与 `getByThirdPartyId`（:184-186）、`AccountInfoController` 的 `GET /third-party/{thirdPartyId}`（:69-71）、`AccountLoginController` 的 `POST /auth/thirdLogin`（:37-39）一并移除。
+2. **平台配置面**：`PlatformInfoController`（`/platform/platform-info/**`）、`PlatformInfoService(+Impl)`、`PlatformInfoMapper`、`PlatformInfo` 实体、`tbl_platform_platform_info` 表、`PlatformTypeEnm`、三个 SDK 服务（`{DingTalk,Feishu,Weixin}SdkService+Impl`）一并移除；前端 `views/platform/platform-info/**`、`api/core/platform-info.ts` 与菜单行「三方平台」（`/basic/platform-info`，module id `37def68697b54109a57c18508fc4358c`）一并下线。
+3. **账号侧残留**：`AccountInfo.thirdPartyId`（`AccountInfo.java:54`）与 `tbl_platform_account_info.third_party_id` 列随之移除。
+4. **客户端**：`apps/mobile-ui` **保留**（Q-P6 裁定），但启动时的 `trySsoLogin()`（`main.ts:47-89`）、`getAuthCode` 与 `platformService.thirdPartyLogin` SHALL 移除，改由既有密码登录页（`LoginPage.vue` + `POST /auth/login`）承接。
+5. **构建保护**：后端与前端全量构建 SHALL 通过，不得残留对已删类的悬空引用（`service/sync/**` 亦随本条款整包删除，见 R-06 边界 4）。
+
+#### 验收场景
+
+- **GIVEN** 新版本部署完成
+  **WHEN** 调用 `POST /auth/thirdLogin`
+  **THEN** 404（不存在），不是 500
+- **GIVEN** 新版本部署完成
+  **WHEN** 调用 `/platform/platform-info/**` 任一端点
+  **THEN** 404
+- **GIVEN** 管理员打开后台
+  **WHEN** 查看导航
+  **THEN** 无「三方平台」菜单项；直接访问 `/basic/platform-info` 落 404 或首页
+- **GIVEN** 新版本部署完成
+  **WHEN** 分别用后台账号与前台账号执行 `POST /auth/login`
+  **THEN** **均登录成功**（回归断言：只保留密码登录，且密码链路未被误伤）
+- **GIVEN** `apps/mobile-ui` 新版本在浏览器环境启动
+  **WHEN** 观察启动流程
+  **THEN** 不再触发 SSO / 免登请求，停留于密码登录页
+- **GIVEN** 三方集成已删除
+  **WHEN** 全量构建后端与前端
+  **THEN** 均通过（无对已删类与已删 API 客户端的悬空引用）
+
 ## Non-goals（范围外）
 
 - **不做**账号历史数据质量清理（孤儿账号 id 引用、共用 `employee_id`、`system` 哨兵 creator）→ 已登记 **BL-30**，独立排期。
 - **不做**智能体执行面硬隔离（沙箱 / 独立执行身份）→ **BL-32**。
 - **不做**知识库数据面收敛（去明文原件、剥离 DB 凭据）→ **BL-33**。
 - **不做**存量向量重建与 embedding 指纹校验 → **BL-34**。
-- **不移除**第三方免登（钉钉 / 飞书 / 企业微信**客户端内 SSO**）及其平台配置（`tbl_platform_platform_info`）——只下线「同步」这一件事。
+- **不移除**账号密码登录（`POST /auth/login`，后台与前台/移动端共用）——本期只下线三方集成（同步 + 免登 + 平台配置，见 R-06 / R-11）。
+- **不新增**其他登录方式（短信 / OTP / 本地 SSO 等）。
 - **不做**功能级/数据行级 ACL 的细粒度重设计——本期只把既有 ACL 行从「预置数据」转为「生效判定」。
 - **不新增**组织架构双向同步能力（只删不建）。
 - **不保留**「按部门/企业统计」类报表能力。
@@ -253,12 +289,13 @@ WHEN 管理员在后台为一个角色配置可见菜单,
 4. 用户↔角色、用户↔组均为多对多。
 5. 破坏性变更 → 挂 **v2.0.0**（MAJOR），按 MAJOR 语义写升级说明与回滚。
 6. 本期**一次做完**「角色过滤生效」与「组↔资源纳管归一」（Q2 已裁定，不分期）。
+7. `apps/mobile-ui` **保留**（Q-P6 裁定），仅移除其 SSO 自动登录；三方平台配置（表 / CRUD / 页面 / 菜单行）**整体下线**（Q-P5 裁定）。
 
 现在纠正，否则按此执行。
 
 ## 待确认问题
 
-**无**（Q1~Q6 与 Q-P1~Q-P4 已于 2026-10-07 全部裁定，见下表；裁定事实已同步 `changelog.md`）。
+**无**（Q1~Q6 与 Q-P1~Q-P6 已于 2026-10-07 全部裁定，见下表；裁定事实已同步 `changelog.md`）。
 
 ## 已裁定问题（2026-10-07，用户答）
 
@@ -267,10 +304,12 @@ WHEN 管理员在后台为一个角色配置可见菜单,
 | Q1 | 两套组是否合并 | **合并一套**（保留平台侧资源授权组，下线后台数据组死代码） | R-09 |
 | Q2 | 是否分期 | **一次做完**（角色过滤 + 组↔资源归一） | 假设 6 |
 | Q3 | 存量组织数据 | **删除**（不归档） | R-03 / 假设 2 |
-| Q4 | 三方同步 | **移除**同步模块（第三方免登保留） | R-06 / Non-goals |
+| Q4 | 三方同步 | **移除**同步模块（注：原「免登保留」已被 Q-P5 推翻） | R-06 |
 | Q5 | 外部 IDM/HR 对接 | **没有** ⇒ 外部对接列可移除 | R-02 边界 / 假设 3 |
 | Q6 | R-08 是否纳入 | **纳入** | R-08 |
 | Q-P1 | 零 ACL 角色 / 无角色用户的降级策略 | **自动补默认角色 + 超管豁免 + 提示兜底** | R-05 边界 / R-07 |
 | Q-P2 | BUG-116（角色↔菜单授权界面失效）是否纳入 | **纳入** ⇒ 本次新增 R-10（v1.1.0 变更源） | R-10 |
 | Q-P3 | 组织列范围（`tbl_privilege_role` / 前台账号表） | **三表都去组织列** | R-02 / R-03 边界 |
 | Q-P4 | 无任何授权行的资源之可见性口径 | **保持兼容：无授权行＝公开** | R-04 边界 |
+| Q-P5 | 三方平台配置（表/CRUD/页面/菜单）是否随免登下线 | **随免登一起下线**（全清，含 `third_party_id` 列与 `PlatformTypeEnm`） | R-11 边界 2/3 |
+| Q-P6 | `apps/mobile-ui` 去留 | **保留 app，只删 SSO 自动登录** | R-11 边界 4 / 假设 7 |
