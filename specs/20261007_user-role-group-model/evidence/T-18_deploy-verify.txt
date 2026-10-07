@@ -33,7 +33,7 @@ phoenix-release-redis-1      redis:7-alpine            Up 3 days (healthy)      
   GET /auth/thirdLogin                               → HTTP 404
   GET /platform/platform-info/getEnabledPlatform     → HTTP 404
 === ⑥ 前端是否为 v2.0.0 新构建（检查是否已无 organization chunk）===
-sed: 1: "s/^/  含组织/平台� ...": bad flag in substitute command: '�'
+sed: 1: "s/^/  含组织/平台? ...": bad flag in substitute command: '?'
   示例 chunk: AccessApi-CRp0c22P.js
   示例 chunk: AgentDataSourceConfig-PsJvTqvX.js
   示例 chunk: AgentGroupGrant-97tAKJh6.js
