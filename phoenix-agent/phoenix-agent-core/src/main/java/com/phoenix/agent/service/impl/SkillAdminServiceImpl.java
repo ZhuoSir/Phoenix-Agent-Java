@@ -152,8 +152,10 @@ public class SkillAdminServiceImpl implements SkillAdminService {
             res.setResourceContent(entry.getValue());
             resources.add(res);
         }
+        // CR-02/R-19：判重按「创建人 + 名称」—— 不同用户可上传同名技能；
+        // 仅当**本人**已有同名时才进入覆盖/冲突分支（他人同名 ⇒ existing=null ⇒ 走新建）
         HarnessSkill existing = harnessSkillMapper.selectOneByQuery(
-            QueryWrapper.create().where("name = ?", parsed.getName()));
+            QueryWrapper.create().where("name = ?", parsed.getName()).and("creator = ?", operator));
         Date now = new Date();
         if (existing != null) {
             if (!overwrite) {
@@ -183,7 +185,15 @@ public class SkillAdminServiceImpl implements SkillAdminService {
         skill.setCreator(operator);
         skill.setCreatedAt(now);
         skill.setUpdatedAt(now);
-        harnessSkillMapper.insert(skill);
+        try {
+            harnessSkillMapper.insert(skill);
+        }
+        catch (org.springframework.dao.DuplicateKeyException dup) {
+            // CR-02：并发下同用户同名撞唯一索引 (name, creator) → 友好失败而非 500
+            log.warn("技能同名并发冲突: name={}, creator={}", parsed.getName(), operator);
+            return ReturnVo.fail(SkillErrorCodeEnm.SKILL_NAME_CONFLICT.getMsg(),
+                SkillErrorCodeEnm.SKILL_NAME_CONFLICT.getCode());
+        }
         insertResources(skill.getId(), resources, now);
         return ReturnVo.ok(skill.getId());
     }
