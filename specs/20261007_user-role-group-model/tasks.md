@@ -8,7 +8,7 @@
 
 ## 1. 基线与备份
 
-- [ ] T-01 取编译基线、生产数据门禁统计与组织维度专项备份
+- [x] T-01 取编译基线、生产数据门禁统计与组织维度专项备份
   关联: R-03
   依赖: 无
   验证方式: ① `mvn -q clean compile -Dspring-javaformat.skip=true` 输出留存（基线，供后续比对增量错误数，L-32）；② `pg_dump` 全量 + 三张组织表与 `tbl_platform_platform_info` **专项导出** → `backups/pre_v2.0.0_orgdim_<ts>.sql`；③ 跑门禁统计 SQL：零角色用户数、零组用户数、各角色可用菜单数、`tbl_privilege_group` 行数、`tbl_platform_platform_info` 行数
@@ -16,19 +16,19 @@
 
 ## 2. 组织维度下线（后端）
 
-- [ ] T-02 删除组织维度整文件与死代码 VO
+- [x] T-02 删除组织维度整文件与死代码 VO
   关联: R-01, R-03, R-09
   依赖: T-01
   验证方式: 删 22 个整文件（三个 `*Controller` / `*Service(+Impl)` / `*Mapper` / `*DTO` / `*VO` / `*Query` / `entity`）+ `DepartmentTreeVO`、`OrganizationTreeVO`（227 处之外的易漏项）+ `PrivilegeGroupVO`；删后全量构建并把**增量错误数**与 T-01 基线比对
   验收标准: 24 个文件不存在；`grep -rn "PrivilegeCompany|PrivilegeDepartment|PrivilegeEmployee|PrivilegeGroupVO" --include=*.java` 命中**仅剩 T-03 的 3 个待改文件**
 
-- [ ] T-03 改造三个部分引用文件（组织维度摘除）
+- [x] T-03 改造三个部分引用文件（组织维度摘除）
   关联: R-01, R-02
   依赖: T-02
   验证方式: 改 `AccountInfoServiceImpl`（import:38 / 字段:67 / 唯一调用 401-404）、`PrivilegeUserServiceImpl`（`pageByQuery` 的 select:136 + leftJoin:137-140 + eq:141-142）、`PrivilegeUserController`（`toVo` 54-72）；构建通过后实测 `GET /api/privilege/user/page` 与 `GET /api/privilege/user/{id}`（**断言响应体业务码** `code`，非 HTTP 码，L-26）
   验收标准: 全量构建通过；用户分页/详情返回体**不含** `companyName`/`deptName`/`companyId`/`deptId`/`employeeId`/`itUserId`/`itUserName`/`isLeader`；上述字段在 Java 侧 grep 为 0
 
-- [ ] T-04 三方集成三层后端删除（同步 / 免登 / 平台配置）
+- [x] T-04 三方集成三层后端删除（同步 / 免登 / 平台配置）
   关联: R-06, R-11
   依赖: T-03
   验证方式: 删 `service/sync/**`（含 `*SyncConstants`，整包不留）、`service/thirdparty/**`、`PlatformInfoController`/`Service(+Impl)`/`Mapper`/实体、`service/platform/{DingTalk,Feishu,Weixin}SdkService(+Impl)`、`PlatformTypeEnm`、`AccountInfo.thirdPartyId`、`AccountInfoServiceImpl.thirdPartyLogin`/`getByThirdPartyId`、`AccountLoginController POST /auth/thirdLogin`、`AccountInfoController GET /third-party/{id}`；**共享面逐身份断言**：① `POST /platform/sync/*` → 404 ② `POST /auth/thirdLogin` → 404 ③ `/platform/platform-info/**` → 404 ④ **`POST /auth/login` 后台账号与前台账号均成功（业务码）** ← 唯一保留登录方式的对面断言
