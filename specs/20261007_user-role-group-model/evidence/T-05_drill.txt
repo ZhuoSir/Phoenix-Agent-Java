@@ -1,0 +1,85 @@
+=== T-05 演练（库 phoenix_drill，2026-10-07 17:09:51）===
+
+[0] 演练前快照
+  [快照] zero_role_users=2  org_menu_rows=4  acl_total=59  user_role_total=12
+
+[0b] 孤儿 user_role 行导出（BUG-118 口径：保留+记账，不删）
+id,user_id,role_id,create_time
+2019320538573410306,00a2eaad48c94380898f23a9cf977e75,845fc4884257402f4aedb295fe194a14,2026-04-27 09:11:41
+2019594739973033986,00a2eaad48c94380898f23a9cf977e75,0628535e-76af-4987-9453-b810fd35f724,2026-04-27 09:12:43
+2019594893501337601,00a2eaad48c94380898f23a9cf977e75,0628535e-76af-4987-9453-b810fd35f724,2026-04-27 09:13:15
+2019600707062534145,00a2eaad48c94380898f23a9cf977e75,0628535e-76af-4987-9453-b810fd35f724,2026-04-27 09:13:19
+2061351317197746178,00a2eaad48c94380898f23a9cf977e75,71f2934c-d93b-4075-9492-d9cbf22e1bb2,2026-06-01 15:37:06
+
+[1] 正向执行 V2.0.0_02（补角色）
+BEGIN
+DO
+psql:<stdin>:71: NOTICE:  [V2.0.0_02] 补角色完成：待补 2 人 / 实际写入 2 行（角色 431285032083144704 / 普通角色）
+psql:<stdin>:86: NOTICE:  [V2.0.0_02] 自检通过：存活用户无角色数 = 0
+DO
+COMMIT
+    → 快照
+  [快照] zero_role_users=0  org_menu_rows=4  acl_total=59  user_role_total=14
+
+[2] 正向执行 V2.0.0_03（组织菜单清理）
+BEGIN
+DELETE 4
+DELETE 4
+DELETE 0
+DELETE 0
+psql:<stdin>:56: NOTICE:  [V2.0.0_03] 自检通过：组织菜单与其授权行均为 0
+DO
+COMMIT
+    → 快照
+  [快照] zero_role_users=0  org_menu_rows=0  acl_total=55  user_role_total=14
+
+[3] 幂等复跑 V2.0.0_02（预期写入 0 行）
+BEGIN
+DO
+psql:<stdin>:71: NOTICE:  [V2.0.0_02] 补角色完成：待补 0 人 / 实际写入 0 行（角色 431285032083144704 / 普通角色）
+psql:<stdin>:86: NOTICE:  [V2.0.0_02] 自检通过：存活用户无角色数 = 0
+DO
+COMMIT
+
+[4] 幂等复跑 V2.0.0_03（预期影响 0 行）
+BEGIN
+DELETE 0
+DELETE 0
+DELETE 0
+DELETE 0
+psql:<stdin>:56: NOTICE:  [V2.0.0_03] 自检通过：组织菜单与其授权行均为 0
+DO
+COMMIT
+    → 快照（应与 [2] 后一致）
+  [快照] zero_role_users=0  org_menu_rows=0  acl_total=55  user_role_total=14
+
+[5] 反向执行 V2.0.0_03 rollback（重建菜单 4 + 授权 4）
+BEGIN
+DELETE 0
+DELETE 0
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+DO
+psql:<stdin>:50: NOTICE:  [V2.0.0_03-rollback] 自检通过：菜单 4 行 + 授权 4 行已恢复
+COMMIT
+    → 快照
+  [快照] zero_role_users=0  org_menu_rows=4  acl_total=59  user_role_total=14
+
+[6] 反向执行 V2.0.0_02 rollback（撤销补角色）
+BEGIN
+DO
+psql:<stdin>:19: NOTICE:  [V2.0.0_02-rollback] 已撤销 2 行补角色关系
+COMMIT
+    → 快照（应与 [0] 一致：zero_role=2 / menu=4 / acl=59 / user_role=12）
+  [快照] zero_role_users=2  org_menu_rows=4  acl_total=59  user_role_total=12
+
+[7] 反向幂等复跑（两个 rollback 再各跑一次，应无报错、状态不变）
+  03-rollback 复跑 OK
+  02-rollback 复跑 OK
+  [快照] zero_role_users=2  org_menu_rows=4  acl_total=59  user_role_total=12
