@@ -1590,6 +1590,10 @@ COMMIT;
 -- Table structure for tbl_data_categories
 -- ----------------------------
 DROP TABLE IF EXISTS "public"."tbl_data_categories";
+-- BUG-127 修复（既有缺陷，2026-10-07 T-15）：本表 DEFAULT 引用被 OWNED BY 的序列，
+-- 而上面的 DROP TABLE 会连带删除该序列 ⇒ CREATE TABLE 前先补建，否则
+-- 报 relation "tbl_data_categories_id_seq" does not exist（ON_ERROR_STOP 下整份导入中断）。
+CREATE SEQUENCE IF NOT EXISTS "public"."tbl_data_categories_id_seq";
 CREATE TABLE "public"."tbl_data_categories" (
   "id" int4 NOT NULL DEFAULT nextval('tbl_data_categories_id_seq'::regclass),
   "name" varchar(50) COLLATE "pg_catalog"."default" NOT NULL
@@ -2730,6 +2734,10 @@ COMMIT;
 -- Table structure for tbl_data_order_items
 -- ----------------------------
 DROP TABLE IF EXISTS "public"."tbl_data_order_items";
+-- BUG-127 修复（既有缺陷，2026-10-07 T-15）：本表 DEFAULT 引用被 OWNED BY 的序列，
+-- 而上面的 DROP TABLE 会连带删除该序列 ⇒ CREATE TABLE 前先补建，否则
+-- 报 relation "tbl_data_order_items_id_seq" does not exist（ON_ERROR_STOP 下整份导入中断）。
+CREATE SEQUENCE IF NOT EXISTS "public"."tbl_data_order_items_id_seq";
 CREATE TABLE "public"."tbl_data_order_items" (
   "id" int4 NOT NULL DEFAULT nextval('tbl_data_order_items_id_seq'::regclass),
   "order_id" int4 NOT NULL,
@@ -3241,9 +3249,6 @@ INSERT INTO "public"."tbl_privilege_acl" ("id", "release_id", "release_sn", "sys
 INSERT INTO "public"."tbl_privilege_acl" ("id", "release_id", "release_sn", "system_sn", "module_id", "module_sn", "acl_state", "create_time", "create_by", "update_time", "update_by", "del_flag") VALUES ('d4f07983a26d470fa27a76e2ffc8d12f', '71f2934c-d93b-4075-9492-d9cbf22e1bb2', 'role', NULL, 'f0c0d2d3a7bb452cb5ff98328575b41a', NULL, '15', NULL, NULL, '2026-06-20 15:16:22.633093', NULL, 0);
 INSERT INTO "public"."tbl_privilege_acl" ("id", "release_id", "release_sn", "system_sn", "module_id", "module_sn", "acl_state", "create_time", "create_by", "update_time", "update_by", "del_flag") VALUES ('ea8dfb0ed27140dca754fea10ec5414b', '71f2934c-d93b-4075-9492-d9cbf22e1bb2', 'role', NULL, '741103abe63748749f82fbd2b420061c', NULL, '15', NULL, NULL, '2026-06-22 21:16:20.943617', NULL, 0);
 INSERT INTO "public"."tbl_privilege_acl" ("id", "release_id", "release_sn", "system_sn", "module_id", "module_sn", "acl_state", "create_time", "create_by", "update_time", "update_by", "del_flag") VALUES ('431929027947798528', '428007432736870400', 'role', NULL, '638d2319c2d54f3ea36b2a519c9a1d0f', 'PlatformAccount', '31', '2026-07-07 10:32:45.08', NULL, '2026-07-07 10:32:45.139725', NULL, 0);
-INSERT INTO "public"."tbl_privilege_acl" ("id", "release_id", "release_sn", "system_sn", "module_id", "module_sn", "acl_state", "create_time", "create_by", "update_time", "update_by", "del_flag") VALUES ('431929027977158656', '428007432736870400', 'role', NULL, '5db7285051204f81867995e2565931c1', 'DepartmentManagement', '31', '2026-07-07 10:32:45.08', NULL, '2026-07-07 10:32:45.139725', NULL, 0);
-INSERT INTO "public"."tbl_privilege_acl" ("id", "release_id", "release_sn", "system_sn", "module_id", "module_sn", "acl_state", "create_time", "create_by", "update_time", "update_by", "del_flag") VALUES ('431929027977158657', '428007432736870400', 'role', NULL, '8ec79aa5e5ab4365805d49a4ff0c5116', 'EmployeeManagement', '31', '2026-07-07 10:32:45.08', NULL, '2026-07-07 10:32:45.139725', NULL, 0);
-INSERT INTO "public"."tbl_privilege_acl" ("id", "release_id", "release_sn", "system_sn", "module_id", "module_sn", "acl_state", "create_time", "create_by", "update_time", "update_by", "del_flag") VALUES ('431929027977158658', '428007432736870400', 'role', NULL, '90511f372a564de1b1ab8df780c640b7', 'CompanyManagement', '31', '2026-07-07 10:32:45.08', NULL, '2026-07-07 10:32:45.139725', NULL, 0);
 INSERT INTO "public"."tbl_privilege_acl" ("id", "release_id", "release_sn", "system_sn", "module_id", "module_sn", "acl_state", "create_time", "create_by", "update_time", "update_by", "del_flag") VALUES ('431929027977158659', '428007432736870400', 'role', NULL, '6c0ee41bea32413080907d4e5584cda3', 'LogManagement', '31', '2026-07-07 10:32:45.08', NULL, '2026-07-07 10:32:45.139725', NULL, 0);
 INSERT INTO "public"."tbl_privilege_acl" ("id", "release_id", "release_sn", "system_sn", "module_id", "module_sn", "acl_state", "create_time", "create_by", "update_time", "update_by", "del_flag") VALUES ('431929027977158660', '428007432736870400', 'role', NULL, 'b6520f15610f49ecb30f647bdb13ca5f', 'PermissionValueManagement', '31', '2026-07-07 10:32:45.08', NULL, '2026-07-07 10:32:45.139725', NULL, 0);
 INSERT INTO "public"."tbl_privilege_acl" ("id", "release_id", "release_sn", "system_sn", "module_id", "module_sn", "acl_state", "create_time", "create_by", "update_time", "update_by", "del_flag") VALUES ('431929027977158661', '428007432736870400', 'role', NULL, 'eecdaae775a54fa8b267c329e489e2', 'MenuManagement', '31', '2026-07-07 10:32:45.08', NULL, '2026-07-07 10:32:45.139725', NULL, 0);
@@ -3255,7 +3260,6 @@ INSERT INTO "public"."tbl_privilege_acl" ("id", "release_id", "release_sn", "sys
 INSERT INTO "public"."tbl_privilege_acl" ("id", "release_id", "release_sn", "system_sn", "module_id", "module_sn", "acl_state", "create_time", "create_by", "update_time", "update_by", "del_flag") VALUES ('431929027981352965', '428007432736870400', 'role', NULL, '6c75ad59fd434d138ecd1473c3ce07b6', 'AgentRun', '31', '2026-07-07 10:32:45.08', NULL, '2026-07-07 10:32:45.139725', NULL, 0);
 INSERT INTO "public"."tbl_privilege_acl" ("id", "release_id", "release_sn", "system_sn", "module_id", "module_sn", "acl_state", "create_time", "create_by", "update_time", "update_by", "del_flag") VALUES ('431929027981352966', '428007432736870400', 'role', NULL, '6752c28a59c048cb9d08179ccadb38b4', 'PlatformAccountInfo', '31', '2026-07-07 10:32:45.08', NULL, '2026-07-07 10:32:45.139725', NULL, 0);
 INSERT INTO "public"."tbl_privilege_acl" ("id", "release_id", "release_sn", "system_sn", "module_id", "module_sn", "acl_state", "create_time", "create_by", "update_time", "update_by", "del_flag") VALUES ('431929027981352967', '428007432736870400', 'role', NULL, '8b1a156184cf49fba34389e8caea4269', 'PlatformGroupInfo', '31', '2026-07-07 10:32:45.08', NULL, '2026-07-07 10:32:45.139725', NULL, 0);
-INSERT INTO "public"."tbl_privilege_acl" ("id", "release_id", "release_sn", "system_sn", "module_id", "module_sn", "acl_state", "create_time", "create_by", "update_time", "update_by", "del_flag") VALUES ('431929027985547264', '428007432736870400', 'role', NULL, '2bafd881f51f43519a54a429be0dabb5', 'OrganizationManagement', '31', '2026-07-07 10:32:45.08', NULL, '2026-07-07 10:32:45.139725', NULL, 0);
 INSERT INTO "public"."tbl_privilege_acl" ("id", "release_id", "release_sn", "system_sn", "module_id", "module_sn", "acl_state", "create_time", "create_by", "update_time", "update_by", "del_flag") VALUES ('431929027985547265', '428007432736870400', 'role', NULL, '02b733aa08774219a23c2f21f1b3f6b5', 'PermissionManagement', '31', '2026-07-07 10:32:45.08', NULL, '2026-07-07 10:32:45.139725', NULL, 0);
 INSERT INTO "public"."tbl_privilege_acl" ("id", "release_id", "release_sn", "system_sn", "module_id", "module_sn", "acl_state", "create_time", "create_by", "update_time", "update_by", "del_flag") VALUES ('431929027985547266', '428007432736870400', 'role', NULL, '741103abe63748749f82fbd2b420061c', 'AgentManager', '31', '2026-07-07 10:32:45.08', NULL, '2026-07-07 10:32:45.139725', NULL, 0);
 INSERT INTO "public"."tbl_privilege_acl" ("id", "release_id", "release_sn", "system_sn", "module_id", "module_sn", "acl_state", "create_time", "create_by", "update_time", "update_by", "del_flag") VALUES ('431929027985547267', '428007432736870400', 'role', NULL, '2f27690452514dd2be93bc79f6f4f993', 'Profile', '31', '2026-07-07 10:32:45.08', NULL, '2026-07-07 10:32:45.139725', NULL, 0);
@@ -3628,9 +3632,6 @@ COMMENT ON TABLE "public"."tbl_privilege_module" IS '模块表';
 -- Records of tbl_privilege_module
 -- ----------------------------
 BEGIN;
-INSERT INTO "public"."tbl_privilege_module" ("id", "name", "url", "sn", "state", "component", "system_id", "status", "image", "order_no", "is_show", "create_time", "create_by", "update_time", "update_by", "del_flag", "pid", "category_id", "type") VALUES ('5db7285051204f81867995e2565931c1', '部门管理', '/organization/department', 'DepartmentManagement', '31', '#/views/organization/department/index.vue', 110, 1, 'lucide:network', 2, 1, '2026-07-07 01:20:57.321454', 'admin', NULL, NULL, 0, '2bafd881f51f43519a54a429be0dabb5', 111, '1');
-INSERT INTO "public"."tbl_privilege_module" ("id", "name", "url", "sn", "state", "component", "system_id", "status", "image", "order_no", "is_show", "create_time", "create_by", "update_time", "update_by", "del_flag", "pid", "category_id", "type") VALUES ('8ec79aa5e5ab4365805d49a4ff0c5116', '人员管理', '/organization/employee', 'EmployeeManagement', '31', '#/views/organization/employee/index.vue', 110, 1, 'lucide:users', 3, 1, '2026-07-07 01:20:57.321454', 'admin', NULL, NULL, 0, '2bafd881f51f43519a54a429be0dabb5', 111, '1');
-INSERT INTO "public"."tbl_privilege_module" ("id", "name", "url", "sn", "state", "component", "system_id", "status", "image", "order_no", "is_show", "create_time", "create_by", "update_time", "update_by", "del_flag", "pid", "category_id", "type") VALUES ('90511f372a564de1b1ab8df780c640b7', '公司管理', '/organization/company', 'CompanyManagement', '31', '#/views/organization/company/index.vue', 110, 1, 'lucide:building', 1, 1, '2026-07-07 01:20:57.321454', 'admin', NULL, NULL, 0, '2bafd881f51f43519a54a429be0dabb5', 111, '1');
 INSERT INTO "public"."tbl_privilege_module" ("id", "name", "url", "sn", "state", "component", "system_id", "status", "image", "order_no", "is_show", "create_time", "create_by", "update_time", "update_by", "del_flag", "pid", "category_id", "type") VALUES ('6c0ee41bea32413080907d4e5584cda3', '日志管理', '/permission-management/log', 'LogManagement', '31', '#/views/system-management/log/index.vue', 110, 1, 'lucide:file-text', 5, 0, '2026-07-07 01:20:57.321454', 'admin', NULL, NULL, 0, '02b733aa08774219a23c2f21f1b3f6b5', 111, '1');
 INSERT INTO "public"."tbl_privilege_module" ("id", "name", "url", "sn", "state", "component", "system_id", "status", "image", "order_no", "is_show", "create_time", "create_by", "update_time", "update_by", "del_flag", "pid", "category_id", "type") VALUES ('b6520f15610f49ecb30f647bdb13ca5f', '权限值管理', '/permission-management/permission-value', 'PermissionValueManagement', '31', '#/views/system-management/permission-value/index.vue', 110, 1, 'lucide:key', 4, 1, '2026-07-07 01:20:57.321454', 'admin', NULL, NULL, 0, '02b733aa08774219a23c2f21f1b3f6b5', 111, '1');
 INSERT INTO "public"."tbl_privilege_module" ("id", "name", "url", "sn", "state", "component", "system_id", "status", "image", "order_no", "is_show", "create_time", "create_by", "update_time", "update_by", "del_flag", "pid", "category_id", "type") VALUES ('eecdaae775a54fa8b267c329e489e2', '菜单管理', '/permission-management/menu', 'MenuManagement', '31', '#/views/system-management/menu-management/index.vue', 110, 1, 'lucide:menu', 3, 1, '2026-07-07 01:20:57.321454', 'admin', NULL, NULL, 0, '02b733aa08774219a23c2f21f1b3f6b5', 111, '1');
@@ -3642,14 +3643,11 @@ INSERT INTO "public"."tbl_privilege_module" ("id", "name", "url", "sn", "state",
 INSERT INTO "public"."tbl_privilege_module" ("id", "name", "url", "sn", "state", "component", "system_id", "status", "image", "order_no", "is_show", "create_time", "create_by", "update_time", "update_by", "del_flag", "pid", "category_id", "type") VALUES ('6c75ad59fd434d138ecd1473c3ce07b6', '智能体对话', '/agent/:id/run', 'AgentRun', '31', '#/components/run/index.vue', 110, 1, NULL, 14, 0, '2026-07-07 01:20:57.321454', 'admin', NULL, NULL, 0, '741103abe63748749f82fbd2b420061c', 111, '1');
 INSERT INTO "public"."tbl_privilege_module" ("id", "name", "url", "sn", "state", "component", "system_id", "status", "image", "order_no", "is_show", "create_time", "create_by", "update_time", "update_by", "del_flag", "pid", "category_id", "type") VALUES ('6752c28a59c048cb9d08179ccadb38b4', '账号管理', '/platform-account/account-info', 'PlatformAccountInfo', '31', '#/views/account/account-info/index.vue', 110, 1, 'lucide:user', 1, 1, '2026-07-07 01:20:57.321454', 'admin', NULL, NULL, 0, '638d2319c2d54f3ea36b2a519c9a1d0f', 111, '1');
 INSERT INTO "public"."tbl_privilege_module" ("id", "name", "url", "sn", "state", "component", "system_id", "status", "image", "order_no", "is_show", "create_time", "create_by", "update_time", "update_by", "del_flag", "pid", "category_id", "type") VALUES ('8b1a156184cf49fba34389e8caea4269', '组管理', '/platform-account/group-info', 'PlatformGroupInfo', '31', '#/views/account/group-info/index.vue', 110, 1, 'lucide:network', 2, 1, '2026-07-07 01:20:57.321454', 'admin', NULL, NULL, 0, '638d2319c2d54f3ea36b2a519c9a1d0f', 111, '1');
-INSERT INTO "public"."tbl_privilege_module" ("id", "name", "url", "sn", "state", "component", "system_id", "status", "image", "order_no", "is_show", "create_time", "create_by", "update_time", "update_by", "del_flag", "pid", "category_id", "type") VALUES ('2bafd881f51f43519a54a429be0dabb5', '组织管理', '/organization', 'OrganizationManagement', '31', NULL, 110, 1, 'lucide:building-2', 10, 1, '2026-07-07 01:20:57.321454', 'admin', NULL, NULL, 0, NULL, 111, '0');
 INSERT INTO "public"."tbl_privilege_module" ("id", "name", "url", "sn", "state", "component", "system_id", "status", "image", "order_no", "is_show", "create_time", "create_by", "update_time", "update_by", "del_flag", "pid", "category_id", "type") VALUES ('02b733aa08774219a23c2f21f1b3f6b5', '权限管理', '/permission-management', 'PermissionManagement', '31', NULL, 110, 1, NULL, 1, 1, '2026-07-07 01:20:57.321454', 'admin', NULL, NULL, 0, NULL, 111, '0');
 INSERT INTO "public"."tbl_privilege_module" ("id", "name", "url", "sn", "state", "component", "system_id", "status", "image", "order_no", "is_show", "create_time", "create_by", "update_time", "update_by", "del_flag", "pid", "category_id", "type") VALUES ('741103abe63748749f82fbd2b420061c', '智能体管理', '/agent-manager', 'AgentManager', '31', NULL, 110, 1, 'meteor-icons:robot', 0, 1, '2026-07-07 01:20:57.321454', 'admin', NULL, NULL, 0, NULL, 111, '0');
 INSERT INTO "public"."tbl_privilege_module" ("id", "name", "url", "sn", "state", "component", "system_id", "status", "image", "order_no", "is_show", "create_time", "create_by", "update_time", "update_by", "del_flag", "pid", "category_id", "type") VALUES ('2f27690452514dd2be93bc79f6f4f993', '个人中心', '/profile', 'Profile', '31', '#/views/_core/profile/index.vue', 110, 1, 'lucide:user', 999, 0, '2026-07-07 01:20:57.321454', 'admin', NULL, NULL, 0, NULL, 111, '1');
 INSERT INTO "public"."tbl_privilege_module" ("id", "name", "url", "sn", "state", "component", "system_id", "status", "image", "order_no", "is_show", "create_time", "create_by", "update_time", "update_by", "del_flag", "pid", "category_id", "type") VALUES ('638d2319c2d54f3ea36b2a519c9a1d0f', '前台管理', '/platform-account', 'PlatformAccount', '31', NULL, 110, 1, 'lucide:users', 350, 1, '2026-07-07 11:28:13.004', 'admin', NULL, NULL, 0, NULL, 111, '0');
 INSERT INTO "public"."tbl_privilege_module" ("id", "name", "url", "sn", "state", "component", "system_id", "status", "image", "order_no", "is_show", "create_time", "create_by", "update_time", "update_by", "del_flag", "pid", "category_id", "type") VALUES ('432372884167696384', '测试', 'aa', 'aa', '31', 'aa', NULL, NULL, 'aa', 0, 0, '2026-07-08 15:56:28.791', '432061200055025664', NULL, NULL, 1, '638d2319c2d54f3ea36b2a519c9a1d0f', NULL, '0');
-INSERT INTO "public"."tbl_privilege_module" ("id", "name", "url", "sn", "state", "component", "system_id", "status", "image", "order_no", "is_show", "create_time", "create_by", "update_time", "update_by", "del_flag", "pid", "category_id", "type") VALUES ('37def68697b54109a57c18508fc4358c', '三方平台', '/basic/platform-info', 'PlatformInfo', '31', '#/views/platform/platform-info/index.vue', 110, 1, 'lucide:globe', 1, 1, '2026-07-16 00:00:00', 'admin', NULL, NULL, 0, '71b572d54b7042359e73e64a6fc40dfc', 111, '1');
-INSERT INTO "public"."tbl_privilege_module" ("id", "name", "url", "sn", "state", "component", "system_id", "status", "image", "order_no", "is_show", "create_time", "create_by", "update_time", "update_by", "del_flag", "pid", "category_id", "type") VALUES ('71b572d54b7042359e73e64a6fc40dfc', '基础管理', '/basic', 'BasicManagement', '31', NULL, 110, 1, 'lucide:settings', 400, 1, '2026-07-16 14:34:51.878', 'admin', '2026-07-16 14:34:51.986', '428011841386577920', 0, NULL, 111, '0');
 INSERT INTO "public"."tbl_privilege_module" ("id", "name", "url", "sn", "state", "component", "system_id", "status", "image", "order_no", "is_show", "create_time", "create_by", "update_time", "update_by", "del_flag", "pid", "category_id", "type") VALUES ('3f8d8f5564ae4e589ab3b6b216c862ca', '请求管理', '/monitoring/agent-request', 'Management', '31', '#/views/account/request-info/index.vue', 110, 1, 'lucide:file-search', 3, 1, '2026-08-11 01:55:50.191738', 'admin', NULL, NULL, 0, '741103abe63748749f82fbd2b420061c', 111, '1');
 COMMIT;
 
@@ -3880,6 +3878,10 @@ COMMIT;
 -- Table structure for tbl_tmp_orders
 -- ----------------------------
 DROP TABLE IF EXISTS "public"."tbl_tmp_orders";
+-- BUG-127 修复（既有缺陷，2026-10-07 T-15）：本表 DEFAULT 引用被 OWNED BY 的序列，
+-- 而上面的 DROP TABLE 会连带删除该序列 ⇒ CREATE TABLE 前先补建，否则
+-- 报 relation "tbl_data_orders_id_seq" does not exist（ON_ERROR_STOP 下整份导入中断）。
+CREATE SEQUENCE IF NOT EXISTS "public"."tbl_data_orders_id_seq";
 CREATE TABLE "public"."tbl_tmp_orders" (
   "id" int4 NOT NULL DEFAULT nextval('tbl_data_orders_id_seq'::regclass),
   "user_id" int4 NOT NULL,
@@ -3910,6 +3912,10 @@ COMMIT;
 -- Table structure for tbl_tmp_products
 -- ----------------------------
 DROP TABLE IF EXISTS "public"."tbl_tmp_products";
+-- BUG-127 修复（既有缺陷，2026-10-07 T-15）：本表 DEFAULT 引用被 OWNED BY 的序列，
+-- 而上面的 DROP TABLE 会连带删除该序列 ⇒ CREATE TABLE 前先补建，否则
+-- 报 relation "tbl_data_products_id_seq" does not exist（ON_ERROR_STOP 下整份导入中断）。
+CREATE SEQUENCE IF NOT EXISTS "public"."tbl_data_products_id_seq";
 CREATE TABLE "public"."tbl_tmp_products" (
   "id" int4 NOT NULL DEFAULT nextval('tbl_data_products_id_seq'::regclass),
   "name" varchar(100) COLLATE "pg_catalog"."default" NOT NULL,
@@ -3940,6 +3946,10 @@ COMMIT;
 -- Table structure for tbl_tmp_users
 -- ----------------------------
 DROP TABLE IF EXISTS "public"."tbl_tmp_users";
+-- BUG-127 修复（既有缺陷，2026-10-07 T-15）：本表 DEFAULT 引用被 OWNED BY 的序列，
+-- 而上面的 DROP TABLE 会连带删除该序列 ⇒ CREATE TABLE 前先补建，否则
+-- 报 relation "tbl_data_users_id_seq" does not exist（ON_ERROR_STOP 下整份导入中断）。
+CREATE SEQUENCE IF NOT EXISTS "public"."tbl_data_users_id_seq";
 CREATE TABLE "public"."tbl_tmp_users" (
   "id" int4 NOT NULL DEFAULT nextval('tbl_data_users_id_seq'::regclass),
   "username" varchar(50) COLLATE "pg_catalog"."default" NOT NULL,

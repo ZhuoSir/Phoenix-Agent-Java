@@ -392,6 +392,17 @@
   `JAVA_HOME=<项目 JDK> <mvn 全路径> … -Dmaven.repo.local="$PWD/.mvn-home"`；③ 证据文件命名带**工具链指纹**
   （JDK 版本 + 仓库路径），配置变更时旧证据改名保留而非删除（本次 `*_WRONGCFG_jdk25_m2repo.raw.txt`）。
 
+## L-50 断言"无错误"必须匹配**真实输出格式**，否则拿到"假绿"
+- **现象**：T-14 全新库重放时，我用 `grep -icE "^error|fatal"` 统计导入错误，输出 `error 行数: 0`，
+  据此写下"all_data 0 error ✅"。但 psql 的实际格式是 **`psql:<stdin>:1597: ERROR:  relation ...`**
+  —— 行首是 `psql:`，`^error` 永远匹配不到 ⇒ **假绿**。真实情况是 `all_data` 在同一处因
+  `ON_ERROR_STOP` 中止（BUG-127），其后所有 INSERT 都没执行，我却按"部分载入"的库得出了终态数字。
+  T-15 改用 `grep -icE 'ERROR|FATAL'` **并同时看退出码** 后立刻暴露（exit=3）。
+- **防再犯规则**：① 错误断言用工具**真实**的输出样式（psql: `ERROR|FATAL`；vue-tsc: `error TS`；
+  maven: `[ERROR]`），并**同时**断言进程退出码；② 只统计"行数=0"不够，必须**两个信号都绿**；
+  ③ 结论若依赖"某文件载入成功"，要顺带抽查**该文件后段**的产物（如菜单/用户行数）——
+  因为"前段成功、后段中止"与"全部成功"在只看汇总行数时难以区分。
+
 ## L-49 `DROP COLUMN IF EXISTS` 不保护"表不存在"；跨基线迁移件一律写 `ALTER TABLE IF EXISTS`
 - **现象**：T-14 的 `V2.0.0_01` 在演练库跑得干干净净（两轮幂等全绿），一放到**全新库重放**就
   `exit=3` 整体中断：`ERROR: relation "tbl_unified_account_map" does not exist`。

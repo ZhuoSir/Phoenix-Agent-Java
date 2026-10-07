@@ -50,3 +50,16 @@
 
 [7] 结论：T-14 代码与升级件面完成（编译绿、双环境演练全绿、件数配对）；
     启动期 SQL 断言挂 T-16 ⇒ **T-14 暂不勾选**。
+
+=== 【勘误 2026-10-07，T-15 阶段发现】 ===
+本文件 [4] 中「全新库重放：all_schema(0 error) → all_data(0 error)」的 **all_data 结论无效**：
+  - 当时的错误统计用 `grep -icE "^error|fatal"`，而 psql 输出行首是 `psql:<stdin>:NNN: `，
+    故**永远匹配不到** ⇒ 假绿。实际 `all_data` 因 BUG-127（DROP TABLE 连带删除 OWNED BY 序列）
+    在同一处以 `exit=3` 中止，其后 INSERT 全部未载入；当时报出的终态数字（menus=17/acls=22 等）
+    是在**部分载入**的库上得到的。
+  - 仍然有效的结论：① 演练库正反向（T-14_drill.txt，用 ON_ERROR_STOP + && 判定）有效；
+    ② `ALTER TABLE IF EXISTS` 的修复结论有效（当时是真实 exit=3 暴露出来的）；
+    ③ 01~04 各件在全新库上可重复执行（该轮 exit=0 为真）。
+  - 修正后的完整重放见 **T-15_drill.txt**：all_schema exit=0/ERROR=0、all_data exit=0/ERROR=0，
+    01~05 两轮全绿，终态 targets_left=0 / org_tables_left=0 / zero_role_users=0。
+  - 该问题已登记 **BUG-127**（已修复）；工具性教训记 **L-50**。
