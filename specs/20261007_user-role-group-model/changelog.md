@@ -1,5 +1,12 @@
 # Changelog: user-role-group-model
 
+## v1.0.0（2026-10-07）确认人: 陈卓
+
+- 三重确认第①重：**requirements 确认通过**（用户口令「确认，陈卓」）→ 版本头落 `v1.0.0 | 状态: 已确认 | 确认人: 陈卓 | 确认日期: 2026-10-07 | 挂载: v2.0.0（在途）`
+- 确认范围：R-01~R-09（9 条需求）+ Non-goals 9 条 + 假设 6 条 + Q1~Q6 裁定
+- 相对 v0.2.0 正文**无改动**，仅版本头转正
+- 下一步：进入 **Phase 2 Plan**（加载 `specs/_project/lessons.md` 全部 active 坑 L-01~L-42 + `.specrc.yml` 路由为 `global` 的 `standards/api-design.md`、`standards/database-design.md` + profile 技术债节）
+
 ## v0.2.0（2026-10-07）用户裁定 Q1~Q6（草稿期，待确认①）
 
 - 新增: **R-09 组语义唯一化**（Q1 裁定「合并一套」→ 保留平台侧资源授权组，下线后台数据组）
