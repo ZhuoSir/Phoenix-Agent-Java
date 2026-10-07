@@ -103,8 +103,18 @@
 | 验证 | `evidence/T-20_scan.txt`、`T-20_drill.txt`、`T-20_deploy-verify.txt`、`T-20_result.txt` |
 | 保留 | `tbl_platform_account_info.code`（前台账号自身标识，前台登录/查询/搜索在用） |
 
+## 六·补五、R-15 追加（2026-10-07，T-21）
+
+| 项 | 值 |
+|---|---|
+| 迁移件 | **无**（R-15 无表结构变更；正向/回滚仍各 8 件） |
+| 后端 | `PrivilegeUserServiceImpl`（补 `mobile` 检索 + `isSuperAdmin`/`updateStatus`/`updateStatusBatch`/`canDisable`）、`PrivilegeUserController`（+2 端点 + 保护）、2 个新 DTO、`LoginServiceImpl`（委托统一口径） |
+| 前端 | `account/{data.ts,index.vue}`、`api/core/privilege-user.ts`；删除 `account/role-form.vue` |
+| 缺陷 | 修 **BUG-130**（手机号搜索失效）；登记 **BUG-131**（用户管理端点缺管理员守卫） |
+| 验证 | `evidence/T-21_result.txt` |
+
 ## 七、计数自检
 
 - 正向 SQL 件数 = 回滚 SQL 件数 = **8** ✅
-- 任务数 20，完成 20（T-17 收口 + T-18 R-12 + T-19 R-13 + T-20 R-14）✅
+- 任务数 21，完成 21（T-17 收口 + T-18 R-12 + T-19 R-13 + T-20 R-14 + T-21 R-15）✅
 - 提交 footer `Task: T-xx` 覆盖 T-01~T-17 ✅（`git log --grep="Task: T-"` 可核）

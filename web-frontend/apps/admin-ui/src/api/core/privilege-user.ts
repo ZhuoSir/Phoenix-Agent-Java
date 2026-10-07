@@ -61,6 +61,27 @@ export async function deleteUserApi(id: string) {
   });
 }
 
+/** R-15（v2.4.0）：启用/禁用单个账号。status：0 启用 / 1 禁用 */
+export async function updateUserStatusApi(id: string, status: number) {
+  return requestClient.put(
+    '/api/privilege/user/status',
+    { id, status },
+    { responseReturn: 'body' },
+  );
+}
+
+/** R-15（v2.4.0）：批量启用/禁用。返回实际更新行数 */
+export async function batchUpdateUserStatusApi(
+  ids: string[],
+  status: number,
+) {
+  return requestClient.put(
+    '/api/privilege/user/status/batch',
+    { ids, status },
+    { responseReturn: 'body' },
+  );
+}
+
 export async function updatePasswordApi(
   userId: number,
   oldPassword: string,

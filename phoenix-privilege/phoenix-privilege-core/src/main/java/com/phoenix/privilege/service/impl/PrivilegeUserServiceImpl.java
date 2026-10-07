@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Random;
 import java.util.function.Consumer;
 
@@ -39,6 +40,17 @@ public class PrivilegeUserServiceImpl extends ServiceImpl<PrivilegeUserMapper, P
 		implements IPrivilegeUserService {
 
 	private static final String RESET_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
+
+	/** 超管角色 id（与 LoginServiceImpl 原口径一致；R-15 起统一由本类判定） */
+	private static final String SUPER_ADMIN_ROLE_ID = "428007432736870400";
+
+	/** 超管角色 sn（库中实存大写，比较忽略大小写） */
+	private static final String ROLE_ADMIN_SN = "ROLE_ADMIN";
+
+	/** 人员状态：0 启用、1 禁用（库注释） */
+	private static final int STATUS_ENABLED = 0;
+
+	private static final int STATUS_DISABLED = 1;
 
 	private final IPrivilegeRoleService privilegeRoleService;
 
@@ -206,11 +218,15 @@ public class PrivilegeUserServiceImpl extends ServiceImpl<PrivilegeUserMapper, P
 	public Page<PrivilegeUserVO> pageByQuery(Page<PrivilegeUserVO> page, PrivilegeUserDTO dto) {
 		// 组织维度已下线（v2.0.0）：不再 leftJoin 公司/部门，也不再按 companyId/deptId 过滤
 		// 用户类型（R-14，v2.3.0）：user_type/工号已下线，不再作为筛选与搜索维度
+		// R-15（v2.4.0）：关键字**必须覆盖手机号** —— 手机号存 `mobile` 列，历史上只搜了 `phone`（座机，实为空）
+		// ⇒ 手机号搜索一直失效；此处补 `mobile`，并保留 `phone`（座机）与 tel
 		QueryWrapper qw = QueryWrapper.create()
 			.select("tbl_privilege_user.*");
 		if (StrUtil.isNotBlank(dto.getKeyword())) {
 			qw.and((Consumer<QueryWrapper>) w -> w.like(PrivilegeUser::getUsername, dto.getKeyword())
 				.or(PrivilegeUser::getRealName)
+				.like(dto.getKeyword())
+				.or(PrivilegeUser::getMobile)
 				.like(dto.getKeyword())
 				.or(PrivilegeUser::getPhone)
 				.like(dto.getKeyword()));
@@ -250,6 +266,85 @@ public class PrivilegeUserServiceImpl extends ServiceImpl<PrivilegeUserMapper, P
 		}).toList();
 		voPage.setRecords(voList);
 		return voPage;
+	}
+
+	/**
+	 * 超管判定（R-15 统一口径）：持超管角色 id，或持 sn=ROLE_ADMIN 的角色（忽略大小写）。
+	 *
+	 * <p>与登录期判定共用本实现（LoginServiceImpl 已委托到此），避免两套口径漂移。
+	 */
+	@Override
+	public boolean isSuperAdmin(String userId) {
+		if (StrUtil.isBlank(userId)) {
+			return false;
+		}
+		List<PrivilegeUserRole> userRoles = privilegeUserRoleService.getByUserId(userId);
+		if (userRoles == null || userRoles.isEmpty()) {
+			return false;
+		}
+		List<String> roleIds = userRoles.stream()
+			.map(PrivilegeUserRole::getRoleId)
+			.filter(Objects::nonNull)
+			.distinct()
+			.toList();
+		if (roleIds.isEmpty()) {
+			return false;
+		}
+		if (roleIds.contains(SUPER_ADMIN_ROLE_ID)) {
+			return true;
+		}
+		// 注意：库里 sn 实际存大写 'ROLE_ADMIN'，比较一律忽略大小写（同类坑见 BUG-123）
+		return privilegeRoleService.listByIds(roleIds)
+			.stream()
+			.anyMatch(r -> r.getSn() != null && ROLE_ADMIN_SN.equalsIgnoreCase(r.getSn()));
+	}
+
+	@Override
+	public boolean updateStatus(String id, Integer status) {
+		if (!isValidStatus(status) || StrUtil.isBlank(id)) {
+			return false;
+		}
+		PrivilegeUser user = new PrivilegeUser();
+		user.setId(id);
+		user.setStatus(status);
+		return updateById(user);
+	}
+
+	@Override
+	public int updateStatusBatch(List<String> ids, Integer status) {
+		if (!isValidStatus(status) || ids == null || ids.isEmpty()) {
+			return 0;
+		}
+		List<String> targets = ids.stream().filter(StrUtil::isNotBlank).distinct().toList();
+		if (targets.isEmpty()) {
+			return 0;
+		}
+		PrivilegeUser patch = new PrivilegeUser();
+		patch.setStatus(status);
+		return getMapper().updateByQuery(patch,
+				QueryWrapper.create().in(PrivilegeUser::getId, targets));
+	}
+
+	@Override
+	public boolean canDisable(List<String> ids) {
+		if (ids == null || ids.isEmpty()) {
+			return true;
+		}
+		List<String> targets = ids.stream().filter(StrUtil::isNotBlank).distinct().toList();
+		// 全部启用的超管账号
+		List<PrivilegeUser> enabled = list(QueryWrapper.create()
+			.eq(PrivilegeUser::getStatus, STATUS_ENABLED)
+			.eq(PrivilegeUser::getDelFlag, 0));
+		List<String> enabledSuperAdmins = enabled.stream()
+			.map(PrivilegeUser::getId)
+			.filter(this::isSuperAdmin)
+			.toList();
+		// 停用后剩余 = 启用超管 - 本次被停用的超管
+		return enabledSuperAdmins.stream().anyMatch(id -> !targets.contains(id));
+	}
+
+	private boolean isValidStatus(Integer status) {
+		return status != null && (status == STATUS_ENABLED || status == STATUS_DISABLED);
 	}
 
 	private String generateRandomPassword(int length) {

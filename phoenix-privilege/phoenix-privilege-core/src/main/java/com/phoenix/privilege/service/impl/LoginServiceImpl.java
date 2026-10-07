@@ -198,29 +198,12 @@ public class LoginServiceImpl implements LoginService {
 	}
 
 	/**
-	 * 是否超级管理员：持有硬编码超管角色 id（沿用 AgentKnowledgeMapper 既有口径）， 或持有
-	 * sn=ROLE_ADMIN（忽略大小写）的角色。两者满足其一即豁免，避免单一口径失配 导致管理员自己反而看不到菜单。
+	 * 是否超级管理员（R-15 起**委托到统一实现**，避免登录期与启停保护两套口径漂移）。
+	 *
+	 * @see IPrivilegeUserService#isSuperAdmin(String)
 	 */
 	private boolean isSuperAdmin(String userId) {
-		List<PrivilegeUserRole> userRoles = privilegeUserRoleService.getByUserId(userId);
-		if (userRoles == null || userRoles.isEmpty()) {
-			return false;
-		}
-		List<String> roleIds = userRoles.stream()
-			.map(PrivilegeUserRole::getRoleId)
-			.filter(Objects::nonNull)
-			.distinct()
-			.toList();
-		if (roleIds.isEmpty()) {
-			return false;
-		}
-		if (roleIds.contains(SUPER_ADMIN_ROLE_ID)) {
-			return true;
-		}
-		// 注意：库里 sn 实际存大写 'COMMON'/'ROLE_ADMIN'，比较一律忽略大小写（同类坑见 BUG-123）
-		return privilegeRoleService.listByIds(roleIds)
-			.stream()
-			.anyMatch(r -> r.getSn() != null && "ROLE_ADMIN".equalsIgnoreCase(r.getSn()));
+		return privilegeUserService.isSuperAdmin(userId);
 	}
 
 	/**

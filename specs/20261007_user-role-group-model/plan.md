@@ -1,4 +1,4 @@
-> 版本: v1.3.0 | 状态: 已确认 | 确认人: 陈卓 | 确认日期: 2026-10-07 | 确认记录: 同 requirements v2.2.0 | 变更源: R-13（v2.2.0 新增条款，账号集合收敛）⇒ 追加 §R-13 实施方案 | 确认记录: 用户 2026-10-07 口令「确认执行（确认人：陈卓）」+ URL 一并改为 /system-management | 变更源: R-12（v2.1.0 新增条款，信息架构调整）⇒ 追加 §R-12 实施方案 | 更新: 2026-10-07（v1.1.0 重确认②通过：仅事实数字订正，正文相对待重确认稿无改动）
+> 版本: v1.4.0 | 状态: 已确认 | 确认人: 陈卓 | 确认日期: 2026-10-07 | 变更源: R-14（工号/用户类型下线）与 R-15（账号管理操作增强）|
 >
 > **v1.1.0 变更（铁律 4：已确认文档被改动 ⇒ 回退待重确认）**：**仅订正事实数字**，无设计变更 —— T-01 活库门禁统计（`evidence/T-01_gate-stats.txt`）推翻了两处口径：普通角色 ACL 由「0 行」订正为「**1 行**（智能体中心）」、名下用户由「10」订正为「**5 个存活用户**」；并在 §数据模型一 追加「活库现值复核」表（dump 为迁移前快照）。**决策 1~6、任务拆解 T-01~T-17、需求条款均不受影响。**
 
@@ -433,3 +433,32 @@ COMMIT;
 2. 洁净库重放：all_schema/all_data → 01~07 两轮，终态恰为 admin + chenzhuo
 3. 部署：migrator 应用 07 → 存活账号 2；5 旧账号登录失败；admin/chenzhuo 登录成功且菜单 19 / 7
 
+## R-15 实施方案（v1.4.0 追加）
+
+> 触发：requirements **v2.4.0** 新增 R-15。**无表结构变更** ⇒ 不新增迁移件（台账仍 8 件）。
+
+### 一、后端
+
+| 项 | 内容 |
+|---|---|
+| 检索修正 | `pageByQuery` keyword 子句补 **`mobile`**（手机号；BUG-130），保留 `phone`/`tel` |
+| 新增端点 | `PUT /api/privilege/user/status`（{id,status}）、`PUT /api/privilege/user/status/batch`（{ids[],status}→更新行数） |
+| 新增 DTO | `PrivilegeUserStatusDTO`、`PrivilegeUserBatchStatusDTO` |
+| 服务层 | `isSuperAdmin`（**统一口径**，LoginServiceImpl 委托到此）、`updateStatus`、`updateStatusBatch`、`canDisable` |
+| 安全保护 | 控制器：① 禁止操作当前登录账号本人（单/批）；② 禁用后须仍存在 ≥1 启用的超管 |
+
+### 二、前端（admin-ui 账号管理）
+
+| 项 | 内容 |
+|---|---|
+| 搜索 | 提示改为「用户名 / 姓名 / 手机号」 |
+| 勾选 | `useColumns` 头部加 `type: 'checkbox'`；grid `checkboxConfig`；`@checkbox-change/@checkbox-all` 同步已选数 |
+| 批量 | 工具栏「批量启用 / 批量禁用」（未勾选禁用、显示已选数、二次确认、成功后清勾选并刷新） |
+| 行级 | 操作列「启用/禁用」按 `status` 显示对应动作（二次确认） |
+| 收敛 | 删「分配权限」按钮、`RoleModal` 与 `role-form.vue`（角色/组分配统一走编辑，R-03） |
+
+### 三、验证
+
+1. API 级：手机号（全量/片段）、姓名、用户名检索；单/批启停；禁用后登录被拒；两条保护被拒。
+2. 产物级：`account-*.js` 含批量按钮且无「分配权限」；`form-*.js` 含新提示、旧提示 0 命中。
+3. 质量门：后端编译 0 错误、`typecheck` 零新增、`build` 通过、部署后后端 0 ERROR。

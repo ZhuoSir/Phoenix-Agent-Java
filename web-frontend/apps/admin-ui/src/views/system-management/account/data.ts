@@ -10,7 +10,8 @@ export function useSearchFormSchema(): VbenFormSchema[] {
       label: '搜索',
       labelWidth: 40,
       componentProps: {
-        placeholder: '请输入用户名/姓名',
+        // R-15（v2.4.0）：关键字检索覆盖 用户名 / 姓名 / 手机号（后端 pageByQuery 已支持三者）
+        placeholder: '用户名 / 姓名 / 手机号',
         allowClear: true,
       },
     },
@@ -19,6 +20,8 @@ export function useSearchFormSchema(): VbenFormSchema[] {
 
 export function useColumns(): VxeTableGridColumns {
   return [
+    // R-15（v2.4.0）：勾选列，用于批量启用/禁用
+    { type: 'checkbox', width: 44, fixed: 'left' },
     { field: 'username', title: '用户名', minWidth: 120 },
     { field: 'realName', title: '真实姓名', width: 120 },
     { field: 'mobile', title: '手机号', width: 100 },
