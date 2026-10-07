@@ -1,5 +1,7 @@
 # v1.7.0 里程碑（M1）
 
+> 状态：**已冻结**（M3 汇总完成 2026-10-06；M4 发布待用户口令）
+
 > 创建: 2026-10-05 | 状态: **已并入 2 个 spec（未汇总；汇总暂缓）** | 类型: MINOR | 验证日期: -
 > **版本分支**: `v1.7.0`（2026-10-05 建，基点 = main tip `456f8ab`；v1.6.0 已发布并 `--no-ff` 合 main，**无悬空**）
 
@@ -15,8 +17,8 @@
 
 ## 二、汇总进度（M3/M4 勾选）
 - [x] M2 范围冻结（2026-10-06：本 spec 12/12 完成；唯一开口=BUG-86(P0) 未纳入本 spec，去向待用户发令；v1.7.0 仍在途，未冻结版本）**〔2026-10-06 用户口令〕BUG-86 等后续处理，不阻塞本版本；新需求优先。**
-- [ ] M3 汇总（SQL/config/RELEASE-NOTES/UPGRADE/checklist）——**〔2026-10-06 用户口令〕暂缓汇总，先做新需求**；本 spec 零 DDL
-- [ ] M4 发布（演练+tag）
+- [x] M3 汇总（SQL/config/RELEASE-NOTES/UPGRADE/checklist）——**2026-10-06 完成**：SQL 聚合 4+4 件、`RELEASE-NOTES.md` / `UPGRADE.md` / `config/changes.md` / `checklist.md` 落盘、MILESTONE/version 台账同步；**遗留：迁移台账未含 V1.7.0_01~04（BUG-115，不阻塞）**
+- [ ] M4 发布（演练 + tag + CHANGELOG + 合并 main）——**待用户口令**（冻结已完成）
 
 ## 三、审计记录
 - **2026-10-05 立项**：requirements v0.1.0 → **v1.0.0 已确认（陈卓）**；Q1~Q6 按 agent 建议暂定并记于 requirements §七；双建完成（version.md 在途行 + 本目录 + `v1.7.0` 分支 + `feature/visibility-filetree-hygiene`）；待办挂载 BL-11/12/15/28→已立项(v1.7.0)、BUG-85→已规划(v1.7.0)
