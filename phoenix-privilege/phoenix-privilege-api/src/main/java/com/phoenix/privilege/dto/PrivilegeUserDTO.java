@@ -23,9 +23,6 @@ public class PrivilegeUserDTO {
 
 	private String id;
 
-	/** 人员ID */
-	private String employeeId;
-
 	private String code;
 
 	private String realName;
@@ -43,16 +40,6 @@ public class PrivilegeUserDTO {
 	private String email;
 
 	private byte[] image;
-
-	private String companyId;
-
-	private String deptId;
-
-	private String itUserId;
-
-	private String itUserName;
-
-	private Integer isLeader;
 
 	private Integer sex;
 

@@ -35,7 +35,6 @@ import com.phoenix.platform.service.thirdparty.ThirdPartyLoginStrategy;
 import com.phoenix.common.vo.front.LoginVO;
 import com.phoenix.privilege.constant.LoginConstant;
 import com.phoenix.privilege.entity.PrivilegeUser;
-import com.phoenix.privilege.service.IPrivilegeDepartmentService;
 import com.phoenix.privilege.service.IPrivilegeUserService;
 import com.phoenix.tools.vo.ReturnVo;
 import lombok.RequiredArgsConstructor;
@@ -64,7 +63,6 @@ public class AccountInfoServiceImpl extends ServiceImpl<AccountInfoMapper, Accou
     private final AgentService agentService;
     private final PlatformInfoService platformInfoService;
     private final ThirdPartyLoginFactory thirdPartyLoginFactory;
-    private final IPrivilegeDepartmentService departmentService;
     /** T-03（统一账号中心）：统一账号源 tbl_privilege_user —— 前台入口与后台共用同一校验实现与口令盐 */
     private final IPrivilegeUserService privilegeUserService;
 
@@ -398,10 +396,7 @@ public class AccountInfoServiceImpl extends ServiceImpl<AccountInfoMapper, Accou
                 .realName(account.getRealName())
                 .groups(groupVOS)
                 .build();
-        if (StrUtil.isNotBlank(account.getDeptId())) {
-            List<String> descendantIds = departmentService.getDescendantIds(account.getDeptId());
-            loginVO.setDeptIds(descendantIds);
-        }
+        // 组织维度已下线（v2.0.0）：登录结果不再计算/下发 deptIds
         StpUtil.getSession().set(ACCOUNT_LOGIN, loginVO);
         return ReturnVo.ok(loginVO);
     }

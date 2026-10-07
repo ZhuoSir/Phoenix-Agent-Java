@@ -6,12 +6,8 @@ import cn.hutool.core.util.StrUtil;
 import com.mybatisflex.core.paginate.Page;
 import com.phoenix.privilege.dto.PasswordUpdateDTO;
 import com.phoenix.privilege.dto.PrivilegeUserDTO;
-import com.phoenix.privilege.entity.PrivilegeCompany;
-import com.phoenix.privilege.entity.PrivilegeDepartment;
 import com.phoenix.privilege.entity.PrivilegeUser;
 import com.phoenix.privilege.enums.AuthErrorCode;
-import com.phoenix.privilege.service.IPrivilegeCompanyService;
-import com.phoenix.privilege.service.IPrivilegeDepartmentService;
 import com.phoenix.privilege.service.IPrivilegeUserService;
 import com.phoenix.privilege.vo.PrivilegeUserVO;
 import com.phoenix.tools.vo.ReturnVo;
@@ -24,8 +20,6 @@ import org.springframework.web.bind.annotation.*;
 public class PrivilegeUserController {
 
 	private final IPrivilegeUserService privilegeUserService;
-	private final IPrivilegeCompanyService privilegeCompanyService;
-	private final IPrivilegeDepartmentService privilegeDepartmentService;
 
 	/**
 	 * 分页查询用户列表
@@ -56,18 +50,7 @@ public class PrivilegeUserController {
 			return null;
 		}
 		PrivilegeUserVO vo = BeanUtil.copyProperties(entity, PrivilegeUserVO.class);
-		if (entity.getCompanyId() != null) {
-			PrivilegeCompany company = privilegeCompanyService.getById(entity.getCompanyId());
-			if (company != null) {
-				vo.setCompanyName(company.getCname());
-			}
-		}
-		if (entity.getDeptId() != null) {
-			PrivilegeDepartment department = privilegeDepartmentService.getById(entity.getDeptId());
-			if (department != null) {
-				vo.setDeptName(department.getName());
-			}
-		}
+		// 组织维度已下线（v2.0.0）：不再回填 companyName / deptName
 		return vo;
 	}
 

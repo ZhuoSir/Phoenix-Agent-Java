@@ -9,8 +9,6 @@ import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.spring.service.impl.ServiceImpl;
 import com.phoenix.privilege.constant.LoginConstant;
 import com.phoenix.privilege.dto.PrivilegeUserDTO;
-import com.phoenix.privilege.entity.PrivilegeCompany;
-import com.phoenix.privilege.entity.PrivilegeDepartment;
 import com.phoenix.privilege.entity.PrivilegeRole;
 import com.phoenix.privilege.entity.PrivilegeUser;
 import com.phoenix.privilege.entity.PrivilegeUserRole;
@@ -132,14 +130,9 @@ public class PrivilegeUserServiceImpl extends ServiceImpl<PrivilegeUserMapper, P
 
 	@Override
 	public Page<PrivilegeUserVO> pageByQuery(Page<PrivilegeUserVO> page, PrivilegeUserDTO dto) {
+		// 组织维度已下线（v2.0.0）：不再 leftJoin 公司/部门，也不再按 companyId/deptId 过滤
 		QueryWrapper qw = QueryWrapper.create()
-			.select("tbl_privilege_user.*, tbl_privilege_company.cname AS company_name, tbl_privilege_department.name AS dept_name")
-			.leftJoin(PrivilegeCompany.class)
-			.on(PrivilegeUser::getCompanyId, PrivilegeCompany::getId)
-			.leftJoin(PrivilegeDepartment.class)
-			.on(PrivilegeUser::getDeptId, PrivilegeDepartment::getId)
-			.eq(PrivilegeUser::getCompanyId, dto.getCompanyId(), dto.getCompanyId() != null)
-			.eq(PrivilegeUser::getDeptId, dto.getDeptId(), dto.getDeptId() != null)
+			.select("tbl_privilege_user.*")
 			.eq(PrivilegeUser::getUserType, dto.getUserType(), dto.getUserType() != null);
 		if (StrUtil.isNotBlank(dto.getKeyword())) {
 			qw.and((Consumer<QueryWrapper>) w -> w.like(PrivilegeUser::getCode, dto.getKeyword())

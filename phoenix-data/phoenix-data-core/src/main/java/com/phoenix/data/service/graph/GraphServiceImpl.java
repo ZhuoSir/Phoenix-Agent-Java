@@ -217,8 +217,8 @@ public class GraphServiceImpl implements GraphService {
         String loginVo = "";
         if (loginVO != null) {
             loginVo = """
-                    登录人相关信息：姓名：%s, 工号：%s, 账号：%s,  邮箱：%s, 部门ids:%s \n
-                    """.formatted(loginVO.getRealName(), loginVO.getUserCode(), loginVO.getUsername(), loginVO.getEmail(), JSON.toJSONString(loginVO.getDeptIds()));
+                    登录人相关信息：姓名：%s, 工号：%s, 账号：%s,  邮箱：%s \n
+                    """.formatted(loginVO.getRealName(), loginVO.getUserCode(), loginVO.getUsername(), loginVO.getEmail());
         }
         return loginVo;
     }
