@@ -42,10 +42,22 @@ public class PrivilegeRoleController {
 		return ReturnVo.ok(privilegeRoleService.updateById(dto.toEntity()));
 	}
 
+	/**
+	 * 删除角色（R-17，v2.6.0 加保护）。
+	 *
+	 * <p>规则（用户口径：「role_admin 不可以删除，除此之外都可以删，但是有用户不能删」）：
+	 * ① 内置管理员角色（`sn=ROLE_ADMIN`）**不可删除**；② 角色下**仍有用户**时不可删除（提示持有者数量）。
+	 */
 	@DeleteMapping("/{id}")
 	public ReturnVo<Boolean> delete(@PathVariable String id) {
-		privilegeRoleService.deleteRoleById(id);
-		return ReturnVo.ok();
+		if (privilegeRoleService.isBuiltInAdminRole(id)) {
+			return ReturnVo.fail("系统管理员角色不可删除");
+		}
+		long holders = privilegeRoleService.countHolders(id);
+		if (holders > 0) {
+			return ReturnVo.fail("该角色下仍有 " + holders + " 个用户，请先解除绑定后再删除");
+		}
+		return ReturnVo.ok(privilegeRoleService.deleteRoleById(id));
 	}
 
 	/**

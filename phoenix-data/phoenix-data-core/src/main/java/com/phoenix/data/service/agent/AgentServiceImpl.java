@@ -94,10 +94,13 @@ public class AgentServiceImpl extends ServiceImpl<AgentMapper, Agent> implements
 
 	/**
 	 * 管理端智能体列表：只返回平台内创建的智能体（sn 为空），过滤 Java 自注册类。
+	 *
+	 * <p>R-17（v2.6.0）：`ownerId` 非 null 时仅返回该创建人的智能体（普通用户只看自己创建的）；
+	 * 传 null 表示不过滤（超管看全部）。
 	 */
 	@Override
 	@Transactional(readOnly = true)
-	public List<Agent> listCreatedInPlatform(String status, String keyword) {
+	public List<Agent> listCreatedInPlatform(String status, String keyword, Long ownerId) {
 		List<Agent> result;
 		if (keyword != null && !keyword.isBlank()) {
 			result = search(keyword);
@@ -110,6 +113,7 @@ public class AgentServiceImpl extends ServiceImpl<AgentMapper, Agent> implements
 		}
 		return result.stream()
 			.filter(agent -> agent != null && !hasText(agent.getSn()))
+			.filter(agent -> ownerId == null || ownerId.equals(agent.getAdminId()))
 			.toList();
 	}
 

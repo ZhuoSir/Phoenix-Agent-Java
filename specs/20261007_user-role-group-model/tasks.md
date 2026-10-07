@@ -1,4 +1,4 @@
-> 版本: v1.5.0 | 状态: 已确认 | 确认人: 陈卓 | 确认日期: 2026-10-07 | 确认记录: R-16 经陈卓 2026-10-07 确认（详见 requirements v2.5.0） |
+> 版本: v1.6.0 | 状态: 已确认 | 确认人: 陈卓 | 确认日期: 2026-10-07 | 确认记录: R-17 经陈卓 2026-10-07 确认（详见 requirements v2.6.0） |
 
 # 任务清单：user-role-group-model
 
@@ -179,6 +179,18 @@
   验收标准: 单个与批量禁用 admin 均被拒且不部分执行；删除 admin 被拒且行仍在；改 admin 用户名被拒；
     admin 其他字段仍可编辑；chenzhuo 删除自己被拒（删除端点保护生效）；
     终态三账号齐全、均启用、admin 可登录且菜单 19；typecheck 零新增、构建通过、0 ERROR；**无迁移件**
+
+## 11. R-17 追加（v2.6.0 智能体按创建人可见 + 角色删除保护）
+
+- [x] T-23 智能体列表按创建人可见（超管看全部）+ 创建人落库 + 同族端点归属校验 + 系统管理员角色不可删
+  关联: R-17
+  依赖: T-22
+  验证方式: `AgentController` 列表按 owner 过滤、创建写 `admin_id`、`checkAgentExists` 统一归属校验；
+    `AgentService.listCreatedInPlatform` 增 ownerId 形参；`PrivilegeRoleService.deleteRoleById` 返回 boolean
+    并按 sn/持有者判定；落 `V2.0.0_09` 存量回填（+rollback）；drill 正反向 + 活库 migrator + API 级实测
+  验收标准: 超管看到全部（sn 为空的 5 条）、普通角色仅看到自己的（未创建=0 条）；
+    普通角色直连他人智能体的 详情/编辑/发布/删除/下线/授权 全部 403；新建后 `admin_id` = 本人；
+    删除 ROLE_ADMIN 被拒、有持有者的角色被拒、无持有者角色可删且行消失；构建通过、0 ERROR
 
 ## 覆盖矩阵（R → T）
 
