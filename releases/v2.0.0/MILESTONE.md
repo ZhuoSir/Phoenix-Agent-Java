@@ -200,3 +200,8 @@
   - 验证：drill 正反向×2 全绿；活库 migrator 应用 10（台账 10 件，自检"state 空 0 个"）；
     授权树这 4 菜单各返回 5 权限位；技能管理 勾选查询→ACL acl_state=1→读回 enabled→还原，闭环通过。
   - 教训：L-59（位掩码列为空致下游过滤出空集合、功能静默不可用）。
+
+- **2026-10-07 BUG-135 收尾（V2.0.0_11）**：补齐 5 个空 `system_id/category_id` 菜单为全站统一 `110/111`（MCP/技能管理/插件管理/智能体中心/知识库）。
+  实测对鉴权**惰性**（登录树用 list() 不按 system_id 过滤、getModuleTreeApi 不带 systemId、category_id 后端零引用）。
+  回归中一次 chenzhuo 7→8 经排查**非本件所致**，系我闭环测试残留的 `acl_state=0` 授权行（"有行即可见"），已按 id 删除、普通角色 ACL 回到 7 条基线。教训 **L-60**。
+  证据 `specs/20261007_user-role-group-model/evidence/T-25_menu-systemid-backfill.txt`；台账 11 件。

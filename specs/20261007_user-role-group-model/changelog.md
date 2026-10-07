@@ -1,5 +1,11 @@
 # Changelog: user-role-group-model
 
+## BUG-135 收尾（2026-10-07，T-25）
+
+- 升级件 `V2.0.0_11`（+rollback，配对 11/11）：补齐 5 个空 system_id/category_id 菜单为 110/111
+- 惰性证明 + drill 正反向 + 活库应用（台账 11 件）；回归 chenzhuo 7→8 经查为闭环测试残留 acl_state=0 行（非本件），已清理回 7 条基线
+- 教训 L-60（测试写操作要删行回基线、回归变数先隔离真因）；证据 `evidence/T-25_menu-systemid-backfill.txt`
+
 ## v2.6.0 实施完成（2026-10-07，T-23，R-17）
 
 - 用户口径：每人只看自己创建的智能体、系统管理员看全部；「role_admin 不可以删除，除此之外都可以删，但是有用户不能删」；存量无主智能体回填给 admin；连编辑/删除等一并限制
