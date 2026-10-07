@@ -59,7 +59,10 @@ function setupAccessGuard(router: Router) {
             '/agent/list',
         );
       }
-      // Chat 路由需登录，且仅允许 userType === 1 的用户访问
+      // Chat 路由（/front/chat）：需登录即可访问。
+      // R-14（v2.3.0）：原「仅 userType === 1 可访问」的门随用户类型下线一并移除 ——
+      // 该判定语义本是"前台用户"，而 user_type 已无维护方；且实测所有用户 user_type 均为 0，
+      // 这道门会把**所有**用户重定向走，与 R-12「/front/chat 恢复为独立 chat 页」自相矛盾。
       if (to.name === 'Chat') {
         if (!accessStore.accessToken) {
           return {
@@ -67,11 +70,6 @@ function setupAccessGuard(router: Router) {
             query: { redirect: encodeURIComponent(to.fullPath) },
             replace: true,
           };
-        }
-        if (accessStore.isAccessChecked && userStore.userInfo?.userType !== 1) {
-          return decodeURIComponent(
-            userStore.userInfo?.homePath || '/agent/list',
-          );
         }
         return true;
       }

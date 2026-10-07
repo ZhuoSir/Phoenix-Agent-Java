@@ -298,7 +298,8 @@ public class AccountInfoServiceImpl extends ServiceImpl<AccountInfoMapper, Accou
         AccountInfo carrier = new AccountInfo();
         carrier.setId(loginId);
         carrier.setUsername(unified.getUsername());
-        carrier.setCode(unified.getCode());
+        // R-14（v2.3.0）：工号已下线 ⇒ 前台登录载体的 code 改取用户名（登录响应 userCode 语义随之变化）
+        carrier.setCode(unified.getUsername());
         carrier.setRealName(unified.getRealName());
         // 组织维度已下线（v2.0.0，T-14）：登录载体不再带 deptId
         return buildLoginResult(carrier);

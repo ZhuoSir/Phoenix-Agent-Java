@@ -1,0 +1,50 @@
+=== T-20 部署验证（R-14：用户类型/IDM + 工号下线）===
+时间: 2026-10-07（部署后实测，入口 http://localhost:8090）
+
+--- ① 库结构：待删列应为 0，且前台账号表 code 保留 ---
+        table_name         | column_name 
+---------------------------+-------------
+ tbl_platform_account_info | code
+ tbl_privilege_dictionary  | code
+(2 rows)
+
+--- ② 账号与组归属 ---
+         id         | username | real_name | status | del_flag 
+--------------------+----------+-----------+--------+----------
+ 461681072489615360 | admin    | 超管      |      0 |        0
+ 461671036765859840 | chenzhuo | 陈卓      |      0 |        0
+ 465417639332724736 | test01   | 测试用户  |      0 |        0
+(3 rows)
+     account_id     | account_name | group_name 
+--------------------+--------------+------------
+ 461671036765859840 | chenzhuo     | 通用组
+(1 row)
+
+--- ③ 后台登录（admin / chenzhuo）与登录响应字段 ---
+  admin     HTTP 200 success=True 响应字段=hasAdminRole,realName,token,userId,username
+            含 userType? 否 ✅
+  chenzhuo  HTTP 200 success=True 响应字段=hasAdminRole,realName,token,userId,username
+            含 userType? 否 ✅
+
+--- ④ 菜单（应与 R-12/R-13 一致：admin 19 / chenzhuo 7）---
+  admin     menus=19 pvalues=5（期望 19）✅
+  chenzhuo  menus=7 pvalues=5（期望 7）✅
+
+--- ⑤ 账号列表响应（不得含 code / userType）---
+  HTTP 200 记录数=3
+  首条字段: aclTimestamp,address,createTime,creator,delFlag,email,failMonth,failureTime,fax,id,image,mobile,password,phone,pwdFtime,pwdInit,realName,roles,sex,status,tel,updateTime,updator,username
+  含 code/userType? 否 ✅
+  用户名列表: test01,admin,chenzhuo
+
+--- ⑥ 工号接口应 404 ---
+  GET /api/privilege/user/code/1001 → HTTP 404 ✅
+
+--- ⑦ 前台登录链路（userCode 应为用户名）---
+  POST /auth/login → HTTP 200 body={"code": "100", "data": {"token": "NN_2yDlXy93z2Jx0r_wiuqjPL0SZEYtVCk__", "userId": "461671036765859840", "userCode": "chenzhuo", "email": null, "username": "chenzhuo", "realName": "陈卓", "groups": [{"name": "通用组", "sn": "COMMON"}]}, "msg": "操作成功!", "success": 
+
+--- ⑧ 后台首页与关键接口 ---
+  GET /              → HTTP 200
+  GET /auth/login    → HTTP 200
+
+--- ⑨ 部署后后端是否有 ERROR ---
+  ERROR 行数: 0

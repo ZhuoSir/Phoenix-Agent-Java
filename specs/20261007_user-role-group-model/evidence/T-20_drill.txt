@@ -1,0 +1,43 @@
+########## T-20 验证（R-14：用户类型/IDM + 工号下线）##########
+=== A. drill（升级路径：部署时备份 → 01~08 链跑一次，与 migrator 一致）===
+  V2.0.0_01                                    exit=0 err=0 
+  V2.0.0_02                                    exit=0 err=0 
+  V2.0.0_03                                    exit=0 err=0 
+  V2.0.0_04                                    exit=0 err=0 
+  V2.0.0_05                                    exit=0 err=0 
+  V2.0.0_06                                    exit=0 err=0 
+  V2.0.0_07                                    exit=0 err=0 
+  V2.0.0_08                                    exit=0 err=0 [V2.0.0_08] 自检通过：待删列 0 个 / 存活账号 2 / chenzhuo 角色绑定 1 / 组归属名称已同步
+  终态: 残留列=0 存活账号=2 组归属名=chenzhuo
+  --- 08 幂等（单独再跑一次）---
+  第2次 exit=0 err=0
+  --- 反向 08（恢复列+原值+user_no+组归属名）---
+  rollback exit=0 err=0
+ username | code | user_type 
+----------+------+-----------
+ admin    | 1001 |         0
+ chenzhuo | 1002 |         0
+(2 rows)
+
+  绑定 user_no 非空=2
+  组归属 account_name=1002
+  再正向后残留列: 0
+
+=== B. 洁净库（migrate.sh 首启顺序 → 01~08 链跑一次）===
+  docker/init/00_baseline_sequences.sql      exit=0 err=0
+  sql/all_data.sql                           exit=0 err=0
+  docker/init/10_seed_admin.sql              exit=0 err=0
+  docker/init/20_seed_runtime_agents.sql     exit=0 err=0
+  V2.0.0_01                                    exit=0 err=0
+  V2.0.0_02                                    exit=0 err=0
+  V2.0.0_03                                    exit=0 err=0
+  V2.0.0_04                                    exit=0 err=0
+  V2.0.0_05                                    exit=0 err=0
+  V2.0.0_06                                    exit=0 err=0
+  V2.0.0_07                                    exit=0 err=0
+  V2.0.0_08                                    exit=0 err=0
+    accounts    | leftover_cols | menus | group_name_col 
+----------------+---------------+-------+----------------
+ admin,chenzhuo |             0 |    14 | chenzhuo
+(1 row)
+

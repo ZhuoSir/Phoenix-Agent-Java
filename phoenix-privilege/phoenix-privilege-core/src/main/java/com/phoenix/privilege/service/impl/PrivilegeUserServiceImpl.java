@@ -50,11 +50,6 @@ public class PrivilegeUserServiceImpl extends ServiceImpl<PrivilegeUserMapper, P
 	}
 
 	@Override
-	public PrivilegeUser getByCode(String code) {
-		return QueryChain.of(getMapper()).eq(PrivilegeUser::getCode, code).one();
-	}
-
-	@Override
 	public boolean checkUsernameExist(String username) {
 		return QueryChain.of(getMapper()).eq(PrivilegeUser::getUsername, username).exists();
 	}
@@ -119,17 +114,17 @@ public class PrivilegeUserServiceImpl extends ServiceImpl<PrivilegeUserMapper, P
 					log.warn("默认角色(sn=common)不存在，用户 {} 创建后无任何角色", entity.getUsername());
 				}
 				else {
-					saveUserRole(entity.getId(), entity.getCode(), role.getId());
+					saveUserRole(entity.getId(), role.getId());
 				}
 			}
 			else {
 				roleIds.stream()
 					.filter(StrUtil::isNotBlank)
 					.distinct()
-					.forEach(roleId -> saveUserRole(entity.getId(), entity.getCode(), roleId));
+					.forEach(roleId -> saveUserRole(entity.getId(), roleId));
 			}
 			// R-03：创建时可直接入组
-			addUserGroups(entity.getId(), entity.getCode(), dto.getGroupIds());
+			addUserGroups(entity.getId(), entity.getUsername(), dto.getGroupIds());
 			log.info("用户创建完成: id={}, username={}, roleIds={}, groupIds={}", entity.getId(), entity.getUsername(),
 					roleIds, dto.getGroupIds());
 		}
@@ -147,11 +142,11 @@ public class PrivilegeUserServiceImpl extends ServiceImpl<PrivilegeUserMapper, P
 					.stream()
 					.filter(StrUtil::isNotBlank)
 					.distinct()
-					.forEach(roleId -> saveUserRole(dto.getId(), dto.getCode(), roleId));
+					.forEach(roleId -> saveUserRole(dto.getId(), roleId));
 			}
 			if (dto.getGroupIds() != null) {
 				Db.updateBySql("delete from tbl_platform_account_group_info where account_id = ?", dto.getId());
-				addUserGroups(dto.getId(), dto.getCode(), dto.getGroupIds());
+				addUserGroups(dto.getId(), dto.getUsername(), dto.getGroupIds());
 			}
 		}
 		return result;
@@ -170,10 +165,9 @@ public class PrivilegeUserServiceImpl extends ServiceImpl<PrivilegeUserMapper, P
 			.orElse(null);
 	}
 
-	private void saveUserRole(String userId, String userNo, String roleId) {
+	private void saveUserRole(String userId, String roleId) {
 		privilegeUserRoleService.save(PrivilegeUserRole.builder()
 			.userId(userId)
-			.userNo(userNo)
 			.roleId(roleId)
 			.build());
 	}
@@ -211,13 +205,11 @@ public class PrivilegeUserServiceImpl extends ServiceImpl<PrivilegeUserMapper, P
 	@Override
 	public Page<PrivilegeUserVO> pageByQuery(Page<PrivilegeUserVO> page, PrivilegeUserDTO dto) {
 		// 组织维度已下线（v2.0.0）：不再 leftJoin 公司/部门，也不再按 companyId/deptId 过滤
+		// 用户类型（R-14，v2.3.0）：user_type/工号已下线，不再作为筛选与搜索维度
 		QueryWrapper qw = QueryWrapper.create()
-			.select("tbl_privilege_user.*")
-			.eq(PrivilegeUser::getUserType, dto.getUserType(), dto.getUserType() != null);
+			.select("tbl_privilege_user.*");
 		if (StrUtil.isNotBlank(dto.getKeyword())) {
-			qw.and((Consumer<QueryWrapper>) w -> w.like(PrivilegeUser::getCode, dto.getKeyword())
-				.or(PrivilegeUser::getUsername)
-				.like(dto.getKeyword())
+			qw.and((Consumer<QueryWrapper>) w -> w.like(PrivilegeUser::getUsername, dto.getKeyword())
 				.or(PrivilegeUser::getRealName)
 				.like(dto.getKeyword())
 				.or(PrivilegeUser::getPhone)

@@ -1,4 +1,4 @@
-> 版本: v2.2.0 | 状态: 已确认 | 确认人: 陈卓 | 确认日期: 2026-10-07 | 确认记录: 用户 2026-10-07 口令「确认执行（确认人：陈卓）」+「聊天数据一并删除」 | 变更源: 用户 2026-10-07 口令「只保留 admin 和 chenzhuo 两个账号，其他的全部删掉，包括初始化数据也要改」⇒ 新增 R-13（新增条款 ⇒ MINOR） | 前次确认: v2.1.0 经陈卓 2026-10-07 确认（R-12） | 变更源: 用户 2026-10-07 口令「权限管理和前台管理合并成系统管理，然后前台管理的账号管理删掉，现在只有一套账号管理，不分前后台了」⇒ 新增 R-12（新增条款 ⇒ MINOR）| 前次确认: v2.0.0 经陈卓 2026-10-07 重确认①通过 | 更新: 2026-10-07（v2.0.0 重确认通过：正文相对待重确认稿**无改动**，仅版本头转正） | 挂载: v2.0.0（在途；与本文档版本号同号属巧合，勿混）
+> 版本: v2.3.0 | 状态: 已确认 | 确认人: 陈卓 | 确认日期: 2026-10-07 | 确认记录: 用户 2026-10-07 口令「确认执行 R-14（确认人：陈卓）」+「工号也删掉」+「test01 暂时保留」⇒ 本版含 R-14（用户类型/IDM 下线 + 工号下线） | 变更源: 用户 2026-10-07 口令「只保留 admin 和 chenzhuo 两个账号，其他的全部删掉，包括初始化数据也要改」⇒ 新增 R-13（新增条款 ⇒ MINOR） | 前次确认: v2.1.0 经陈卓 2026-10-07 确认（R-12） | 变更源: 用户 2026-10-07 口令「权限管理和前台管理合并成系统管理，然后前台管理的账号管理删掉，现在只有一套账号管理，不分前后台了」⇒ 新增 R-12（新增条款 ⇒ MINOR）| 前次确认: v2.0.0 经陈卓 2026-10-07 重确认①通过 | 更新: 2026-10-07（v2.0.0 重确认通过：正文相对待重确认稿**无改动**，仅版本头转正） | 挂载: v2.0.0（在途；与本文档版本号同号属巧合，勿混）
 >
 > **v2.0.0 变更（改范围 ⇒ MAJOR）——已于 2026-10-07 经陈卓重确认①通过**
 >
@@ -377,6 +377,68 @@ WHEN 新版本部署完成,
 - **GIVEN** 新版本部署完成
   **WHEN** 以 `admin`、`chenzhuo` 登录
   **THEN** 均成功，且菜单/权限与各自角色一致
+
+### R-14 用户类型（`user_type`）与 IDM 维度下线 + 工号（`code`）下线
+
+WHEN 新版本部署完成,
+用户类型（自建/IDM）与**工号**SHALL 不再是用户可维护、可筛选或可用于鉴权/审计的属性，相关死代码与死规则 SHALL 一并清除。
+
+> **事实依据（2026-10-07 全栈实测，见 `evidence/T-20_scan.txt`）**：
+> `user_type` 全仓仅 **2** 处 Java 引用（登录透传给前端 + 列表按值过滤）与 14 处前端引用（列表标签/表单下拉/类型声明），
+> **没有任何逻辑分支**；`UserTypeEnum` 除自身定义与一句 javadoc 外**无调用方**；
+> `ExceptionEnum.USER_DELETE_ERROR("该用户为IDM用户，不可删除")` 与
+> `DEPORTMENT_DELETE_ERROR("IDM同步的部门不允许删除")` **定义但从未抛出**；
+> IDM 同步包已随 R-06 整包删除；库内 `user_type = 1` 的记录 **0 条**。
+
+边界（逐项可验）：
+
+1. **数据库**：`tbl_privilege_user.user_type` 列及其注释 SHALL 删除（`ALTER TABLE ... DROP COLUMN IF EXISTS`）。
+2. **后端**：`PrivilegeUser.userType` 实体字段、`PrivilegeUserDTO.userType`、`PrivilegeUserVO.userType`、
+   `LoginUserInfoVO.userType` 字段 SHALL 删除；`LoginServiceImpl` 的 `.userType(...)` 透传与
+   `PrivilegeUserServiceImpl.pageByQuery` 的 `eq(PrivilegeUser::getUserType, ...)` 过滤 SHALL 移除。
+3. **死枚举/死规则**：`enums/UserTypeEnum.java` SHALL 删除；`ExceptionEnum` 中
+   `USER_DELETE_ERROR` 与 `DEPORTMENT_DELETE_ERROR`（后者指向 R-01 已下线的"部门"）SHALL 删除。
+4. **前端**：`system-management/account` 的列表「用户类型」列与 `userTypeSlot`、
+   新增/编辑表单的「用户类型」下拉（含 `idm用户` 选项）、`api/core/privilege-user.ts` 与 `api/core/auth.ts`
+   的 `userType` 字段、`store/auth.ts` 的解构项、`mobile-ui/services/authTransport.ts` 的 `userType` 声明 SHALL 移除。
+5. **`it_user_id` / `it_user_name`（IDM 侧标识，同为死列）SHALL 一并删除**（全仓 0 引用）。
+8. **不变量**：账号列表、新增/编辑账号、登录（后台与前台）、菜单与权限判定 SHALL 不受影响；
+   `typecheck` 不新增错误；`user_type=1` 无数据故无需数据迁移。
+
+6. **工号（`tbl_privilege_user.code`）删除（用户追加裁定「工号也删掉」）**：
+   - **数据库**：`tbl_privilege_user.code`（NOT NULL）与 `tbl_privilege_user_role.user_no`（工号冗余列）SHALL 删除。
+   - **后端**：`PrivilegeUser.code` / `PrivilegeUserDTO.code` / `PrivilegeUserVO.code`、
+     `PrivilegeUserRole.userNo`（+DTO/VO）、`IPrivilegeUserService.getByCode` 及其实现、
+     `PrivilegeUserController` 的 `GET /code/{code}`、`pageByQuery` 关键字中的工号子句 SHALL 移除。
+   - **审计与归属**：`PrivilegePvalueController.save` 的 `setCreateBy(user.getCode())` SHALL 改为写**用户名**；
+     `addUserGroups(..., accountName)` 传入的工号 SHALL 改为**用户名**（`tbl_platform_account_group_info.account_name`）。
+   - **前台链路的兼容处理**：`AccountInfoServiceImpl` 登录载体 `carrier.setCode(unified.getCode())`
+     SHALL 改为取**用户名**（`getUsername()`），使前台登录响应 `userCode` 语义由"工号"变为"用户名"，
+     保证前台登录链路不因工号下线而中断。
+   - **前端**：`system-management/account/data.ts` 的工号列与工号表单项（含必填规则）、
+     `account/group-info/assign-people-form.vue` 的工号列与工号搜索占位、
+     `api/core/privilege-user.ts` 的 `code` 字段与无调用方的 `getUserByCodeApi` SHALL 移除。
+7. **边界（本次保留，非本条款范围）**：前台账号表 `tbl_platform_account_info.code` 属**前台账号自身标识**，
+   仍被前台登录响应 `userCode`、`getByCode`、列表筛选与关键字搜索使用，**本次不删**（其值不再由后台工号派生）。
+
+#### 验收场景
+
+- **GIVEN** 新版本部署完成
+  **WHEN** 打开 系统管理 → 账号管理
+  **THEN** 列表不再有「用户类型」列，新增/编辑表单不再有「用户类型」下拉
+- **GIVEN** 新版本部署完成
+  **WHEN** 登录并取得 `getLoginUserInfo` 响应
+  **THEN** 不含 `userType` 字段
+- **GIVEN** 新版本部署完成
+  **WHEN** 查询 `information_schema.columns`
+  **THEN** `tbl_privilege_user` 不含 `user_type` / `it_user_id` / `it_user_name`
+- **GIVEN** 管理员登录 **WHEN** 查看账号列表与菜单 **THEN** 与 R-12/R-13 后的行为一致（19 / 7 菜单）
+- **GIVEN** 新版本部署完成 **WHEN** 打开 系统管理 → 账号管理 **THEN** 列表与表单**不再出现「工号」**
+- **GIVEN** 新版本部署完成 **WHEN** 调用 `GET /api/privilege/user/code/{code}` **THEN** 404
+- **GIVEN** 新版本部署完成 **WHEN** 查询 `information_schema.columns`
+  **THEN** `tbl_privilege_user` 不含 `code`，`tbl_privilege_user_role` 不含 `user_no`
+- **GIVEN** 前台账号（`chenzhuo`）通过 `POST /auth/login` 登录
+  **THEN** 登录成功，响应 `userCode` 为**用户名**（不再是工号）
 
 ## 已裁定问题（2026-10-07，用户答）
 

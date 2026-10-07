@@ -48,7 +48,8 @@ public class ReactAgentController {
                 return Flux.error(new RuntimeException("用户未登录"));
             }
             String sessionId = request.getSessionId();
-            var userProfile = UserProfile.builder().sessionId(sessionId).userCode(privilegeUser.getCode()).userId(userId).email(privilegeUser.getEmail()).email(privilegeUser.getEmail()).name(privilegeUser.getRealName()).build();
+            // R-14（v2.3.0）：工号已下线 ⇒ userCode 传用户名（原为 privilegeUser.getCode()）
+            var userProfile = UserProfile.builder().sessionId(sessionId).userCode(privilegeUser.getUsername()).userId(userId).email(privilegeUser.getEmail()).email(privilegeUser.getEmail()).name(privilegeUser.getRealName()).build();
             AgentInfoDto agentInfoDto = AgentInfoDto.builder().sn(request.getAgentSn()).userProfile(userProfile).message(request.getContent()).build();
             return agentManager.streamCall(agentInfoDto).map(output -> {
                         Map<String, Object> event = new LinkedHashMap<>();
@@ -134,7 +135,9 @@ public class ReactAgentController {
         if (value instanceof PrivilegeUser pUser) {
             return pUser;
         }
-        ObjectMapper mapper = new ObjectMapper();
+        // R-14（v2.3.0）：会话里可能是旧版 PrivilegeUser（含已下线字段）⇒ 必须忽略未知属性
+        ObjectMapper mapper = new ObjectMapper()
+                .configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
         if (value instanceof Map<?, ?> map) {
             return mapper.convertValue(map, PrivilegeUser.class);
         }

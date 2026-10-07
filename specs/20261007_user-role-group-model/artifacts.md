@@ -2,7 +2,7 @@
 
 > 统计日期: 2026-10-07 | 与 `git log` footer（`Task: T-01~T-17`）可交叉核对
 
-## 一、升级件 SQL（`sql/`）—— 正向 7 件 / 回滚 7 件（**件数配对**）
+## 一、升级件 SQL（`sql/`）—— 正向 8 件 / 回滚 8 件（**件数配对**）
 
 | 序号 | 正向件 | 回滚件 | 类型 | 内容 |
 |---|---|---|---|---|
@@ -10,11 +10,12 @@
 | 02 | `V2.0.0_02__role_backfill_dml.sql` | `rollback/V2.0.0_02__role_backfill_dml_rollback.sql` | DML | 存量用户补默认角色（`upper(sn)='COMMON'`） |
 | 03 | `V2.0.0_03__org_menu_cleanup_dml.sql` | `rollback/V2.0.0_03__org_menu_cleanup_dml_rollback.sql` | DML | 删 4 条组织菜单 + 4 条 ACL（回滚含原始 8 行保真重建） |
 | 04 | `V2.0.0_04__acl_baseline_rebuild_dml.sql` | `rollback/V2.0.0_04__acl_baseline_rebuild_dml_rollback.sql` | DML | ACL 基线重建（超管全量 + 普通 7），含 JSONB 备份表与脏行清理 |
+| 08 | `V2.0.0_08__usertype_code_drop_ddl.sql` | `rollback/V2.0.0_08__usertype_code_drop_ddl_rollback.sql` | DDL/DML | R-14：用户类型/IDM 与工号整体下线（删 `code`/`user_type`/`it_user_id`/`it_user_name`/`user_no` 5 列；组归属 `account_name` 改用户名；自检为环境无关不变量） |
 | 07 | `V2.0.0_07__account_prune_dml.sql` | `rollback/V2.0.0_07__account_prune_dml_rollback.sql` | DML | R-13：账号收敛为 admin + chenzhuo；删除 5 个账号及其账号域数据（角色绑定/登录日志/智能体绑定/聊天会话与消息/向量记忆）（自检为环境无关不变量） |
 | 06 | `V2.0.0_06__menu_merge_system_management_dml.sql` | `rollback/V2.0.0_06__menu_merge_system_management_dml_rollback.sql` | DML | R-12：权限管理→系统管理（原地更名，id 不变）+ 组管理迁入相邻 + 5 子菜单 URL 统一为 `/system-management/*` + 删前台「账号管理」与空目录「前台管理」及其 ACL（自检为**环境无关不变量**） |
 | 05 | `V2.0.0_05__three_party_menu_cleanup_dml.sql` | `rollback/V2.0.0_05__three_party_menu_cleanup_dml_rollback.sql` | DML | 删「三方平台」+ 父目录「基础管理」2 行（回滚保真重建） |
 
-**执行序**：01 → 02 → 03 → 04 → 05 → 06 → 07（幂等，可重跑；全新库重放与 drill 正反向均已演练）
+**执行序**：01 → 02 → 03 → 04 → 05 → 06 → 07 → 08（幂等，可重跑；全新库重放与 drill 正反向均已演练）
 **数据备份**：`backups/pre_v2.0.0_full_20261007_165618.sql`（迁移前全量）、`backups/pre_v2.0.0_orgdim_20261007_165618.sql`（组织维度专项）
 
 ## 二、基线文件（`sql/`）
@@ -91,8 +92,19 @@
 | 验证 | `evidence/T-19_result.txt`、`T-19_drill.txt`、`T-19_deploy-verify.txt` |
 | 遗留处置 | 用户裁定**不加迁移件**，2026-10-07 直接清理活库孤儿账号域数据（user_role 12 / login_log 1 / chat_message 39 / chat_session 5 行），备份 `backups/orphan_cleanup_20261007_202052.sql`；证据 `evidence/T-19_orphan_cleanup.txt` |
 
+## 六·补四、R-14 追加（2026-10-07，T-20）
+
+| 项 | 值 |
+|---|---|
+| 升级件 | `V2.0.0_08__usertype_code_drop_ddl.sql`（+ rollback，含列与原值保真恢复） |
+| 后端 | 17 文件：删 `PrivilegeUser.{code,userType,itUserId,itUserName}` 等 8 个字段/接口/死枚举（UserTypeEnum + 3 条死异常）；工号语义替换为用户名 |
+| 前端 | 7 文件：账号列表/表单工号与用户类型、组管理工号搜索与列、api 类型、store、mobile 类型；`router/guard.ts` 死门移除 |
+| 兼容加固 | 4 处会话读取点 Jackson `FAIL_ON_UNKNOWN_PROPERTIES=false`（L-54） |
+| 验证 | `evidence/T-20_scan.txt`、`T-20_drill.txt`、`T-20_deploy-verify.txt`、`T-20_result.txt` |
+| 保留 | `tbl_platform_account_info.code`（前台账号自身标识，前台登录/查询/搜索在用） |
+
 ## 七、计数自检
 
-- 正向 SQL 件数 = 回滚 SQL 件数 = **7** ✅
-- 任务数 19，完成 19（T-17 收口 + T-18 R-12 + T-19 R-13）✅
+- 正向 SQL 件数 = 回滚 SQL 件数 = **8** ✅
+- 任务数 20，完成 20（T-17 收口 + T-18 R-12 + T-19 R-13 + T-20 R-14）✅
 - 提交 footer `Task: T-xx` 覆盖 T-01~T-17 ✅（`git log --grep="Task: T-"` 可核）

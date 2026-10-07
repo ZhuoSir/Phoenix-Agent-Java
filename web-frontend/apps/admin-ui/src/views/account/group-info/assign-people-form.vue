@@ -30,7 +30,6 @@ const assignPeoplePage = ref(1);
 const assignPeoplePageSize = ref(10);
 const assignPeopleTotal = ref(0);
 const assignPeopleName = ref('');
-const assignPeopleCode = ref('');
 const assignPeopleAccountMap = ref<Map<string, AccountInfo>>(new Map());
 const peopleTableRef = ref();
 
@@ -40,7 +39,6 @@ async function loadAssignPeople() {
   try {
     const params: Record<string, any> = { groupId: groupData?.id };
     if (assignPeopleName.value) params.realName = assignPeopleName.value;
-    if (assignPeopleCode.value) params.code = assignPeopleCode.value;
     const res = (await getUnGroupPageByGroupId(
       assignPeoplePage.value,
       assignPeoplePageSize.value,
@@ -90,7 +88,6 @@ const [Modal, modalApi] = useVbenModal({
   onOpenChange(isOpen) {
     if (isOpen) {
       assignPeopleName.value = '';
-      assignPeopleCode.value = '';
       assignPeopleAccountMap.value = new Map();
       assignPeoplePage.value = 1;
       assignPeoplePageSize.value = 10;
@@ -120,13 +117,6 @@ const [Modal, modalApi] = useVbenModal({
         style="width: 160px"
         @keyup.enter="assignPeoplePage = 1; loadAssignPeople()"
       />
-      <ElInput
-        v-model="assignPeopleCode"
-        placeholder="工号"
-        clearable
-        style="width: 160px"
-        @keyup.enter="assignPeoplePage = 1; loadAssignPeople()"
-      />
       <ElButton type="primary" @click="assignPeoplePage = 1; loadAssignPeople()">
         搜索
       </ElButton>
@@ -146,7 +136,6 @@ const [Modal, modalApi] = useVbenModal({
         :row-key="(row: any) => row.id"
       >
         <ElTableColumn type="selection" width="50" :reserve-selection="true" />
-        <ElTableColumn prop="code" label="工号" width="100" />
         <ElTableColumn prop="username" label="用户名" />
         <ElTableColumn prop="realName" label="真实姓名" />
         <ElTableColumn prop="phone" label="手机号" />

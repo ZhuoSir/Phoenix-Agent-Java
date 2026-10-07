@@ -22,13 +22,6 @@ export function useColumns(): VxeTableGridColumns {
     { field: 'username', title: '用户名', minWidth: 120 },
     { field: 'realName', title: '真实姓名', width: 120 },
     { field: 'mobile', title: '手机号', width: 100 },
-    { field: 'code', title: '工号', width: 100 },
-    {
-      field: 'userType',
-      title: '用户类型',
-      width: 110,
-      slots: { default: 'userTypeSlot' },
-    },
     {
       field: 'status',
       title: '状态',
@@ -96,23 +89,5 @@ export function useSchema(): VbenFormSchema[] {
       label: '手机号',
       rules: z.string().min(1, '请输入手机号'),
     },
-    {
-      component: 'Input',
-      fieldName: 'code',
-      label: '工号',
-      rules: z.string().min(1, '请输入工号'),
-    },
-    {
-      component: 'Select',
-      fieldName: 'userType',
-      label: '用户类型',
-      componentProps: {
-        options: [
-          { label: '自建用户', value: 0 },
-          { label: 'idm用户', value: 1 },
-        ],
-      },
-      rules: 'selectRequired',
-    }
   ];
 }

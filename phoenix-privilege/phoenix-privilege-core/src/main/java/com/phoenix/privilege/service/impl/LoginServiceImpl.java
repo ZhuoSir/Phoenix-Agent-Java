@@ -82,7 +82,8 @@ public class LoginServiceImpl implements LoginService {
 			// 以免"改角色后必须重新登录才生效"（旧快照路径已删除）
 			StpUtil.getSession().set(LOGIN_USER_INFO, user);
 			String tokenValue = StpUtil.getTokenValue();
-			// T-05：落地页判定依据——该账号是否持有后台角色（userType 语义为自建/IDM，不得用于此判定）
+			// T-05：落地页判定依据——该账号是否持有后台角色
+			// R-14（v2.3.0）：user_type（自建/IDM）已下线，不再出现在登录响应中
 			List<PrivilegeUserRole> userRoles = privilegeUserRoleService.getByUserId(user.getId());
 			boolean hasAdminRole = userRoles != null && !userRoles.isEmpty();
 			LoginUserInfoVO loginVO = LoginUserInfoVO.builder()
@@ -90,7 +91,6 @@ public class LoginServiceImpl implements LoginService {
 				.userId(user.getId())
 				.username(user.getUsername())
 				.realName(user.getRealName())
-				.userType(user.getUserType())
 				.hasAdminRole(hasAdminRole)
 				.build();
 			PrivilegeLoginLog loginLog = PrivilegeLoginLog.builder()

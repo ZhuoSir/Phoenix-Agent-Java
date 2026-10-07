@@ -15,7 +15,6 @@ export namespace AuthApi {
     realName: string;
     email?: string;
     phone?: string;
-    userType?: number;
     /** T-05（统一账号中心）：是否持有后台角色——落地页判定依据 */
     hasAdminRole?: boolean;
   }

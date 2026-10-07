@@ -10,8 +10,6 @@ public interface IPrivilegeUserService extends IService<PrivilegeUser> {
 
 	PrivilegeUser getByUsername(String username);
 
-	PrivilegeUser getByCode(String code);
-
 	boolean checkUsernameExist(String username);
 
 	boolean checkMobileExist(String mobile);

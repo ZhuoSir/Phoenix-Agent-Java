@@ -19,9 +19,6 @@ import java.util.Date;
 @Table("tbl_privilege_user")
 public class PrivilegeUser extends BaseEntity {
 
-	/** 工号 */
-	private String code;
-
 	/** 真实姓名 */
 	private String realName;
 
@@ -45,12 +42,6 @@ public class PrivilegeUser extends BaseEntity {
 
 	/** 头像 */
 	private byte[] image;
-
-	/** it用户ID */
-	private String itUserId;
-
-	/** it用户姓名 */
-	private String itUserName;
 
 	/** 是否是领导1:是 0:否 */
 	private Integer isLeader;
@@ -81,10 +72,6 @@ public class PrivilegeUser extends BaseEntity {
 	/** 初始密码是否已修改 1是0否 */
 	private Integer pwdInit;
 
-	/**
-	 * @see com.phoenix.privilege.enums.UserTypeEnum 用户类型 0：自建用户 1：idm用户
-	 */
-	private Integer userType;
 	/**  1是0否 */
 	private Integer status;
 

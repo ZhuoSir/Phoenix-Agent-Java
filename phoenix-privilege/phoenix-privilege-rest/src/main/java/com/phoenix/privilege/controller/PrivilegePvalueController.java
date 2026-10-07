@@ -66,7 +66,7 @@ public class PrivilegePvalueController {
 			return ReturnVo.fail("用户未登录");
 		}
 		PrivilegePvalue entity = dto.toEntity();
-		entity.setCreateBy(user.getCode());
+		entity.setCreateBy(user.getUsername());
 		return ReturnVo.ok(privilegePvalueService.save(entity));
 	}
 
@@ -85,7 +85,9 @@ public class PrivilegePvalueController {
 		if (value instanceof PrivilegeUser pUser) {
 			return pUser;
 		}
-		ObjectMapper mapper = new ObjectMapper();
+		// R-14（v2.3.0）：会话里可能是旧版 PrivilegeUser（含已下线字段）⇒ 必须忽略未知属性
+		ObjectMapper mapper = new ObjectMapper()
+			.configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 		if (value instanceof Map<?, ?> map) {
 			return mapper.convertValue(map, PrivilegeUser.class);
 		}

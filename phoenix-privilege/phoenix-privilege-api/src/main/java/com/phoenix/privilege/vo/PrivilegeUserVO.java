@@ -19,8 +19,6 @@ public class PrivilegeUserVO {
 
 	private String id;
 
-	private String code;
-
 	private String realName;
 
 	private String username;
@@ -66,8 +64,6 @@ public class PrivilegeUserVO {
 	private String updator;
 
 	private Integer delFlag;
-
-	private Integer userType;
 
 	/** 人员禁用状态 1是0否 */
 	private Integer status;

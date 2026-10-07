@@ -8,8 +8,6 @@ export interface PrivilegeUser {
   username?: string;
   realName?: string;
   mobile?: string;
-  code?: string;
-  userType?: number;
   status?: number;
   secret?: string;
   password?: string;
@@ -43,12 +41,6 @@ export async function getUserByUsernameApi(username: string) {
     `/api/privilege/user/username/${username}`,
     { responseReturn: 'body' },
   );
-}
-
-export async function getUserByCodeApi(code: string) {
-  return requestClient.get<PrivilegeUser>(`/api/privilege/user/code/${code}`, {
-    responseReturn: 'body',
-  });
 }
 
 export async function createUserApi(data: Record<string, any>) {

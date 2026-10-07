@@ -157,14 +157,6 @@ function refreshGrid() {
       <template #toolbar-tools>
         <ElButton type="primary" @click="onCreate">新增</ElButton>
       </template>
-      <template #userTypeSlot="{ row }">
-        <ElTag
-          :type="row.userType === 1 ? 'primary' : 'info'"
-          size="small"
-        >
-          {{ row.userType === 1 ? 'idm用户' : '自建用户' }}
-        </ElTag>
-      </template>
       <template #statusSlot="{ row }">
         <ElTag
           :type="row.status === 0 ? 'success' : 'danger'"

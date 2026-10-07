@@ -400,6 +400,26 @@
   再按语句判断删留；② 改完**立刻灌进临时库验证**（`exit=0` 且对象计数符合预期），不要等下一轮演练才发现；
   ③ 自检"引号数为偶数""目标表语句数"这类廉价不变量，能在打开 DB 前就发现截断。
 
+## L-54 从**会话缓存的实体**上删字段 ⇒ 必须让所有读取点容忍未知属性
+- **现象**：R-14 从 `PrivilegeUser` 删掉 `code`/`userType`/`itUserId`/`itUserName` 后，登录时写入会话的仍是
+  **旧版对象 JSON**；而 `HarnessController` / `ReactAgentController` / `PrivilegePvalueController` /
+  `LoginHelper` 四处都用 Jackson 2 的 `new ObjectMapper()` 读会话（默认 `FAIL_ON_UNKNOWN_PROPERTIES = true`）
+  ⇒ 读旧会话会抛 `UnrecognizedPropertyException`，相关接口全线 500（登录本身却正常，极易漏检）。
+- **防再犯规则**：① 改**会被序列化进会话/缓存/消息**的实体时，先全仓搜索它的读取点
+  （搜会话常量如 `LOGIN_USER_INFO`），逐个确认反序列化是否宽容；
+  ② Jackson 2 手搓 `ObjectMapper` 必须显式 `.configure(FAIL_ON_UNKNOWN_PROPERTIES, false)`，
+  或统一改用容器注入的 ObjectMapper（Spring Boot 默认已关该特性；本项目 Jackson 3 的 `tools.jackson` 注入实例天然宽容）；
+  ③ 部署后要专门验一次"**旧会话 + 新代码**"路径（拿改造前就登录的 token 打一次相关接口），
+  不能只验"重新登录后是否正常"。
+
+## L-55 升级链的"可重复执行"会在**后面的件删掉前面件用到的列**时终结
+- **现象**：T-20 的 drill 沿用"01~08 跑两轮"验证幂等，第二轮 `V2.0.0_02` 直接失败：
+  `column "user_no" of relation "tbl_privilege_user_role" does not exist` —— 因为 08 删了这一列。
+  真实迁移由台账保证**每件只跑一次**，故生产无风险；但"整链跑两轮"这种自检方式会给出**假失败**。
+- **防再犯规则**：① drill 分两层——**整链跑一次**（与 migrator 语义一致）+ **目标件单独跑两次**（验幂等）；
+  ② 不要用"整链可重放"当作幂等证据；③ DDL 删除型升级件的自检里，务必把"被删对象不存在"写成断言
+  （而不是断言后续件仍能引用它）。
+
 ## L-53 种子数据要按**迁移前**的 schema 生成；否则全新库载入即撞 NOT NULL
 - **现象**：T-19 往基线注入 chenzhuo 种子时，行是从**已迁移**的活库导出的 —— 而 `company_id`/`dept_id`
   已被 `V2.0.0_01` 删除，导出的 INSERT 自然没有这两列；灌入**全新库**（迁移前 schema，两列 NOT NULL）即

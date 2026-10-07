@@ -24,8 +24,6 @@ public class PrivilegeUserDTO {
 
 	private String id;
 
-	private String code;
-
 	private String realName;
 
 	private String username;
@@ -66,8 +64,6 @@ public class PrivilegeUserDTO {
 
 	/** R-03（v2.0.0）：创建/更新时一并加入的组 id 集合。null = 不改动；空列表 = 清空。 */
 	private List<String> groupIds;
-
-	private Integer userType;
 
 	private String keyword;
 

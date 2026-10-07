@@ -40,11 +40,6 @@ public class PrivilegeUserController {
 		return ReturnVo.ok(toVo(privilegeUserService.getByUsername(username)));
 	}
 
-	@GetMapping("/code/{code}")
-	public ReturnVo<PrivilegeUserVO> getByCode(@PathVariable String code) {
-		return ReturnVo.ok(toVo(privilegeUserService.getByCode(code)));
-	}
-
 	private PrivilegeUserVO toVo(PrivilegeUser entity) {
 		if (entity == null) {
 			return null;

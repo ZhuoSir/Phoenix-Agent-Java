@@ -33,7 +33,7 @@ export const useAuthStore = defineStore('auth', () => {
       loginLoading.value = true;
       // R-11 / T-19（v2.0.1）：单套登录逻辑 —— 不再有"普通用户/管理员"两条分支，统一一个端点
       const result = await loginApi(params);
-      const { token, userId, username, realName, email, phone, userType } =
+      const { token, userId, username, realName, email, phone } =
         result as typeof result & { hasAdminRole?: boolean };
 
       if (token) {
@@ -41,8 +41,7 @@ export const useAuthStore = defineStore('auth', () => {
         accessStore.setAccessToken(token);
 
         // T-05（统一账号中心）：落地页按「是否持有后台角色」判定。
-        // 原实现用 userType===1 判「普通用户」，但该列语义是「0 自建 / 1 IDM」（见 BUG-101 同源的语义混淆），
-        // 会把 IDM 来源的后台用户误送前台。
+        // R-14（v2.3.0）：user_type（自建/IDM）已下线，不再参与任何判定。
         // T-19（v2.0.1）：无后台角色者落「智能体中心」(/agent/chat，R-11 新入口)，不再落前台路由 /front/chat。
         const hasAdminRole = (result as { hasAdminRole?: boolean }).hasAdminRole;
         const homePath =
@@ -57,7 +56,6 @@ export const useAuthStore = defineStore('auth', () => {
           username,
           email,
           phone,
-          userType,
         };
 
         userStore.setUserInfo(userInfo);
