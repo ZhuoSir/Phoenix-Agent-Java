@@ -366,3 +366,15 @@
   三者缺一不得命名，只能照抄代码原名（如"第三方登录策略"）；② 类名/方法名只能生成假设，**假设必须标注为假设**（"疑似扫码登录（未证实调用方）"），不得写成并列事实；
   ③ 写进文档的每个业务名词都要能在证据文件里指到 file:line；④ 被用户纠正后**全库 grep 该词**逐处订正（本次 26 处），只改一处＝留半截错。
 
+## L-46 构建工具链必须用项目记载的配置：JDK 不在 java_home 列表、本地仓库是项目内 `.mvn-home`
+- **现象**：做 T-01 编译基线时，我用 `which mvn`（无）→ `/usr/libexec/java_home -V`（只列出 25/17/16/11/8，**没有 21/23**）
+  → 便下结论"本机只能拿 JDK 25 编"，用 JDK 25 + 默认 `~/.m2`（28G）跑出了 `BUILD SUCCESS`。
+  用户随即给出真实配置：**JDK 23 在 `~/jdk/jdk-23.0.1.jdk`（不在 `java_home -V` 覆盖范围）**，
+  Maven 在 `~/Documents/work/apache/apache-maven-3.8.6/bin/mvn`（写在 `~/.bash_profile` 的 `MVN_HOME`），
+  **本地仓库是项目内 `<项目根>/.mvn-home`（每次构建带 `-Dmaven.repo.local`）**，Docker CLI 在 `/usr/local/bin/docker`。
+  ⇒ 我的"基线"用的是**错误的工具链与错误的依赖仓库**，结论不可作为后续增量对比的基线。
+- **防再犯**：① 开工前按顺序读 **AGENTS.md / `specs/_project/profile.md` / `~/.bash_profile`·`~/.zprofile`**（PATH 由它们决定），
+  **不要**用 `which` + `java_home -V` 反推项目环境（`~/jdk/**` 不在其覆盖内）；② 构建命令模板必须完整落盘：
+  `JAVA_HOME=<项目 JDK> <mvn 全路径> … -Dmaven.repo.local="$PWD/.mvn-home"`；③ 证据文件命名带**工具链指纹**
+  （JDK 版本 + 仓库路径），配置变更时旧证据改名保留而非删除（本次 `*_WRONGCFG_jdk25_m2repo.raw.txt`）。
+

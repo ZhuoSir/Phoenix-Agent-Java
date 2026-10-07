@@ -18,6 +18,14 @@
 - 格式化 `mvn spring-javaformat:apply`
 - 后端测试 `mvn test`（仅 2 个测试类）| 前端 `pnpm test:unit`（vitest）| 前端 lint `pnpm lint`（vsh: eslint/oxlint/stylelint/cspell）
 - 本地启动 `mvn spring-boot:run`（-pl 以启动模块 phoenix-admin/phoenix-admin-manager 为准，未实测）
+- **权威工具链（用户 2026-10-07 给定，构建/运行一律用这套）**：
+  - JDK：`/Users/bryanchen/jdk/jdk-23.0.1.jdk/Contents/Home`（java 23.0.1；**不在 `java_home -V` 列表内**）
+  - Maven：`/Users/bryanchen/Documents/work/apache/apache-maven-3.8.6/bin/mvn`（3.8.6；`~/.bash_profile` 的 `MVN_HOME`）
+  - **本地仓库：项目内 `<项目根>/.mvn-home`** ⇒ 构建命令须带 `-Dmaven.repo.local="$PWD/.mvn-home"`（`~/.m2` 非本项目所用）
+  - Maven settings：`~/.m2/settings.xml`
+  - Docker CLI：`/usr/local/bin/docker`；compose 文件 `docker/docker-compose.yaml`
+  - 活库（2026-10-07 实测）：容器 `phoenix-release-postgres-1`（pgvector/pg16，healthy）／DB `phoenix`（另有 `phoenix_drill`）；宿主机无 `psql`，一律 `docker exec` 进容器执行
+  - 构建基线（T-01，JDK 23 + `.mvn-home`）：`mvn clean compile` = **BUILD SUCCESS**
 - ⚠ AGENTS.md 指定的 settings 路径 `/Users/liuwenjun/java/doc/maven-setting/dragon-settings.xml` 属他人机器、本机不存在；本机使用 `~/.m2/settings.xml`
 
 SQL/迁移: `sql/all_schema.sql` + `sql/all_data.sql`（PostgreSQL 语法：IDENTITY/JSONB/COMMENT ON），**无 Flyway/Liquibase**，DDL 手工执行

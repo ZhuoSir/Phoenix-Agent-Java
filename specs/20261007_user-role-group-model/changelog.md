@@ -1,5 +1,15 @@
 # Changelog: user-role-group-model
 
+## v1.1.0 plan 事实订正（2026-10-07，状态: 待重确认）
+
+- **触发**：T-01 门禁统计改用**活库**（容器 `phoenix-release-postgres-1`／DB `phoenix`，已应用 `V1.7.0_01~04`）后，推翻 plan 两处数字（原为 seed/dump 口径）：
+  - 普通角色 ACL：「0 行」→ **1 行**（智能体中心 `/agent/chat`）
+  - 普通角色名下用户：「10」→ **5 个存活用户**
+- **订正范围**：plan 版本头（v1.0.0 → v1.1.0 待重确认）· 决策 6 第 2 条 · 风险「最严重的一条」· §数据模型一 追加「活库现值复核」表
+- **无设计变更**：决策 1~6、T-01~T-17、R-01~R-11 全部不受影响 ⇒ 仅需重走**确认②**
+- **T-01 产物**：`evidence/T-01_compile-baseline.raw.txt`（BUILD SUCCESS）·`T-01_gate-stats.txt`·`T-01_role-menu-facts.txt`·`T-01_backup-manifest.txt`；备份 `backups/pre_v2.0.0_full_*.sql`(44M) + `_orgdim_*.sql`(31K) + 3 份组织列 CSV
+- **环境口径纠正**：工具链/仓库路径误用（JDK 25 + `~/.m2`）→ 记 `lessons.md` **L-46**，profile 运行环境节已更新为权威配置（JDK 23 + `.mvn-home`）
+
 ## v1.0.0 tasks 确认记录（2026-10-07）确认人: 陈卓
 
 - **三重确认第③重通过**：用户口令「确认，陈卓」→ tasks 版本头落 `v1.0.0 | 状态: 已确认 | 确认人: 陈卓 | 确认日期: 2026-10-07`

@@ -1,0 +1,75 @@
+--- 0) 库版本台账 ---
+                   seq                   |          applied_at           
+-----------------------------------------+-------------------------------
+ V1.7.0_04__agent_chat_center_new_window | 2026-10-06 15:03:16+08
+ V1.7.0_03__agent_chat_center_menu       | 2026-10-06 15:03:16+08
+ V1.7.0_02__unified_account_migration    | 2026-10-06 15:03:16+08
+ V1.7.0_01__unified_account_map          | 2026-10-06 15:03:16+08
+ V1.6.0_03__runtime_compaction_columns   | 2026-10-05 13:59:17.200922+08
+(5 rows)
+
+--- 1) 组织三表与待删对象行数 ---
+             t              | count 
+----------------------------+-------
+ tbl_privilege_company      |     4
+ tbl_privilege_department   |    17
+ tbl_privilege_employee     |    14
+ tbl_privilege_group        |     0
+ tbl_platform_platform_info |     0
+ tbl_platform_account_info  |     1
+(6 rows)
+
+--- 2) 用户/角色/菜单/ACL 规模 ---
+               t               | count 
+-------------------------------+-------
+ tbl_privilege_user(存活)      |     5
+ tbl_privilege_role(存活)      |     2
+ tbl_privilege_module(存活)    |    27
+ tbl_privilege_acl(存活)       |    61
+ tbl_privilege_user_role(存活) |    12
+(5 rows)
+
+--- 3) 零角色可登录用户数（R-07 门禁）---
+ zero_role_users 
+-----------------
+               2
+(1 row)
+
+--- 4) 每角色可用菜单数（R-05 门禁）---
+         id         |    name    | usable_menus | acl_rows 
+--------------------+------------+--------------+----------
+ 428007432736870400 | 系统管理员 |           24 |       24
+ 431285032083144704 | 普通角色   |            1 |        1
+(2 rows)
+
+--- 5) ACL 脏数据面 ---
+ orphan_module_rows 
+--------------------
+                 30
+(1 row)
+
+              release_id              | count 
+--------------------------------------+-------
+ 71f2934c-d93b-4075-9492-d9cbf22e1bb2 |    36
+(1 row)
+
+--- 6) 零组前台账号数（R-04 门禁）---
+ zero_group_accounts 
+---------------------
+                   1
+(1 row)
+
+--- 7) 组授权行与墓碑行（BUG-121）---
+            t            | count 
+-------------------------+-------
+ group_info              |     1
+ group_agent_info(del=0) |     4
+ group_agent_info(del=1) |     0
+ group_kbase_info(del=0) |     3
+ group_kbase_info(del=1) |     2
+ group_skill_info(del=0) |     5
+ group_skill_info(del=1) |     6
+ group_mcp_info(del=0)   |     1
+ group_mcp_info(del=1)   |     5
+(9 rows)
+
