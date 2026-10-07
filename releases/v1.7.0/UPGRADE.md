@@ -54,3 +54,8 @@
 - **中断**：一次 backend 重启（本版本实测 `11:43:18Z`），**全员重登**；nginx 重建不影响会话；
 - **兼容**：前台 `POST /auth/login` 保留；旧账号 id 已按映射表迁移（`tbl_unified_account_map`）；
 - **人工动作**：无（除上述维护窗口告知）。
+
+## 六、升级后清理（housekeeping）
+
+- [ ] 观察一个版本周期后可清理 **BUG-115 补登时留下的备份表**：`DROP TABLE tbl_phoenix_release_bak_20261006;`
+      （保留目的是可整体还原台账；清理前确认 `tbl_phoenix_release` 中 V1.7.0_01~04 四行仍在）

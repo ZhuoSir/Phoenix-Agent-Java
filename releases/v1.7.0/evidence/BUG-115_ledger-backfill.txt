@@ -1,0 +1,43 @@
+=== BUG-115 迁移台账补登（2026-10-06，用户口令「补吧」）===
+【问题】V1.7.0_01~04 的库内变更已生效，但迁移台账 `tbl_phoenix_release` 无对应记录（最新仅 V1.6.0_03）。
+
+【第 1 步：应用时间取证】
+`select sn, create_time from tbl_privilege_module where sn in ('AgentRun','AgentChatCenter')`
+→ AgentChatCenter create_time = **2026-10-06 15:03:16**（V1.7.0_03/04 写入的菜单行）⇒ 该批升级件的执行时刻。
+（AgentRun = 2026-07-07，为历史已存在行，被 03/04 更新而非新建。）
+
+【第 2 步：备份】
+`CREATE TABLE tbl_phoenix_release_bak_20261006 AS SELECT * FROM tbl_phoenix_release;`
+→ 备份 12 行（回滚依据）。
+
+【第 3 步：补登（幂等保护 WHERE NOT EXISTS）】
+INSERT INTO tbl_phoenix_release(seq, file, applied_at)
+SELECT v.seq, v.file, v.applied_at FROM (VALUES
+  ('V1.7.0_01__unified_account_map',         '/releases/v1.7.0/sql/V1.7.0_01__unified_account_map.sql',         TIMESTAMPTZ '2026-10-06 15:03:16+08'),
+  ('V1.7.0_02__unified_account_migration',   '/releases/v1.7.0/sql/V1.7.0_02__unified_account_migration.sql',   TIMESTAMPTZ '2026-10-06 15:03:16+08'),
+  ('V1.7.0_03__agent_chat_center_menu',      '/releases/v1.7.0/sql/V1.7.0_03__agent_chat_center_menu.sql',      TIMESTAMPTZ '2026-10-06 15:03:16+08'),
+  ('V1.7.0_04__agent_chat_center_new_window','/releases/v1.7.0/sql/V1.7.0_04__agent_chat_center_new_window.sql', TIMESTAMPTZ '2026-10-06 15:03:16+08')
+) AS v(seq, file, applied_at)
+WHERE NOT EXISTS (SELECT 1 FROM tbl_phoenix_release r WHERE r.seq = v.seq);
+
+【第 4 步：核对（实测输出）】
+INSERT 0 4
+ seq                                     | file                                                          | applied_at
+ V1.7.0_01__unified_account_map          | /releases/v1.7.0/sql/V1.7.0_01__unified_account_map.sql          | 2026-10-06 15:03:16+08
+ V1.7.0_02__unified_account_migration    | /releases/v1.7.0/sql/V1.7.0_02__unified_account_migration.sql    | 2026-10-06 15:03:16+08
+ V1.7.0_03__agent_chat_center_menu       | /releases/v1.7.0/sql/V1.7.0_03__agent_chat_center_menu.sql       | 2026-10-06 15:03:16+08
+ V1.7.0_04__agent_chat_center_new_window | /releases/v1.7.0/sql/V1.7.0_04__agent_chat_center_new_window.sql | 2026-10-06 15:03:16+08
+表总行数：12 → **16**（+4）
+
+【第 5 步：回滚语句（如需）】
+-- 仅删补登行：
+DELETE FROM tbl_phoenix_release WHERE seq LIKE 'V1.7.0\_%';
+-- 或整体还原备份：
+TRUNCATE tbl_phoenix_release;
+INSERT INTO tbl_phoenix_release(seq, file, applied_at) SELECT seq, file, applied_at FROM tbl_phoenix_release_bak_20261006;
+
+【遗留与说明（如实）】
+1. `applied_at` 为**回溯近似值**（以 03/04 的菜单行 create_time 为据；01/02 按同批推定），非迁移器真实写入时刻；
+2. 未在本仓库 Java 源码中找到读取 `tbl_phoenix_release` 的迁移器实现（可能在脚本/外部流程）⇒ **建议后续确认其比对口径**，
+   若它要求 `file` 为绝对容器路径或另有 seq 规范，则本补登需按该口径微调；
+3. 备份表 `tbl_phoenix_release_bak_20261006` 建议保留至少一个版本周期。

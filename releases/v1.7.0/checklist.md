@@ -8,9 +8,9 @@
 - [x] **SQL 汇总与 Flyway 风格校对**：`sql/V1.7.0_01~04` 齐（4 件 + `rollback/` 4 件，已聚合到本目录）
 - [x] **零 DDL 声明核对**：`kb-access-isolation`、`visibility-filetree-hygiene` 均**零 DDL**（与各自 `artifacts.md` 一致）
 - [x] **文档落盘**：`MILESTONE.md`（状态已冻结）/`RELEASE-NOTES.md`/`UPGRADE.md`/`config/changes.md`/`checklist.md`
-- [!] **迁移台账在册核对 —— 未通过（遗留项）**：`tbl_phoenix_release` 最新为 **V1.6.0_03（2026-10-05）**，**没有 V1.7.0_01~04 行**；
+- [x] **迁移台账在册核对（原未通过 → 2026-10-06 已补齐）**：`tbl_phoenix_release` 最新为 **V1.6.0_03（2026-10-05）**，**没有 V1.7.0_01~04 行**；
   但实测**变更确已生效**：`tbl_unified_account_map`、`tbl_unified_account_migration_rows` 存在，`V1.7.0_03/04` 的菜单行在（`AgentRun` 等命中 2 行）
-  ⇒ 判定为**"执行方式未登记"**（疑似手工 `psql` 执行）。**风险**：后续迁移器可能重复执行或顺序错乱。→ 已登记 **BUG-115**，**不阻塞冻结**，但**必须在下次数据库变更前处理**
+  ⇒ 判定为**"执行方式未登记"**（疑似手工 `psql` 执行）。**风险**：后续迁移器可能重复执行或顺序错乱。→ 已登记 **BUG-115** 并**已补齐 4 行**（备份 `tbl_phoenix_release_bak_20261006`；证据 `evidence/BUG-115_ledger-backfill.txt`，含回滚语句）
 
 ## 二、验证（冻结批次，实测留档）
 
