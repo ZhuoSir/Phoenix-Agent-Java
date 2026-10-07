@@ -32,7 +32,7 @@
 
 三条主线，一次版本完成（Q2 裁定不分期）：
 
-1. **下线**（R-01/R-03/R-06/R-09）——删除组织维度（三表 + 用户表组织列 + 6 类入口）、下线三方平台用户/组织同步模块（保留第三方扫码登录）、下线后台数据组死代码。
+1. **下线**（R-01/R-03/R-06/R-09）——删除组织维度（三表 + 用户表组织列 + 6 类入口）、下线三方平台用户/组织同步模块（保留第三方免登（应用内 SSO））、下线后台数据组死代码。
 2. **收敛**（R-02/R-04/R-09）——用户模型收敛为 用户 / 角色 / 组；组唯一化到平台侧资源授权组，组直接关联智能体 / 技能 / 知识库 / MCP。
 3. **生效**（R-05/R-07/R-08）——角色过滤菜单生效（ACL 预置数据转判定源）、存量账号补角色与组、预设问题接口加角色校验。
 
@@ -56,7 +56,7 @@
 | **整文件可删** | 22 | `phoenix-privilege-api`：`entity/{PrivilegeCompany,PrivilegeDepartment,PrivilegeEmployee}.java`、`dto/{PrivilegeCompanyDTO,PrivilegeDepartmentDTO,PrivilegeEmployeeDTO}.java`、`dto/query/PrivilegeCompanyQuery.java`、`vo/{PrivilegeCompanyVO,PrivilegeDepartmentVO,PrivilegeEmployeeVO}.java`（10）；`phoenix-privilege-core`：三个 `*Mapper.java`、`I*Service.java`、`*ServiceImpl.java`（8）；`phoenix-privilege-rest`：三个 `*Controller.java`（3）；`phoenix-common-core`：`service/sync/AbstractPlatformSyncStrategy.java`（1，随同步包整删） |
 | **文件内部分改** | 3 | `AccountInfoServiceImpl.java`（import:38、字段:67、唯一调用 401-404）、`PrivilegeUserServiceImpl.java`（import:12-13、`pageByQuery` select:136 + leftJoin:137-140 + eq:141-142）、`PrivilegeUserController.java`（import:9-14、字段:27-28、`toVo` 54-72 中公司/部门回填 59-70） |
 | **227 之外必删的 VO**（易漏） | 2 | `vo/DepartmentTreeVO.java`、`vo/OrganizationTreeVO.java`（仅被部门 Controller/ServiceImpl 使用） |
-| **删后成孤儿（不报错但须清）** | 6 | `service/platform/{DingTalk,Feishu,Weixin}SdkService(+Impl)`——引用于三个 `*SyncStrategy` 与被删的两个组织 Service；**`PlatformInfoService` 必须保留**（扫码登录依赖） |
+| **删后成孤儿（不报错但须清）** | 6 | `service/platform/{DingTalk,Feishu,Weixin}SdkService(+Impl)`——引用于三个 `*SyncStrategy` 与被删的两个组织 Service；**`PlatformInfoService` 必须保留**（第三方免登依赖） |
 
 ### B. 字段级：组织列横跨 4 处（Q-P3 已裁定「全删」）
 
@@ -70,7 +70,7 @@
 ### C. 同步模块删除面
 
 删：`service/sync/{PlatformSyncStrategy,AbstractPlatformSyncStrategy,PlatformSyncFactory}.java`、`sync/{dingtalk,feishu,weixin}/*SyncStrategy.java`、`model/dto/{SyncUserDTO,SyncDeptDTO}.java`、`controller/sync/PlatformSyncController.java`、前端 `api/core/platform-sync.ts` + `api/core/index.ts:19` 再导出。
-**⚠️ 编译耦合（决策 3 已处置）**：三个扫码登录策略 import 了 `*SyncConstants` 的 URL 常量 ⇒ 采用**方案 1：保留 3 个 `*SyncConstants` 常量文件**（纯 String，无组织语义），其余整删。
+**⚠️ 编译耦合（决策 3 已处置）**：三个第三方免登策略 import 了 `*SyncConstants` 的 URL 常量 ⇒ 采用**方案 1：保留 3 个 `*SyncConstants` 常量文件**（纯 String，无组织语义），其余整删。
 **两条平行死端点**（在 phoenix-privilege，非 sync 包，全仓零调用）：`POST /api/privilege/department/sync`、`/sync-children/{deptId}`、`POST /api/privilege/employee/sync`、`/sync-by-dept/{deptId}` ⇒ 随组织 Controller 整删。
 
 ### D. 前端删除面（`apps/admin-ui`）
@@ -91,7 +91,7 @@
        └─ 其他角色 → ACL(release_id=roleId ∩ module_id) 命中菜单，权限位按角色授予
 组授权 → tbl_platform_group_{agent,kbase,skill,mcp}_info
   └─ 前台可见性：getMyAgents（组∩已发布）/ FrontSkillAccessServiceImpl.MY_SKILLS_SQL / FrontMcpAccessServiceImpl.EFFECTIVE_FRONT_SQL
-删除面：组织三表 + 用户模型三处组织列 + 后台数据组 + 三方同步模块（保留扫码登录常量与平台配置）
+删除面：组织三表 + 用户模型三处组织列 + 后台数据组 + 三方同步模块（保留第三方免登常量与平台配置）
 ```
 
 ## 接口设计
@@ -225,7 +225,7 @@ COMMIT;
 | `tbl_privilege_acl` | ① 维护写入方（`PrivilegeAclController` PUT/DELETE/`saveAll`/`saveModule`）② **判定读取方（本版新增）** | ① 写入路径不变（但界面写路径坏 → BUG-116）② 成为菜单可见性判定源 | T-xx |
 | `tbl_privilege_user_role` | ① 角色分配维护（`/api/privilege/user-role/batch-save|batch-remove`，界面正常）② `LoginServiceImpl:80` 算 `hasAdminRole` ③ `PrivilegeAclServiceImpl:43` | ①②③ 行为不变；但**孤儿行（BUG-118）须先订正**，否则过滤结果不可预期 | T-xx |
 | `AgentKnowledgeMapper:32-42` | 硬编码 `role_id='428007432736870400'` 判超管（既有先例） | 保持兼容：超管定义沿用该 role_id（新增豁免逻辑须与之一致，禁造第二套超管口径） | T-xx |
-| `tbl_platform_platform_info` | ① 同步模块读（三个 `*SyncStrategy` 取 corpId/secret）② **第三方扫码登录读**（`AccountInfoServiceImpl:351 getEnabledByType` → `ThirdPartyLoginFactory`） | ① 随同步模块删除而失去消费方，**表与 `PlatformInfoService` 保留** ② 扫码登录**必须仍可用**（唯一硬耦合是 3 个 `*SyncConstants`，决策 3 方案 1 保留之） | T-xx |
+| `tbl_platform_platform_info` | ① 同步模块读（三个 `*SyncStrategy` 取 corpId/secret）② **第三方免登（应用内 SSO）读**（`AccountInfoServiceImpl:351 getEnabledByType` → `ThirdPartyLoginFactory`） | ① 随同步模块删除而失去消费方，**表与 `PlatformInfoService` 保留** ② 第三方免登**必须仍可用**（唯一硬耦合是 3 个 `*SyncConstants`，决策 3 方案 1 保留之） | T-xx |
 | `POST /platform/sync` 等 6 条 | ① 前端 `platform-sync.ts`（唯一调用方）② 无任何后端内部调用方 | ① 前端随 organization 页面整删 ② 端点 404（不存在），非 500 | T-xx |
 | `tbl_privilege_user` | 登录 / 鉴权（Sa-Token `StpUtil`）/ 账号管理 / 前台 chat / `getLoginUserInfo`（`BeanUtils.copyProperties` 从**实体**拷贝）/ 原同步的原始 SQL 写入 | 组织列移除后各身份行为不变，唯一变化=字段集；注意 `PrivilegeUserVO.roles` 永不填充（前端 `userRoles` 恒空，`accessMode='backend'` 下不影响路由） | T-xx |
 | `tbl_platform_group_*` 五表 | ① 组管理页维护（agent/kbase 有组侧端点；skill/mcp 仅资源侧）② 前台可见性解析：`getMyAgents`（`GroupAgentInfoServiceImpl.getByGroupIds:21-25`）、`FrontSkillAccessServiceImpl.MY_SKILLS_SQL:27-37`、`FrontMcpAccessServiceImpl.EFFECTIVE_FRONT_SQL:24-34` | 成为唯一组语义；授权即时生效——**但读侧 `del_flag` 口径不统一（BUG-121），须先统一再验收** | T-xx |
@@ -248,14 +248,14 @@ COMMIT;
 
 ### 决策 3：同步模块移除的边界（只删 sync，保留 login 与平台配置）
 
-- **采用**：仅删 `service/sync/**` + `PlatformSyncController`（`/platform/sync`）+ 前端同步 API/入口；**保留** `service/platform/**`（SDK 封装）、`thirdparty/strategy/**`（扫码登录）、`tbl_platform_platform_info`。
-- **理由**：扫码登录与同步**共用**平台配置表与 SDK；删配置表会直接打死第三方登录，超出用户"移除同步"的授权范围（R-06 边界 1）。
-- **被拒绝**：连 `platform` 包与配置表一起删 —— 理由：破坏扫码登录，属超授权范围的连带破坏。
+- **采用**：仅删 `service/sync/**` + `PlatformSyncController`（`/platform/sync`）+ 前端同步 API/入口；**保留** `service/platform/**`（SDK 封装）、`thirdparty/strategy/**`（第三方免登）、`tbl_platform_platform_info`。
+- **理由**：第三方免登与同步**共用**平台配置表与 SDK；删配置表会直接打死第三方登录，超出用户"移除同步"的授权范围（R-06 边界 1）。
+- **被拒绝**：连 `platform` 包与配置表一起删 —— 理由：破坏第三方免登，属超授权范围的连带破坏。
 - 重新评估条件：若用户后续明确"第三方登录也不用"，另立 spec。
-- **调研补充（C 路实测，本决策的关键修正）**：扫码登录对同步模块存在**一处硬编译耦合**——`DingTalkThirdPartyLoginStrategy.java:8,24,35`、`FeishuThirdPartyLoginStrategy.java:8,24`、`WeComThirdPartyLoginStrategy.java:8,24,35` 分别 import 了 `service/sync/{dingtalk,feishu,weixin}/*SyncConstants` 的 URL 常量（`TOKEN_URL`/`USER_INFO_URL`/`OAUTH_ACCESS_TOKEN_URL`）⇒ **整包盲删会直接编译失败**。
+- **调研补充（C 路实测，本决策的关键修正）**：第三方免登对同步模块存在**一处硬编译耦合**——`DingTalkThirdPartyLoginStrategy.java:8,24,35`、`FeishuThirdPartyLoginStrategy.java:8,24`、`WeComThirdPartyLoginStrategy.java:8,24,35` 分别 import 了 `service/sync/{dingtalk,feishu,weixin}/*SyncConstants` 的 URL 常量（`TOKEN_URL`/`USER_INFO_URL`/`OAUTH_ACCESS_TOKEN_URL`）⇒ **整包盲删会直接编译失败**。
   - **采用：方案 1（保留 3 个 `*SyncConstants` 常量接口文件）**。理由：这 3 个文件是**纯 String 常量**（各 5–7 行）、不含任何组织维度语义，保留成本近零；相比迁常量（方案 2）少改 3 处 import + 4 处引用，破坏面更小。
   - **被拒绝**：方案 2（把 5 个 URL 常量迁到 `thirdparty/strategy` 下的新常量类再整删 `service/sync/**`）——理由：收益仅是"包更干净"，却要改国产登录策略的 import 与用法，属于为整洁引入多余改动面。
-  - **被拒绝**：连平台配置一起删 —— 见上（会打死扫码登录）。
+  - **被拒绝**：连平台配置一起删 —— 见上（会打死第三方免登）。
   - 重新评估条件：若将来 `service/sync` 目录要彻底消失（如再删第三方登录），届时一并迁常量。
 - **另需处置的孤儿**（删除后编译通过但无引用）：`service/platform/{DingTalk,Feishu,Weixin}SdkService(+Impl)` 6 个文件——**建议同批清理**，但 `PlatformInfoService` 必须留。
 
@@ -305,7 +305,7 @@ COMMIT;
 - **[风险] 过滤菜单但漏了按钮级权限 ⇒ `hasAccessByCodes` 恒真** → 规避：`buildAdminAclMap` 与 `access.ts:123-126` 的 `setAccessCodes` 同批改造（决策 4）；验收须含"未授权按钮不出现/点击被拒"的断言，不能只验菜单。
 - **[风险] 无菜单用户落地白屏/404**（前端 `homePath` 默认 `/agent/list`，`store/auth.ts:49`）→ 规避：Q-P1 口径落定 + 提示页兜底；验收含"零授权账号登录后不白屏"。
 - **[风险] session 里的 ACL 是登录时刻快照**（`LoginServiceImpl:76` 写 `LOGIN_ACLS`）→ 规避：新实现**不得**继续读 session 快照（否则改角色须重登才生效，与 R-04「即时生效」精神相悖）；改为按需查库并说明缓存口径。
-- **[风险] 移除同步波及扫码登录** → 规避：R-06 已写成共享面边界 + 回归断言（删同步后实测扫码登录仍成功）。
+- **[风险] 移除同步波及第三方免登** → 规避：R-06 已写成共享面边界 + 回归断言（删同步后实测第三方免登仍成功）。
 - **[风险] 迁移器重跑（台账缺行，L-40/BUG-115）** → 规避：SQL 全部自幂等，不依赖台账判重。
 - **[风险] 提交面过宽吞入 40MB 级 backups dump（L-13）** → 规避：显式列路径提交，提交前核对 `git status --porcelain`。
 - **[风险] 平台侧组授权表读侧不过滤逻辑删 ⇒ 已撤销授权仍可能可见（BUG-121）** → 规避：统一读侧口径（`BaseModel` 补 `isLogicDelete` 或显式补 `del_flag=0`），并以 R-04「撤销即时生效」的断言覆盖；生产已有墓碑行（kbase 2 / skill 6 / mcp 5）。
