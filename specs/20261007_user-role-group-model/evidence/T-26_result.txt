@@ -1,0 +1,19 @@
+=== T-26 验证结论（BUG-138：授权行 release_sn 误写 ⇒ 授权对菜单不可见）===
+日期: 2026-10-07 | 触发: 用户「给 common 授技能/插件/MCP 后 chenzhuo 左侧目录不变」
+
+[根因链]
+  ① 前端 assign-menu.vue / role/index.vue 调 saveModuleAclApi 传 releaseSn = role.sn（'COMMON'）
+  ② 后端 saveModuleAcl 信任 DTO：insert 分支 setReleaseSn(dto) ⇒ 新行 release_sn='COMMON'
+     （update 分支按 release_id+module_id 命中基线行、不改 release_sn ⇒ 已有授权的菜单"看似正常"）
+  ③ 登录菜单 buildUserAclMap / getRoleAcls 过滤 release_sn='role' ⇒ 'COMMON' 行被排除 ⇒ 菜单不变
+
+[修复]
+  · 后端 saveModuleAcl 插入/更新双分支强制 release_sn='role'（与 saveAllAcl 对齐；更新分支自愈存量）
+  · 前端两调用方改传 'role'
+  · V2.0.0_12 归正存量错值行（+rollback）；drill 正向/幂等 exit=0
+
+[实测]
+  · 修复前: 普通角色对 技能管理/插件管理/MCP 的 ACL 行 release_sn='COMMON'；chenzhuo 菜单=7（缺这3个）
+  · 修复后: 错值行归零；chenzhuo 菜单=**10**，含 技能管理(智能体管理下)/插件管理(根)/MCP(插件管理下) ✅
+  · 强制归正验证: 故意传 releaseSn='COMMON' 调 saveModule → 落库 release_sn='role' ✅（测试行已删，普通角色回到10行）
+  · typecheck 203 零新增 / build ✓ / 后端+前端镜像重建部署 / 台账 12 件 / 后端 0 ERROR

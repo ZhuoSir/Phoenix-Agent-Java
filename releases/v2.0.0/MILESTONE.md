@@ -205,3 +205,5 @@
   实测对鉴权**惰性**（登录树用 list() 不按 system_id 过滤、getModuleTreeApi 不带 systemId、category_id 后端零引用）。
   回归中一次 chenzhuo 7→8 经排查**非本件所致**，系我闭环测试残留的 `acl_state=0` 授权行（"有行即可见"），已按 id 删除、普通角色 ACL 回到 7 条基线。教训 **L-60**。
   证据 `specs/20261007_user-role-group-model/evidence/T-25_menu-systemid-backfill.txt`；台账 11 件。
+
+- **2026-10-07 BUG-138 修复（升级件 V2.0.0_12）**：角色授权行 `release_sn` 被误写为角色业务 sn（'COMMON'），登录菜单按 `release_sn='role'` 过滤 ⇒ 授权不生效。后端 `saveModuleAcl` 双分支强制 'role' + 前端改传 + V2.0.0_12 归正存量。实测 chenzhuo 菜单 7→10。教训 L-63。台账 **12 件**。

@@ -271,7 +271,8 @@ function handlePvalueChange(data: AclTreeNode) {
   const aclState = Number(calcAclState(data.pvalues));
   saveModuleAclApi({
     releaseId: role.id,
-    releaseSn: role.sn,
+    // BUG-138：release_sn 是释放类型（恒 'role'），不是角色业务 sn；后端亦会强制归正
+    releaseSn: 'role',
     moduleId: data.id,
     moduleSn: data.sn,
     aclState,

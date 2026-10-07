@@ -1,5 +1,13 @@
 # Changelog: user-role-group-model
 
+## BUG-138 修复（2026-10-07）
+
+- 根因：`saveModuleAcl` 信任 DTO.releaseSn（前端传角色业务 sn），而 release_sn 语义是释放类型（恒 'role'）；
+  登录菜单按 release_sn='role' 过滤 ⇒ 新授的权对菜单不可见（update 分支命中基线行看似正常、insert 分支暴露）
+- 修复：后端双分支强制 'role'（存量自愈）+ 前端改传 'role' + `V2.0.0_12` 归正存量错值行
+- 实测：chenzhuo 菜单 7→10（技能管理/插件管理/MCP 出现）；故意传错值落库仍为 role；错值行归零
+- 登记 BUG-138、教训 L-63
+
 ## BUG-137 修复（2026-10-07，BUG-136 的复核追加）
 
 - 分配权限弹窗保存时机从「勾选即时保存」改为「**确定时批量提交**」：打开做授权位快照，勾选只改本地；

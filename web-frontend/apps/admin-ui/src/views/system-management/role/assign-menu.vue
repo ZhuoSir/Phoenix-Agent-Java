@@ -54,7 +54,8 @@ const [Modal, modalApi] = useVbenModal({
         dirty.map(({ node, cur }) =>
           saveModuleAclApi({
             releaseId: role.id,
-            releaseSn: role.sn,
+            // BUG-138：release_sn 是释放类型（恒 'role'），不是角色业务 sn；后端亦会强制归正
+            releaseSn: 'role',
             systemSn: '',
             moduleId: node.id,
             moduleSn: node.sn,
