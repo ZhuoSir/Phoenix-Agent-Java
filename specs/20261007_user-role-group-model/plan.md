@@ -3,7 +3,7 @@
 # 技术方案：user-role-group-model
 
 > 本轮为 Phase 2 稿：**坑核对 / 方案概述 / 迁移与回滚 / 接口设计 / 数据模型变更 / 共享面身份矩阵（A 路已落证）/ 关键决策 / 风险 / 依赖** 已成文；
-> 仅 **§涉及模块与数据流**（逐文件删除/改动清单）与少量标〔B/C 路回填〕的条目待只读调研补齐 —— **补齐前不提交确认②**（缺节 = 方案不完整）。
+> 全部章节已成文（三路只读调研 A/B/C 已回填）。剩余开口：**Q-P4**（无授权行资源的可见性口径）+ requirements v1.1.0（R-10 / R-04 边界 / 范围澄清）**重走确认①** —— 两项落定后才提交确认②。
 
 ## 坑核对（必填，确认②审这一节）
 
@@ -49,20 +49,64 @@
 
 ## 涉及模块与数据流
 
-〔调研回填〕——三路只读调研（权限菜单链路 / 用户·组·预设问题链路 / 组织维度·同步·前端）结果回来后逐文件清单化：每个文件标注「整文件可删 / 文件内部分改」，并给出模块级数据流图。
+### A. 删除面：组织三维度（Java **227 处 / 26 文件**，实测口径）
+
+| 分类 | 数量 | 文件 |
+|---|---|---|
+| **整文件可删** | 22 | `phoenix-privilege-api`：`entity/{PrivilegeCompany,PrivilegeDepartment,PrivilegeEmployee}.java`、`dto/{PrivilegeCompanyDTO,PrivilegeDepartmentDTO,PrivilegeEmployeeDTO}.java`、`dto/query/PrivilegeCompanyQuery.java`、`vo/{PrivilegeCompanyVO,PrivilegeDepartmentVO,PrivilegeEmployeeVO}.java`（10）；`phoenix-privilege-core`：三个 `*Mapper.java`、`I*Service.java`、`*ServiceImpl.java`（8）；`phoenix-privilege-rest`：三个 `*Controller.java`（3）；`phoenix-common-core`：`service/sync/AbstractPlatformSyncStrategy.java`（1，随同步包整删） |
+| **文件内部分改** | 3 | `AccountInfoServiceImpl.java`（import:38、字段:67、唯一调用 401-404）、`PrivilegeUserServiceImpl.java`（import:12-13、`pageByQuery` select:136 + leftJoin:137-140 + eq:141-142）、`PrivilegeUserController.java`（import:9-14、字段:27-28、`toVo` 54-72 中公司/部门回填 59-70） |
+| **227 之外必删的 VO**（易漏） | 2 | `vo/DepartmentTreeVO.java`、`vo/OrganizationTreeVO.java`（仅被部门 Controller/ServiceImpl 使用） |
+| **删后成孤儿（不报错但须清）** | 6 | `service/platform/{DingTalk,Feishu,Weixin}SdkService(+Impl)`——引用于三个 `*SyncStrategy` 与被删的两个组织 Service；**`PlatformInfoService` 必须保留**（扫码登录依赖） |
+
+### B. 字段级：组织列横跨 4 处（Q-P3 已裁定「全删」）
+
+| 对象 | 列（实体行号） |
+|---|---|
+| `tbl_privilege_user` | `employeeId`:23、`companyId`:53、`deptId`:56、`itUserId`:66、`itUserName`:69、`isLeader`:72；另 `companyName`/`deptName` 是 `@Column(ignore=true)` 回填列（59/63） |
+| `tbl_privilege_role` | `companyId`（**`Long`**，`PrivilegeRole.java:36`；DTO:32 / Query:19 / VO:41；服务签名 `getByCompanyId(Long)`） |
+| `tbl_platform_account_info` | `employeeId`（`AccountInfo.java:56`）、`deptId`:58、`deptName`:60 |
+| `LoginVO`（phoenix-common-api） | `deptIds:21` —— **只写不读的死载荷**，随组织维度一并删 |
+
+### C. 同步模块删除面
+
+删：`service/sync/{PlatformSyncStrategy,AbstractPlatformSyncStrategy,PlatformSyncFactory}.java`、`sync/{dingtalk,feishu,weixin}/*SyncStrategy.java`、`model/dto/{SyncUserDTO,SyncDeptDTO}.java`、`controller/sync/PlatformSyncController.java`、前端 `api/core/platform-sync.ts` + `api/core/index.ts:19` 再导出。
+**⚠️ 编译耦合（决策 3 已处置）**：三个扫码登录策略 import 了 `*SyncConstants` 的 URL 常量 ⇒ 采用**方案 1：保留 3 个 `*SyncConstants` 常量文件**（纯 String，无组织语义），其余整删。
+**两条平行死端点**（在 phoenix-privilege，非 sync 包，全仓零调用）：`POST /api/privilege/department/sync`、`/sync-children/{deptId}`、`POST /api/privilege/employee/sync`、`/sync-by-dept/{deptId}` ⇒ 随组织 Controller 整删。
+
+### D. 前端删除面（`apps/admin-ui`）
+
+**整删 15 个**：`views/organization/{company,department,employee}/{index.vue,form.vue,data.ts}`（9）+ `api/core/{privilege-company,privilege-department,privilege-employee,platform-sync}.ts`（4）+ `components/dept/{DepartmentSelector,EmployeeSelector}.vue`（2）。
+**部分改 10 个**：`api/core/index.ts:16-19`（删 4 行导出）；`views/system-management/account/{index.vue,form.vue,data.ts}`；`views/account/account-info/{index.vue,form.vue,data.ts}`；`api/core/{platform-account-info.ts,privilege-user.ts,privilege-role.ts}`。
+`components/dept/DeptTreeSidebar.vue` 被 **3 处**引用（两个账号页 + 员工页）⇒ **不是 organization 专用**，须先解除引用再删。
+**路由零改动**（`router/access.ts` 用 `import.meta.glob` + 后端 `component` 字段动态解析）；`apps/admin-ui/dist/**`、`docker/.stage/dist/**` 是构建产物 ⇒ **重新构建覆盖，不手工改**；`pc-ui`/`mobile-ui` 对上述关键词**零命中**。
+
+### E. 改造后数据流
+
+```
+登录 POST /api/privilege/auth/login
+  └─ 写 session LOGIN_USER_INFO（不再带组织归属；不再写 LOGIN_ACLS 快照）
+前端 generateAccess → GET /api/privilege/auth/menus
+  └─ LoginServiceImpl.getUserMenus()          ← 【唯一改动点】
+       ├─ 超管 (role_id=428007432736870400) → 全量存活菜单 + 全权限位
+       └─ 其他角色 → ACL(release_id=roleId ∩ module_id) 命中菜单，权限位按角色授予
+组授权 → tbl_platform_group_{agent,kbase,skill,mcp}_info
+  └─ 前台可见性：getMyAgents（组∩已发布）/ FrontSkillAccessServiceImpl.MY_SKILLS_SQL / FrontMcpAccessServiceImpl.EFFECTIVE_FRONT_SQL
+删除面：组织三表 + 用户模型三处组织列 + 后台数据组 + 三方同步模块（保留扫码登录常量与平台配置）
+```
 
 ## 接口设计
 
 遵守 `.specrc.yml` 路由（api-design = global）与**本项目既有信封约定**：HTTP 层恒 200，成败在响应体 `code`（100/200 成功）——验证一律断言 `code`（L-26）。
 
-**A. 随组织维度一并删除的端点**（〔C 路回填完整清单〕，控制面已知）
+**A. 随组织维度一并删除的端点**
 
-| 端点族 | 载体 |
-|---|---|
-| `/api/privilege/company/**` | `PrivilegeCompanyController` |
-| `/api/privilege/department/**` | `PrivilegeDepartmentController` |
-| `/api/privilege/employee/**` | `PrivilegeEmployeeController` |
-| `POST /platform/sync` | `PlatformSyncController`（R-06） |
+| 端点族 | 载体 | 备注 |
+|---|---|---|
+| `/api/privilege/company/**` | `PrivilegeCompanyController`（`@RequestMapping` :20） | 随文件整删 |
+| `/api/privilege/department/**` | `PrivilegeDepartmentController` | 含两条**死端点** `POST /sync`(:156)、`/sync-children/{deptId}`(:165)（全仓零调用） |
+| `/api/privilege/employee/**` | `PrivilegeEmployeeController` | 含两条**死端点** `POST /sync`(:76)、`/sync-by-dept/{deptId}`(:85) |
+| `/platform/sync/**`（6 条） | `PlatformSyncController`：`/all`(:19)、`/departments`(:25)、`/users`(:31)、`/depts/{deptId}`(:37)、`/depts/users/{deptId}`(:43)、`/users/{userId}`(:49) | 前端唯一消费方 `api/core/platform-sync.ts` 与 `views/organization/{department,employee}/index.vue` 一并删 |
+| `/api/privilege/role/company/{companyId}` | `PrivilegeRoleController:34-36` + `getByCompanyId(Long)` | 随 `PrivilegeRole.companyId`（Q-P3 全删）一并移除 |
 
 删除后 SHALL 返回 404（路由不存在），**不是 500**。
 
@@ -75,7 +119,7 @@
 
 响应**结构不变**（仍 `{code,msg,data:{menus,pvalues}}`）⇒ 前端零改动；但"同一账号可见菜单集合变小"是用户可感知的破坏性行为变化，须写入 `RELEASE-NOTES.md`。
 
-**C. 新增端点**：**无**。R-04（组关联四类资源）沿用既有 `tbl_platform_group_*` 相关端点；R-08 在既有预设问题端点上**加角色校验**〔B 路回填：控制器与方法名〕。
+**C. 新增端点**：**后端零新增**。R-04 四类资源中，**组侧已有端点仅 2 类**——组↔智能体（`POST /platform/group-agent-info`、`DELETE /group/{gid}/agent/{aid}`）、组↔知识库（`PUT /platform/group-kbase/{gid}/assign`，差集幂等）；**组↔技能 / 组↔MCP 只有「资源侧」单向授权**（`PUT /api/skill/{id}/groups`、`PUT /api/mcp/{id}/groups`），组管理页无对应操作 ⇒ **R-04 需补齐这两类的组侧读写（工作量计入本 spec）**。R-08 落点：`AgentPresetQuestionController` 的 `POST /{agentId}/preset-questions`(:53-76) 与 `DELETE /{agentId}/preset-questions/{questionId}`(:81-91) 加角色校验（现状零校验，见 BUG-122）。
 
 **D. 若 Q-P2 裁定纳入 BUG-116**：修复前端 `assign-menu.vue` 的 `currentRole` 赋值链，复用既有端点 `POST /api/privilege/acl/saveAll/{releaseId}/{checkStatus}`、`POST /api/privilege/acl/saveModule`；**不新增后端端点**。
 
@@ -181,10 +225,10 @@ COMMIT;
 | `tbl_privilege_acl` | ① 维护写入方（`PrivilegeAclController` PUT/DELETE/`saveAll`/`saveModule`）② **判定读取方（本版新增）** | ① 写入路径不变（但界面写路径坏 → BUG-116）② 成为菜单可见性判定源 | T-xx |
 | `tbl_privilege_user_role` | ① 角色分配维护（`/api/privilege/user-role/batch-save|batch-remove`，界面正常）② `LoginServiceImpl:80` 算 `hasAdminRole` ③ `PrivilegeAclServiceImpl:43` | ①②③ 行为不变；但**孤儿行（BUG-118）须先订正**，否则过滤结果不可预期 | T-xx |
 | `AgentKnowledgeMapper:32-42` | 硬编码 `role_id='428007432736870400'` 判超管（既有先例） | 保持兼容：超管定义沿用该 role_id（新增豁免逻辑须与之一致，禁造第二套超管口径） | T-xx |
-| `tbl_platform_platform_info` | ① 同步模块读（企微/钉钉/飞书 corpId/secret）② **第三方扫码登录读** | ① 随同步模块删除而失去消费方，**表保留** ② 扫码登录**必须仍可用** | T-xx〔C 路回填证据〕 |
-| `POST /platform/sync` | 同步入口（`PlatformSyncController`） | 404（端点不存在），非 500 | T-xx〔C 路回填〕 |
-| `tbl_privilege_user` | 登录 / 鉴权（Sa-Token `StpUtil`）/ 账号管理 / 前台 chat / `getLoginUserInfo`（`BeanUtils.copyProperties` 从**实体**拷贝） | 组织列移除后各身份行为不变；注意 VO 侧 `PrivilegeUserVO.roles` 永不填充（前端 `userRoles` 恒空，`accessMode='backend'` 下不影响路由） | T-xx〔C 路回填字段清单〕 |
-| `tbl_platform_group_*` 四表 | 组管理维护 + 前台可见性解析（`getMyAgents` 等） | 成为唯一组语义；授权即时生效 | T-xx〔B 路回填〕 |
+| `tbl_platform_platform_info` | ① 同步模块读（三个 `*SyncStrategy` 取 corpId/secret）② **第三方扫码登录读**（`AccountInfoServiceImpl:351 getEnabledByType` → `ThirdPartyLoginFactory`） | ① 随同步模块删除而失去消费方，**表与 `PlatformInfoService` 保留** ② 扫码登录**必须仍可用**（唯一硬耦合是 3 个 `*SyncConstants`，决策 3 方案 1 保留之） | T-xx |
+| `POST /platform/sync` 等 6 条 | ① 前端 `platform-sync.ts`（唯一调用方）② 无任何后端内部调用方 | ① 前端随 organization 页面整删 ② 端点 404（不存在），非 500 | T-xx |
+| `tbl_privilege_user` | 登录 / 鉴权（Sa-Token `StpUtil`）/ 账号管理 / 前台 chat / `getLoginUserInfo`（`BeanUtils.copyProperties` 从**实体**拷贝）/ 原同步的原始 SQL 写入 | 组织列移除后各身份行为不变，唯一变化=字段集；注意 `PrivilegeUserVO.roles` 永不填充（前端 `userRoles` 恒空，`accessMode='backend'` 下不影响路由） | T-xx |
+| `tbl_platform_group_*` 五表 | ① 组管理页维护（agent/kbase 有组侧端点；skill/mcp 仅资源侧）② 前台可见性解析：`getMyAgents`（`GroupAgentInfoServiceImpl.getByGroupIds:21-25`）、`FrontSkillAccessServiceImpl.MY_SKILLS_SQL:27-37`、`FrontMcpAccessServiceImpl.EFFECTIVE_FRONT_SQL:24-34` | 成为唯一组语义；授权即时生效——**但读侧 `del_flag` 口径不统一（BUG-121），须先统一再验收** | T-xx |
 
 ## 关键决策
 
@@ -198,7 +242,7 @@ COMMIT;
 ### 决策 2：组唯一化 = 单向下线 vs 数据合并迁移
 
 - **采用**：单向下线（删 `tbl_privilege_group` 及其 `PrivilegeGroupVO`）。
-- **理由**：全仓检索确认**零 mapper/service/接口引用**（仅 1 个自声明 VO）= 死代码；无消费方、无映射规则可写。〔调研回填：补生产行数核对〕
+- **理由**：**双面取证**——① 代码面：全仓检索零 mapper/service/controller/前端引用（仅 1 个自声明 VO `PrivilegeGroupVO`），4 个 `ExceptionEnum`「数据组」错误码亦零引用；② **数据面：seed（`all_data.sql`/`all_schema.sql`）与生产 dump 均 0 行**（本次曾因解析转义错误一度误得「606 行」，已记 L-43）。无消费方、无数据、无映射规则可写。
 - **被拒绝**：把 `tbl_privilege_group` 的 `super_id`/`type`/`state` 迁进平台组表 —— 理由：平台组表无对应语义列，且无任何消费方，迁移=凭空造需求。
 - 重新评估条件：若调研发现遗漏引用，或生产表存在非空业务行且能证明用途。
 
@@ -208,6 +252,12 @@ COMMIT;
 - **理由**：扫码登录与同步**共用**平台配置表与 SDK；删配置表会直接打死第三方登录，超出用户"移除同步"的授权范围（R-06 边界 1）。
 - **被拒绝**：连 `platform` 包与配置表一起删 —— 理由：破坏扫码登录，属超授权范围的连带破坏。
 - 重新评估条件：若用户后续明确"第三方登录也不用"，另立 spec。
+- **调研补充（C 路实测，本决策的关键修正）**：扫码登录对同步模块存在**一处硬编译耦合**——`DingTalkThirdPartyLoginStrategy.java:8,24,35`、`FeishuThirdPartyLoginStrategy.java:8,24`、`WeComThirdPartyLoginStrategy.java:8,24,35` 分别 import 了 `service/sync/{dingtalk,feishu,weixin}/*SyncConstants` 的 URL 常量（`TOKEN_URL`/`USER_INFO_URL`/`OAUTH_ACCESS_TOKEN_URL`）⇒ **整包盲删会直接编译失败**。
+  - **采用：方案 1（保留 3 个 `*SyncConstants` 常量接口文件）**。理由：这 3 个文件是**纯 String 常量**（各 5–7 行）、不含任何组织维度语义，保留成本近零；相比迁常量（方案 2）少改 3 处 import + 4 处引用，破坏面更小。
+  - **被拒绝**：方案 2（把 5 个 URL 常量迁到 `thirdparty/strategy` 下的新常量类再整删 `service/sync/**`）——理由：收益仅是"包更干净"，却要改国产登录策略的 import 与用法，属于为整洁引入多余改动面。
+  - **被拒绝**：连平台配置一起删 —— 见上（会打死扫码登录）。
+  - 重新评估条件：若将来 `service/sync` 目录要彻底消失（如再删第三方登录），届时一并迁常量。
+- **另需处置的孤儿**（删除后编译通过但无引用）：`service/platform/{DingTalk,Feishu,Weixin}SdkService(+Impl)` 6 个文件——**建议同批清理**，但 `PlatformInfoService` 必须留。
 
 ### 决策 4：权限过滤的实现落点（后端一处 + 数据订正，前端零改动）
 
@@ -247,9 +297,9 @@ COMMIT;
 ## 风险与规避
 
 - **[风险] 227 处引用一次性删除导致编译面失控** → 规避：以编译器为裁判、按模块分批提交、禁文本批量替换；每批全量 `mvn clean install -Dspring-javaformat.skip=true`。
-- **[风险] NOT NULL 列/索引/外键依赖删除顺序** → 规避：先核 `all_schema.sql` 的约束与索引（〔调研回填〕），DDL 内先解依赖再删列。
+- **[风险] NOT NULL 列 / 索引 / 外键依赖删除顺序** → 已实测核对（C 路）：`tbl_privilege_user.company_id`(:3772)/`dept_id`(:3773) 是 **NOT NULL 且无 DEFAULT**、两列**无索引**；全库 **零外键**（grep `FOREIGN KEY`/`REFERENCES` 零命中）、**零视图/触发器/生成列**依赖；`tbl_privilege_user` 仅有的索引是 `code`/`username`。⇒ DDL 可安全 `DROP COLUMN`（自动带走 NOT NULL）。**但必须先清掉写这两列的代码**：`AbstractPlatformSyncStrategy:356`（原始 SQL）与 `PrivilegeUser` 全字段插入链路。
 - **[风险] 存量组织数据不可逆** → 规避：pre-migration 全量 dump + 组织维度专项导出；UPGRADE.md 明确"数据恢复依赖备份"。
-- **[风险] 组过滤生效后"未入组用户看不到任何资源"（前台可见性骤变）** → 规避：R-07 补角色与组；「未入组」的可见性口径必须在 plan 定稿（〔调研回填〕），并在部署前用 SQL 统计"零组用户数"作为上线前门禁。
+- **[风险] 资源可见性口径未定（**Q-P4 待裁定**）** → 现状代码有三处「**无任何授权行 = 全公开**」分支：`AccountInfoServiceImpl.getMyAgents:96-116`（`published ∧ 无授权行 ⇒ 全员可见`）、`FrontSkillAccessServiceImpl.validateVisible:75-86`、`FrontMcpAccessServiceImpl` 同族；而生产授权行极少（组↔智能体 4、组↔知识库 4、组↔技能 11、组↔MCP 6）⇒ **若解释为"无授权行即不可见"，绝大多数资源会对所有普通用户消失**。规避：Q-P4 定口径（建议保留兼容语义=「有授权行的资源仅授权组可见，无授权行者维持公开」），并在部署前统计「零组用户数 / 各资源授权行数」作为门禁。
 - **[风险] 菜单过滤过严致全员看不到菜单（ACL 数据不完整/过期，L-29 已证 `module_sn` 是过期标签）** → 规避：过滤只用 `module_id`/`url`；超管豁免；上线前统计"每个角色可用菜单数"，出现 0 即拦截发布。
 - **[风险] 最严重的一条：普通角色现 0 行 ACL、名下 10 用户**（BUG-117 实测）→ 规避：实施决策 6 的 ACL 基线重建 + Q-P1 降级口径；上线前用 SQL 统计"每个角色的可用菜单数"与"无角色用户数"双门禁，任一为 0 即阻断发布。
 - **[风险] 过滤菜单但漏了按钮级权限 ⇒ `hasAccessByCodes` 恒真** → 规避：`buildAdminAclMap` 与 `access.ts:123-126` 的 `setAccessCodes` 同批改造（决策 4）；验收须含"未授权按钮不出现/点击被拒"的断言，不能只验菜单。
@@ -258,10 +308,16 @@ COMMIT;
 - **[风险] 移除同步波及扫码登录** → 规避：R-06 已写成共享面边界 + 回归断言（删同步后实测扫码登录仍成功）。
 - **[风险] 迁移器重跑（台账缺行，L-40/BUG-115）** → 规避：SQL 全部自幂等，不依赖台账判重。
 - **[风险] 提交面过宽吞入 40MB 级 backups dump（L-13）** → 规避：显式列路径提交，提交前核对 `git status --porcelain`。
+- **[风险] 平台侧组授权表读侧不过滤逻辑删 ⇒ 已撤销授权仍可能可见（BUG-121）** → 规避：统一读侧口径（`BaseModel` 补 `isLogicDelete` 或显式补 `del_flag=0`），并以 R-04「撤销即时生效」的断言覆盖；生产已有墓碑行（kbase 2 / skill 6 / mcp 5）。
+- **[风险] R-04 的组侧能力只完成一半** → 组↔技能 / 组↔MCP 现无组侧端点（仅资源侧单向授权）⇒ 规避：把这两类的组侧读写列为独立任务，验收断言含「组管理页可为组勾选技能与 MCP 并即时生效」。
+- **[风险] 预设问题接口零校验（BUG-122）被漏改** → 规避：R-08 的验证必须覆盖 `POST`（整批覆盖他人 agent）与 `DELETE`（按 questionId 删、不校验归属）**两条越权路径**，断言"普通角色被拒 + 管理员成功"（业务码，L-26）。
+- **[风险] 删除组织维度后 `tbl_privilege_role.company_id` 的存量值悬空**（`ROLE_ADMIN.company_id=428001009954172928` = 初彩科技）→ 规避：Q-P3 已裁定删列 ⇒ 悬空随列消失；**但删列前须导出留档**（决策 2/迁移策略的备份动作覆盖）。
 
 ## 依赖与前置
 
-- 三路只读调研结果（§涉及模块 / §接口 / §数据模型 / §共享面矩阵 / 决策 4 的回填依据）。
+- 三路只读调研结果（A 权限菜单链路 / B 用户·组·预设问题链路 / C 组织维度·同步·前端 —— 已全部回填本文件）。
+ - **编译基线**：实施前先跑 `mvn -q clean compile -Dspring-javaformat.skip=true` 取基线（C 路为纯静态调研，未跑构建，编译失败点为引用推导）。
+ - **Q-P4 裁定**（无授权行资源的可见性口径）—— 影响 R-04 边界与 tasks 断言设计。
 - 生产库真实数据统计（部署前门禁）：零角色用户数、零组用户数、各角色可用菜单数、`tbl_privilege_group` 行数与非空业务列比例、组织三表行数。
 - `tbl_phoenix_release` 台账现状核对（BUG-115 补登后是否完整）。
 - 迁移器事实（已确认，供 Implement 参照）：`docker/init/migrate.sh` 扫 `/releases/v*/sql/V*.sql`，`sort -V` 顺序，逐文件 `-1` 事务，成功写 `tbl_phoenix_release`；`rollback/` 子目录**不被扫描**（回滚靠人工执行）。
