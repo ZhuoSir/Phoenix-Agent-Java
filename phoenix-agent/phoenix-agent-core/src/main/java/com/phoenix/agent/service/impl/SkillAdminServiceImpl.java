@@ -63,10 +63,14 @@ public class SkillAdminServiceImpl implements SkillAdminService {
     private final AgentSkillInfoMapper agentSkillInfoMapper;
 
     @Override
-    public ReturnVo<Page<SkillListVO>> page(String keyword, String status, int pageNum, int pageSize) {
+    public ReturnVo<Page<SkillListVO>> page(String keyword, String status, int pageNum, int pageSize, String ownerId) {
         int size = Math.min(Math.max(pageSize, 1), MAX_PAGE_SIZE);
         // 周边模块无 APT TableDef 先例，采用字符串列 + ? 参数绑定（等价 #{}，无注入面）
         QueryWrapper query = QueryWrapper.create();
+        // R-18（CR-01/T-25）：普通用户仅见本人创建；ownerId=null（超管）不过滤
+        if (StringUtils.hasText(ownerId)) {
+            query.and("creator = ?", ownerId);
+        }
         if (StringUtils.hasText(keyword)) {
             String like = "%" + keyword.trim() + "%";
             query.and("(name like ? or description like ?)", like, like);
@@ -110,7 +114,7 @@ public class SkillAdminServiceImpl implements SkillAdminService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public ReturnVo<Long> upload(MultipartFile file, boolean overwrite) {
+    public ReturnVo<Long> upload(MultipartFile file, boolean overwrite, String operator) {
         if (file == null || file.isEmpty()) {
             return ReturnVo.fail(SkillErrorCodeEnm.SKILL_ZIP_INVALID.getMsg(),
                 SkillErrorCodeEnm.SKILL_ZIP_INVALID.getCode());
@@ -163,6 +167,7 @@ public class SkillAdminServiceImpl implements SkillAdminService {
             existing.setSkillContent(parsed.getSkillContent());
             existing.setSource(SkillConstant.SOURCE_UPLOAD);
             existing.setStatus(SkillStatusEnm.DRAFT.getCode());
+            // R-18：覆盖上传不改变归属（creator 保持原创建人）
             existing.setUpdatedAt(now);
             harnessSkillMapper.update(existing);
             insertResources(existing.getId(), resources, now);
@@ -174,6 +179,8 @@ public class SkillAdminServiceImpl implements SkillAdminService {
         skill.setSkillContent(parsed.getSkillContent());
         skill.setSource(SkillConstant.SOURCE_UPLOAD);
         skill.setStatus(SkillStatusEnm.DRAFT.getCode());
+        // R-18（CR-01/T-24）：创建人 = 当前登录用户（服务端注入，不信任入参）
+        skill.setCreator(operator);
         skill.setCreatedAt(now);
         skill.setUpdatedAt(now);
         harnessSkillMapper.insert(skill);
@@ -287,24 +294,79 @@ public class SkillAdminServiceImpl implements SkillAdminService {
     }
 
     @Override
-    public ReturnVo<List<AgentSkillOptionVO>> options(Long agentId) {
+    public ReturnVo<List<AgentSkillOptionVO>> options(Long agentId, String viewerId, boolean superAdmin) {
         List<Long> boundIds = boundIds(agentId);
         List<AgentSkillOptionVO> result = new ArrayList<>();
         Set<Long> seen = new HashSet<>();
-        // 已发布池
-        List<HarnessSkill> published = harnessSkillMapper.selectListByQuery(
-            QueryWrapper.create().where("status = ?", SkillStatusEnm.PUBLISHED.getCode()));
+        // R-18（CR-01/T-26）：可见集合 = 超管全部已发布；否则 自己的 ∪ 我所在组关联的 ∪ 公共（无组授权行）
+        List<HarnessSkill> published;
+        if (superAdmin) {
+            published = harnessSkillMapper.selectListByQuery(
+                QueryWrapper.create().where("status = ?", SkillStatusEnm.PUBLISHED.getCode()));
+        }
+        else {
+            published = harnessSkillMapper.selectListByQuery(visibleSkillQuery(viewerId));
+        }
         for (HarnessSkill s : published) {
             result.add(toOptionVo(s, boundIds.contains(s.getId())));
             seen.add(s.getId());
         }
-        // 已绑定但当前已下线：仍返回供编辑页灰显（R-04 场景2）
+        // 已绑定但当前不可见/已下线：仍返回供编辑页灰显（R-04 场景2，不丢已绑关系）
         List<Long> offlineBound = boundIds.stream().filter(id -> !seen.contains(id)).toList();
         if (!offlineBound.isEmpty()) {
             harnessSkillMapper.selectListByQuery(QueryWrapper.create().in("id", offlineBound))
                 .forEach(s -> result.add(toOptionVo(s, true)));
         }
         return ReturnVo.ok(result);
+    }
+
+    /** R-18：技能可见集合查询（own ∪ myGroups ∪ public），仅已发布 */
+    private QueryWrapper visibleSkillQuery(String viewerId) {
+        QueryWrapper q = QueryWrapper.create().where("status = ?", SkillStatusEnm.PUBLISHED.getCode());
+        List<String> myGroups = myGroupIds(viewerId);
+        StringBuilder cond = new StringBuilder("(creator = ?");
+        List<Object> params = new ArrayList<>();
+        params.add(viewerId);
+        if (!myGroups.isEmpty()) {
+            cond.append(" or id in (select skill_id from tbl_platform_group_skill_info where del_flag = 0 and group_id in (")
+                .append(placeholders(myGroups.size())).append("))");
+            params.addAll(myGroups);
+        }
+        // 公共 = 无任何组授权行（Q-P4 / R-04 口径）
+        cond.append(" or id not in (select skill_id from tbl_platform_group_skill_info where del_flag = 0))");
+        q.and(cond.toString(), params.toArray());
+        return q;
+    }
+
+    /** 当前用户所在组 id 集（tbl_platform_account_group_info.account_id = 用户 id） */
+    private List<String> myGroupIds(String userId) {
+        if (!StringUtils.hasText(userId)) {
+            return List.of();
+        }
+        return Db.selectListBySql(
+                "select group_id from tbl_platform_account_group_info where account_id = ? and del_flag = 0", userId)
+            .stream()
+            .map(r -> r.getString("group_id"))
+            .filter(Objects::nonNull)
+            .distinct()
+            .toList();
+    }
+
+    private String placeholders(int n) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < n; i++) {
+            if (i > 0) {
+                sb.append(',');
+            }
+            sb.append('?');
+        }
+        return sb.toString();
+    }
+
+    @Override
+    public String getCreatorById(Long id) {
+        HarnessSkill s = harnessSkillMapper.selectOneById(id);
+        return s == null ? null : s.getCreator();
     }
 
     @Override

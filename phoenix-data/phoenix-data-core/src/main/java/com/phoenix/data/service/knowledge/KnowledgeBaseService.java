@@ -20,7 +20,13 @@ public interface KnowledgeBaseService {
     /** 逻辑删；仍被绑定则 IllegalStateException 携带绑定清单（R-04）。 */
     void delete(Long id, String operator);
 
-    PageResult<KnowledgeBaseVO> queryByConditionsWithPage(KnowledgeBaseQueryDTO query);
+    /**
+     * R-18（CR-01/T-25）：分页查询。{@code ownerId} 非空 = 仅该创建人（普通用户）；null = 不过滤（超管）。
+     */
+    PageResult<KnowledgeBaseVO> queryByConditionsWithPage(KnowledgeBaseQueryDTO query, String ownerId);
+
+    /** R-18（CR-01/T-25）：取知识库创建人 id（controller 归属校验用）；不存在返回 null。 */
+    String getCreatorById(Long id);
 
     /** BUG-18(T-04)：按库重刷 QA/FAQ 联合向量（幂等，DOCUMENT 不在范围） */
     java.util.Map<String, Object> reEmbedKnowledgeBase(Long id);

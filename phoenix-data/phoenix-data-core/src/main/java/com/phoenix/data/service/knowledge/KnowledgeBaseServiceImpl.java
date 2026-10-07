@@ -94,14 +94,19 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
     }
 
     @Override
-    public PageResult<KnowledgeBaseVO> queryByConditionsWithPage(KnowledgeBaseQueryDTO dto) {
+    public PageResult<KnowledgeBaseVO> queryByConditionsWithPage(KnowledgeBaseQueryDTO dto, String ownerId) {
         var chain = QueryChain.of(knowledgeBaseMapper)
                 .where("del_flag = 0");
+        // R-18（CR-01/T-25）：普通用户仅见本人创建；ownerId=null（超管）不过滤。
+        // 占位符必须用 ?：QueryChain.and 不做 {0} 替换（原 name/status 的 {0} 为既有缺陷 BUG-139，一并修正）
+        if (StrUtil.isNotBlank(ownerId)) {
+            chain.and("creator = ?", ownerId);
+        }
         if (StrUtil.isNotBlank(dto.getName())) {
-            chain.and("name LIKE {0}", "%" + StrUtil.trim(dto.getName()) + "%");
+            chain.and("name LIKE ?", "%" + StrUtil.trim(dto.getName()) + "%");
         }
         if (dto.getStatus() != null) {
-            chain.and("status = {0}", dto.getStatus());
+            chain.and("status = ?", dto.getStatus());
         }
         chain.orderBy("update_time DESC");
         Page<KnowledgeBase> page = chain.page(new Page<>(dto.getPageNum(), dto.getPageSize()));
@@ -113,6 +118,12 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
         result.setPageSize((int) page.getPageSize());
         result.setTotalPages((int) page.getTotalPage());
         return result;
+    }
+
+    @Override
+    public String getCreatorById(Long id) {
+        KnowledgeBase kb = knowledgeBaseMapper.selectOneById(id);
+        return kb == null ? null : kb.getCreator();
     }
 
     @Override

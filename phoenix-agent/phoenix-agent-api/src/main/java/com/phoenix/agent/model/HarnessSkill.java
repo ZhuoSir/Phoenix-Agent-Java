@@ -33,6 +33,9 @@ public class HarnessSkill implements Serializable {
 
     private String status;
 
+    /** R-18（CR-01/T-24）：创建人用户 id（V2.0.0_13 加列；存量回填 admin） */
+    private String creator;
+
     private Date createdAt;
 
     private Date updatedAt;
