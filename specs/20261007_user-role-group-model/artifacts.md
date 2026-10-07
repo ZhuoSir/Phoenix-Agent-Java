@@ -113,8 +113,18 @@
 | 缺陷 | 修 **BUG-130**（手机号搜索失效）；登记 **BUG-131**（用户管理端点缺管理员守卫） |
 | 验证 | `evidence/T-21_result.txt` |
 
+## 六·补六、R-16 追加（2026-10-07，T-22）
+
+| 项 | 值 |
+|---|---|
+| 迁移件 | **无**（纯代码改动；正向/回滚仍各 8 件） |
+| 后端 | `PrivilegeUserServiceImpl`（`isProtectedAdmin` + 删除/启停/编辑兜底）、`IPrivilegeUserService`、`PrivilegeUserController`（三端点校验 + 删除端点补齐） |
+| 前端 | `account/index.vue`（操作列置灰 + tooltip + 批量预检） |
+| 缺陷 | 修 **BUG-132**（删除端点零保护：可删自己 / 可删最后一个启用超管） |
+| 验证 | `evidence/T-22_result.txt` |
+
 ## 七、计数自检
 
 - 正向 SQL 件数 = 回滚 SQL 件数 = **8** ✅
-- 任务数 21，完成 21（T-17 收口 + T-18 R-12 + T-19 R-13 + T-20 R-14 + T-21 R-15）✅
+- 任务数 22，完成 22（T-17 收口 + T-18 R-12 + T-19 R-13 + T-20 R-14 + T-21 R-15 + T-22 R-16）✅
 - 提交 footer `Task: T-xx` 覆盖 T-01~T-17 ✅（`git log --grep="Task: T-"` 可核）

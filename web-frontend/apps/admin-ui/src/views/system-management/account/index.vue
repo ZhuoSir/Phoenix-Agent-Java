@@ -150,11 +150,22 @@ function onToggleStatus(row: any) {
     .catch(() => {});
 }
 
-/** R-15：批量启用/禁用（含当前登录账号时后端整体拒绝并提示） */
+/** R-16（v2.5.0）：内置超管账号 —— 不可禁用/删除/改名（服务端强制，这里做体验层的置灰与说明） */
+function isProtectedAdmin(row: any) {
+  return String(row?.username ?? '').toLowerCase() === 'admin';
+}
+
+/** R-15：批量启用/禁用（含当前登录账号或内置 admin 时后端整体拒绝，这里先做预检提示） */
 function onBatchStatus(status: number) {
   const ids = selectedIds();
   if (ids.length === 0) {
     ElMessage.warning('请先勾选账号');
+    return;
+  }
+  const rows: any[] = gridApi.grid?.getCheckboxRecords?.() || [];
+  // R-16：状态变更含内置 admin 时先拦下（服务端同样会拒）
+  if (status === 1 && rows.some((r) => isProtectedAdmin(r))) {
+    ElMessage.warning('所选账号包含内置超管账号（admin），不可禁用');
     return;
   }
   const action = status === 1 ? '禁用' : '启用';
@@ -178,17 +189,24 @@ function onBatchStatus(status: number) {
 
 function getActions(row: any) {
   const isEnabled = row.status === 0;
+  // R-16：内置超管账号的 启用/禁用 与 删除 一律置灰并给出原因
+  const protectedRow = isProtectedAdmin(row);
+  const protectedTip = '内置超管账号不可禁用/删除（基础约束）';
   return [
-    // R-15：启用/禁用按当前状态显示对应动作
+    // R-15：启用/禁用按当前状态显示对应动作；R-16：内置 admin 置灰
     {
       text: isEnabled ? '禁用' : '启用',
       icon: isEnabled ? 'lucide:ban' : 'lucide:circle-check',
-      popConfirm: {
-        title: `确定要${isEnabled ? '禁用' : '启用'}【${row.username}】吗？`,
-        confirm: () => onToggleStatus(row),
-        okText: '确定',
-        cancelText: '取消',
-      },
+      disabled: protectedRow,
+      tooltip: protectedRow ? protectedTip : undefined,
+      popConfirm: protectedRow
+        ? undefined
+        : {
+            title: `确定要${isEnabled ? '禁用' : '启用'}【${row.username}】吗？`,
+            confirm: () => onToggleStatus(row),
+            okText: '确定',
+            cancelText: '取消',
+          },
     },
     {
       text: '设置密码',
@@ -205,12 +223,16 @@ function getActions(row: any) {
       text: '删除',
       icon: 'lucide:trash-2',
       danger: true,
-      popConfirm: {
-        title: `确定要删除【${row.username}】吗？`,
-        confirm: () => onDelete(row),
-        okText: '确定',
-        cancelText: '取消',
-      },
+      disabled: protectedRow,
+      tooltip: protectedRow ? protectedTip : undefined,
+      popConfirm: protectedRow
+        ? undefined
+        : {
+            title: `确定要删除【${row.username}】吗？`,
+            confirm: () => onDelete(row),
+            okText: '确定',
+            cancelText: '取消',
+          },
     },
   ];
 }

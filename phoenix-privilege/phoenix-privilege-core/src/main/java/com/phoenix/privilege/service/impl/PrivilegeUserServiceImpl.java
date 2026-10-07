@@ -52,6 +52,9 @@ public class PrivilegeUserServiceImpl extends ServiceImpl<PrivilegeUserMapper, P
 
 	private static final int STATUS_DISABLED = 1;
 
+	/** 内置超管账号用户名（R-16：不可禁用/删除/改名；按用户名判定以跨环境稳定） */
+	private static final String PROTECTED_ADMIN_USERNAME = "admin";
+
 	private final IPrivilegeRoleService privilegeRoleService;
 
 	private final IPrivilegeUserRoleService privilegeUserRoleService;
@@ -145,6 +148,18 @@ public class PrivilegeUserServiceImpl extends ServiceImpl<PrivilegeUserMapper, P
 
 	@Override
 	public boolean updateUser(PrivilegeUserDTO dto) {
+		boolean protectedAdmin = isProtectedAdmin(dto.getId());
+		if (protectedAdmin) {
+			// R-16（v2.5.0）：内置超管账号 —— 用户名不可改（否则可"改名后禁用/删除"绕过保护）。
+			// 注：`PrivilegeUserDTO` **不含 status 字段**，故编辑路径本就无法改状态（实测确认，无需额外强制）
+			PrivilegeUser current = getById(dto.getId());
+			if (current != null && dto.getUsername() != null && !PROTECTED_ADMIN_USERNAME.equalsIgnoreCase(dto.getUsername())) {
+				log.warn("[R-16] 拒绝修改内置超管账号用户名: id={}, 现={}, 请求={}",
+						dto.getId(), current.getUsername(), dto.getUsername());
+				return false;
+			}
+			dto.setUsername(current == null ? dto.getUsername() : current.getUsername());
+		}
 		boolean result = updateById(dto.toEntity());
 		if (result) {
 			// null = 不改动（兼容既有「分配角色/分配组」弹窗路径）；空列表 = 清空
@@ -162,6 +177,22 @@ public class PrivilegeUserServiceImpl extends ServiceImpl<PrivilegeUserMapper, P
 			}
 		}
 		return result;
+	}
+
+	/**
+	 * 是否**内置超管账号**（R-16，v2.5.0）：`username = 'admin'`（忽略大小写）。
+	 *
+	 * <p>以用户名判定而非 id —— id 是逐环境生成的雪花值（活库 vs 全新库种子不同），用户名才跨环境稳定。
+	 * 该账号**不可禁用、不可删除、不可改名**（用户口径：「这个是基础」）。
+	 */
+	@Override
+	public boolean isProtectedAdmin(String userId) {
+		if (StrUtil.isBlank(userId)) {
+			return false;
+		}
+		PrivilegeUser user = getById(userId);
+		return user != null && user.getUsername() != null
+				&& PROTECTED_ADMIN_USERNAME.equalsIgnoreCase(user.getUsername());
 	}
 
 	/**
@@ -210,6 +241,11 @@ public class PrivilegeUserServiceImpl extends ServiceImpl<PrivilegeUserMapper, P
 
 	@Override
 	public boolean deleteUser(String id) {
+		// R-16：内置超管账号不可删除（服务层兜底）
+		if (isProtectedAdmin(id)) {
+			log.warn("[R-16] 拒绝删除内置超管账号: id={}", id);
+			return false;
+		}
 		privilegeUserRoleService.removeUserRoleByUserId(id);
 		return this.removeById(id);
 	}
@@ -304,6 +340,11 @@ public class PrivilegeUserServiceImpl extends ServiceImpl<PrivilegeUserMapper, P
 		if (!isValidStatus(status) || StrUtil.isBlank(id)) {
 			return false;
 		}
+		// R-16：内置超管账号不可禁用（服务层兜底，避免任何调用方绕过控制器校验）
+		if (isProtectedAdmin(id)) {
+			log.warn("[R-16] 拒绝变更内置超管账号状态: id={}, status={}", id, status);
+			return false;
+		}
 		PrivilegeUser user = new PrivilegeUser();
 		user.setId(id);
 		user.setStatus(status);
@@ -315,7 +356,12 @@ public class PrivilegeUserServiceImpl extends ServiceImpl<PrivilegeUserMapper, P
 		if (!isValidStatus(status) || ids == null || ids.isEmpty()) {
 			return 0;
 		}
-		List<String> targets = ids.stream().filter(StrUtil::isNotBlank).distinct().toList();
+		// R-16：批量中若含内置超管账号，服务层兜底剔除（控制器对含保护账号的批量整体拒绝）
+		List<String> targets = ids.stream()
+			.filter(StrUtil::isNotBlank)
+			.filter(id -> !isProtectedAdmin(id))
+			.distinct()
+			.toList();
 		if (targets.isEmpty()) {
 			return 0;
 		}

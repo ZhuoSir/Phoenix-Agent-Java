@@ -40,6 +40,12 @@ public interface IPrivilegeUserService extends IService<PrivilegeUser> {
 	boolean isSuperAdmin(String userId);
 
 	/**
+	 * 是否**内置超管账号**（R-16）：`username = 'admin'`（忽略大小写）。
+	 * 该账号不可禁用、不可删除、不可改名（服务端强制）。
+	 */
+	boolean isProtectedAdmin(String userId);
+
+	/**
 	 * 启用/禁用单个账号（R-15）。status：0 启用 / 1 禁用。
 	 */
 	boolean updateStatus(String id, Integer status);
