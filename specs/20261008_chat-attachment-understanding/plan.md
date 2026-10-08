@@ -1,4 +1,4 @@
-> 版本: v1.0.0 | 状态: 已确认 | 确认人: 陈卓 | 确认日期: 2026-10-08 | 确认记录: 用户 2026-10-08 选定「确认通过（确认人：陈卓）」（确认②）+ 施工范围「全量做（两端 + 文档 + 图片多模态 + 历史回看 + 鉴权）」 | 更新: 2026-10-08
+> 版本: v1.1.0 | 状态: 已确认 | 确认人: 陈卓 | 确认日期: 2026-10-08 | 确认记录: CR-01（micro）合入（陈卓 2026-10-08）⇒ 决策2 模型名、决策3 密钥来源改造 | 确认记录: 用户 2026-10-08 选定「确认通过（确认人：陈卓）」（确认②）+ 施工范围「全量做（两端 + 文档 + 图片多模态 + 历史回看 + 鉴权）」 | 更新: 2026-10-08
 
 # 技术方案：chat-attachment-understanding（对话附件上传与大模型理解）
 
@@ -17,7 +17,7 @@
 | **L-06** 多入口枚举缺失——修一条链漏一条链 | 两端 + 共享包 | 入口清单写死在共享面矩阵：admin-ui 对话页、mobile-ui 对话页、`chat-shared`（类型/composable/mocks）、后端上传端点、后端 stream 端点 —— 每处一条断言 |
 | **L-20** 视图态凡与"会话"绑定就必须按会话分片 | 待发送附件草稿态 | 附件草稿态**按 sessionId 分片**存储（切会话不串附件），不用单例 ref |
 | **L-36** 外部服务"能力清单"接口不是权威 | 多模态模型可用性 | **不信 `/models` 清单**；Implement 首任务发一次**真实带 `image_url` 的请求**，拿到成功响应才算可用 |
-| **L-11** 用户环境 ≠ 我以为的环境 | 模型名/密钥权限 | 模型名由用户裁定（`qwen-vl-max`）+ 探针实证；探针失败即停并回报，不改名硬试 |
+| **L-11** 用户环境 ≠ 我以为的环境 | 模型名/密钥权限 | 模型名由用户裁定（CR-01 后为 `qwen3.8-max`）+ 探针实证；探针失败即停并回报，不改名硬试 |
 | **L-19** 路径归属必须与写入方同源解析 | 附件存储路径 | 附件访问一律**以库中记录的 `storage_path`** 解析归属，不接受请求入参里的路径拼接 |
 | **L-21** MyBatis-Flex 逻辑删列会让墓碑行隐形 | 新附件表若用 `del_flag` | 新表**不设 `del_flag`**，用 `status` 显式状态列 + 物理清理（决策 4） |
 | **L-13** `git add` 面过宽吞大产物 | 测试用真实文件 | 测试附件走 `/tmp`，**不入库**；提交前 `git status` 核面 |
@@ -34,7 +34,7 @@
 
 **理解路径分两支**（对应 R-05/R-06）：
 - **文档类** → 复用已在依赖中的 `spring-ai-tika-document-reader` 抽文本 → 受控模板注入提示词（含截断告知，R-08）→ 走既有 `CHAT` 模型。
-- **图片类** → 装配 **OpenAI 兼容 multimodal 内容部件**（`type=image_url`，本地文件转 data URI）→ 走**新增 `MULTIMODAL` 模型**（`qwen-vl-max`，复用现有 qwen provider/base_url/api_key）。
+- **图片类** → 装配 **OpenAI 兼容 multimodal 内容部件**（`type=image_url`，本地文件转 data URI）→ 走**新增 `MULTIMODAL` 模型**（**`qwen3.8-max`**，复用现有 qwen provider/base_url；api_key 经管理页配置实测可用的一把，CR-01）。
 - **混合**（图 + 文档）→ 走 `MULTIMODAL`，文本部分同时含文档抽取内容。
 - **无可用 MULTIMODAL 模型** → 按 R-07 **降级 + 用户可见告知**，标注写入消息 `metadata`，历史回看同样标注。
 
@@ -51,7 +51,7 @@
 | `web-frontend/packages/chat-shared` | `ChatMessage`/草稿态类型加**可选** `attachments`；上传 API 封装；草稿态按会话分片 |
 | `web-frontend/apps/admin-ui` | 对话页附件选择/展示/移除 + 失败提示（文案单一来源在 chat-shared） |
 | `web-frontend/apps/mobile-ui` | vant 上传适配（相册/拍照/文件按平台能力），规则与提示语义与 admin 一致 |
-| SQL | `V2.0.0_15`（新表 + 索引 + **幂等插入 MULTIMODAL 模型行**）+ 配对 rollback |
+| SQL | `V2.0.0_15`（**只**新表 + 2 索引）+ 配对 rollback；MULTIMODAL 模型行经管理页配置（CR-01） |
 
 ```
 [前端] 选文件 → POST /api/chat/attachment (multipart, phoenix-token)
@@ -63,7 +63,7 @@
           ↓ GET /api/agent/{agentId}/sessions/stream?...&attachmentIds=1,2   (GET 无 body ⇒ 查询参数)
 [后端] 载入附件行 → 逐个鉴权(R-11/L-58/L-19) → 分派:
          文档 → Tika 抽文本 →(超长顺序截断+告知 R-08)→ 注入提示词 → CHAT 模型
-         图片 → image_url 部件 → MULTIMODAL(qwen-vl-max)
+         图片 → image_url 部件 → MULTIMODAL(qwen3.8-max)
          无 MULTIMODAL → 降级 + 显式告知(R-07) → 标注写 metadata
           ↓ SSE 流式返回；消息落 tbl_data_chat_message(content + metadata 标注)；附件回填 message_id
 [历史] 打开会话 → 消息带 attachments 元信息 → 缩略图/文件名 → 点击经鉴权端点取原件
@@ -108,7 +108,9 @@ CREATE INDEX IF NOT EXISTS idx_chat_attachment_message  ON tbl_data_chat_attachm
 - **不加外键**（沿用本项目既有风格：`tbl_data_chat_message` 亦无 FK）；`message_id` 为空 = 上传未发送（孤儿）。
 - **不设 `del_flag`**（避开 L-21 墓碑行隐形）；清理走 `status` + 物理删（决策 4）。
 - **不改** `tbl_data_chat_message` 结构：降级/截断标注写既有 `metadata`(jsonb→String)，**零 DDL**。
-- **不改** `tbl_data_model_config` 结构：`model_type` 为 varchar，新增取值 `MULTIMODAL` 属数据层面（迁移件幂等插入，密钥用**子查询复用现有 qwen 行**，不落明文）。
+- **不改** `tbl_data_model_config` 结构：`model_type` 为 varchar，新增取值 `MULTIMODAL` 属数据层面，**由管理页配置写入**（CR-01：迁移件不插模型行、不搬运密钥）。
+- **既有约束须遵守**：`uk_dmc_type_default` = 部分唯一索引 `(model_type) WHERE is_default=true AND is_deleted=0` ⇒ 每类型至多一个默认行；
+  且 `ModelType.fromCode()` 对未知值**抛 IllegalArgumentException** ⇒ **必须先发代码（加枚举值）再写 MULTIMODAL 数据行**，否则管理页/转换链会炸。
 - 回滚：`DROP TABLE IF EXISTS tbl_data_chat_attachment;` + 删除该 MULTIMODAL 行（按 `model_type='MULTIMODAL'` 定位）。
 
 ## 共享面身份矩阵（判据：还有谁依赖这个路径/列/配置？）
@@ -132,16 +134,16 @@ CREATE INDEX IF NOT EXISTS idx_chat_attachment_message  ON tbl_data_chat_attachm
 - **重新评估条件**：若对话入口整体改 POST/WS，附件可随 body 直发。
 
 ### 决策 2：图片走 OpenAI 兼容 `image_url` 部件 + 新增 `MULTIMODAL` 类型
-- **采用**：`ModelType.MULTIMODAL`；模型行复用现有 qwen provider（DashScope compatible-mode，同 id=7 的 base_url/api_key），首行 `qwen-vl-max`（用户裁定 Q4-1）。
+- **采用**：`ModelType.MULTIMODAL`；模型行复用现有 qwen provider（DashScope compatible-mode，同 id=7 的 base_url/api_key），首行 **`qwen3.8-max`**（用户裁定 Q4-1 + CR-01 修正）。
 - **理由**：配置体系已是 DB 驱动 + OpenAI 兼容路径，**零新依赖**即可支持 multimodal；类型独立于 CHAT，避免污染既有选取逻辑（S2）。
-- **被拒**：① OCR 取文字 —— 用户明确要"真多模态"，图表/布局信息会丢；② 复用 `CHAT` 类型换模型名 —— 所有对话都走 VL（成本/延迟），且无法按"是否含图"分派；③ 类型名用 `VISION` —— 用户裁定用 `MULTIMODAL`（语义更宽，qwen3.8 类原生图文模型同归此类型）。
+- **被拒**：① OCR 取文字 —— 用户明确要"真多模态"，图表/布局信息会丢；② 复用 `CHAT` 类型换模型名 —— 所有对话都走 VL（成本/延迟），且无法按"是否含图"分派；③ 类型名用 `VISION` —— 用户裁定用 `MULTIMODAL`（语义更宽）；④ 继续用 `qwen-vl-max` —— CR-01 实测其在 id=6 端点 **404 model_not_found**（跨环境不稳），而 `qwen3.8-max` 在两把可用 key 下均 200 并正确读图。
 - **重新评估条件**：探针失败（provider 不支持 `image_url`）⇒ 回用户处重选模型/provider。
 
-### 决策 3：MULTIMODAL 模型行由**迁移件幂等插入**，不只靠管理页手点
-- **采用**：`V2.0.0_15` 除建表外，幂等插入一行 MULTIMODAL（provider/base_url/api_key **子查询复用现有 qwen 行**，不硬编码密钥），`is_active=true`、`is_default=false`。
-- **理由**：全新环境与存量环境**行为一致**（R-06/R-07 可验证）；避免"忘记配"导致在别的环境静默降级；密钥不落文件。
-- **被拒**：① 只在管理页手工加 —— 环境漂移、无法验证；② 写 `application.yml`/环境变量 —— 与"模型配置 DB 驱动 + 零 resource 配置文件"的既有事实相悖（profile 记载）。
-- **重新评估条件**：若视觉模型需独立密钥/provider ⇒ 改管理页配置，迁移件只建类型。
+### 决策 3（CR-01 改造）：MULTIMODAL 模型行由**管理页配置**，迁移件**只做 DDL**
+- **采用**：`V2.0.0_15` **只建表 + 2 索引**（不含任何模型配置行）；MULTIMODAL 行在 T-03 加完枚举值后，**经「模型配置」管理页**新增（模型名 `qwen3.8-max`，api_key 由配置人填实测可用的一把），并遵守部分唯一索引 `uk_dmc_type_default`（每类型至多一个默认行）。
+- **理由**：**密钥不进版本库**（安全）；不依赖环境相关 id（L-51）；原方案"复用现有 qwen 行密钥"经实测指向**欠费死 key**（id=7 原 key → 400 Arrearage），照原样会把死 key 带进所有新环境。"未配置"本就是 R-07 定义的降级起点，语义自洽。
+- **被拒**：① 迁移件幂等插行 + 子查询复制密钥 —— 复制到的可能是死 key（实测 id=7 原 key 欠费），且 SQL 间接搬运密钥；② 复制"EMBEDDING 默认行"的 key —— 把"embedding 行的 key 必可用于 chat"当假设，跨环境不成立；③ 写 `application.yml`/环境变量 —— 与"模型配置 DB 驱动 + 零 resource 配置文件"的既有事实相悖（profile 记载）。
+- **重新评估条件**：若将来要求"全新环境零手工配置即可用多模态"，再评估由部署脚本（非 SQL 迁移件）注入配置。
 
 ### 决策 4：附件用**独立表 + status 物理清理**，不用 metadata-only、不用逻辑删
 - **采用**：新表 `tbl_data_chat_attachment`；`status ∈ {ACTIVE, ORPHAN, EXTRACT_FAILED}`；发送后回填 `message_id`；查询以 `uploader_id` 强约束。
@@ -159,7 +161,7 @@ CREATE INDEX IF NOT EXISTS idx_chat_attachment_message  ON tbl_data_chat_attachm
 
 | 风险 | 规避 |
 |---|---|
-| **探针失败**（key 未开通 qwen-vl-max / provider 不支持 image_url） | Implement **首任务**即探针（真实带图调用；L-36 不信清单接口）；失败**即停回报**，不带病施工（L-11） |
+| **探针失败**（key 未开通 `qwen3.8-max` / provider 不支持 image_url） | Implement **首任务**即探针（真实带图调用；L-36 不信清单接口）；失败**即停回报**，不带病施工（L-11） |
 | **GET 查询参数改 id 越权读他人附件** | 后端**逐个**校验 `uploader_id`（非本人且非超管 → 403），不信任入参（L-19/L-58）；`attachmentIds` 数量上限同 R-04 |
 | **reactive 上传取登录态**再踩 BUG-140 | 强制 token 反查范式（L-65）；验证必须**用非超管账号**实测上传成功 + 归属正确 |
 | **两端行为漂移** | 白名单/上限/文案**集中在 chat-shared**（单一来源），两端只做渲染；矩阵 S5 各一条断言（L-06） |
@@ -171,7 +173,8 @@ CREATE INDEX IF NOT EXISTS idx_chat_attachment_message  ON tbl_data_chat_attachm
 
 ## 依赖与前置
 
-- **前置（阻塞 Implement）**：多模态可用性探针通过（`qwen-vl-max` 经现有 qwen provider 真实带 `image_url` 调用成功）。
+- **前置（已解除）**：多模态可用性探针 **已于 2026-10-08 通过** —— `qwen3.8-max` 带 `image_url` → HTTP 200 且正确读出图内编码（两把可用 key 各验一次），证据 `evidence/T-01_multimodal-probe.txt`。
+- **前置（已解除）**：CHAT 链路死锁（deepseek 402 / qwen id=7 欠费）已由**运维配置动作**修复并端到端复验（SSE 21 事件含真实回答），证据 `evidence/OPS_chat-default-fix.txt`；衍生缺陷 **BUG-152** 已登记不顺手修。
 - **依赖既有能力**：`FileStorageService`/`FileStorageProperties`、`spring-ai-tika-document-reader`、`tbl_data_model_config` + `HarnessModelRegistry`/`AiModelConfigEpoch`、`tbl_data_chat_message.metadata`、`chat-shared`。
 - **无新增第三方依赖**；**无 nginx/网关新路径**（`/api/**` 已被既有鉴权链与代理覆盖）—— 若实测发现新路径需代理规则，**回改本 plan 并重走确认②**（铁律 6）。
 - **版本归属**：v2.0.0（在途）；升级件序号 **V2.0.0_15**（现台账 14 件，续号；M3 汇总时统一复核编号）。

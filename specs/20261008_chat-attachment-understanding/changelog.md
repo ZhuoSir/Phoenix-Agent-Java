@@ -1,5 +1,20 @@
 # Changelog: chat-attachment-understanding
 
+## v1.1.0 = CR-01 合入（2026-10-08，micro，1 次确认 陈卓）
+
+- **变更**：多模态模型 `qwen-vl-max` → **`qwen3.8-max`**（实测原生支持 `image_url`，两把可用 key 均 200 并正确读图；
+  原 `qwen-vl-max` 在 id=6 端点 404 model_not_found、在原 CHAT 行 key 下 400 Arrearage）
+- **变更**：plan 决策 3 改造 —— `V2.0.0_15` **只做 DDL**（建表+2 索引），MULTIMODAL 模型行**改由管理页配置**；
+  理由：原方案"子查询复用现有 qwen 行密钥"实测指向**欠费死 key**，会把死 key 带进所有新环境；密钥不入版本库
+- **新增纪律**（写入 plan/tasks）：`ModelType.fromCode()` 对未知值抛异常 ⇒ **先发代码加枚举值、再写 MULTIMODAL 数据行**；
+  遵守部分唯一索引 `uk_dmc_type_default`（每类型至多一个默认行）
+- **T-01 达成并勾选**：探针 HTTP 200 且读出图内编码 `PROBE-4821-KQ`（证据 `evidence/T-01_multimodal-probe.txt`）
+- **三文档 bump**：requirements v1.1.0 / plan v1.1.0 / tasks v1.1.0（本 CR 的 1 次确认即其重确认）
+- **关联账**：BUG-152（CHAT 选取两路径语义不一致，新建·不顺手修）、L-74（改配置前先读选取代码+确认运行时缓存）、
+  运维证据 `evidence/OPS_chat-default-fix.txt`（CHAT 死链修复 + 端到端复验 SSE 21 事件含真实回答）
+- 八动作：①②③④⑤⑥⑦⑧ 全勾（⑥ 本 CR 不涉新 SQL 件：`V2.0.0_15` 仍 1 件、范围收窄，待 T-02 落地登记 artifacts）
+
+
 ## Implement 阻塞（2026-10-08）：T-01 探针未通过 ⇒ 按 plan 停工回报
 
 - **T-01 未通过**：`qwen-vl-max` 真实带 `image_url` 调用 → **HTTP 400 `Arrearage`**（阿里云百炼账号欠费/状态异常）。

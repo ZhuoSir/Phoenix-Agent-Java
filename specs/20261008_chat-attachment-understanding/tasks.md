@@ -1,4 +1,4 @@
-> 版本: v1.0.0 | 状态: 已确认 | 确认人: 陈卓 | 确认日期: 2026-10-08 | 确认记录: 用户 2026-10-08 选定「确认通过（确认人：陈卓）」（确认③）| 更新: 2026-10-08
+> 版本: v1.1.0 | 状态: 已确认 | 确认人: 陈卓 | 确认日期: 2026-10-08 | 确认记录: CR-01（micro）合入（陈卓 2026-10-08）⇒ T-01/T-02/T-03 改造，T-01 已达成勾选 | 确认记录: 用户 2026-10-08 选定「确认通过（确认人：陈卓）」（确认③）| 更新: 2026-10-08
 
 # 任务清单：chat-attachment-understanding（对话附件上传与大模型理解）
 
@@ -7,21 +7,24 @@
 
 ## 1. 前置探针（阻塞）
 
-- [ ] T-01 多模态可用性探针：用现有 qwen provider 真实调用 `qwen-vl-max` 带 `image_url` 的对话请求
-  关联: R-06
+- [x] T-01 多模态可用性探针：用现有 qwen provider 真实调用 **`qwen3.8-max`** 带 `image_url` 的对话请求（CR-01 改造：原 `qwen-vl-max`）
+  关联: R-06 ｜ CR: CR-01 ｜ 处置: 改造（模型名参数）
   依赖: 无
   验证方式: 从 `tbl_data_model_config`（现有 qwen 行）取 base_url/api_key，发一次**真实带图**的
     OpenAI 兼容 chat completions 请求；请求与响应原文落 `evidence/T-01_multimodal-probe.txt`；
     **不得**以 `/models` 能力清单代替（L-36）
   验收标准: 拿到成功响应且回答**反映图片实际内容**（用一张含独特文字的图验证）；
     若失败 ⇒ **停止全部后续任务并回报用户**（不改模型名硬试，L-11）
+  **实测结果（2026-10-08，证据 `evidence/T-01_multimodal-probe.txt`）**：图内编码 `PROBE-4821-KQ`，
+    `qwen3.8-max` 在 key#4025(id=11) 与 key#55eb(id=6) 下均 **HTTP 200 且正确读出编码** ✅；
+    对照：`qwen-vl-max` 在 key#55eb 端点 **404 model_not_found**、在原 CHAT 行 key#2dc4 下 **400 Arrearage**（故 CR-01 改名）
 
 ## 2. 后端：上传、存储与库表
 
-- [ ] T-02 附件上传端点 + 存储落盘 + 新表迁移件 `V2.0.0_15`
-  关联: R-01, R-02, R-03, R-04
+- [ ] T-02 附件上传端点 + 存储落盘 + 新表迁移件 `V2.0.0_15`（CR-01：**只建表+索引，不插模型行**）
+  关联: R-01, R-02, R-03, R-04 ｜ CR: CR-01 ｜ 处置: 改造（迁移件范围收窄）
   依赖: 无
-  验证方式: ① `V2.0.0_15`（建表+2 索引+幂等插入 MULTIMODAL 行，密钥子查询不落明文）drill
+  验证方式: ① `V2.0.0_15`（**建表 + 2 索引**，不含模型配置行）drill
     正向×2/反向/再正向 + **从未应用过该件的库上首跑**（L-66 drill 脏库假通过教训）；活库 migrator 应用；
     ② API 实测（**用非超管账号**，L-65）：合法 .docx/.pdf/.xlsx/.txt/.md 与 .png/.jpg 上传成功且
     `uploader_id` 正确；`.zip`/`.svg`/改名伪装的 exe（扩展名与真实内容类型不符）被拒；
@@ -31,15 +34,15 @@
   验收标准: 白名单双判定（扩展名+真实内容类型）生效；限制生效；附件落库且落盘于 `chat-attachments` 子目录；
     avatar 与既有上传**零回归**；rollback 可复原；表/索引存在
 
-- [ ] T-03 `ModelType` 新增 `MULTIMODAL` + 模型选取支路 + 模型配置页兼容
-  关联: R-06, R-07
+- [ ] T-03 `ModelType` 新增 `MULTIMODAL` + 模型选取支路 + **经管理页配置 `qwen3.8-max` 行**
+  关联: R-06, R-07 ｜ CR: CR-01 ｜ 处置: 改造（密钥来源：迁移件 → 管理页配置）
   依赖: T-01
-  验证方式: ① 迁移件插入的 MULTIMODAL 行在管理页「模型配置」可见可编辑可启停；
+  验证方式: ① **先加枚举值再写数据行**（`ModelType.fromCode` 对未知值抛异常）；MULTIMODAL 行（`qwen3.8-max`）经管理页新增后可见可编辑可启停，且遵守部分唯一索引 `uk_dmc_type_default`（每类型至多一个默认）；
     ② **对面断言 S2**：`HarnessConfig`、`AbstractCompiledGragph`、`MemoryPipelineServiceImpl`、
     `HarnessModelRegistry` 四个消费点在**新增枚举值后**对 CHAT/EMBEDDING 的选取结果不变（各一条断言）；
     ③ **对面断言 S3**：既有 CHAT/EMBEDDING 默认行不变；MULTIMODAL 行**不能**被设为 CHAT 默认；
     ④ 未配置 MULTIMODAL 时纯文本对话不抛错（走 CHAT）
-  验收标准: 含图请求选 MULTIMODAL、纯文本仍选 CHAT；四个消费点零回归；配置页增删改查正常
+  验收标准: 含图请求选 MULTIMODAL（`qwen3.8-max`）、纯文本仍选 CHAT（`qwen3.8-flash`）；四个消费点零回归；配置页增删改查正常；**未配置 MULTIMODAL 时不抛错**且带图请求走 R-07 降级+显式告知
 
 ## 3. 后端：理解与鉴权
 
