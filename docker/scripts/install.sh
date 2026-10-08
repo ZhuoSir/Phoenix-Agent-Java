@@ -77,12 +77,14 @@ phx_step 2 $TOTAL "引擎就位" && {
   elif [ "$OFFLINE" -eq 1 ]; then
     phx_fail 2 $TOTAL "离线且无 engine/*.deb——参见 docs/OFFLINE-ENGINE.md 手工装引擎后重跑"
   else
-    phx_log INFO "在线安装 Docker Engine（get.docker.com --mirror Aliyun）"
-    if curl -fsSL -m 30 https://get.docker.com -o /tmp/phx-getdocker.sh; then
+    phx_log INFO "在线安装 Docker Engine（get.docker.com --mirror Aliyun；拉不到则回退国内源）"
+    # --mirror Aliyun 只管 deb 包源，安装脚本本体仍在 get.docker.com（境外）⇒ 需国内回退（BUG-145）
+    if curl -fsSL -m 30 https://get.docker.com -o /tmp/phx-getdocker.sh 2>/dev/null; then
       # shellcheck disable=SC2086
       $SUDO sh /tmp/phx-getdocker.sh --mirror Aliyun >>"$PHX_LOG_FILE" 2>&1 || phx_fail 2 $TOTAL "引擎安装脚本失败（见日志；断网请加 --offline 并备 engine/*.deb）"
     else
-      phx_fail 2 $TOTAL "get.docker.com 不可达（网络受限？）——加 --offline 走 deb/文档路线"
+      phx_log WARN "get.docker.com 不可达（受限网络）——回退国内源 docker-ce@mirrors.aliyun.com"
+      phx_install_docker_aliyun || phx_fail 2 $TOTAL "国内源装引擎失败（见日志 $PHX_LOG_FILE；断网请加 --offline 并备 engine/*.deb）"
     fi
     $SUDO systemctl enable --now docker >/dev/null 2>&1 || $SUDO service docker start >/dev/null 2>&1 || true
     $SUDO usermod -aG docker "$(id -un)" >/dev/null 2>&1 || true

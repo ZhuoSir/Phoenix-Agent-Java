@@ -36,11 +36,17 @@ if docker info >/dev/null 2>&1; then
 elif [ "$(uname -s)" = "Darwin" ]; then
   phx_fail 1 4 "mac 不代装引擎（A-3）：请装 Docker Desktop/Colima 后重跑"
 else
-  phx_log INFO "[A/4] 引擎安装（get.docker.com --mirror Aliyun）"
+  phx_log INFO "[A/4] 引擎安装（get.docker.com --mirror Aliyun；拉不到则回退国内源）"
   SUDO=""; [ "$(id -u)" -ne 0 ] && SUDO="sudo"
-  curl -fsSL -m 30 https://get.docker.com -o /tmp/phx-getdocker.sh || phx_fail 1 4 "get.docker.com 不可达（网络受限？）"
-  # shellcheck disable=SC2086
-  $SUDO sh /tmp/phx-getdocker.sh --mirror Aliyun >>"$PHX_LOG_FILE" 2>&1 || phx_fail 1 4 "引擎安装失败（见日志）"
+  # 注意：--mirror Aliyun 只管 deb 包源，安装脚本本体仍在 get.docker.com（境外）；
+  # 国内受限网络 curl 会被 reset，故此处必须带国内回退（BUG-145）。
+  if curl -fsSL -m 30 https://get.docker.com -o /tmp/phx-getdocker.sh 2>/dev/null; then
+    # shellcheck disable=SC2086
+    $SUDO sh /tmp/phx-getdocker.sh --mirror Aliyun >>"$PHX_LOG_FILE" 2>&1 || phx_fail 1 4 "引擎安装失败（见日志）"
+  else
+    phx_log WARN "get.docker.com 不可达（受限网络）——回退国内源 docker-ce@mirrors.aliyun.com"
+    phx_install_docker_aliyun || phx_fail 1 4 "国内源装引擎失败（见日志 $PHX_LOG_FILE）"
+  fi
   $SUDO systemctl enable --now docker >/dev/null 2>&1 || $SUDO service docker start >/dev/null 2>&1 || true
   # shellcheck disable=SC2086
   [ -n "$SUDO" ] && $SUDO usermod -aG docker "$(id -un)" >/dev/null 2>&1

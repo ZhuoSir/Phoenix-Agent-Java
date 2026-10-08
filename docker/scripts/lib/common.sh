@@ -119,3 +119,35 @@ phx_disk_ok() { # phx_disk_ok <路径> <需要MB>
   free=$(phx_disk_free_mb "$1")
   [ -n "$free" ] && [ "$free" -ge "$2" ]
 }
+
+# ---------- 引擎安装：受限网络下的国内回退（BUG-145） ----------
+# get.docker.com 的 **安装脚本本体在境外**（`--mirror Aliyun` 只管 deb 包源），
+# 国内受限网络下 curl 会被 reset ⇒ 脚本判定"引擎装不上"直接失败。
+# 本函数改走 docker-ce@mirrors.aliyun.com 的 apt 仓库，全程国内源。
+# 成功返回 0；过程输出进 $PHX_LOG_FILE（调用方负责报错文案）。
+phx_install_docker_aliyun() {
+  local s="" arch="" codename=""
+  [ "$(id -u)" -ne 0 ] && s="sudo"
+  case "$(uname -m)" in
+    x86_64) arch=amd64;;
+    aarch64|arm64) arch=arm64;;
+  esac
+  if [ -z "$arch" ]; then phx_log ERROR "回退安装仅覆盖 amd64/arm64（本机 $(uname -m)）"; return 1; fi
+  if [ -r /etc/os-release ]; then
+    # shellcheck disable=SC1091
+    codename=$(. /etc/os-release 2>/dev/null; echo "${VERSION_CODENAME:-}")
+  fi
+  [ -n "$codename" ] || codename=jammy
+  phx_log INFO "回退安装: docker-ce@mirrors.aliyun.com ($codename/$arch)"
+  {
+    export DEBIAN_FRONTEND=noninteractive
+    $s apt-get update -qq
+    $s apt-get install -y -qq ca-certificates curl gnupg
+    $s install -m 0755 -d /etc/apt/keyrings
+    curl -fsSL -m 60 https://mirrors.aliyun.com/docker-ce/linux/ubuntu/gpg | $s gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+    $s chmod a+r /etc/apt/keyrings/docker.gpg
+    echo "deb [arch=$arch signed-by=/etc/apt/keyrings/docker.gpg] https://mirrors.aliyun.com/docker-ce/linux/ubuntu $codename stable" | $s tee /etc/apt/sources.list.d/docker.list >/dev/null
+    $s apt-get update -qq
+    $s apt-get install -y -qq docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+  } >>"$PHX_LOG_FILE" 2>&1
+}
