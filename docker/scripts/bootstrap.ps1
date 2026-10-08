@@ -34,14 +34,25 @@ if (-not $isAdmin) { Write-Fail "请以管理员身份运行 PowerShell" }
 
 # ── 2. Windows 原生引擎 = 拒绝（跑不了 Linux 镜像） ──
 if (Get-Command docker -ErrorAction SilentlyContinue) {
-  $ost = & docker info --format '{{.OSType}}' 2>$null
+  # 走 cmd /c 取输出：PS 5.1 在 $ErrorActionPreference=Stop 下会把原生命令的 stderr 升级成
+  # 终止错误，`2>$null` 拦不住（BUG-141）——引擎没起时那样会让脚本红堆栈死在这一行。
+  $ost = & cmd /c 'docker info --format {{.OSType}} 2>nul'
   if ($ost -eq "windows") { Write-Fail "检测到 Windows 原生容器引擎(OSType=windows)——本脚本走 WSL2 路线，请先停用 Windows 容器模式或忽略本机既有引擎（不影响 WSL 内独立引擎）" }
 }
 
 # ── 3. WSL2 + 发行版（与 install.ps1 同构；-Distro 兼容 wsl --import 自定义名） ──
 if (-not (Get-Command wsl -ErrorAction SilentlyContinue)) { Write-Fail "无 wsl 命令——系统版本过老或功能未启用（先跑 dism 两功能+重启）" }
-$distros = (& wsl -l -q 2>$null) -join "`n"
-if ($distros -notmatch [regex]::Escape($Distro)) {
+# 发行版就绪判定 = **直接探测**，不解析 `wsl -l -q`：其输出在 PowerShell 5.1 里字间夹 NUL
+# （实测 "U\0b\0u\0n\0t\0u\0"），-match 恒不命中 ⇒ 已装好被误判为未装 ⇒ 重装报
+# ERROR_ALREADY_EXISTS ⇒ **第二次重跑必失败**（BUG-144）。探测全程走 cmd /c，避免
+# native stderr 在 EAP=Stop 下抛错（BUG-141）。
+function Test-Distro($name) {
+  & cmd /c "wsl -d $name -u root -- true 1>nul 2>nul"
+  return ($LASTEXITCODE -eq 0)
+}
+if (Test-Distro $Distro) {
+  Write-Step "$Distro 已就绪，跳过发行版安装"
+} else {
   if (-not (Test-Done "features")) {
     Write-Step "启用 WSL 与虚拟机平台功能（dism）..."
     & dism.exe /online /enable-feature /featurename:Microsoft-Windows-Subsystem-Linux /all /norestart | Out-Null
@@ -51,12 +62,13 @@ if ($distros -notmatch [regex]::Escape($Distro)) {
     exit 2
   }
   Write-Step "安装 $Distro（若 Server 无商店报「无效的分发名称」，请按 README 的 rootfs 导入法建同名发行版后重跑）..."
-  & wsl --install -d $Distro --no-launch
-  if ($LASTEXITCODE -ne 0) { Write-Fail "wsl --install 失败(码 $LASTEXITCODE)——Server 环境请改用导入法：aka.ms/wslubuntu2204 下载后 wsl --import $Distro C:\WSL\Ubuntu <rootfs.tar.gz>" }
+  $installOut = & cmd /c "wsl --install -d $Distro --no-launch 2>&1"
+  $installOut | ForEach-Object { Write-Host "  $_" }
+  if (-not (Test-Distro $Distro)) {
+    Write-Fail "$Distro 不可用——Server 无商店请改用导入法：aka.ms/wslubuntu2204 下载后 wsl --import $Distro C:\WSL\Ubuntu <rootfs.tar.gz> 后重跑；刚装完也可能需重启；仍失败查虚拟化/嵌套虚拟化"
+  }
   Mark-Done "distro"
 }
-& wsl -d $Distro -u root -- true 2>$null
-if ($LASTEXITCODE -ne 0) { Write-Fail "$Distro 无法以 root 启动——刚装完可能需重启；仍失败查虚拟化/嵌套虚拟化" }
 
 # ── 4. 源码拷入 WSL ext4（/mnt 下构建慢 10 倍） ──
 $WinPath = ($SrcRoot -replace '\\','/')
