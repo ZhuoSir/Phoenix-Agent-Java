@@ -1,5 +1,16 @@
 # Changelog: chat-attachment-understanding
 
+## v1.0.0（2026-10-08）确认① 通过
+
+- 确认人: **陈卓**（用户 2026-10-08 选定「确认通过（确认人：陈卓）」）；三重确认门第 **①** 重达成
+- 同轮裁定 **Q4-1**：模型类型枚举值 = **`MULTIMODAL`**（非 VISION；语义为多模态大模型，qwen3.8 类原生图文模型同归此类型）；
+  首行 `model_name = qwen-vl-max`，provider/base_url/api_key 复用现有 qwen（DashScope compatible-mode，id=7）
+- 修改：假设 4 重写（MULTIMODAL + qwen-vl-max + OpenAI 兼容 `image_url` 部件 + 不新增 SDK）；
+  裁定表 Q4 行去掉「模型名待定」；Q4-1 段落翻为「已裁定」；待确认问题节标题改「已全部裁定」
+- 保留兜底纪律：Implement 首任务 = 多模态可用性探针（真实带 `image_url` 调用），探针不过即停
+- 下一步：Phase 2 Plan（须先加载 lessons 全部 active 坑 + api-design/database 规范源，坑核对节置顶）
+
+
 ## v0.2.0（2026-10-08）用户裁定 Q1~Q6（草稿期，待确认①）
 
 - 裁定：Q1 仅会话级 / Q2 按草案白名单（.svg 排除）/ Q3 20MB·5 个 / Q4 允许加 `model_type=VISION` 配置行 /

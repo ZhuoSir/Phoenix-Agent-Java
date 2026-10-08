@@ -1,4 +1,4 @@
-> 版本: v0.2.0 | 状态: 草稿 | 更新: 2026-10-08 | 变更: 用户裁定 Q1~Q6（草稿期，待确认①）
+> 版本: v1.0.0 | 状态: 已确认 | 确认人: 陈卓 | 确认日期: 2026-10-08 | 确认记录: 用户 2026-10-08 选定「确认通过（确认人：陈卓）」（确认①）+ 同轮裁定 Q4-1：模型类型枚举用 **MULTIMODAL**、首行模型名 **qwen-vl-max**、探针驱动 | 更新: 2026-10-08
 
 # 需求规格：chat-attachment-understanding（对话附件上传与大模型理解）
 
@@ -185,8 +185,7 @@ WHEN 同一后端契约被 admin-ui 与 mobile-ui 调用,
 1. ✅（Q1）**附件语义 = 会话级材料**（当次对话 + 历史回看），不入知识库、不做检索索引。（如不成立请现在指出，否则按此执行）
 2. ✅（Q2）**文件白名单** = `.doc/.docx/.pdf/.xls/.xlsx/.txt/.md`；`.csv/.rtf/.html` 未纳入（Q2 决定）。
 3. ✅（Q2）**图片白名单** = `.png/.jpg/.jpeg/.gif/.webp/.bmp`；**`.svg` 默认排除**（可内嵌脚本，XSS 面）；`.heic/.tiff` 未纳入（Q2 决定）。
-4. ✅（Q4，模型名待定）**视觉模型接入方式** = 在既有 `tbl_data_model_config` 增加一行（如 `model_type=VISION`），
-   走 provider 的 OpenAI 兼容 multimodal 消息格式；**不新增第三方 SDK 依赖**。（Q4 决定模型与密钥）
+4. ✅（Q4 + Q4-1）**多模态模型接入方式** = 在既有 `tbl_data_model_config` 增加一行 `model_type=`**`MULTIMODAL`**（新增枚举值，语义=多模态大模型；未来 qwen3.8 类原生图文模型同归此类型），首行 `model_name=`**`qwen-vl-max`**，provider/base_url/api_key 复用现有 qwen（DashScope compatible-mode，同 id=7）；走 OpenAI 兼容 multimodal 消息格式（`image_url` 内容部件）；**不新增第三方 SDK 依赖**。
 5. ✅ **文档文本抽取**复用已在依赖中的 `spring-ai-tika-document-reader`，**不引入新解析库**。
 6. **附件存储**复用既有 `FileStorageService`/`FileStorageProperties`；附件元数据记录在
    `tbl_data_chat_message.metadata`(jsonb)；是否需要独立附件表由 Plan 阶段按检索/清理需求评估（可能产生 DDL）。
@@ -202,15 +201,15 @@ WHEN 同一后端契约被 admin-ui 与 mobile-ui 调用,
 | Q1 | 附件语义 | **仅会话级**（当次对话 + 历史回看；不入知识库、不做检索） | 假设 1 / Non-goals 第 1 条 |
 | Q2 | 格式清单 | **按草案白名单**：文档 .doc/.docx/.pdf/.xls/.xlsx/.txt/.md；图片 .png/.jpg/.jpeg/.gif/.webp/.bmp；**.svg 排除** | R-01 / R-02 |
 | Q3 | 上限 | **单文件 ≤ 20MB、单次 ≤ 5 个**；不设会话累计上限 | R-04 |
-| Q4 | 视觉模型接入 | **允许在 `tbl_data_model_config` 增 `model_type=VISION` 行**，复用现有 qwen provider（DashScope compatible-mode，同 id=7 的 base_url/api_key）；**确切模型名待确认**（见下） | R-06 / 假设 4 |
+| Q4 | 视觉模型接入 | **允许在 `tbl_data_model_config` 增行**，复用现有 qwen provider（DashScope compatible-mode，同 id=7 的 base_url/api_key） | R-06 / 假设 4 |
 | Q5 | 视觉模型不可用时 | **降级但显式提示**（不硬失败）：忽略图片 + 用户可见告知「图片未被理解，仅根据文本作答」，禁止暗示看过图 | **R-07 已改写** |
 | Q6 | 超长 / 扫描件 | **超长按顺序截断并显式告知**；**扫描件 PDF（无文本层）直接报错，不自动转视觉模型** | R-08 / R-09 已改写 |
 
-## 待确认问题
+## 待确认问题（已全部裁定）
 
-- **Q4-1（唯一遗留阻塞项）视觉模型的确切模型名**：现有配置里 qwen 走
-  `https://dashscope.aliyuncs.com/compatible-mode`（id=7，api_key 已在库）。
-  我**无法验证你的 key 开通了哪个 VL 模型**，故不代猜。请给一个模型名（例如 `qwen-vl-max` / `qwen-vl-plus` /
-  你环境里实际可用的 VL 型号）。
-  **兜底纪律**：Implement 的第一个任务 SHALL 是「视觉模型可用性探针」——用你给的名字发一次带 `image_url`
-  的真实请求，拿到成功响应才继续；探针失败即停并回报，不带病施工。
+- **Q4-1 已裁定（2026-10-08 用户）**：模型类型枚举值用 **`MULTIMODAL`**（多模态大模型，qwen3.8 那类原生图文模型亦归此类型）；
+  本次首行配置 `model_name = qwen-vl-max`。
+  **兜底纪律不变**：Implement 第一个任务 SHALL 是「多模态可用性探针」——用该模型名发一次带 `image_url` 的真实请求，
+  拿到成功响应才继续；探针失败即停并回报，不带病施工。
+
+**无其他待确认问题 ⇒ 确认① 已通过（陈卓 2026-10-08），进入 Phase 2 Plan。**
