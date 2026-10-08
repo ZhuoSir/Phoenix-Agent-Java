@@ -347,3 +347,13 @@
 - **状态**：active
 - **复发**：×1（本次 bootstrap.ps1 / install.ps1 第二次重跑）
 - **关联**：BUG-144、`docker/scripts/bootstrap.ps1`、`docker/scripts/install.ps1`
+
+## L-71 文档说"国内源"时，必须核到**每一条外部 URL**——"镜像参数"不等于"入口也在国内"
+- **分类**：判断 / 交付（受限网络）
+- **触发场景**：交付脚本号称"默认全国内源"；用户直接问"源是国内的吗"
+- **现象**：我照抄 `docker/README.md` 的「引擎安装=get.docker `--mirror Aliyun`」并向用户保证"国内源默认，无需配置"，实际 `curl https://get.docker.com` **本体在境外**、用户网络被 reset ⇒ 一键安装在引擎段即失败。用户一句"源是国内的吗"把我问回现场——**答案一半是国内、一半是国外，我上次给的是错的那半**。
+- **根因**：`--mirror` 只切换**包源**，不切换**引导脚本/元数据来源**。"某环节用了国内镜像" ≠ "该环节的入口在国内"。同类陷阱：`npm --registry=<国内>` 但包内 install 脚本另从他处下载；`pip -i <国内>` 但依赖自带源码包地址。
+- **防再犯规则**：① 回答"是不是国内源"之前，把该环节的**每条外部域名逐一列出核对**（本例：`get.docker.com`=境外被拦 / `mirrors.aliyun.com`=200 / `archive.ubuntu.com`=200），核不到就不下结论；② 交付脚本里凡"境外端点"必须有**国内回退**或写明前置条件，不能把失败留给用户现场（本次回退=apt + docker-ce@aliyun，见 `phx_install_docker_aliyun`）；③ 用户报"网络问题"时先做**可达性对照实验**（同机 curl 国内源 200、境外源 reset ⇒ 结论是"该端点被拦"而不是"没网"），再谈方案。
+- **状态**：active
+- **复发**：×1（本次 bootstrap [A/4] 引擎段）
+- **关联**：BUG-145、`docker/scripts/lib/common.sh`、`docker/README.md`（"国内源说明"节需补"安装脚本本体仍走 get.docker.com"的注记）
