@@ -34,7 +34,7 @@
   验收标准: 白名单双判定（扩展名+真实内容类型）生效；限制生效；附件落库且落盘于 `chat-attachments` 子目录；
     avatar 与既有上传**零回归**；rollback 可复原；表/索引存在
 
-- [ ] T-03 `ModelType` 新增 `MULTIMODAL` + 模型选取支路 + **经管理页配置 `qwen3.8-max` 行**
+- [x] T-03 `ModelType` 新增 `MULTIMODAL` + 模型选取支路 + **经管理页配置 `qwen3.8-max` 行**
   关联: R-06, R-07 ｜ CR: CR-01 ｜ 处置: 改造（密钥来源：迁移件 → 管理页配置）
   依赖: T-01
   验证方式: ① **先加枚举值再写数据行**（`ModelType.fromCode` 对未知值抛异常）；MULTIMODAL 行（`qwen3.8-max`）经管理页新增后可见可编辑可启停，且遵守部分唯一索引 `uk_dmc_type_default`（每类型至多一个默认）；
@@ -43,6 +43,11 @@
     ③ **对面断言 S3**：既有 CHAT/EMBEDDING 默认行不变；MULTIMODAL 行**不能**被设为 CHAT 默认；
     ④ 未配置 MULTIMODAL 时纯文本对话不抛错（走 CHAT）
   验收标准: 含图请求选 MULTIMODAL（`qwen3.8-max`）、纯文本仍选 CHAT（`qwen3.8-flash`）；四个消费点零回归；配置页增删改查正常；**未配置 MULTIMODAL 时不抛错**且带图请求走 R-07 降级+显式告知
+  **实测结果（2026-10-08，证据 `evidence/T-03_multimodal-type.txt`）**：list 含 MULTIMODAL 行、设默认/启停往返/默认行保护全过；
+  S3 既有 CHAT(id7)·EMBEDDING(id11) 默认未变；S2 真实对话 3/3 成功 + 日志「默认对话模型: configId=7」；typecheck 203=基线、modelconf 0 错。
+  过程中修复共享面回归：`ModelConfigOpsService.refreshMemoryModel` 对新枚举值抛「未知的模型类型」⇒ 加显式分支。
+  **遗留到 T-06 的两条断言**（本任务无调用方，不虚报）：① 含图请求端到端选 MULTIMODAL；② `getOpenAIMultimodalModel()` 未配置时返回 null 的运行时验证。
+  **前端 dist 未重建** ⇒ 管理页下拉暂无 MULTIMODAL 选项，浏览器验证归 T-07/T-09。
 
 ## 3. 后端：理解与鉴权
 

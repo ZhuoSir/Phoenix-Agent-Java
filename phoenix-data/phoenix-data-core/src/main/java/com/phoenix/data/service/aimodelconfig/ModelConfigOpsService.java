@@ -141,6 +141,12 @@ public class ModelConfigOpsService {
 		else if (ModelType.AUDIO.equals(type)) {
 			aiModelRegistry.refreshTranscription();
 		}
+		else if (ModelType.MULTIMODAL.equals(type)) {
+			// T-03：data 域注册中心（AiModelRegistry）只构建 Chat/Embedding/Transcription，
+			// **不构建多模态实例** ⇒ 此处无缓存可清；agent 域由 publishChanged 事件触发
+			// AiModelConfigChangeListener → HarnessModelRegistry.refreshMultimodal()。
+			log.debug("MULTIMODAL 配置变更：data 域无内存实例需刷新（agent 域由事件刷新）");
+		}
 		else {
 			throw new RuntimeException("未知的模型类型: " + type);
 		}
