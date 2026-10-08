@@ -1,4 +1,4 @@
-<#
+﻿<#
 Phoenix 一键安装（Windows / WSL2 路线，docker-auto-pipeline T-05）
 用法: 管理员 PowerShell 中执行  .\install.ps1 [-Timeout 300] [-Project phoenix] [-Offline]
 流程: 管理员检查 → Windows 原生引擎拒绝(L-12) → WSL2 探测/功能启用(重启断点续跑)

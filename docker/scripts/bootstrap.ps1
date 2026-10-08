@@ -1,4 +1,4 @@
-<#
+﻿<#
 Phoenix 一键 bootstrap · Windows 版（R-10/T-11）
 用法: 管理员 PowerShell，在源码目录执行  .\docker\scripts\bootstrap.ps1 [-Version v] [-Project phoenix] [-Port 0] [-Distro Ubuntu-22.04] [-Offline]
 流程: 管理员检查 → Windows 原生引擎拒绝(L-12) → WSL2 就绪(功能启用/重启续接/-Distro 兼容 --import 自定义名)
