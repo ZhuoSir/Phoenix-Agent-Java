@@ -1,5 +1,14 @@
 # Changelog: chat-attachment-understanding
 
+## v1.0.0 tasks 确认③ 通过 ⇒ **三重确认门达成**（2026-10-08）
+
+- **确认③**：tasks **v1.0.0 已确认**，确认人 **陈卓**
+- 三重确认自检：requirements **v1.0.0 已确认（陈卓）** / plan **v1.0.0 已确认（陈卓）** /
+  tasks **v1.0.0 已确认（陈卓）** ⇒ 三份齐、确认人非空 ⇒ **允许进入 Implement（铁律 1 解除）**
+- 施工分支：`git checkout -b feature/chat-attachment-understanding v2.0.0`（基点 = 在途版本分支）
+- 开工顺序：T-01 多模态探针为**阻塞前置**——探针不过即停并回报，不带病施工
+
+
 ## v1.0.0 plan 确认② 通过 + tasks v0.1.0 草稿（2026-10-08）
 
 - **确认②**：plan **v1.0.0 已确认**，确认人 **陈卓**（用户选定「确认通过（确认人：陈卓）」）；
