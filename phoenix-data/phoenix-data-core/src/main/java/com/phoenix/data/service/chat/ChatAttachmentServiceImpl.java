@@ -53,6 +53,9 @@ public class ChatAttachmentServiceImpl implements ChatAttachmentService {
 
 	private final ChatAttachmentMapper chatAttachmentMapper;
 
+	/** T-04：文档文本抽取（Tika），超长顺序截断 + 失败原因分类 */
+	private final ChatDocumentExtractor documentExtractor;
+
 	private final Tika tika = new Tika();
 
 	@Override
@@ -101,6 +104,26 @@ public class ChatAttachmentServiceImpl implements ChatAttachmentService {
 			String path = null;
 			try {
 				path = fileStorageService.storeFile(new ByteArrayMultipartFile(content, name, mime), SUB_PATH);
+				// T-04（R-08/R-09）：文档类在上传时即抽取——最早暴露"截断"与"无法解析"，
+				// 并落 extracted_chars/status 供发送阶段（T-06）复用判断；图片类不抽取。
+				String status = "ACTIVE";
+				Integer extractedChars = null;
+				String notice = null;
+				if ("DOCUMENT".equals(kind)) {
+					ChatDocumentExtractor.ExtractResult er = documentExtractor.extract(content, mime, name);
+					if (er.isOk()) {
+						extractedChars = er.getChars();
+						if (er.isTruncated()) {
+							notice = "文档内容较长，已按顺序截断至前 " + ChatDocumentExtractor.MAX_EXTRACT_CHARS
+									+ " 字符（超出部分不参与理解）";
+						}
+					}
+					else {
+						// 仍接受上传但标记失败：发送阶段据此拒绝生成（R-09：不得用空内容继续作答）
+						status = "EXTRACT_FAILED";
+						notice = er.getFailureReason();
+					}
+				}
 				ChatAttachment e = new ChatAttachment();
 				e.setSessionId(sessionId);
 				e.setUploaderId(uploaderId);
@@ -110,11 +133,12 @@ public class ChatAttachmentServiceImpl implements ChatAttachmentService {
 				e.setFileName(name);
 				e.setSizeBytes((long) content.length);
 				e.setStoragePath(path);
-				e.setStatus("ACTIVE");
+				e.setStatus(status);
+				e.setExtractedChars(extractedChars);
 				e.setCreateTime(LocalDateTime.now());
 				e.setUpdateTime(LocalDateTime.now());
 				chatAttachmentMapper.insert(e);
-				accepted.add(toVo(e));
+				accepted.add(toVo(e, notice));
 				log.info("对话附件上传: id={}, name={}, kind={}, size={}, by={}", e.getId(), name, kind, content.length, uploaderId);
 			}
 			catch (Exception e) {
@@ -134,7 +158,7 @@ public class ChatAttachmentServiceImpl implements ChatAttachmentService {
 		return new ChatAttachmentUploadResultVO(accepted, rejected);
 	}
 
-	private ChatAttachmentVO toVo(ChatAttachment e) {
+	private ChatAttachmentVO toVo(ChatAttachment e, String notice) {
 		return ChatAttachmentVO.builder()
 			.id(e.getId())
 			.fileName(e.getFileName())
@@ -143,6 +167,8 @@ public class ChatAttachmentServiceImpl implements ChatAttachmentService {
 			.sizeBytes(e.getSizeBytes())
 			// 刻意给受鉴权端点而非存储直链（R-11 / L-58：可见性与归属校验成对）
 			.url("/api/chat/attachment/" + e.getId())
+			.extractStatus(e.getStatus())
+			.notice(notice)
 			.build();
 	}
 

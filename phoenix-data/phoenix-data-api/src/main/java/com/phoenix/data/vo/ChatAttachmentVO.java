@@ -31,4 +31,10 @@ public class ChatAttachmentVO {
 	/** 受鉴权的取件端点：/api/chat/attachment/{id} */
 	private String url;
 
+	/** 抽取状态：ACTIVE | EXTRACT_FAILED（仅文档类有意义；R-09） */
+	private String extractStatus;
+
+	/** 用户可见提示：解析失败原因类别，或"内容已截断"告知（R-08/R-09） */
+	private String notice;
+
 }
