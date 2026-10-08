@@ -85,7 +85,7 @@ if ($LASTEXITCODE -ne 0) { Write-Fail "源码拷贝失败（路径换算: $WslSr
 # `case "$1" in` 就报 syntax error，跑不到任何自愈代码，所以必须在**外部**先规整。
 # 只规整被 bash/Docker/Compose 消费的文本资产；Java/TS/SQL 的 CRLF 无害，不动。
 Write-Step "规整行尾 CRLF→LF（bash/Docker/Compose 资产）..."
-& wsl -d $Distro -u root -- bash -c "cd ~/phoenix-src && find . -type f \( -name '*.sh' -o -name 'Dockerfile*' -o -name '.env*' -o -name '*.conf' -o -name '*.yaml' -o -name '*.yml' \) -exec sed -i 's/\r//g' {} +"
+& wsl -d $Distro -u root -- bash -c "cd ~/phoenix-src && find . -type f \( -name '*.sh' -o -name 'Dockerfile*' -o -name '.env*' -o -name '*.conf' -o -name '*.yaml' -o -name '*.yml' -o -name '*.list' \) -exec sed -i 's/\r//g' {} +"
 if ($LASTEXITCODE -ne 0) { Write-Fail "行尾规整失败（WSL 内 find/sed 不可用？）" }
 
 # ── 5. WSL 内 bootstrap.sh 全链 ──

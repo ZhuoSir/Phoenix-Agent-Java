@@ -1,7 +1,9 @@
-# 行尾策略（BUG-143）
+# 行尾策略（BUG-143 / BUG-147）
 # 背景：Windows 工作树在 core.autocrlf=true（Git for Windows 默认）下检出为 CRLF，而对象
 # 库里存的是 LF。bootstrap.ps1 会把整棵源码树拷进 WSL 执行，CRLF 会让 bash 在
-# bootstrap.sh 第 13 行 `case "$1" in` 就崩（set: pipefail: invalid option name）。
+# bootstrap.sh 第 13 行 `case "$1" in` 就崩（set: pipefail: invalid option name）；
+# 对**数据文件**更隐蔽：mirrors.list 带 CRLF 时 token 尾部粘 \r，curl 对每个镜像源都返回
+# 000 ⇒ 探活全判死 ⇒ 打包段步骤 2/8 直接失败（BUG-147，实测复现）。
 # 故把「被 bash/Docker/Compose 消费的文本资产」钉死为 LF，任何平台检出结果一致；
 # 其余文件（Java/TS/SQL/Markdown 等，CRLF 无害）沿用 core.autocrlf 的默认行为。
 .gitattributes  text eol=lf
@@ -11,3 +13,4 @@ docker/*.yaml   text eol=lf
 docker/*.yml    text eol=lf
 .env*           text eol=lf
 *.conf          text eol=lf
+*.list          text eol=lf
