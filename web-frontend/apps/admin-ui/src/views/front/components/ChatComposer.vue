@@ -4,11 +4,23 @@ import { computed, nextTick, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useAgentStore, useChatStore } from '@phoenix/chat-shared';
 import { ElMessage, ElIcon, ElOption, ElSelect, ElTooltip } from 'element-plus';
-import { FolderOpened, ArrowDown, ArrowUp } from '@element-plus/icons-vue';
+import { FolderOpened, ArrowDown, ArrowUp, Paperclip, Close } from '@element-plus/icons-vue';
 
 import { getMySkillsApi } from '#/api/front/agent';
 
-import { setExplicitSkillIds } from '../api-transport';
+import { setExplicitSkillIds, setPendingAttachments } from '../api-transport';
+
+import type { ChatAttachmentMeta } from '@phoenix/chat-shared';
+import {
+  ATTACHMENT_MAX_FILES_PER_SEND,
+  attachmentCountMessage,
+  validateAttachmentsLocally,
+} from '@phoenix/chat-shared';
+import {
+  fetchAttachmentThumbUrlApi,
+  formatAttachmentSize,
+  uploadChatAttachmentsApi,
+} from '#/api/core/chatAttachment';
 import PresetQuestions from './PresetQuestions.vue';
 
 const presetCount = ref(0);
@@ -43,6 +55,103 @@ const hasPendingConfirm = computed(() => {
   const msgs = chat.messagesByS[sessionId] ?? [];
   return msgs.some((m: any) => m.messageType === 'harness-confirm');
 });
+
+// ===== T-07：对话附件（chat-attachment-understanding）=====
+/** 待发送附件草稿：**按会话分片**（L-20：切会话不串附件） */
+const attachmentDrafts = ref<Map<string, ChatAttachmentMeta[]>>(new Map());
+const attachmentInputRef = ref<HTMLInputElement | null>(null);
+const uploadingAttachments = ref(false);
+const thumbUrls = ref<Map<number, string>>(new Map());
+
+function currentDraft(): ChatAttachmentMeta[] {
+  const sid = activeSessionId.value;
+  return (sid && attachmentDrafts.value.get(sid)) || [];
+}
+
+function takeDraft(): ChatAttachmentMeta[] {
+  const list = currentDraft();
+  const sid = activeSessionId.value;
+  if (sid && list.length) {
+    const next = new Map(attachmentDrafts.value);
+    next.set(sid, []);
+    attachmentDrafts.value = next;
+  }
+  return list;
+}
+
+function pickAttachments() {
+  attachmentInputRef.value?.click();
+}
+
+async function loadThumb(att: ChatAttachmentMeta) {
+  if (att.kind !== "IMAGE" || thumbUrls.value.has(att.id)) return;
+  // 缩略图必须 fetch+blob（<img src> 带不了鉴权头 —— T-05 交接注记）
+  const url = await fetchAttachmentThumbUrlApi(att.id);
+  if (url) {
+    const next = new Map(thumbUrls.value);
+    next.set(att.id, url);
+    thumbUrls.value = next;
+  }
+}
+
+async function onAttachmentsPicked(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const files = [...(input.files || [])];
+  input.value = ''; // 允许再次选同一文件
+  if (!files.length) return;
+  // 会话可能尚未创建（composer 惰性建会话）：先建，避免附件无处归属
+  let sid = activeSessionId.value;
+  if (!sid) {
+    if (!activeAgent.value?.id) {
+      ElMessage.error('当前没有可用的智能体');
+      return;
+    }
+    try {
+      await chat.createSession(activeAgent.value.id);
+    } catch {
+      ElMessage.error('创建会话失败');
+      return;
+    }
+    sid = activeSessionId.value;
+  }
+  if (!sid) return;
+  const existed = attachmentDrafts.value.get(sid) || [];
+  if (existed.length + files.length > ATTACHMENT_MAX_FILES_PER_SEND) {
+    ElMessage.error(attachmentCountMessage(existed.length + files.length));
+    return;
+  }
+  // 前端即时反馈（后端仍做「扩展名 + 真实内容类型」双判定，R-01）
+  const checked = validateAttachmentsLocally(files);
+  for (const c of checked.filter((x) => x.reason)) {
+    ElMessage.error(`${c.file.name}：${c.reason}`);
+  }
+  const okFiles = checked.filter((x) => !x.reason).map((x) => x.file);
+  if (!okFiles.length) return;
+  uploadingAttachments.value = true;
+  try {
+    const res = await uploadChatAttachmentsApi(okFiles, sid);
+    // R-03：非法者逐个指明，不整批静默失败
+    for (const r of res.rejected) ElMessage.error(`${r.fileName}：${r.reason}`);
+    if (res.accepted.length) {
+      const next = new Map(attachmentDrafts.value);
+      next.set(sid, [...existed, ...res.accepted]);
+      attachmentDrafts.value = next;
+      for (const a of res.accepted) await loadThumb(a);
+    }
+  } catch (error: any) {
+    ElMessage.error(error?.message || '附件上传失败');
+  } finally {
+    uploadingAttachments.value = false;
+  }
+}
+
+function removeAttachment(id: number) {
+  const sid = activeSessionId.value;
+  if (!sid) return;
+  const next = new Map(attachmentDrafts.value);
+  next.set(sid, (next.get(sid) || []).filter((a) => a.id !== id));
+  attachmentDrafts.value = next;
+}
 
 const MIN_HEIGHT = 48;
 const MAX_HEIGHT = 200;
@@ -91,12 +200,17 @@ async function handlePresetQuestionClick(question: string) {
 
 async function handleSubmit() {
   const value = inputValue.value.trim();
-  if (!value) return;
+  if (!value) {
+    if (currentDraft().length) ElMessage.warning("请输入问题后再发送（已选附件会保留）");
+    return;
+  }
   if (isActiveSessionSending.value) return;
   if (hasPendingConfirm.value) return;
   inputValue.value = '';
   resize();
   // 显式技能仅对下一条消息生效（不持久）
+  // T-07：本轮附件随消息发送（transport 读取一次即清空）
+  setPendingAttachments(takeDraft());
   setExplicitSkillIds(selectedSkillIds.value);
   await chat.send(value);
   selectedSkillIds.value = [];
@@ -151,6 +265,25 @@ function handleKeydown(event: KeyboardEvent) {
           预设问题
         </button>
         <span class="composer__tb-spacer" />
+        <!-- T-07：附件上传（白名单/上限即时反馈，最终裁决在后端 R-01~R-04） -->
+        <input
+          ref="attachmentInputRef"
+          type="file"
+          multiple
+          style="display: none"
+          accept=".doc,.docx,.pdf,.xls,.xlsx,.txt,.md,.png,.jpg,.jpeg,.gif,.webp,.bmp"
+          @change="onAttachmentsPicked"
+        />
+        <button
+          type="button"
+          class="composer__tb-chip"
+          :disabled="uploadingAttachments"
+          title="上传附件：文档 word/pdf/excel/txt/md，图片 png/jpg/gif/webp/bmp；单个≤20MB，单次≤5个"
+          @click="pickAttachments"
+        >
+          <el-icon class="composer__tb-icon"><Paperclip /></el-icon>
+          {{ uploadingAttachments ? '上传中…' : '附件' }}
+        </button>
         <button
           type="button"
           class="composer__tb-chip composer__tb-chip--files"
@@ -162,6 +295,23 @@ function handleKeydown(event: KeyboardEvent) {
       </div>
       <div v-show="!presetCollapsed" class="composer__preset-body">
         <PresetQuestions @select="handlePresetQuestionClick" @loaded="presetCount = $event" />
+      </div>
+      <!-- T-07：待发送附件草稿（按会话分片，L-20） -->
+      <div v-if="currentDraft().length" class="composer__attachments">
+        <span
+          v-for="att in currentDraft()"
+          :key="att.id"
+          class="composer__att-chip"
+        >
+          <img
+            v-if="att.kind === 'IMAGE' && thumbUrls.get(att.id)"
+            :src="thumbUrls.get(att.id)"
+            class="composer__att-thumb"
+          />
+          <span class="composer__att-name">{{ att.fileName }}</span>
+          <span class="composer__att-size">{{ formatAttachmentSize(att.sizeBytes) }}</span>
+          <el-icon class="composer__att-x" @click="removeAttachment(att.id)"><Close /></el-icon>
+        </span>
       </div>
       <textarea
         ref="textareaRef"
@@ -416,5 +566,42 @@ function handleKeydown(event: KeyboardEvent) {
 .composer__tb-icon { font-size: 13px; }
 .composer__preset-body {
   padding: 10px 14px 2px;
+}
+
+/* T-07：附件草稿 chips */
+.composer__attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 10px 0;
+}
+.composer__att-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border: 1px solid var(--el-border-color, #dcdfe6);
+  border-radius: 14px;
+  background: var(--el-fill-color-light, #f7f8fa);
+  font-size: 12px;
+  max-width: 260px;
+}
+.composer__att-thumb {
+  width: 20px;
+  height: 20px;
+  object-fit: cover;
+  border-radius: 4px;
+}
+.composer__att-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.composer__att-size {
+  color: var(--el-text-color-secondary, #909399);
+}
+.composer__att-x {
+  cursor: pointer;
+  color: var(--el-text-color-secondary, #909399);
 }
 </style>

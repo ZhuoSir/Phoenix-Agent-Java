@@ -123,6 +123,9 @@ export interface FrontChatStreamRequest {
   content: string;
   agentSn: string;
   type: string;
+
+  /** 对话附件 id（chat-attachment-understanding T-07；可选，不传即后端短路） */
+  attachmentIds?: number[];
 }
 
 const API_BASE_URL = '/api';
@@ -245,6 +248,9 @@ export interface FrontHarnessChatRequest {
   harnessSn?: string;
   /** 显式执行的技能 id（R-09：不传=模型自主匹配） */
   enabledSkillIds?: number[];
+
+  /** 对话附件 id（chat-attachment-understanding T-07；可选，不传即后端短路） */
+  attachmentIds?: number[];
 }
 
 export interface FrontHarnessConfirmRequest {
