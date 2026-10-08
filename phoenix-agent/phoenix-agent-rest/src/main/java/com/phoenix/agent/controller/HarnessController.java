@@ -131,7 +131,9 @@ public class HarnessController {
                 .agentId(harnessRequest.getAgentId())
                 .enabledSkillIds(harnessRequest.getEnabledSkillIds())
                 .channel("admin")
-                .build();
+                
+                // T-06：转抄附件 id —— 不转抄则该入口静默丢附件（L-06 多入口枚举）
+                .attachmentIds(harnessRequest.getAttachmentIds()).build();
         return SseSupport.withHeartbeat(turnManager.openOrReject(harnessRequest.getSessionId(),
                 () -> harnessChatService.stream(request).map(HarnessEventMapper::toEventMap)));
     }

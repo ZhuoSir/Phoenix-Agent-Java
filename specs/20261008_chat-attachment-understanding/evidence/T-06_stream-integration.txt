@@ -1,0 +1,69 @@
+=== T-06 验证结论：两族发送链接入 + 两阶段图片理解 + 文档注入 + 降级显式告知 + S9 回填 ===
+日期: 2026-10-09 | 分支: feature/chat-attachment-understanding | 关联: R-05/R-06/R-07/R-10 | plan 决策2（两阶段·方案B）
+模型: CHAT=qwen3.8-flash(id7) / MULTIMODAL=qwen3.8-max(id13) | 智能体: BpmReactAgent(agentId=19)
+
+--- 实现（本轮新增/改动）---
+- HarnessRequest / ChatModelRequest：各加**可选** attachmentIds
+- ChatAttachmentAssembler（agent-core）：prepare() 空 ids 短路；逐个 requireAccessible 鉴权；文档就地抽取（复用 T-04）；
+  图片阶段1 = MULTIMODAL + ImageBlock/Base64Source 结构化理解；未配置/失败 ⇒ 降级+显式告知；全不可用 ⇒ 注入[附件状态]
+- HarnessChatServiceImpl：call×2 + doStream 插入 prepare；buildUserMessage 双重载（S8）
+- ReactAgentController / AgentChatController：return 包进 flatMapMany，用 assembler.enrich(content, ctx)
+  （streamCall 声明 checked Exception ⇒ lambda 内自带 try/catch 转 Flux.error）
+- **三处 HarnessRequest.builder() 补 attachmentIds 转抄**（HarnessController / FrontHarnessController / HarnessFrontController）
+  —— 原样不补则该三个入口**静默丢附件**（L-06 多入口枚举）；AgentManager:49 走 content 富化，无需转抄
+- ChatController.saveMessage：S9 副作用 bindAttachmentsIfPresent（无 attachmentIds 键 ⇒ 快路径零行为；畸形 ⇒ WARN 不影响保存）
+
+--- ① S1' 对面断言：**不带** attachmentIds 的既有调用（两族各一条）---
+  react 族   POST /api/admin/agent/chat      → 事件 18，内容「正常」✅
+  harness 族 POST /api/admin/harness/chat    → 事件 5， 内容「正常」✅
+--- ①b SSE 订阅端点未被改动 ---
+  git diff HEAD -- SessionEventController.java ⇒ **diff 行数 0** ✅（plan 承诺"不改它"）
+
+--- ③ 含图请求（阶段1 → R-06 端到端）---
+  上传 /tmp/t06_code.png（图内独特编码 IMG-7391-KQ，Pillow 生成）→ attachmentIds=[28]
+  提问「附件图片里那串大写编码是什么？只回答编码本身。」
+  → 事件 31，回答 **IMG-7391-KQ** ✅（阶段1 视觉理解结果成功流入 agent 回答）
+  恢复态复验（降级测试后）：再次提问 → 回答 **IMG-7391-KQ** ✅（环境未留在降级态）
+
+--- ④ 含文档请求（**T-04 遗留的端到端断言在此补齐**）---
+  上传 sample.docx（内含"合同编号 HT-2026-4821，金额 137000 元"）→ attachmentIds=[29]
+  提问「附件文档里的合同编号和金额分别是什么？」
+  → 事件 36，回答「合同编号是 **HT-2026-4821**，金额是 **137000 元**。」✅ 两项均命中（R-05）
+
+--- ⑤ 降级（R-07）：MULTIMODAL 真正不可用时 ---
+  **首轮测错（如实记）**：只把 id=13 的 is_default 置 false ⇒ `getDefaultConfigByType` 存在
+  "无默认则回落该类型启用集合首条"的既有逻辑，行仍 is_active=true ⇒ 阶段1 照跑，**未进降级分支**（我的测试方法错，非产品缺陷）。
+  重做：`is_default=false 且 is_active=false` + 触发配置变更事件（deactivate/activate id=6 → 监听器 refreshMultimodal 清缓存）
+  → 事件 145，回答原文摘录：
+    「很抱歉，我**无法查看该附件图片的内容**。**不可用原因说明：** 附件《t06_code.png》未被成功理解，
+      当前会话中**多模态（图片识别）模型不可用**，我只能基于您输入的文本内容进行作答。
+      因此图片里那串大写编码我**看不到**，为避免误导，我**不会猜测或编造**它的值。」
+  断言：含降级告知 ✅ | 未编造图中编码（不含 7391）✅
+--- ⑤-2 R-07 边界：只发图片、无文本可答 ---
+  提问「图里是什么？」→ 事件 106，回答「抱歉，我无法查看图片内容…**不会被理解**…我**不会编造任何信息**」
+  断言：明确说明无法理解 ✅ | 未编造 ✅
+
+--- ⑤b S9：saveMessage 副作用回填 message_id（R-10）---
+  POST /api/sessions/{sid}/messages  metadata={"attachmentIds":[28,29]} → HTTP 200 success=true messageId=4418
+  DB 回填：`28→4418, 29→4418` ✅
+  **对面断言**：metadata={"foo":1}（不含 attachmentIds）→ HTTP 200 success=true，附件绑定**前后完全一致** ✅
+  **畸形容错**：metadata={"attachmentIds":"oops"} → HTTP 200 success=true（消息仍保存，**未 500**）✅
+
+--- ⑥ S6：旧消息（metadata 无新键/为 NULL）兼容 ---
+  库中原无 metadata 为空的消息 ⇒ 造一条 metadata=NULL 的"旧消息"后读取：
+  GET /api/sessions/{sid}/messages → HTTP 200 success=true 条数=1 首条 metadata=None ✅（不报错、不 NPE）
+
+--- ⑦ 复原基线（L-60）---
+  附件行 0 / chat-attachments 残留文件 0 / t06* 会话 0 / t06* 消息 0；
+  MULTIMODAL 终态 **is_active=true, is_default=true**（未把环境留在降级态）✅
+
+--- ⑧ 观察与未验证项（如实报，不虚报）---
+  1) **视觉模型轮次间波动**：同一张图，③ 与恢复态复验均**精确**读出 IMG-7391-KQ；
+     但首轮⑤（当时阶段1 仍在跑）曾读出错误编码 `IMG-731206261737903104`。⇒ 多模态识别存在**非确定性**，
+     已作为风险记录（plan 风险表"描述瓶颈"同源）；不是本次改动引入的缺陷，但**影响 R-06 的可重复性**，需在 T-09 汇总时向用户明示。
+  2) **S8 身份②（skillScopeHint 末尾拼接）仅代码审查**，未做运行时断言 —— 该身份只在**前台通道**
+     （FrontHarnessController + frontSkillAccessService.buildScopeHint）触发，需前台账号与会话环境；
+     代码上顺序为「用户原文 → 附件材料 → [平台约束]」，约束仍在末尾。**不声称已运行时验证**。
+  3) **告知写入消息 metadata 由前端负责（T-07）**：本轮已证"当次回答内用户可见"（R-07 主口径）与
+     "后端能按 metadata.attachmentIds 回填"；**历史回看仍见标注**需 T-07 前端写 metadata 后才成立。
+  4) 前端未构建 ⇒ 管理页/对话页 UI 尚无上传入口；本任务全部为 **API 级**验证。

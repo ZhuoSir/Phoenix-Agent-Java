@@ -42,6 +42,16 @@ public class ChatController {
 
     private final ReportTemplateUtil reportTemplateUtil;
 
+    /** T-06（共享面 S9）：附件↔消息绑定 */
+    private final com.phoenix.data.service.chat.ChatAttachmentService chatAttachmentService;
+
+    /** T-06：超管判定复用 R-08/R-17/R-18 同一守卫（单一口径） */
+    private final com.phoenix.data.component.AdminRoleGuard adminRoleGuard;
+
+    /** metadata 解析用（复用实例，避免每次新建） */
+    private static final com.fasterxml.jackson.databind.ObjectMapper METADATA_MAPPER =
+            new com.fasterxml.jackson.databind.ObjectMapper();
+
     /**
      * Get session list for an agent
      */
@@ -109,6 +119,10 @@ public class ChatController {
 
             ChatMessage savedMessage = chatMessageService.saveMessage(message);
 
+            // T-06（共享面 S9）：metadata 含 attachmentIds 时回填附件 message_id（R-10）。
+            // **不含该键 ⇒ 快路径直接返回，既有行为逐字节不变**；解析失败仅 WARN，不得影响消息保存。
+            bindAttachmentsIfPresent(request.getMetadata(), savedMessage);
+
             // Update session activity time
             chatSessionService.updateSessionTime(sessionId);
 
@@ -120,6 +134,45 @@ public class ChatController {
         } catch (Exception e) {
             log.error("Save message error for session {}: {}", sessionId, e.getMessage(), e);
             return ReturnVo.error(e.getMessage());
+        }
+    }
+
+    /**
+     * T-06（S9）：按 metadata.attachmentIds 把附件绑定到刚保存的消息（回填 message_id）。
+     *
+     * <p>纪律：① metadata 不含该键 ⇒ **零额外行为**（既有四种身份不受影响）；
+     * ② 任何解析/绑定异常 ⇒ 仅 WARN，**消息保存不受影响**（不 500）；
+     * ③ 只能绑定属于本人（或超管）的附件 —— 由 service 侧校验，防把他人附件挂到自己消息上。
+     */
+    private void bindAttachmentsIfPresent(String metadata, ChatMessage savedMessage) {
+        if (!StringUtils.hasText(metadata) || savedMessage == null || savedMessage.getId() == null) {
+            return;
+        }
+        if (!metadata.contains("attachmentIds")) {
+            return;
+        }
+        try {
+            com.fasterxml.jackson.databind.JsonNode node = METADATA_MAPPER.readTree(metadata).get("attachmentIds");
+            if (node == null || !node.isArray() || node.isEmpty()) {
+                return;
+            }
+            java.util.List<Long> ids = new java.util.ArrayList<>();
+            node.forEach(n -> {
+                if (n.canConvertToLong()) {
+                    ids.add(n.asLong());
+                }
+            });
+            if (ids.isEmpty()) {
+                return;
+            }
+            String viewer = StpUtil.getLoginIdAsString();
+            boolean superAdmin = adminRoleGuard.isAdmin(viewer);
+            int bound = chatAttachmentService.bindToMessage(ids, savedMessage.getId(), viewer, superAdmin);
+            log.info("附件已绑定到消息: messageId={}, 请求 {} 个, 实际回填 {} 个", savedMessage.getId(), ids.size(), bound);
+        }
+        catch (Exception e) {
+            log.warn("解析 metadata.attachmentIds 失败（消息已保存，忽略绑定）: messageId={}, reason={}",
+                    savedMessage.getId(), e.getMessage());
         }
     }
 
