@@ -660,6 +660,17 @@
 - **复发**：×1（本次打包段步骤 2/8 误诊）
 - **关联**：BUG-147（真因=CRLF）、L-69（CRLF 家族）、L-02、L-37、`docker/scripts/lib/common.sh:phx_mirror_pick`、`docker/scripts/mirrors.list`
 
+## L-75 「构建成功」≠「改动已包含」——脚本化改文件后必须 grep 断言落盘再构建
+- **现象**：用 python heredoc 批量改 Java 白名单时，脚本本身 `SyntaxError`（跨行单引号串）**修改未落盘**；
+  紧接着 `mvn package` 仍 **exit=0**（因为源码没变、当然能编译），我差点把这版"旧行为"当新实现去部署验证。
+  同轮还有一个同源假信号：验证落盘文件时按 `uploads/chat-attachments` 查得 0 个文件，
+  而真实存储根是 `uploads/data-agent/`（avatar 的返回 url 早就暴露了该前缀）⇒ "文件没落盘"是**我查错路径**。
+- **防再犯规则**：① 任何**脚本化/批量**改文件后，构建前必须 `grep` 断言目标字符串**已出现**（并打印命中次数）；
+  ② 编译/打包 exit=0 只证明"能编译"，**不证明改动在里面**——两者要分开断言；
+  ③ 断言"文件/产物不存在"之前，先用**已知存在的同类产物**（如 avatar 的 url）反推真实路径，
+  否则"查不到"很可能只是查错地方（与 L-45 全称否定须复核同源）；
+  ④ python heredoc 里避免跨行单引号串；多行替换用三引号或改用 edit 工具。
+
 ## L-74 改「配置类」数据前必须先读**选取代码**，且改完要确认运行时缓存/启动期实例
 - **现象**：线上对话打到余额不足的 deepseek。我按常识把可用行设成 `is_default=true` 并重启，**对话依旧 402**——
   因为图工作流走的是 `selectActiveByType`（`is_active=true LIMIT 1`，**无 ORDER BY、不看 is_default**），
