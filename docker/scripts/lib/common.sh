@@ -49,18 +49,24 @@ phx_fail() { # phx_fail <n> <total> <原因...> —— 唯一失败出口（L-02
 }
 
 # ---------- mirror 竞速探活（R-02；L-09：-m 8 且以 HTTP 响应码判活，401 也算活） ----------
+# 抗抖动（BUG-147）：网络瞬时抖动时整轮候选会同时判死（实测三个源在同一秒内全死、
+# 数分钟后复测全部 200/401）⇒ 整轮重试 2 遍（间隔 3s）再放弃。
 phx_mirror_pick() { # phx_mirror_pick <候选前缀...> → stdout=首个活口；全死返回 1
-  local m code
-  for m in "$@"; do
-    [ -z "$m" ] && continue
-    # curl 连接失败时 -w 自会输出 000——不可再 || echo 000（会拼接成 000000 骗过判活，selftest 抓获的真 bug）
-    code=$(curl -s -m 8 -o /dev/null -w '%{http_code}' "$m/v2/" 2>>"$PHX_LOG_FILE" || true)
-    if [ -n "$code" ] && [ "$code" != "000" ]; then
-      phx_log INFO "mirror 选定: $m (HTTP $code)"
-      echo "$m"
-      return 0
-    fi
-    phx_log WARN "mirror 不可达: $m"
+  local m code attempt=1
+  while [ "$attempt" -le 2 ]; do
+    for m in "$@"; do
+      [ -z "$m" ] && continue
+      # curl 连接失败时 -w 自会输出 000——不可再 || echo 000（会拼接成 000000 骗过判活，selftest 抓获的真 bug）
+      code=$(curl -s -m 8 -o /dev/null -w '%{http_code}' "$m/v2/" 2>>"$PHX_LOG_FILE" || true)
+      if [ -n "$code" ] && [ "$code" != "000" ]; then
+        phx_log INFO "mirror 选定: $m (HTTP $code)"
+        echo "$m"
+        return 0
+      fi
+      phx_log WARN "mirror 不可达: $m（第 $attempt/2 轮）"
+    done
+    [ "$attempt" -lt 2 ] && sleep 3
+    attempt=$((attempt+1))
   done
   return 1
 }

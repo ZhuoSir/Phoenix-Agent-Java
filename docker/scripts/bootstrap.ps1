@@ -1,6 +1,6 @@
 ﻿<#
 Phoenix 一键 bootstrap · Windows 版（R-10/T-11）
-用法: 管理员 PowerShell，在源码目录执行  .\docker\scripts\bootstrap.ps1 [-Version v] [-Project phoenix] [-Port 0] [-Distro Ubuntu-22.04] [-Offline]
+用法: 管理员 PowerShell，在源码目录执行  .\docker\scripts\bootstrap.ps1 [-Version v] [-Project phoenix] [-Port 0] [-Distro Ubuntu-22.04] [-Mirror <源前缀>] [-Offline]
 流程: 管理员检查 → Windows 原生引擎拒绝(L-12) → WSL2 就绪(功能启用/重启续接/-Distro 兼容 --import 自定义名)
       → 源码拷入 WSL → bootstrap.sh(引擎/打包/安装/收据) → Windows 侧收据
 退出码: 0=成功  1=失败  2=需重启后重跑
@@ -12,6 +12,7 @@ param(
   [int]$Port = 0,
   [int]$Timeout = 300,
   [string]$Distro = "Ubuntu-22.04",
+  [string]$Mirror = "",
   [switch]$Offline
 )
 $ErrorActionPreference = "Stop"
@@ -91,6 +92,7 @@ if ($LASTEXITCODE -ne 0) { Write-Fail "行尾规整失败（WSL 内 find/sed 不
 $bsArgs = "--project $Project --timeout $Timeout"
 if ($Version) { $bsArgs += " --version $Version" }
 if ($Port -gt 0) { $bsArgs += " --port $Port" }
+if ($Mirror) { $bsArgs += " --mirror $Mirror" }
 if ($Offline) { $bsArgs += " --offline" }
 Write-Step "WSL 内启动 bootstrap 全链（引擎→打包→安装，首次约 40-70 分钟）..."
 & wsl -d $Distro -u root -- bash -c "cd ~/phoenix-src && bash docker/scripts/bootstrap.sh $bsArgs"

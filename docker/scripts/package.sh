@@ -71,7 +71,7 @@ if true; then
   else
     CANDS=$(grep -v '^#' "$HERE/mirrors.list" | grep -v '^[[:space:]]*$' | tr '\n' ' ')
     # shellcheck disable=SC2086
-    MP=$(phx_mirror_pick $CANDS) || phx_fail 2 $TOTAL "候选 mirror 全不可达（mirrors.list）；可 --mirror 手工指定或 --overseas"
+    MP=$(phx_mirror_pick $CANDS) || phx_fail 2 $TOTAL "候选 mirror 全不可达（已重试 2 轮，见 mirrors.list）——多为瞬时网络抖动：直接重跑本脚本即可（昂贵步骤会跳过）；仍失败用 --mirror <源> 手工指定，或 --overseas"
     mph_from "$MP"
   fi
 fi
