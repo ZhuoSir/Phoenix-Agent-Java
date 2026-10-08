@@ -660,6 +660,17 @@
 - **复发**：×1（本次打包段步骤 2/8 误诊）
 - **关联**：BUG-147（真因=CRLF）、L-69（CRLF 家族）、L-02、L-37、`docker/scripts/lib/common.sh:phx_mirror_pick`、`docker/scripts/mirrors.list`
 
+## L-74 改「配置类」数据前必须先读**选取代码**，且改完要确认运行时缓存/启动期实例
+- **现象**：线上对话打到余额不足的 deepseek。我按常识把可用行设成 `is_default=true` 并重启，**对话依旧 402**——
+  因为图工作流走的是 `selectActiveByType`（`is_active=true LIMIT 1`，**无 ORDER BY、不看 is_default**），
+  与 `HarnessModelRegistry` 的 `selectDefaultByType` 语义不一致（BUG-152）。真正生效的动作是**停用那条死行**。
+  另一次弯路：同事务里先设新默认再摘旧默认 ⇒ 撞部分唯一索引 `uk_dmc_type_default`（每类型一个默认），整事务回滚。
+- **防再犯规则**：① 改配置数据前先 grep **谁在读它、按什么条件读**（`is_default`? `is_active`? LIMIT 1 有无 ORDER BY?），
+  别按字段名的常识推断；② 改完确认**运行时是否缓存/启动期实例化**（本项目模型配置有 epoch 缓存、
+  图工作流 ChatModel 启动期创建 ⇒ 必须重启或触发 bump）；③ 验证只认**端到端真实调用**（对话返回真内容），
+  配置回显不算证据；④ 涉及"每类型唯一默认"这类**部分唯一索引**时，单事务内**先摘旧再设新**；
+  ⑤ 运维绕行（停用死行）与代码缺陷（选取语义不一致）**分开记账**：绕行入证据、缺陷登 BUG，不混为一谈。
+
 ## L-73 `docker pull` 报 DONE ≠ blob 完整——`short read` 先做**字节数对账**，别先怀疑磁盘/daemon
 - **分类**：验证盲区（供应链完整性）
 - **触发场景**：容器构建死于 `failed to compute cache key: short read: expected N bytes but got 0: unexpected EOF`；或经第三方镜像源拉取的基础镜像首次投入构建
