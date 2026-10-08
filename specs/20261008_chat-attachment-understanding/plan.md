@@ -134,6 +134,7 @@ CREATE INDEX IF NOT EXISTS idx_chat_attachment_message  ON tbl_data_chat_attachm
 
 - **事实纠正（v1.1.0 的前提是错的）**：`GET /api/agent/{agentId}/sessions/stream`（`SessionEventController.streamSessionUpdates`）
   **只是 SSE 事件订阅**，不是发送端点；真正的运行端点**全是 POST**：
+
   | 端 | 运行端点 | 后端 | 入参 DTO |
   |---|---|---|---|
   | admin-ui | `/api/admin/harness/chat` | HarnessController | `HarnessRequest` |
