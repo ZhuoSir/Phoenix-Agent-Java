@@ -323,7 +323,17 @@
 - **触发场景**：仓库交付的 `.ps1` 含中文；在中文 Windows（系统 ACP=936）用 Windows PowerShell 5.1 运行
 - **现象**：`.\bootstrap.ps1` 直接抛 ParseException（`<` 保留运算符 / `&&` 非法语句分隔符 / 缺 `}`），且报错行里的中文是 `涓嬭浇鍚?` 这类乱码。第一反应容易往"用户命令打错 / 路径不对 / 脚本本身有语法错"上找——实际是 UTF-8 中文字节把**后面的 ASCII 引号吞掉**，双引号字符串永不闭合 → 吞掉后续行 → 连锁报错。
 - **根因**：PS 5.1 对**无 BOM** 的 .ps1 按系统 ANSI 代码页解码（本机 ACP=936 即 GBK），PS 7 才默认 UTF-8；英文 Windows(CP1252) 下同样内容只是乱码不致错 ⇒ **该缺陷只在中文环境致命**，最容易被"我这儿能跑"掩盖。
-- **防再犯规则**：① 仓库内 `.ps1` **一律 UTF-8 带 BOM**（正文一个字节不动、只加 3 字节，PS 5.1/7 双兼容）；② 判断"脚本能不能跑"用 `[System.Management.Automation.Language.Parser]::ParseFile($path,[ref]$null,[ref]$errs)` **数错误**，不要靠肉眼看文件——读工具与编辑器会自动认 UTF-8，看不出问题；③ 用户报"某 .ps1 语法错误"时，先查 BOM 与系统 ACP（`(Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Nls\CodePage').ACP`），再谈命令对不对。
+- **防再犯规则**：① 仓库内 `.ps1` **一律 UTF-8 带 BOM**（正文一个字节不动、只加 3 字节，PS 5.1/7 双兼容）；② **每次用编辑工具写回 `.ps1` 后都要复查 BOM**——本次 `edit` 工具写回 `bootstrap.ps1` 就把 BOM 抹掉了，解析错误立刻从 0 回到 4 个（`ReadAllBytes` 看前三字节是否 `EF BB BF`）；③ 判断"脚本能不能跑"用 `[System.Management.Automation.Language.Parser]::ParseFile($path,[ref]$null,[ref]$errs)` **数错误**，不要靠肉眼看文件——读工具与编辑器会自动认 UTF-8，看不出问题；④ 用户报"某 .ps1 语法错误"时，先查 BOM 与系统 ACP（`(Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Nls\CodePage').ACP`），再谈命令对不对。
 - **状态**：active
-- **复发**：×1（本次 bootstrap.ps1 / install.ps1 安装入口不可用）
+- **复发**：×2（安装入口不可用 1 次；编辑工具抹 BOM 致复发 1 次）
 - **关联**：BUG-142、`docker/scripts/*.ps1`。**现场验证**：补 BOM 后用户 2026-10-08 13:55 实跑，脚本越过解析进入 WSL 就绪段（exit 2 待重启）
+
+## L-69 「Windows 工作树」不等于「Linux 检出」——autocrlf 的 CRLF 会从入口脚本一路带进容器
+- **分类**：工具链（跨平台）
+- **触发场景**：把 Windows 上的工作树整棵交给 Linux 消费——`cp` 进 WSL、挂进容器、打成 tar 再解包执行
+- **现象**：WSL 内 `bootstrap.sh` 起手即崩：`set: pipefail: invalid option name`、`$'\r': command not found`、`syntax error near $'in\r'`（第 7/10/13 行）。第一反应容易怀疑"脚本逻辑 / 权限 / 路径 / WSL 坏了"，实际是每行结尾多了个 `\r`。
+- **根因**：Git for Windows 默认 `core.autocrlf=true`（本机系统级 gitconfig 实测 true）⇒ **工作树 CRLF、对象库 LF**；只要把工作树整棵搬到 Linux，`\r` 就跟着走。同一份代码在作者机器（mac/Linux 或 `autocrlf=false`）完全正常，故属"只在 Windows 复现"的隐性交付缺陷。
+- **防再犯规则**：① 会被跨 OS 消费的文本资产用 `.gitattributes` **钉死 `eol=lf`**，不要指望检出配置（`*.sh`/`Dockerfile*`/`.env*`/`*.conf`/`*.yaml`）；② 入口脚本要"自我规整"时，**必须选在被消费代码之前执行的那一层**——本例 `bootstrap.sh` 第 13 行就崩，自愈代码写进它等于没写，只能放 Windows 侧（`bootstrap.ps1` 拷贝后、起 bash 前）；③ 取证口诀：`git cat-file -s <rev>:<path>` 与工作树字节数一比，**差值 ≈ 行数就是 CR 差**（本例 4347−4272=75）；④ 规整时按扩展名挑文件（`find … -name '*.sh' … -exec sed -i 's/\r//g'`），**禁止整树 sed**（会毁二进制资产）
+- **状态**：active
+- **复发**：×1（本次 bootstrap.ps1 Windows 全链）
+- **关联**：BUG-143、`docker/scripts/bootstrap.ps1`、根 `.gitattributes`
