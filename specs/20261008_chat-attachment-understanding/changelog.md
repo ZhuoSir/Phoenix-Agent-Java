@@ -1,5 +1,19 @@
 # Changelog: chat-attachment-understanding
 
+## Implement 阻塞（2026-10-08）：T-01 探针未通过 ⇒ 按 plan 停工回报
+
+- **T-01 未通过**：`qwen-vl-max` 真实带 `image_url` 调用 → **HTTP 400 `Arrearage`**（阿里云百炼账号欠费/状态异常）。
+  失败原因**不是**模型名、不是 provider 不支持多模态、不是本需求代码（尚未写任何生产代码）。
+- **影响面诊断**：既有 **默认 CHAT（deepseek）HTTP 402 Insufficient Balance**、qwen CHAT 400 Arrearage
+  ⇒ **当前环境所有 CHAT/多模态链路不可用**；embedding 链路**正常**（/v1/embeddings → 200，1024 维）。
+- **自我纠错留痕**：首次用 `/v1/chat/completions` 探 embedding 模型得到 404 `model_not_supported`，
+  属**探错端点**的假信号；按 L-45/L-37 复核后撤销，**未登记假 BUG**。
+- **按 tasks 依赖图判定**：T-01/T-03/T-06/T-09 阻塞，T-04 验证阻塞（代码可写但**不得声称验证通过**，铁律 5）；
+  **T-02/T-05/T-07/T-08 不依赖模型**（若用户授权可先做，属对 plan「探针为阻塞前置」的偏离，需明确同意并留账）。
+- **未勾选任何任务**；证据 `evidence/T-01_multimodal-probe.txt`（含 request_id、三条链路诊断、解除条件 A/B/C）。
+- 密钥全程仅脚本内读取，**未落盘未打印**。
+
+
 ## v1.0.0 tasks 确认③ 通过 ⇒ **三重确认门达成**（2026-10-08）
 
 - **确认③**：tasks **v1.0.0 已确认**，确认人 **陈卓**
