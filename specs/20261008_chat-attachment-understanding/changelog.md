@@ -1,5 +1,22 @@
 # Changelog: chat-attachment-understanding
 
+## v1.4.0（2026-10-09）**待重确认** —— 铁律 6：消息由前端落库 ⇒ metadata/回填改经既有 saveMessage 副作用
+
+- **停编码**：T-06 仍未写任何生产代码
+- **查实事实**：agent 侧**不写消息表**；消息由前端 `saveMessageApi` 落库
+  （`components/run/index.vue:637` 用户消息、`:698/:713` 助手消息）⇒ 后端拿不到 message id，
+  原 T-06 验收里「`metadata.attachmentNotice` 落库」「附件回填 `message_id`」两条**无法只靠后端达成**
+- **方案（不新增端点）**：扩展既有 `POST /api/sessions/{sessionId}/messages` —— 前端把 `attachmentIds` 与告知写入
+  `metadata`，后端 `saveMessage` 见该键即回填附件 `message_id`；**不含该键时行为逐字节不变**
+- **新增共享面 S9**：`ChatController.saveMessage` 的四个既有身份（保存用户消息 / 保存助手消息 /
+  `titleNeeded` 触发标题生成 / 每次更新会话时间）逐一列出变更后预期；metadata 畸形不得影响消息保存（降级 WARN，不 500）
+- **新增 plan 小节「T-06 / T-07 责任边界」**：R-07/R-08 告知的「当次用户可见」由 T-06 写进回答内容；
+  「历史回看仍可见」由前端写 metadata + 后端回填共同达成；缩略图必须 fetch+blob（不支持 `?token=`）
+- **T-06 可独立验证**：直接以带 `attachmentIds` 的 metadata 调既有端点即可断言回填，**不依赖 T-07 完成**
+- 影响文档：plan（接口表 / S9 / 数据流 / 分工小节）、tasks（T-06 ⑤b·⑦、T-07 ④⑤⑥）；**requirements 不变**
+- 状态：plan/tasks **v1.4.0 待重确认**（确认② 重走）；三重门暂不齐 ⇒ 继续禁止写生产代码
+
+
 ## v1.3.0 确认② 重走通过（2026-10-09）⇒ 三重门恢复齐全
 
 - 确认人 **陈卓**（用户选定「确认通过（确认人：陈卓）」）；plan **v1.3.0 已确认** / tasks **v1.3.0 已确认**

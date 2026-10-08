@@ -1,4 +1,4 @@
-> 版本: v1.3.0 | 状态: 已确认 | 确认人: 陈卓 | 确认日期: 2026-10-09 | 确认记录: 铁律6 回改后**重走确认②**，用户 2026-10-09 选定「确认通过（确认人：陈卓）」（决策2 两阶段方案 B）| 前次确认: v1.2.0（陈卓 2026-10-09）
+> 版本: v1.4.0 | 状态: **待重确认** | 更新: 2026-10-09 | 变更源: 查实**消息由前端落库**（agent 侧不写消息表）⇒ metadata 标注与 message_id 回填须经既有 `POST /api/sessions/{sid}/messages` 副作用完成；新增共享面 S9、明确 T-06/T-07 分工（铁律 6：停编码→回改文档→重走确认②）| 前次确认: v1.3.0（陈卓 2026-10-09）
 
 # 技术方案：chat-attachment-understanding（对话附件上传与大模型理解）
 
@@ -68,6 +68,8 @@
                → 阶段2: 描述+文档文本+提示词 进 agent 循环（技能/工具/记忆/工作区保留）
          无 MULTIMODAL → 降级 + 显式告知(R-07) → 标注写 metadata
           ↓ SSE 流式返回；消息落 tbl_data_chat_message(content + metadata 标注)；附件回填 message_id
+[落库] 前端 POST /api/sessions/{sid}/messages（metadata 带 attachmentIds + 告知）
+          → 后端回填附件 message_id（S9；无该键则行为不变）
 [历史] 打开会话 → 消息带 attachments 元信息 → 缩略图/文件名 → 点击经鉴权端点取原件
 ```
 
@@ -81,6 +83,7 @@
 | POST | `/api/admin/harness/chat`、`/front/stream/chat`、`/platform/harness/chat`、`/api/front/harness/chat`、`/api/front/stream/chat` | `HarnessRequest` **新增可选** `attachmentIds`（数量上限同 R-04） | SSE（事件序列不变） | 收敛点 `HarnessChatService` 统一处理；**不传时行为完全不变**（矩阵 S1'） |
 | POST | `/api/admin/agent/chat` | `ChatModelRequest` **新增可选** `attachmentIds` | SSE（不变） | 收敛点 `AgentManager.streamCall`；不传时行为不变 |
 | GET | `/api/agent/{agentId}/sessions/stream` | **不改**（v1.1.0 曾计划改，已作废） | SSE | 纯事件订阅，与附件无关 |
+| POST | `/api/sessions/{sessionId}/messages`（**既有端点，新增副作用**） | `metadata` 内可含 `attachmentIds`（数组）与告知文案键 | 原信封不变 | T-06：解析 `metadata.attachmentIds` ⇒ 回填附件 `message_id`（R-10 附件↔消息）；**不含该键时行为逐字节不变**（矩阵 S9）。前端（T-07）负责把 `attachmentIds` 与降级/截断告知写入 `metadata` |
 
 错误语义：白名单外/超限/解析失败（加密、损坏、无文本层）= **业务失败 + 原因类别**（R-03/R-04/R-09，不是 500）；MULTIMODAL 不可用 = **正常流式返回但含显式降级告知**（R-07，不是错误）。
 
@@ -128,8 +131,21 @@ CREATE INDEX IF NOT EXISTS idx_chat_attachment_message  ON tbl_data_chat_attachm
 | **S4** `FileStorageService.storeFile(file, subPath)` | 既有调用方 `/api/upload/avatar`（image-only，subPath=avatars）等 | 新 subPath `chat-attachments` **不影响** avatar 上传/读取；目录互不覆盖 | T-02 |
 | **S5** `chat-shared` 的 `ChatMessage` 类型 + `useChatSession` + mocks | **两端共用**（admin-ui、mobile-ui），mocks 亦实现该类型 | `attachments` 为**可选字段**；两端 + mocks 的 typecheck **增量错误 0**（L-32）；旧路径不变 | T-07 |
 | **S6** `tbl_data_chat_message.metadata` | 既有写入/读取方（jsonb→String 映射，先例见 `McpServerInfo` 注释） | 仅**新增键**（`attachmentNotice`/`truncated`），不改既有键语义；旧消息（无该键）渲染不报错 | T-06 |
+| **S9** `POST /api/sessions/{sessionId}/messages`（`ChatController.saveMessage`） | 既有身份：① 前端保存**用户**消息（`components/run/index.vue:637`）；② 前端保存**助手**消息（同文件 :698/:713）；③ `titleNeeded=true` 时触发 `sessionTitleService.scheduleTitleGeneration`；④ 每次调用 `chatSessionService.updateSessionTime` | `metadata` **不含** `attachmentIds` 时①~④ 行为完全不变；含该键时**额外**回填附件 `message_id`（幂等：重复保存不产生重复回填）；解析失败不得影响消息保存本身（降级为忽略 + WARN） | T-06 |
 | **S8** `HarnessChatServiceImpl.buildUserMessage` | 既有身份：① 无附件纯文本 `new UserMessage(message)`；② 带 `skillScopeHint` 时拼接「[平台约束] …」于**末尾**（R-09 风险①缓解） | 无附件时**逐字节不变**（两种既有身份都保留）；有附件时按「文档文本 + 图片描述 + 约束 + 用户原文」顺序组装，约束仍在末尾 | T-06 |
 | **S7** 路由命名 `/api/chat/attachment` | 与既有 `/api/upload/avatar`、`/api/skill/upload`、`AgentKnowledgeController` 上传**并存** | 不与既有路由冲突；`/api/**` 鉴权链覆盖；**不复用** avatar 端点（避免稀释其 image-only 语义） | T-02 |
+
+## T-06 / T-07 责任边界（v1.4.0 明确）
+
+| 事项 | T-06（后端） | T-07/T-08（前端） |
+|---|---|---|
+| 附件解析/鉴权/文档文本注入/图片阶段1 理解 | ✅ 装配器 + 两族发送链接入 | — |
+| R-07 降级告知、R-08 截断告知「**用户可见**」 | ✅ 写进回答内容（当次即可见） | 原样展示 |
+| 告知与 `attachmentIds` 写入消息 `metadata`（历史回看仍可见） | ✅ `saveMessage` 副作用：按 `metadata.attachmentIds` 回填 `message_id` | ✅ 保存消息时写入 `metadata`（否则历史丢标注） |
+| 缩略图加载 | ✅ 提供受鉴权端点（T-05 已完成） | ✅ 必须 **fetch + blob URL**（`<img src>` 带不了鉴权头；刻意不支持 `?token=`） |
+
+> T-06 可**独立验证** metadata/回填链路：直接以 `metadata={"attachmentIds":[…]}` 调既有 saveMessage 端点（模拟前端），
+> 断言附件行 `message_id` 被回填；不依赖 T-07 完成。
 
 ## 关键决策
 
