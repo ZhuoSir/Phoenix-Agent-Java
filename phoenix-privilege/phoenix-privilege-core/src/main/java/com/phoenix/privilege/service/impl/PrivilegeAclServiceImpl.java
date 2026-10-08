@@ -32,6 +32,14 @@ public class PrivilegeAclServiceImpl extends ServiceImpl<PrivilegeAclMapper, Pri
 	@Autowired
 	private IPrivilegeUserRoleService privilegeUserRoleService;
 
+	/**
+	 * ACL 的 release_sn 是**释放类型**（本系统恒为 'role'，即"授权给某角色"），
+	 * 与 saveAllAcl / buildUserAclMap / getRoleAcls 的过滤口径一致。
+	 * BUG-138：不可信任 DTO 传入值（前端曾传角色的业务 sn 如 'COMMON'/'ROLE_ADMIN'，
+	 * 导致登录菜单按 release_sn='role' 过滤时漏掉这些授权行）。
+	 */
+	private static final String RELEASE_SN_ROLE = "role";
+
 	@Override
 	public void deleteAclByReleaseId(String releaseId) {
 		this.remove(QueryChain.of(this.mapper).eq(PrivilegeAcl::getReleaseId, releaseId));
@@ -101,11 +109,14 @@ public class PrivilegeAclServiceImpl extends ServiceImpl<PrivilegeAclMapper, Pri
 			privilegeAcl.setModuleId(module.getId());
 			privilegeAcl.setAclState(dto.getAclState());
 			privilegeAcl.setModuleSn(module.getSn());
-			privilegeAcl.setReleaseSn(dto.getReleaseSn());
+			// BUG-138：release_sn 恒为类型值 'role'（不信任 DTO，与 saveAllAcl 一致）
+			privilegeAcl.setReleaseSn(RELEASE_SN_ROLE);
 			save(privilegeAcl);
 		}
 		else {
 			acl.setAclState(dto.getAclState());
+			// BUG-138：存量错值自愈 —— 更新时一并把 release_sn 归正为 'role'
+			acl.setReleaseSn(RELEASE_SN_ROLE);
 			this.updateById(acl);
 		}
 

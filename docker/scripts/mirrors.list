@@ -1,5 +1,13 @@
 # Phoenix 打包/安装镜像加速候选源（package.sh 竞速探活选优；一行一个，# 注释）
 # 第三方服务稳定性看天——失稳时增删此表即可，脚本零改动
+# 〔2026-10-08 扩充（BUG-147）〕前三源曾在一次网络抖动中同秒全判死；补三个国内镜像以增冗余。
+#   实测码（WSL 内 curl -m 8 -o /dev/null -w '%{http_code}' <源>/v2/）：
+#   docker.1ms.run→401 / docker.m.daocloud.io→401 / dockerproxy.net→200
+#   docker.1panel.live→200 / docker.nju.edu.cn→403 / hub.rat.dev→302
+#   注意：401/403 也算"活"（registry 正常应答），判活只看响应码 != 000
 https://docker.1ms.run
 https://docker.m.daocloud.io
 https://dockerproxy.net
+https://docker.1panel.live
+https://docker.nju.edu.cn
+https://hub.rat.dev

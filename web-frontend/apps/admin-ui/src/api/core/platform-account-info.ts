@@ -20,10 +20,6 @@ export interface PlatformAccountInfo {
   avatarUrl?: string;
   gender?: string;
   status?: string;
-  deptId?: string;
-  deptName?: string;
-  thirdPartyId?: string;
-  employeeId?: string;
   groups?: UserGroupVO[];
   createTime?: string;
   create?: string;

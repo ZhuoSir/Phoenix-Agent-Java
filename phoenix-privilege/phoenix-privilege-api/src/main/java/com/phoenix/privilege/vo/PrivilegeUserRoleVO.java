@@ -18,8 +18,6 @@ public class PrivilegeUserRoleVO {
 
 	private String userId;
 
-	private String userNo;
-
 	private String roleId;
 
 	@JsonFormat(pattern = "yyyy-MM-dd", timezone = "GMT+8")

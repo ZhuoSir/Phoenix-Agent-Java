@@ -12,11 +12,6 @@ import java.util.List;
 @Mapper
 public interface PrivilegeUserMapper extends BaseMapper<PrivilegeUser> {
 
-	List<PrivilegeUser> selectPageByQuery(@Param("dto") PrivilegeUserDTO dto, @Param("limit") long limit,
-			@Param("offset") long offset);
-
-	long countPageByQuery(@Param("dto") PrivilegeUserDTO dto);
-
 	@Delete("delete from tbl_privilege_user where id = #{id}")
 	int deletePhysicallyById(@Param("id") String id);
 

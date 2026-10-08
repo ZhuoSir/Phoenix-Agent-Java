@@ -1,11 +1,15 @@
 package com.phoenix.data.controller;
 
+import cn.dev33.satoken.stp.StpUtil;
+import com.phoenix.data.component.AdminRoleGuard;
 import com.phoenix.data.entity.AgentPresetQuestion;
 import com.phoenix.data.service.agent.AgentPresetQuestionService;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Map;
@@ -21,6 +25,9 @@ import java.util.Map;
 public class AgentPresetQuestionController {
 
     private final AgentPresetQuestionService presetQuestionService;
+
+    /** R-08（BUG-122）：预设问题的管理动作限管理员 —— 此前两个写接口零校验，任意登录用户可越权。 */
+    private final AdminRoleGuard adminRoleGuard;
 
     @GetMapping("/{agentId}/{accountId}/preset-questions")
     public ResponseEntity<List<AgentPresetQuestion>> getPresetQuestions(@PathVariable(value = "agentId") Long agentId, @PathVariable(value = "accountId") String accountId) {
@@ -53,6 +60,8 @@ public class AgentPresetQuestionController {
     @PostMapping("/{agentId}/preset-questions")
     public ResponseEntity<Map<String, String>> savePresetQuestions(@PathVariable(value = "agentId") Long agentId,
                                                                    @RequestBody List<Map<String, Object>> questionsData) {
+        // 校验必须放在 try 之外：本方法的 catch(Exception) 会把异常包成 500，令 403 语义失真
+        requireAdmin();
         try {
             List<AgentPresetQuestion> questions = questionsData.stream().map(data -> {
                 AgentPresetQuestion question = new AgentPresetQuestion();
@@ -76,11 +85,24 @@ public class AgentPresetQuestionController {
     }
 
     /**
+     * R-08：非管理员调用写接口一律 403（由 GlobalExceptionHandler 统一渲染为 ApiResponse.error）。
+     * 未登录时 StpUtil 会抛 NotLoginException，同样由全局处理器转 401。
+     */
+    private void requireAdmin() {
+        String operator = StpUtil.getLoginIdAsString();
+        if (!adminRoleGuard.isAdmin(operator)) {
+            log.warn("非管理员尝试管理预设问题, operator={}", operator);
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "权限不足：仅管理员可管理预设问题");
+        }
+    }
+
+    /**
      * Delete preset question
      */
     @DeleteMapping("/{agentId}/preset-questions/{questionId}")
     public ResponseEntity<Map<String, String>> deletePresetQuestion(@PathVariable(value = "agentId") Long agentId,
                                                                     @PathVariable Long questionId) {
+        requireAdmin();
         try {
             presetQuestionService.deleteById(questionId);
             return ResponseEntity.ok(Map.of("message", "预设问题删除成功"));

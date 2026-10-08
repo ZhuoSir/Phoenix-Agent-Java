@@ -1,0 +1,18 @@
+=== CR-02 / R-19 / T-27~T-28 验证结论（技能名称唯一性按创建人隔离）===
+日期: 2026-10-07 | 档位: major | §S/§P/§T 三确认: 陈卓 | Q-D1 不做UI区分 / Q-D2 overwrite 只覆盖本人
+
+[T-27 SQL V2.0.0_14] 表达式唯一索引 (name, coalesce(creator,'')) 替换全局 UNIQUE(name) 约束
+  · drill: 正向×2 / 反向 / 跨用户同名插入✅ / 同用户同名被拒✅ 全通过
+  · 活库: migrator 应用（台账 14 件）；name_creator 索引=1、旧 name_key 约束=0
+  · 坑（记 L-66）: 原 name_key 是**约束**非裸索引，DROP INDEX 报 "constraint requires it"；
+    首版 drill"通过"是假象（drill 曾被约束版删过约束）⇒ 改 DROP CONSTRAINT 后活库才真过
+
+[T-28 upload 判重/覆盖按创建人]（活库端到端）
+  · chenzhuo 上传 name=X → id=22 ✅
+  · admin 上传同名 X → id=23 ✅（**跨用户同名可共存**，旧版会被 DB 唯一索引拒绝）
+  · chenzhuo 再传 X（overwrite 默认）→ fail「同名技能已存在，请确认后以覆盖方式上传」✅（同用户互斥）
+  · chenzhuo 再传 X（overwrite=true）→ 覆盖**本人** id=22 ✅；admin 的 id=23 未受波及 ✅
+  · 同名行数=2（chen+admin）✅；清理后=0 ✅
+  · 并发撞键 → DuplicateKeyException 捕获为友好 fail（代码路径，未单独构造并发）
+
+[质量门] 打包 exit=0 后部署；typecheck 无前端改动；部署后 0 ERROR；工作树干净

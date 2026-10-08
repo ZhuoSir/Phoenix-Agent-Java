@@ -1,0 +1,34 @@
+=== T-02 删除后「已删类型的真实引用」精确清点 ===
+检索式: \b(IPrivilege(Company|Department|Employee)Service|Privilege(Company|Department|Employee)(DTO|Query|VO|Mapper|ServiceImpl|Controller)?|DepartmentTreeVO|OrganizationTreeVO|PrivilegeGroupVO)\b
+
+./phoenix-platform/phoenix-platform-core/src/main/java/com/phoenix/platform/service/front/impl/AccountInfoServiceImpl.java:38:import com.phoenix.privilege.servi
+./phoenix-platform/phoenix-platform-core/src/main/java/com/phoenix/platform/service/front/impl/AccountInfoServiceImpl.java:67:    private final IPrivilegeDepart
+./phoenix-privilege/phoenix-privilege-rest/src/main/java/com/phoenix/privilege/controller/PrivilegeUserController.java:9:import com.phoenix.privilege.entity.Pri
+./phoenix-privilege/phoenix-privilege-rest/src/main/java/com/phoenix/privilege/controller/PrivilegeUserController.java:10:import com.phoenix.privilege.entity.Pr
+./phoenix-privilege/phoenix-privilege-rest/src/main/java/com/phoenix/privilege/controller/PrivilegeUserController.java:13:import com.phoenix.privilege.service.I
+./phoenix-privilege/phoenix-privilege-rest/src/main/java/com/phoenix/privilege/controller/PrivilegeUserController.java:14:import com.phoenix.privilege.service.I
+./phoenix-privilege/phoenix-privilege-rest/src/main/java/com/phoenix/privilege/controller/PrivilegeUserController.java:27:	private final IPrivilegeCompanyServic
+./phoenix-privilege/phoenix-privilege-rest/src/main/java/com/phoenix/privilege/controller/PrivilegeUserController.java:28:	private final IPrivilegeDepartmentSer
+./phoenix-privilege/phoenix-privilege-rest/src/main/java/com/phoenix/privilege/controller/PrivilegeUserController.java:60:			PrivilegeCompany company = privileg
+./phoenix-privilege/phoenix-privilege-rest/src/main/java/com/phoenix/privilege/controller/PrivilegeUserController.java:66:			PrivilegeDepartment department = pr
+./phoenix-privilege/phoenix-privilege-core/src/main/java/com/phoenix/privilege/service/impl/PrivilegeUserServiceImpl.java:12:import com.phoenix.privilege.entity
+./phoenix-privilege/phoenix-privilege-core/src/main/java/com/phoenix/privilege/service/impl/PrivilegeUserServiceImpl.java:13:import com.phoenix.privilege.entity
+./phoenix-privilege/phoenix-privilege-core/src/main/java/com/phoenix/privilege/service/impl/PrivilegeUserServiceImpl.java:137:			.leftJoin(PrivilegeCompany.clas
+./phoenix-privilege/phoenix-privilege-core/src/main/java/com/phoenix/privilege/service/impl/PrivilegeUserServiceImpl.java:138:			.on(PrivilegeUser::getCompanyId
+./phoenix-privilege/phoenix-privilege-core/src/main/java/com/phoenix/privilege/service/impl/PrivilegeUserServiceImpl.java:139:			.leftJoin(PrivilegeDepartment.c
+./phoenix-privilege/phoenix-privilege-core/src/main/java/com/phoenix/privilege/service/impl/PrivilegeUserServiceImpl.java:140:			.on(PrivilegeUser::getDeptId, P
+
+=== 去重文件清单 ===
+./phoenix-platform/phoenix-platform-core/src/main/java/com/phoenix/platform/service/front/impl/AccountInfoServiceImpl.java
+./phoenix-privilege/phoenix-privilege-core/src/main/java/com/phoenix/privilege/service/impl/PrivilegeUserServiceImpl.java
+./phoenix-privilege/phoenix-privilege-rest/src/main/java/com/phoenix/privilege/controller/PrivilegeUserController.java
+
+文件数: 3
+
+=== 对照：被排除的假阳性（方法名 queryPrivilegeCompanyId / queryPrivilegeDeptId）===
+119:		String existId = queryPrivilegeCompanyId(dto.getName(), dto.getSn());
+137:		String existId = queryPrivilegeDeptId(dto.getSn());
+156:		return queryPrivilegeDeptId(platformDeptId);
+160:	private String queryPrivilegeCompanyId(String name, String thirdId) {
+168:	private String queryPrivilegeDeptId(String thirdId) {
+（这些是对【表】的原始 SQL 读写，非类型引用；归 T-04 同步模块删除处理）

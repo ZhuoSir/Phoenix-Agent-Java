@@ -15,8 +15,6 @@ public enum ExceptionEnum {
     USER_ERROR_EXIST_EXCEPTION(1001, "用户不存在"),
     USER_IS_DISABLE_EXCEPTION(1002, "用户已被禁用"),
     USERNAME_DUPLICATE_EXCEPTION(1003, "用户名重复"),
-    USERCODE_DUPLICATE_EXCEPTION(1004, "工号重复"),
-    USER_DELETE_ERROR(1005, "该用户为IDM用户，不可删除"),
     USER_PASSWORD_ERROR(1006, "密码错误"),
 
     // 图形验证码
@@ -179,7 +177,6 @@ public enum ExceptionEnum {
     DATAUNITNAME_EXIST_ERROR(22006, "数据单元名称已存在"),
     PASSWORDS_ENTERD_INCORRECT(22007, "两次输入的密码不一致"),
     NO_QUERY_MODULE_EXCEED_ERROR(22008, "请至少选择一个查询权限"),
-    DEPORTMENT_DELETE_ERROR(22009, "IDM同步的部门不允许删除"),
     ;
 
     private final int code;

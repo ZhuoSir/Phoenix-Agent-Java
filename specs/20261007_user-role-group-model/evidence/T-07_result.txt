@@ -1,0 +1,46 @@
+=== T-07 验收结论（菜单与权限位按角色过滤）===
+日期: 2026-10-07 | 工具链: JDK 23 + Maven 3.8.6 + .mvn-home
+
+[1] 改动（唯一入口 LoginServiceImpl + 3 个新辅助方法）
+  - getUserMenus()：不再 `list()` 全量 + 满权限位；改为
+      超管 → 全部存活菜单 + 全权限位；其他 → 按角色 ACL 实时合并（复用既有 buildUserAclMap）
+  - 新增 isSuperAdmin()：硬编码超管 role_id（沿用 AgentKnowledgeMapper 既有口径）
+      **或** sn=ROLE_ADMIN（忽略大小写）双条件豁免，避免单一口径失配
+  - 新增 filterGrantedModules()：只留有授权的菜单，并**向上补全祖先目录**
+      （否则"授了子菜单、父目录未授权"时，子菜单既不成根也不挂父 ⇒ 前端树里静默消失）
+  - 新增 resolveGrantedPvalues()：按钮级只下发"角色实际授予的位"对应的 pvalue
+  - buildModuleTree()：每菜单带 pvalues（enabled=该位是否授予），兑现 ModuleTreeVO 既有契约
+  - 删除 session ACL 快照路径（LOGIN_ACLS 的写/读 + getAclsFromSession 全删）⇒ **改角色无需重登**
+  - 加固：多角色合并时 aclState=null 按 0 处理（原实现会拆箱 NPE）
+
+[2] 编译与格式（真实输出）
+  - mvn clean compile -Dspring-javaformat.skip=true -Dmaven.repo.local=$PWD/.mvn-home
+    → **BUILD SUCCESS，ERROR 行数 = 0**（T-07_compile.raw.txt）
+  - spring-javaformat:validate（phoenix-privilege-core）：本人改动的 2 个文件**已合规**；
+    模块内另有 4 个**既有**违规文件（PrivilegeUserRoleServiceImpl / PrivilegeRoleServiceImpl /
+    IPrivilegeUserService / IPrivilegeUserRoleService）——本次未触碰，已 `git checkout` 还原，
+    避免无关 diff（既有格式债，非本次引入）
+
+[3] 逻辑复刻断言（drill 库，已应用 02→03→04；T-07_logic-replica.txt）
+  ① 超管判定：admin/liufang(ROLE_ADMIN)=t；chenzhuo/lwj/xtj(COMMON)=f  ✅
+  ② 可见菜单：admin/liufang = **23 = 存活菜单全量** ✅；3 个普通角色用户 = **7** ✅
+     （与 T-06 基线集合一致：智能体中心·智能体管理·列表·编辑·对话·知识库·个人中心）
+  ③ 存活菜单总数 23 = 超管可见数 ✅
+
+[4] **运行期断言延期至 T-16（明确记载，不静默）**
+  HTTP 级断言需对"含本次改动的运行实例"执行，当前运行镜像是 v1.6.0-dev 旧代码：
+    - 超管 GET /api/privilege/auth/menus → 23 条
+    - 普通角色 → 7 条
+    - 未授权菜单 URL 直接访问 → 404/首页（动态路由不注册）
+    - 零授权账号登录 → 提示页不白屏
+    - 改角色后**无需重登**菜单即刻变化
+  ⇒ **T-07 暂不勾选**（共享面任务未验证不得宣布完成），待 T-16 通过后勾选。
+
+[5] **按钮级验证盲点（T-16 用受控数据补验）**
+  当前 ACL 基线 acl_state 全为 '31'（5 位全给）⇒ 所有角色都拿到全部 pvalue，
+  "未授权按钮为 false"用现有数据**无法区分**。T-16 配方：
+    ① drill 库把某普通角色**某一个菜单**的 acl_state 改为 '1'（仅 position 0）
+    ② 对比 GET menus 返回的 pvalues（应只剩 position 0 的项）
+    ③ 验完恢复 '31'
+
+[6] 结论：T-07 代码面完成（编译绿 + 逻辑复刻断言通过）；HTTP 级与按钮级受控验证挂 T-16。

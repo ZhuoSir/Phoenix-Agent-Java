@@ -1,0 +1,1590 @@
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::load has been called by org.fusesource.jansi.internal.JansiLoader in an unnamed module (file:/Users/bryanchen/Documents/work/apache/apache-maven-3.8.6/lib/jansi-2.4.0.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by com.google.common.util.concurrent.AbstractFuture$UnsafeAtomicHelper (file:/Users/bryanchen/Documents/work/apache/apache-maven-3.8.6/lib/guava-25.1-android.jar)
+WARNING: Please consider reporting this to the maintainers of class com.google.common.util.concurrent.AbstractFuture$UnsafeAtomicHelper
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+[INFO] Scanning for projects...
+[WARNING] 
+[WARNING] Some problems were encountered while building the effective model for com.phoenix:phoenix-parent:pom:2.0.0-SNAPSHOT
+[WARNING] 'dependencyManagement.dependencies.dependency.(groupId:artifactId:type:classifier)' must be unique: com.esotericsoftware.kryo:kryo5:jar -> duplicate declaration of version ${kryo5.version} @ com.phoenix:phoenix-parent:${revision}, /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-parent/pom.xml, line 152, column 25
+[WARNING] 
+[WARNING] Some problems were encountered while building the effective model for com.phoenix:phoenix-data:pom:2.0.0-SNAPSHOT
+[WARNING] 'dependencyManagement.dependencies.dependency.(groupId:artifactId:type:classifier)' must be unique: com.esotericsoftware.kryo:kryo5:jar -> duplicate declaration of version ${kryo5.version} @ com.phoenix:phoenix-parent:${revision}, /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-parent/pom.xml, line 152, column 25
+[WARNING] 
+[WARNING] It is highly recommended to fix these problems because they threaten the stability of your build.
+[WARNING] 
+[WARNING] For this reason, future Maven versions might no longer support building such malformed projects.
+[WARNING] 
+[INFO] ------------------------------------------------------------------------
+[INFO] Reactor Build Order:
+[INFO] 
+[INFO] phoenix-parent                                                     [pom]
+[INFO] phoenix-tool                                                       [jar]
+[INFO] phoenix-common-api                                                 [jar]
+[INFO] phoenix-data-api                                                   [jar]
+[INFO] phoenix-common-core                                                [jar]
+[INFO] phoenix-privilege-api                                              [jar]
+[INFO] phoenix-privilege-core                                             [jar]
+[INFO] phoenix-data-core                                                  [jar]
+[INFO] phoenix-data-rest                                                  [jar]
+[INFO] phoenix-data                                                       [pom]
+[INFO] phoenix-agent-api                                                  [jar]
+[INFO] phoenix-agent-core                                                 [jar]
+[INFO] phoenix-agent-rest                                                 [jar]
+[INFO] phoenix-agent                                                      [pom]
+[INFO] phoenix-admin-api                                                  [jar]
+[INFO] phoenix-admin-core                                                 [jar]
+[INFO] phoenix-privilege-rest                                             [jar]
+[INFO] phoenix-platform-api                                               [jar]
+[INFO] phoenix-platform-core                                              [jar]
+[INFO] phoenix-platform-rest                                              [jar]
+[INFO] phoenix-common-rest                                                [jar]
+[INFO] phoenix-admin-rest                                                 [jar]
+[INFO] phoenix-admin-manager                                              [jar]
+[INFO] phoenix-admin                                                      [pom]
+[INFO] phoenix-privilege                                                  [pom]
+[INFO] phoenix-common                                                     [pom]
+[INFO] phoenix-platform                                                   [pom]
+[INFO] phoenix-codegen                                                    [jar]
+[INFO] phoenix-flink-api                                                  [jar]
+[INFO] phoenix-flink-core                                                 [jar]
+[INFO] phoenix-flink-server                                               [jar]
+[INFO] phoenix-flink                                                      [pom]
+[INFO] phoenix-rag-api                                                    [jar]
+[INFO] phoenix-rag-core                                                   [jar]
+[INFO] phoenix-rag-rest                                                   [jar]
+[INFO] phoenix-rag                                                        [pom]
+[INFO] phoenix-kg-api                                                     [jar]
+[INFO] phoenix-kg-core                                                    [jar]
+[INFO] phoenix-kg-rest                                                    [jar]
+[INFO] phoenix-kg                                                         [pom]
+[INFO] phoenix                                                            [pom]
+[INFO] 
+[INFO] ---------------------< com.phoenix:phoenix-parent >---------------------
+[INFO] Building phoenix-parent 2.0.0-SNAPSHOT                            [1/41]
+[INFO] --------------------------------[ pom ]---------------------------------
+[INFO] 
+[INFO] --- maven-clean-plugin:2.5:clean (default-clean) @ phoenix-parent ---
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:clean (flatten.clean) @ phoenix-parent ---
+[INFO] Deleting /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-parent/.flattened-pom.xml
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:flatten (flatten) @ phoenix-parent ---
+[INFO] Generating flattened POM of project com.phoenix:phoenix-parent:pom:2.0.0-SNAPSHOT...
+[INFO] 
+[INFO] ----------------------< com.phoenix:phoenix-tool >----------------------
+[INFO] Building phoenix-tool 2.0.0-SNAPSHOT                              [2/41]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- maven-clean-plugin:2.5:clean (default-clean) @ phoenix-tool ---
+[INFO] Deleting /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-tool/target
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:clean (flatten.clean) @ phoenix-tool ---
+[INFO] Deleting /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-tool/.flattened-pom.xml
+[INFO] 
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ phoenix-tool ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-tool/src/main/resources
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:flatten (flatten) @ phoenix-tool ---
+[INFO] Generating flattened POM of project com.phoenix:phoenix-tool:jar:2.0.0-SNAPSHOT...
+[INFO] 
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ phoenix-tool ---
+[INFO] Changes detected - recompiling the module! :source
+[INFO] Compiling 3 source files with javac [debug release 21] to target/classes
+[INFO] 
+[INFO] -------------------< com.phoenix:phoenix-common-api >-------------------
+[INFO] Building phoenix-common-api 2.0.0-SNAPSHOT                        [3/41]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- maven-clean-plugin:2.5:clean (default-clean) @ phoenix-common-api ---
+[INFO] Deleting /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-common/phoenix-common-api/target
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:clean (flatten.clean) @ phoenix-common-api ---
+[INFO] Deleting /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-common/phoenix-common-api/.flattened-pom.xml
+[INFO] 
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ phoenix-common-api ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-common/phoenix-common-api/src/main/resources
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:flatten (flatten) @ phoenix-common-api ---
+[INFO] Generating flattened POM of project com.phoenix:phoenix-common-api:jar:2.0.0-SNAPSHOT...
+[INFO] 
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ phoenix-common-api ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 18 source files with javac [debug release 21] to target/classes
+[WARNING] /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-common/phoenix-common-api/src/main/java/com/phoenix/common/vectorstore/request/SearchVectorRequest.java:[14,17] @Builder will ignore the initializing expression entirely. If you want the initializing expression to serve as default, add @Builder.Default. If it is not supposed to be settable during building, make the field final.
+[WARNING] /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-common/phoenix-common-api/src/main/java/com/phoenix/common/vectorstore/request/SearchVectorRequest.java:[18,20] @Builder will ignore the initializing expression entirely. If you want the initializing expression to serve as default, add @Builder.Default. If it is not supposed to be settable during building, make the field final.
+[WARNING] /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-common/phoenix-common-api/src/main/java/com/phoenix/common/model/platform/PlatformInfo.java:[13,1] Generating equals/hashCode implementation but without a call to superclass, even though this class does not extend java.lang.Object. If this is intentional, add '@EqualsAndHashCode(callSuper=false)' to your type.
+[INFO] 
+[INFO] --------------------< com.phoenix:phoenix-data-api >--------------------
+[INFO] Building phoenix-data-api 2.0.0-SNAPSHOT                          [4/41]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- maven-clean-plugin:2.5:clean (default-clean) @ phoenix-data-api ---
+[INFO] Deleting /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-data/phoenix-data-api/target
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:clean (flatten.clean) @ phoenix-data-api ---
+[INFO] Deleting /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-data/phoenix-data-api/.flattened-pom.xml
+[INFO] 
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ phoenix-data-api ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-data/phoenix-data-api/src/main/resources
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:flatten (flatten) @ phoenix-data-api ---
+[INFO] Generating flattened POM of project com.phoenix:phoenix-data-api:jar:2.0.0-SNAPSHOT...
+[INFO] 
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ phoenix-data-api ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 120 source files with javac [debug release 21] to target/classes
+[WARNING] /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-data/phoenix-data-api/src/main/java/com/phoenix/data/entity/Agent.java:[30,24] @Builder will ignore the initializing expression entirely. If you want the initializing expression to serve as default, add @Builder.Default. If it is not supposed to be settable during building, make the field final.
+[WARNING] /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-data/phoenix-data-api/src/main/java/com/phoenix/data/dto/search/HybridSearchRequest.java:[27,24] @Builder will ignore the initializing expression entirely. If you want the initializing expression to serve as default, add @Builder.Default. If it is not supposed to be settable during building, make the field final.
+[WARNING] /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-data/phoenix-data-api/src/main/java/com/phoenix/data/dto/ModelConfigDTO.java:[43,24] @Builder will ignore the initializing expression entirely. If you want the initializing expression to serve as default, add @Builder.Default. If it is not supposed to be settable during building, make the field final.
+[WARNING] /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-data/phoenix-data-api/src/main/java/com/phoenix/data/dto/ModelConfigDTO.java:[45,25] @Builder will ignore the initializing expression entirely. If you want the initializing expression to serve as default, add @Builder.Default. If it is not supposed to be settable during building, make the field final.
+[WARNING] /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-data/phoenix-data-api/src/main/java/com/phoenix/data/dto/ModelConfigDTO.java:[49,25] @Builder will ignore the initializing expression entirely. If you want the initializing expression to serve as default, add @Builder.Default. If it is not supposed to be settable during building, make the field final.
+[WARNING] /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-data/phoenix-data-api/src/main/java/com/phoenix/data/dto/ModelConfigDTO.java:[54,25] @Builder will ignore the initializing expression entirely. If you want the initializing expression to serve as default, add @Builder.Default. If it is not supposed to be settable during building, make the field final.
+[WARNING] /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-data/phoenix-data-api/src/main/java/com/phoenix/data/dto/ModelConfigDTO.java:[57,25] @Builder will ignore the initializing expression entirely. If you want the initializing expression to serve as default, add @Builder.Default. If it is not supposed to be settable during building, make the field final.
+[WARNING] /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-data/phoenix-data-api/src/main/java/com/phoenix/data/entity/AgentCategory.java:[16,1] Generating equals/hashCode implementation but without a call to superclass, even though this class does not extend java.lang.Object. If this is intentional, add '@EqualsAndHashCode(callSuper=false)' to your type.
+[INFO] /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-data/phoenix-data-api/src/main/java/com/phoenix/data/prompt/PromptHelper.java: /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-data/phoenix-data-api/src/main/java/com/phoenix/data/prompt/PromptHelper.java使用或覆盖了已过时的 API。
+[INFO] /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-data/phoenix-data-api/src/main/java/com/phoenix/data/prompt/PromptHelper.java: 有关详细信息, 请使用 -Xlint:deprecation 重新编译。
+[INFO] 
+[INFO] ------------------< com.phoenix:phoenix-common-core >-------------------
+[INFO] Building phoenix-common-core 2.0.0-SNAPSHOT                       [5/41]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- maven-clean-plugin:2.5:clean (default-clean) @ phoenix-common-core ---
+[INFO] Deleting /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-common/phoenix-common-core/target
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:clean (flatten.clean) @ phoenix-common-core ---
+[INFO] Deleting /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-common/phoenix-common-core/.flattened-pom.xml
+[INFO] 
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ phoenix-common-core ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-common/phoenix-common-core/src/main/resources
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:flatten (flatten) @ phoenix-common-core ---
+[INFO] Generating flattened POM of project com.phoenix:phoenix-common-core:jar:2.0.0-SNAPSHOT...
+[INFO] 
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ phoenix-common-core ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 23 source files with javac [debug release 21] to target/classes
+[INFO] 
+[INFO] -----------------< com.phoenix:phoenix-privilege-api >------------------
+[INFO] Building phoenix-privilege-api 2.0.0-SNAPSHOT                     [6/41]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- maven-clean-plugin:2.5:clean (default-clean) @ phoenix-privilege-api ---
+[INFO] Deleting /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-privilege/phoenix-privilege-api/target
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:clean (flatten.clean) @ phoenix-privilege-api ---
+[INFO] Deleting /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-privilege/phoenix-privilege-api/.flattened-pom.xml
+[INFO] 
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ phoenix-privilege-api ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-privilege/phoenix-privilege-api/src/main/resources
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:flatten (flatten) @ phoenix-privilege-api ---
+[INFO] Generating flattened POM of project com.phoenix:phoenix-privilege-api:jar:2.0.0-SNAPSHOT...
+[INFO] 
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ phoenix-privilege-api ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 57 source files with javac [debug release 21] to target/classes
+[WARNING] /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-privilege/phoenix-privilege-api/src/main/java/com/phoenix/privilege/entity/PrivilegeAcl.java:[55,21] @Builder will ignore the initializing expression entirely. If you want the initializing expression to serve as default, add @Builder.Default. If it is not supposed to be settable during building, make the field final.
+[WARNING] /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-privilege/phoenix-privilege-api/src/main/java/com/phoenix/privilege/entity/PrivilegeEmployee.java:[12,1] Generating equals/hashCode implementation but without a call to superclass, even though this class does not extend java.lang.Object. If this is intentional, add '@EqualsAndHashCode(callSuper=false)' to your type.
+[INFO] 
+[INFO] -----------------< com.phoenix:phoenix-privilege-core >-----------------
+[INFO] Building phoenix-privilege-core 2.0.0-SNAPSHOT                    [7/41]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- maven-clean-plugin:2.5:clean (default-clean) @ phoenix-privilege-core ---
+[INFO] Deleting /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-privilege/phoenix-privilege-core/target
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:clean (flatten.clean) @ phoenix-privilege-core ---
+[INFO] Deleting /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-privilege/phoenix-privilege-core/.flattened-pom.xml
+[INFO] 
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ phoenix-privilege-core ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] Copying 4 resources
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:flatten (flatten) @ phoenix-privilege-core ---
+[INFO] Generating flattened POM of project com.phoenix:phoenix-privilege-core:jar:2.0.0-SNAPSHOT...
+[INFO] 
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ phoenix-privilege-core ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 40 source files with javac [debug release 21] to target/classes
+[INFO] 
+[INFO] -------------------< com.phoenix:phoenix-data-core >--------------------
+[INFO] Building phoenix-data-core 2.0.0-SNAPSHOT                         [8/41]
+[INFO] --------------------------------[ jar ]---------------------------------
+Downloading from central: https://repo.maven.apache.org/maven2/com/aliyun/tea/maven-metadata.xml
+[WARNING] Failed to write tracking file /Users/bryanchen/.m2/repository/com/aliyun/tea/resolver-status.properties
+java.io.FileNotFoundException: /Users/bryanchen/.m2/repository/com/aliyun/tea/resolver-status.properties (Operation not permitted)
+    at java.io.RandomAccessFile.open0 (Native Method)
+    at java.io.RandomAccessFile.open (RandomAccessFile.java:338)
+    at java.io.RandomAccessFile.<init> (RandomAccessFile.java:257)
+    at java.io.RandomAccessFile.<init> (RandomAccessFile.java:211)
+    at org.eclipse.aether.internal.impl.TrackingFileManager.update (TrackingFileManager.java:86)
+    at org.eclipse.aether.internal.impl.DefaultUpdateCheckManager.write (DefaultUpdateCheckManager.java:590)
+    at org.eclipse.aether.internal.impl.DefaultUpdateCheckManager.touchMetadata (DefaultUpdateCheckManager.java:557)
+    at org.eclipse.aether.internal.impl.DefaultMetadataResolver.resolve (DefaultMetadataResolver.java:367)
+    at org.eclipse.aether.internal.impl.DefaultMetadataResolver.resolveMetadata (DefaultMetadataResolver.java:181)
+    at org.apache.maven.repository.internal.DefaultVersionRangeResolver.getVersions (DefaultVersionRangeResolver.java:198)
+    at org.apache.maven.repository.internal.DefaultVersionRangeResolver.resolveVersionRange (DefaultVersionRangeResolver.java:148)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.cachedResolveRangeResult (DefaultDependencyCollector.java:619)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:392)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:362)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.process (DefaultDependencyCollector.java:349)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.doRecurse (DefaultDependencyCollector.java:506)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:458)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:362)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.process (DefaultDependencyCollector.java:349)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.doRecurse (DefaultDependencyCollector.java:506)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:458)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:362)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.process (DefaultDependencyCollector.java:349)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.collectDependencies (DefaultDependencyCollector.java:254)
+    at org.eclipse.aether.internal.impl.DefaultRepositorySystem.collectDependencies (DefaultRepositorySystem.java:284)
+    at org.apache.maven.project.DefaultProjectDependenciesResolver.resolve (DefaultProjectDependenciesResolver.java:170)
+    at org.apache.maven.lifecycle.internal.LifecycleDependencyResolver.getDependencies (LifecycleDependencyResolver.java:243)
+    at org.apache.maven.lifecycle.internal.LifecycleDependencyResolver.resolveProjectDependencies (LifecycleDependencyResolver.java:147)
+    at org.apache.maven.lifecycle.internal.MojoExecutor.ensureDependenciesAreResolved (MojoExecutor.java:401)
+    at org.apache.maven.lifecycle.internal.MojoExecutor.doExecute (MojoExecutor.java:347)
+    at org.apache.maven.lifecycle.internal.MojoExecutor.execute (MojoExecutor.java:215)
+    at org.apache.maven.lifecycle.internal.MojoExecutor.execute (MojoExecutor.java:171)
+    at org.apache.maven.lifecycle.internal.MojoExecutor.execute (MojoExecutor.java:163)
+    at org.apache.maven.lifecycle.internal.LifecycleModuleBuilder.buildProject (LifecycleModuleBuilder.java:117)
+    at org.apache.maven.lifecycle.internal.LifecycleModuleBuilder.buildProject (LifecycleModuleBuilder.java:81)
+    at org.apache.maven.lifecycle.internal.builder.singlethreaded.SingleThreadedBuilder.build (SingleThreadedBuilder.java:56)
+    at org.apache.maven.lifecycle.internal.LifecycleStarter.execute (LifecycleStarter.java:128)
+    at org.apache.maven.DefaultMaven.doExecute (DefaultMaven.java:294)
+    at org.apache.maven.DefaultMaven.doExecute (DefaultMaven.java:192)
+    at org.apache.maven.DefaultMaven.execute (DefaultMaven.java:105)
+    at org.apache.maven.cli.MavenCli.execute (MavenCli.java:960)
+    at org.apache.maven.cli.MavenCli.doMain (MavenCli.java:293)
+    at org.apache.maven.cli.MavenCli.main (MavenCli.java:196)
+    at jdk.internal.reflect.DirectMethodHandleAccessor.invoke (DirectMethodHandleAccessor.java:104)
+    at java.lang.reflect.Method.invoke (Method.java:565)
+    at org.codehaus.plexus.classworlds.launcher.Launcher.launchEnhanced (Launcher.java:282)
+    at org.codehaus.plexus.classworlds.launcher.Launcher.launch (Launcher.java:225)
+    at org.codehaus.plexus.classworlds.launcher.Launcher.mainWithExitCode (Launcher.java:406)
+    at org.codehaus.plexus.classworlds.launcher.Launcher.main (Launcher.java:347)
+[WARNING] Could not transfer metadata com.aliyun:tea/maven-metadata.xml from/to central (https://repo.maven.apache.org/maven2): /Users/bryanchen/.m2/repository/com/aliyun/tea/maven-metadata-central.xml.part.lock (Operation not permitted)
+Downloading from central: https://repo.maven.apache.org/maven2/com/aliyun/tea-util/maven-metadata.xml
+[WARNING] Failed to write tracking file /Users/bryanchen/.m2/repository/com/aliyun/tea-util/resolver-status.properties
+java.io.FileNotFoundException: /Users/bryanchen/.m2/repository/com/aliyun/tea-util/resolver-status.properties (Operation not permitted)
+    at java.io.RandomAccessFile.open0 (Native Method)
+    at java.io.RandomAccessFile.open (RandomAccessFile.java:338)
+    at java.io.RandomAccessFile.<init> (RandomAccessFile.java:257)
+    at java.io.RandomAccessFile.<init> (RandomAccessFile.java:211)
+    at org.eclipse.aether.internal.impl.TrackingFileManager.update (TrackingFileManager.java:86)
+    at org.eclipse.aether.internal.impl.DefaultUpdateCheckManager.write (DefaultUpdateCheckManager.java:590)
+    at org.eclipse.aether.internal.impl.DefaultUpdateCheckManager.touchMetadata (DefaultUpdateCheckManager.java:557)
+    at org.eclipse.aether.internal.impl.DefaultMetadataResolver.resolve (DefaultMetadataResolver.java:367)
+    at org.eclipse.aether.internal.impl.DefaultMetadataResolver.resolveMetadata (DefaultMetadataResolver.java:181)
+    at org.apache.maven.repository.internal.DefaultVersionRangeResolver.getVersions (DefaultVersionRangeResolver.java:198)
+    at org.apache.maven.repository.internal.DefaultVersionRangeResolver.resolveVersionRange (DefaultVersionRangeResolver.java:148)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.cachedResolveRangeResult (DefaultDependencyCollector.java:619)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:392)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:362)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.process (DefaultDependencyCollector.java:349)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.doRecurse (DefaultDependencyCollector.java:506)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:458)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:362)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.process (DefaultDependencyCollector.java:349)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.doRecurse (DefaultDependencyCollector.java:506)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:458)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:362)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.process (DefaultDependencyCollector.java:349)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.collectDependencies (DefaultDependencyCollector.java:254)
+    at org.eclipse.aether.internal.impl.DefaultRepositorySystem.collectDependencies (DefaultRepositorySystem.java:284)
+    at org.apache.maven.project.DefaultProjectDependenciesResolver.resolve (DefaultProjectDependenciesResolver.java:170)
+    at org.apache.maven.lifecycle.internal.LifecycleDependencyResolver.getDependencies (LifecycleDependencyResolver.java:243)
+    at org.apache.maven.lifecycle.internal.LifecycleDependencyResolver.resolveProjectDependencies (LifecycleDependencyResolver.java:147)
+    at org.apache.maven.lifecycle.internal.MojoExecutor.ensureDependenciesAreResolved (MojoExecutor.java:401)
+    at org.apache.maven.lifecycle.internal.MojoExecutor.doExecute (MojoExecutor.java:347)
+    at org.apache.maven.lifecycle.internal.MojoExecutor.execute (MojoExecutor.java:215)
+    at org.apache.maven.lifecycle.internal.MojoExecutor.execute (MojoExecutor.java:171)
+    at org.apache.maven.lifecycle.internal.MojoExecutor.execute (MojoExecutor.java:163)
+    at org.apache.maven.lifecycle.internal.LifecycleModuleBuilder.buildProject (LifecycleModuleBuilder.java:117)
+    at org.apache.maven.lifecycle.internal.LifecycleModuleBuilder.buildProject (LifecycleModuleBuilder.java:81)
+    at org.apache.maven.lifecycle.internal.builder.singlethreaded.SingleThreadedBuilder.build (SingleThreadedBuilder.java:56)
+    at org.apache.maven.lifecycle.internal.LifecycleStarter.execute (LifecycleStarter.java:128)
+    at org.apache.maven.DefaultMaven.doExecute (DefaultMaven.java:294)
+    at org.apache.maven.DefaultMaven.doExecute (DefaultMaven.java:192)
+    at org.apache.maven.DefaultMaven.execute (DefaultMaven.java:105)
+    at org.apache.maven.cli.MavenCli.execute (MavenCli.java:960)
+    at org.apache.maven.cli.MavenCli.doMain (MavenCli.java:293)
+    at org.apache.maven.cli.MavenCli.main (MavenCli.java:196)
+    at jdk.internal.reflect.DirectMethodHandleAccessor.invoke (DirectMethodHandleAccessor.java:104)
+    at java.lang.reflect.Method.invoke (Method.java:565)
+    at org.codehaus.plexus.classworlds.launcher.Launcher.launchEnhanced (Launcher.java:282)
+    at org.codehaus.plexus.classworlds.launcher.Launcher.launch (Launcher.java:225)
+    at org.codehaus.plexus.classworlds.launcher.Launcher.mainWithExitCode (Launcher.java:406)
+    at org.codehaus.plexus.classworlds.launcher.Launcher.main (Launcher.java:347)
+[WARNING] Could not transfer metadata com.aliyun:tea-util/maven-metadata.xml from/to central (https://repo.maven.apache.org/maven2): /Users/bryanchen/.m2/repository/com/aliyun/tea-util/maven-metadata-central.xml.part.lock (Operation not permitted)
+Downloading from central: https://repo.maven.apache.org/maven2/com/aliyun/tea-rpc-util/maven-metadata.xml
+[WARNING] Failed to write tracking file /Users/bryanchen/.m2/repository/com/aliyun/tea-rpc-util/resolver-status.properties
+java.io.FileNotFoundException: /Users/bryanchen/.m2/repository/com/aliyun/tea-rpc-util/resolver-status.properties (Operation not permitted)
+    at java.io.RandomAccessFile.open0 (Native Method)
+    at java.io.RandomAccessFile.open (RandomAccessFile.java:338)
+    at java.io.RandomAccessFile.<init> (RandomAccessFile.java:257)
+    at java.io.RandomAccessFile.<init> (RandomAccessFile.java:211)
+    at org.eclipse.aether.internal.impl.TrackingFileManager.update (TrackingFileManager.java:86)
+    at org.eclipse.aether.internal.impl.DefaultUpdateCheckManager.write (DefaultUpdateCheckManager.java:590)
+    at org.eclipse.aether.internal.impl.DefaultUpdateCheckManager.touchMetadata (DefaultUpdateCheckManager.java:557)
+    at org.eclipse.aether.internal.impl.DefaultMetadataResolver.resolve (DefaultMetadataResolver.java:367)
+    at org.eclipse.aether.internal.impl.DefaultMetadataResolver.resolveMetadata (DefaultMetadataResolver.java:181)
+    at org.apache.maven.repository.internal.DefaultVersionRangeResolver.getVersions (DefaultVersionRangeResolver.java:198)
+    at org.apache.maven.repository.internal.DefaultVersionRangeResolver.resolveVersionRange (DefaultVersionRangeResolver.java:148)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.cachedResolveRangeResult (DefaultDependencyCollector.java:619)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:392)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:362)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.process (DefaultDependencyCollector.java:349)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.doRecurse (DefaultDependencyCollector.java:506)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:458)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:362)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.process (DefaultDependencyCollector.java:349)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.doRecurse (DefaultDependencyCollector.java:506)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:458)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:362)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.process (DefaultDependencyCollector.java:349)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.collectDependencies (DefaultDependencyCollector.java:254)
+    at org.eclipse.aether.internal.impl.DefaultRepositorySystem.collectDependencies (DefaultRepositorySystem.java:284)
+    at org.apache.maven.project.DefaultProjectDependenciesResolver.resolve (DefaultProjectDependenciesResolver.java:170)
+    at org.apache.maven.lifecycle.internal.LifecycleDependencyResolver.getDependencies (LifecycleDependencyResolver.java:243)
+    at org.apache.maven.lifecycle.internal.LifecycleDependencyResolver.resolveProjectDependencies (LifecycleDependencyResolver.java:147)
+    at org.apache.maven.lifecycle.internal.MojoExecutor.ensureDependenciesAreResolved (MojoExecutor.java:401)
+    at org.apache.maven.lifecycle.internal.MojoExecutor.doExecute (MojoExecutor.java:347)
+    at org.apache.maven.lifecycle.internal.MojoExecutor.execute (MojoExecutor.java:215)
+    at org.apache.maven.lifecycle.internal.MojoExecutor.execute (MojoExecutor.java:171)
+    at org.apache.maven.lifecycle.internal.MojoExecutor.execute (MojoExecutor.java:163)
+    at org.apache.maven.lifecycle.internal.LifecycleModuleBuilder.buildProject (LifecycleModuleBuilder.java:117)
+    at org.apache.maven.lifecycle.internal.LifecycleModuleBuilder.buildProject (LifecycleModuleBuilder.java:81)
+    at org.apache.maven.lifecycle.internal.builder.singlethreaded.SingleThreadedBuilder.build (SingleThreadedBuilder.java:56)
+    at org.apache.maven.lifecycle.internal.LifecycleStarter.execute (LifecycleStarter.java:128)
+    at org.apache.maven.DefaultMaven.doExecute (DefaultMaven.java:294)
+    at org.apache.maven.DefaultMaven.doExecute (DefaultMaven.java:192)
+    at org.apache.maven.DefaultMaven.execute (DefaultMaven.java:105)
+    at org.apache.maven.cli.MavenCli.execute (MavenCli.java:960)
+    at org.apache.maven.cli.MavenCli.doMain (MavenCli.java:293)
+    at org.apache.maven.cli.MavenCli.main (MavenCli.java:196)
+    at jdk.internal.reflect.DirectMethodHandleAccessor.invoke (DirectMethodHandleAccessor.java:104)
+    at java.lang.reflect.Method.invoke (Method.java:565)
+    at org.codehaus.plexus.classworlds.launcher.Launcher.launchEnhanced (Launcher.java:282)
+    at org.codehaus.plexus.classworlds.launcher.Launcher.launch (Launcher.java:225)
+    at org.codehaus.plexus.classworlds.launcher.Launcher.mainWithExitCode (Launcher.java:406)
+    at org.codehaus.plexus.classworlds.launcher.Launcher.main (Launcher.java:347)
+[WARNING] Could not transfer metadata com.aliyun:tea-rpc-util/maven-metadata.xml from/to central (https://repo.maven.apache.org/maven2): /Users/bryanchen/.m2/repository/com/aliyun/tea-rpc-util/maven-metadata-central.xml.part.lock (Operation not permitted)
+Downloading from java.net.Releases: https://maven.java.net/content/repositories/releases/org/glassfish/javax.el/maven-metadata.xml
+Downloading from central: https://repo.maven.apache.org/maven2/org/glassfish/javax.el/maven-metadata.xml
+Downloading from project.local: file:${project.basedir}/src/main/site/resources/repo/org/glassfish/javax.el/maven-metadata.xml
+Downloading from apache.snapshots: https://repository.apache.org/snapshots/org/glassfish/javax.el/maven-metadata.xml
+Downloading from jvnet-nexus-snapshots: https://maven.java.net/content/repositories/snapshots/org/glassfish/javax.el/maven-metadata.xml
+[WARNING] Failed to write tracking file /Users/bryanchen/.m2/repository/org/glassfish/javax.el/resolver-status.properties
+java.io.FileNotFoundException: /Users/bryanchen/.m2/repository/org/glassfish/javax.el/resolver-status.properties (Operation not permitted)
+    at java.io.RandomAccessFile.open0 (Native Method)
+    at java.io.RandomAccessFile.open (RandomAccessFile.java:338)
+    at java.io.RandomAccessFile.<init> (RandomAccessFile.java:257)
+    at java.io.RandomAccessFile.<init> (RandomAccessFile.java:211)
+    at org.eclipse.aether.internal.impl.TrackingFileManager.update (TrackingFileManager.java:86)
+    at org.eclipse.aether.internal.impl.DefaultUpdateCheckManager.write (DefaultUpdateCheckManager.java:590)
+    at org.eclipse.aether.internal.impl.DefaultUpdateCheckManager.touchMetadata (DefaultUpdateCheckManager.java:557)
+    at org.eclipse.aether.internal.impl.DefaultMetadataResolver.resolve (DefaultMetadataResolver.java:367)
+    at org.eclipse.aether.internal.impl.DefaultMetadataResolver.resolveMetadata (DefaultMetadataResolver.java:181)
+    at org.apache.maven.repository.internal.DefaultVersionRangeResolver.getVersions (DefaultVersionRangeResolver.java:198)
+    at org.apache.maven.repository.internal.DefaultVersionRangeResolver.resolveVersionRange (DefaultVersionRangeResolver.java:148)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.cachedResolveRangeResult (DefaultDependencyCollector.java:619)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:392)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:362)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.process (DefaultDependencyCollector.java:349)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.doRecurse (DefaultDependencyCollector.java:506)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:458)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:362)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.process (DefaultDependencyCollector.java:349)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.doRecurse (DefaultDependencyCollector.java:506)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:458)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:362)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.process (DefaultDependencyCollector.java:349)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.doRecurse (DefaultDependencyCollector.java:506)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:458)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:362)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.process (DefaultDependencyCollector.java:349)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.doRecurse (DefaultDependencyCollector.java:506)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:458)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:362)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.process (DefaultDependencyCollector.java:349)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.doRecurse (DefaultDependencyCollector.java:506)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:458)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:362)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.process (DefaultDependencyCollector.java:349)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.collectDependencies (DefaultDependencyCollector.java:254)
+    at org.eclipse.aether.internal.impl.DefaultRepositorySystem.collectDependencies (DefaultRepositorySystem.java:284)
+    at org.apache.maven.project.DefaultProjectDependenciesResolver.resolve (DefaultProjectDependenciesResolver.java:170)
+    at org.apache.maven.lifecycle.internal.LifecycleDependencyResolver.getDependencies (LifecycleDependencyResolver.java:243)
+    at org.apache.maven.lifecycle.internal.LifecycleDependencyResolver.resolveProjectDependencies (LifecycleDependencyResolver.java:147)
+    at org.apache.maven.lifecycle.internal.MojoExecutor.ensureDependenciesAreResolved (MojoExecutor.java:401)
+    at org.apache.maven.lifecycle.internal.MojoExecutor.doExecute (MojoExecutor.java:347)
+    at org.apache.maven.lifecycle.internal.MojoExecutor.execute (MojoExecutor.java:215)
+    at org.apache.maven.lifecycle.internal.MojoExecutor.execute (MojoExecutor.java:171)
+    at org.apache.maven.lifecycle.internal.MojoExecutor.execute (MojoExecutor.java:163)
+    at org.apache.maven.lifecycle.internal.LifecycleModuleBuilder.buildProject (LifecycleModuleBuilder.java:117)
+    at org.apache.maven.lifecycle.internal.LifecycleModuleBuilder.buildProject (LifecycleModuleBuilder.java:81)
+    at org.apache.maven.lifecycle.internal.builder.singlethreaded.SingleThreadedBuilder.build (SingleThreadedBuilder.java:56)
+    at org.apache.maven.lifecycle.internal.LifecycleStarter.execute (LifecycleStarter.java:128)
+    at org.apache.maven.DefaultMaven.doExecute (DefaultMaven.java:294)
+    at org.apache.maven.DefaultMaven.doExecute (DefaultMaven.java:192)
+    at org.apache.maven.DefaultMaven.execute (DefaultMaven.java:105)
+    at org.apache.maven.cli.MavenCli.execute (MavenCli.java:960)
+    at org.apache.maven.cli.MavenCli.doMain (MavenCli.java:293)
+    at org.apache.maven.cli.MavenCli.main (MavenCli.java:196)
+    at jdk.internal.reflect.DirectMethodHandleAccessor.invoke (DirectMethodHandleAccessor.java:104)
+    at java.lang.reflect.Method.invoke (Method.java:565)
+    at org.codehaus.plexus.classworlds.launcher.Launcher.launchEnhanced (Launcher.java:282)
+    at org.codehaus.plexus.classworlds.launcher.Launcher.launch (Launcher.java:225)
+    at org.codehaus.plexus.classworlds.launcher.Launcher.mainWithExitCode (Launcher.java:406)
+    at org.codehaus.plexus.classworlds.launcher.Launcher.main (Launcher.java:347)
+[WARNING] Failed to write tracking file /Users/bryanchen/.m2/repository/org/glassfish/javax.el/resolver-status.properties
+java.io.FileNotFoundException: /Users/bryanchen/.m2/repository/org/glassfish/javax.el/resolver-status.properties (Operation not permitted)
+    at java.io.RandomAccessFile.open0 (Native Method)
+    at java.io.RandomAccessFile.open (RandomAccessFile.java:338)
+    at java.io.RandomAccessFile.<init> (RandomAccessFile.java:257)
+    at java.io.RandomAccessFile.<init> (RandomAccessFile.java:211)
+    at org.eclipse.aether.internal.impl.TrackingFileManager.update (TrackingFileManager.java:86)
+    at org.eclipse.aether.internal.impl.DefaultUpdateCheckManager.write (DefaultUpdateCheckManager.java:590)
+    at org.eclipse.aether.internal.impl.DefaultUpdateCheckManager.touchMetadata (DefaultUpdateCheckManager.java:557)
+    at org.eclipse.aether.internal.impl.DefaultMetadataResolver.resolve (DefaultMetadataResolver.java:367)
+    at org.eclipse.aether.internal.impl.DefaultMetadataResolver.resolveMetadata (DefaultMetadataResolver.java:181)
+    at org.apache.maven.repository.internal.DefaultVersionRangeResolver.getVersions (DefaultVersionRangeResolver.java:198)
+    at org.apache.maven.repository.internal.DefaultVersionRangeResolver.resolveVersionRange (DefaultVersionRangeResolver.java:148)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.cachedResolveRangeResult (DefaultDependencyCollector.java:619)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:392)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:362)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.process (DefaultDependencyCollector.java:349)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.doRecurse (DefaultDependencyCollector.java:506)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:458)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:362)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.process (DefaultDependencyCollector.java:349)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.doRecurse (DefaultDependencyCollector.java:506)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:458)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:362)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.process (DefaultDependencyCollector.java:349)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.doRecurse (DefaultDependencyCollector.java:506)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:458)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:362)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.process (DefaultDependencyCollector.java:349)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.doRecurse (DefaultDependencyCollector.java:506)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:458)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:362)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.process (DefaultDependencyCollector.java:349)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.doRecurse (DefaultDependencyCollector.java:506)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:458)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:362)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.process (DefaultDependencyCollector.java:349)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.collectDependencies (DefaultDependencyCollector.java:254)
+    at org.eclipse.aether.internal.impl.DefaultRepositorySystem.collectDependencies (DefaultRepositorySystem.java:284)
+    at org.apache.maven.project.DefaultProjectDependenciesResolver.resolve (DefaultProjectDependenciesResolver.java:170)
+    at org.apache.maven.lifecycle.internal.LifecycleDependencyResolver.getDependencies (LifecycleDependencyResolver.java:243)
+    at org.apache.maven.lifecycle.internal.LifecycleDependencyResolver.resolveProjectDependencies (LifecycleDependencyResolver.java:147)
+    at org.apache.maven.lifecycle.internal.MojoExecutor.ensureDependenciesAreResolved (MojoExecutor.java:401)
+    at org.apache.maven.lifecycle.internal.MojoExecutor.doExecute (MojoExecutor.java:347)
+    at org.apache.maven.lifecycle.internal.MojoExecutor.execute (MojoExecutor.java:215)
+    at org.apache.maven.lifecycle.internal.MojoExecutor.execute (MojoExecutor.java:171)
+    at org.apache.maven.lifecycle.internal.MojoExecutor.execute (MojoExecutor.java:163)
+    at org.apache.maven.lifecycle.internal.LifecycleModuleBuilder.buildProject (LifecycleModuleBuilder.java:117)
+    at org.apache.maven.lifecycle.internal.LifecycleModuleBuilder.buildProject (LifecycleModuleBuilder.java:81)
+    at org.apache.maven.lifecycle.internal.builder.singlethreaded.SingleThreadedBuilder.build (SingleThreadedBuilder.java:56)
+    at org.apache.maven.lifecycle.internal.LifecycleStarter.execute (LifecycleStarter.java:128)
+    at org.apache.maven.DefaultMaven.doExecute (DefaultMaven.java:294)
+    at org.apache.maven.DefaultMaven.doExecute (DefaultMaven.java:192)
+    at org.apache.maven.DefaultMaven.execute (DefaultMaven.java:105)
+    at org.apache.maven.cli.MavenCli.execute (MavenCli.java:960)
+    at org.apache.maven.cli.MavenCli.doMain (MavenCli.java:293)
+    at org.apache.maven.cli.MavenCli.main (MavenCli.java:196)
+    at jdk.internal.reflect.DirectMethodHandleAccessor.invoke (DirectMethodHandleAccessor.java:104)
+    at java.lang.reflect.Method.invoke (Method.java:565)
+    at org.codehaus.plexus.classworlds.launcher.Launcher.launchEnhanced (Launcher.java:282)
+    at org.codehaus.plexus.classworlds.launcher.Launcher.launch (Launcher.java:225)
+    at org.codehaus.plexus.classworlds.launcher.Launcher.mainWithExitCode (Launcher.java:406)
+    at org.codehaus.plexus.classworlds.launcher.Launcher.main (Launcher.java:347)
+[WARNING] Failed to write tracking file /Users/bryanchen/.m2/repository/org/glassfish/javax.el/resolver-status.properties
+java.io.FileNotFoundException: /Users/bryanchen/.m2/repository/org/glassfish/javax.el/resolver-status.properties (Operation not permitted)
+    at java.io.RandomAccessFile.open0 (Native Method)
+    at java.io.RandomAccessFile.open (RandomAccessFile.java:338)
+    at java.io.RandomAccessFile.<init> (RandomAccessFile.java:257)
+    at java.io.RandomAccessFile.<init> (RandomAccessFile.java:211)
+    at org.eclipse.aether.internal.impl.TrackingFileManager.update (TrackingFileManager.java:86)
+    at org.eclipse.aether.internal.impl.DefaultUpdateCheckManager.write (DefaultUpdateCheckManager.java:590)
+    at org.eclipse.aether.internal.impl.DefaultUpdateCheckManager.touchMetadata (DefaultUpdateCheckManager.java:557)
+    at org.eclipse.aether.internal.impl.DefaultMetadataResolver.resolve (DefaultMetadataResolver.java:367)
+    at org.eclipse.aether.internal.impl.DefaultMetadataResolver.resolveMetadata (DefaultMetadataResolver.java:181)
+    at org.apache.maven.repository.internal.DefaultVersionRangeResolver.getVersions (DefaultVersionRangeResolver.java:198)
+    at org.apache.maven.repository.internal.DefaultVersionRangeResolver.resolveVersionRange (DefaultVersionRangeResolver.java:148)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.cachedResolveRangeResult (DefaultDependencyCollector.java:619)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:392)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:362)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.process (DefaultDependencyCollector.java:349)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.doRecurse (DefaultDependencyCollector.java:506)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:458)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:362)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.process (DefaultDependencyCollector.java:349)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.doRecurse (DefaultDependencyCollector.java:506)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:458)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:362)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.process (DefaultDependencyCollector.java:349)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.doRecurse (DefaultDependencyCollector.java:506)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:458)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:362)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.process (DefaultDependencyCollector.java:349)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.doRecurse (DefaultDependencyCollector.java:506)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:458)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:362)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.process (DefaultDependencyCollector.java:349)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.doRecurse (DefaultDependencyCollector.java:506)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:458)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:362)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.process (DefaultDependencyCollector.java:349)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.collectDependencies (DefaultDependencyCollector.java:254)
+    at org.eclipse.aether.internal.impl.DefaultRepositorySystem.collectDependencies (DefaultRepositorySystem.java:284)
+    at org.apache.maven.project.DefaultProjectDependenciesResolver.resolve (DefaultProjectDependenciesResolver.java:170)
+    at org.apache.maven.lifecycle.internal.LifecycleDependencyResolver.getDependencies (LifecycleDependencyResolver.java:243)
+    at org.apache.maven.lifecycle.internal.LifecycleDependencyResolver.resolveProjectDependencies (LifecycleDependencyResolver.java:147)
+    at org.apache.maven.lifecycle.internal.MojoExecutor.ensureDependenciesAreResolved (MojoExecutor.java:401)
+    at org.apache.maven.lifecycle.internal.MojoExecutor.doExecute (MojoExecutor.java:347)
+    at org.apache.maven.lifecycle.internal.MojoExecutor.execute (MojoExecutor.java:215)
+    at org.apache.maven.lifecycle.internal.MojoExecutor.execute (MojoExecutor.java:171)
+    at org.apache.maven.lifecycle.internal.MojoExecutor.execute (MojoExecutor.java:163)
+    at org.apache.maven.lifecycle.internal.LifecycleModuleBuilder.buildProject (LifecycleModuleBuilder.java:117)
+    at org.apache.maven.lifecycle.internal.LifecycleModuleBuilder.buildProject (LifecycleModuleBuilder.java:81)
+    at org.apache.maven.lifecycle.internal.builder.singlethreaded.SingleThreadedBuilder.build (SingleThreadedBuilder.java:56)
+    at org.apache.maven.lifecycle.internal.LifecycleStarter.execute (LifecycleStarter.java:128)
+    at org.apache.maven.DefaultMaven.doExecute (DefaultMaven.java:294)
+    at org.apache.maven.DefaultMaven.doExecute (DefaultMaven.java:192)
+    at org.apache.maven.DefaultMaven.execute (DefaultMaven.java:105)
+    at org.apache.maven.cli.MavenCli.execute (MavenCli.java:960)
+    at org.apache.maven.cli.MavenCli.doMain (MavenCli.java:293)
+    at org.apache.maven.cli.MavenCli.main (MavenCli.java:196)
+    at jdk.internal.reflect.DirectMethodHandleAccessor.invoke (DirectMethodHandleAccessor.java:104)
+    at java.lang.reflect.Method.invoke (Method.java:565)
+    at org.codehaus.plexus.classworlds.launcher.Launcher.launchEnhanced (Launcher.java:282)
+    at org.codehaus.plexus.classworlds.launcher.Launcher.launch (Launcher.java:225)
+    at org.codehaus.plexus.classworlds.launcher.Launcher.mainWithExitCode (Launcher.java:406)
+    at org.codehaus.plexus.classworlds.launcher.Launcher.main (Launcher.java:347)
+[WARNING] Failed to write tracking file /Users/bryanchen/.m2/repository/org/glassfish/javax.el/resolver-status.properties
+java.io.FileNotFoundException: /Users/bryanchen/.m2/repository/org/glassfish/javax.el/resolver-status.properties (Operation not permitted)
+    at java.io.RandomAccessFile.open0 (Native Method)
+    at java.io.RandomAccessFile.open (RandomAccessFile.java:338)
+    at java.io.RandomAccessFile.<init> (RandomAccessFile.java:257)
+    at java.io.RandomAccessFile.<init> (RandomAccessFile.java:211)
+    at org.eclipse.aether.internal.impl.TrackingFileManager.update (TrackingFileManager.java:86)
+    at org.eclipse.aether.internal.impl.DefaultUpdateCheckManager.write (DefaultUpdateCheckManager.java:590)
+    at org.eclipse.aether.internal.impl.DefaultUpdateCheckManager.touchMetadata (DefaultUpdateCheckManager.java:557)
+    at org.eclipse.aether.internal.impl.DefaultMetadataResolver.resolve (DefaultMetadataResolver.java:367)
+    at org.eclipse.aether.internal.impl.DefaultMetadataResolver.resolveMetadata (DefaultMetadataResolver.java:181)
+    at org.apache.maven.repository.internal.DefaultVersionRangeResolver.getVersions (DefaultVersionRangeResolver.java:198)
+    at org.apache.maven.repository.internal.DefaultVersionRangeResolver.resolveVersionRange (DefaultVersionRangeResolver.java:148)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.cachedResolveRangeResult (DefaultDependencyCollector.java:619)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:392)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:362)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.process (DefaultDependencyCollector.java:349)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.doRecurse (DefaultDependencyCollector.java:506)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:458)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:362)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.process (DefaultDependencyCollector.java:349)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.doRecurse (DefaultDependencyCollector.java:506)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:458)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:362)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.process (DefaultDependencyCollector.java:349)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.doRecurse (DefaultDependencyCollector.java:506)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:458)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:362)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.process (DefaultDependencyCollector.java:349)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.doRecurse (DefaultDependencyCollector.java:506)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:458)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:362)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.process (DefaultDependencyCollector.java:349)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.doRecurse (DefaultDependencyCollector.java:506)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:458)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:362)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.process (DefaultDependencyCollector.java:349)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.collectDependencies (DefaultDependencyCollector.java:254)
+    at org.eclipse.aether.internal.impl.DefaultRepositorySystem.collectDependencies (DefaultRepositorySystem.java:284)
+    at org.apache.maven.project.DefaultProjectDependenciesResolver.resolve (DefaultProjectDependenciesResolver.java:170)
+    at org.apache.maven.lifecycle.internal.LifecycleDependencyResolver.getDependencies (LifecycleDependencyResolver.java:243)
+    at org.apache.maven.lifecycle.internal.LifecycleDependencyResolver.resolveProjectDependencies (LifecycleDependencyResolver.java:147)
+    at org.apache.maven.lifecycle.internal.MojoExecutor.ensureDependenciesAreResolved (MojoExecutor.java:401)
+    at org.apache.maven.lifecycle.internal.MojoExecutor.doExecute (MojoExecutor.java:347)
+    at org.apache.maven.lifecycle.internal.MojoExecutor.execute (MojoExecutor.java:215)
+    at org.apache.maven.lifecycle.internal.MojoExecutor.execute (MojoExecutor.java:171)
+    at org.apache.maven.lifecycle.internal.MojoExecutor.execute (MojoExecutor.java:163)
+    at org.apache.maven.lifecycle.internal.LifecycleModuleBuilder.buildProject (LifecycleModuleBuilder.java:117)
+    at org.apache.maven.lifecycle.internal.LifecycleModuleBuilder.buildProject (LifecycleModuleBuilder.java:81)
+    at org.apache.maven.lifecycle.internal.builder.singlethreaded.SingleThreadedBuilder.build (SingleThreadedBuilder.java:56)
+    at org.apache.maven.lifecycle.internal.LifecycleStarter.execute (LifecycleStarter.java:128)
+    at org.apache.maven.DefaultMaven.doExecute (DefaultMaven.java:294)
+    at org.apache.maven.DefaultMaven.doExecute (DefaultMaven.java:192)
+    at org.apache.maven.DefaultMaven.execute (DefaultMaven.java:105)
+    at org.apache.maven.cli.MavenCli.execute (MavenCli.java:960)
+    at org.apache.maven.cli.MavenCli.doMain (MavenCli.java:293)
+    at org.apache.maven.cli.MavenCli.main (MavenCli.java:196)
+    at jdk.internal.reflect.DirectMethodHandleAccessor.invoke (DirectMethodHandleAccessor.java:104)
+    at java.lang.reflect.Method.invoke (Method.java:565)
+    at org.codehaus.plexus.classworlds.launcher.Launcher.launchEnhanced (Launcher.java:282)
+    at org.codehaus.plexus.classworlds.launcher.Launcher.launch (Launcher.java:225)
+    at org.codehaus.plexus.classworlds.launcher.Launcher.mainWithExitCode (Launcher.java:406)
+    at org.codehaus.plexus.classworlds.launcher.Launcher.main (Launcher.java:347)
+[WARNING] Failed to write tracking file /Users/bryanchen/.m2/repository/org/glassfish/javax.el/resolver-status.properties
+java.io.FileNotFoundException: /Users/bryanchen/.m2/repository/org/glassfish/javax.el/resolver-status.properties (Operation not permitted)
+    at java.io.RandomAccessFile.open0 (Native Method)
+    at java.io.RandomAccessFile.open (RandomAccessFile.java:338)
+    at java.io.RandomAccessFile.<init> (RandomAccessFile.java:257)
+    at java.io.RandomAccessFile.<init> (RandomAccessFile.java:211)
+    at org.eclipse.aether.internal.impl.TrackingFileManager.update (TrackingFileManager.java:86)
+    at org.eclipse.aether.internal.impl.DefaultUpdateCheckManager.write (DefaultUpdateCheckManager.java:590)
+    at org.eclipse.aether.internal.impl.DefaultUpdateCheckManager.touchMetadata (DefaultUpdateCheckManager.java:557)
+    at org.eclipse.aether.internal.impl.DefaultMetadataResolver.resolve (DefaultMetadataResolver.java:367)
+    at org.eclipse.aether.internal.impl.DefaultMetadataResolver.resolveMetadata (DefaultMetadataResolver.java:181)
+    at org.apache.maven.repository.internal.DefaultVersionRangeResolver.getVersions (DefaultVersionRangeResolver.java:198)
+    at org.apache.maven.repository.internal.DefaultVersionRangeResolver.resolveVersionRange (DefaultVersionRangeResolver.java:148)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.cachedResolveRangeResult (DefaultDependencyCollector.java:619)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:392)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:362)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.process (DefaultDependencyCollector.java:349)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.doRecurse (DefaultDependencyCollector.java:506)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:458)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:362)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.process (DefaultDependencyCollector.java:349)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.doRecurse (DefaultDependencyCollector.java:506)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:458)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:362)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.process (DefaultDependencyCollector.java:349)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.doRecurse (DefaultDependencyCollector.java:506)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:458)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:362)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.process (DefaultDependencyCollector.java:349)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.doRecurse (DefaultDependencyCollector.java:506)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:458)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:362)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.process (DefaultDependencyCollector.java:349)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.doRecurse (DefaultDependencyCollector.java:506)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:458)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:362)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.process (DefaultDependencyCollector.java:349)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.collectDependencies (DefaultDependencyCollector.java:254)
+    at org.eclipse.aether.internal.impl.DefaultRepositorySystem.collectDependencies (DefaultRepositorySystem.java:284)
+    at org.apache.maven.project.DefaultProjectDependenciesResolver.resolve (DefaultProjectDependenciesResolver.java:170)
+    at org.apache.maven.lifecycle.internal.LifecycleDependencyResolver.getDependencies (LifecycleDependencyResolver.java:243)
+    at org.apache.maven.lifecycle.internal.LifecycleDependencyResolver.resolveProjectDependencies (LifecycleDependencyResolver.java:147)
+    at org.apache.maven.lifecycle.internal.MojoExecutor.ensureDependenciesAreResolved (MojoExecutor.java:401)
+    at org.apache.maven.lifecycle.internal.MojoExecutor.doExecute (MojoExecutor.java:347)
+    at org.apache.maven.lifecycle.internal.MojoExecutor.execute (MojoExecutor.java:215)
+    at org.apache.maven.lifecycle.internal.MojoExecutor.execute (MojoExecutor.java:171)
+    at org.apache.maven.lifecycle.internal.MojoExecutor.execute (MojoExecutor.java:163)
+    at org.apache.maven.lifecycle.internal.LifecycleModuleBuilder.buildProject (LifecycleModuleBuilder.java:117)
+    at org.apache.maven.lifecycle.internal.LifecycleModuleBuilder.buildProject (LifecycleModuleBuilder.java:81)
+    at org.apache.maven.lifecycle.internal.builder.singlethreaded.SingleThreadedBuilder.build (SingleThreadedBuilder.java:56)
+    at org.apache.maven.lifecycle.internal.LifecycleStarter.execute (LifecycleStarter.java:128)
+    at org.apache.maven.DefaultMaven.doExecute (DefaultMaven.java:294)
+    at org.apache.maven.DefaultMaven.doExecute (DefaultMaven.java:192)
+    at org.apache.maven.DefaultMaven.execute (DefaultMaven.java:105)
+    at org.apache.maven.cli.MavenCli.execute (MavenCli.java:960)
+    at org.apache.maven.cli.MavenCli.doMain (MavenCli.java:293)
+    at org.apache.maven.cli.MavenCli.main (MavenCli.java:196)
+    at jdk.internal.reflect.DirectMethodHandleAccessor.invoke (DirectMethodHandleAccessor.java:104)
+    at java.lang.reflect.Method.invoke (Method.java:565)
+    at org.codehaus.plexus.classworlds.launcher.Launcher.launchEnhanced (Launcher.java:282)
+    at org.codehaus.plexus.classworlds.launcher.Launcher.launch (Launcher.java:225)
+    at org.codehaus.plexus.classworlds.launcher.Launcher.mainWithExitCode (Launcher.java:406)
+    at org.codehaus.plexus.classworlds.launcher.Launcher.main (Launcher.java:347)
+[WARNING] Could not transfer metadata org.glassfish:javax.el/maven-metadata.xml from/to central (https://repo.maven.apache.org/maven2): /Users/bryanchen/.m2/repository/org/glassfish/javax.el/maven-metadata-central.xml.part.lock (Operation not permitted)
+[WARNING] Could not transfer metadata org.glassfish:javax.el/maven-metadata.xml from/to apache.snapshots (https://repository.apache.org/snapshots): /Users/bryanchen/.m2/repository/org/glassfish/javax.el/maven-metadata-apache.snapshots.xml.part.lock (Operation not permitted)
+[WARNING] Could not transfer metadata org.glassfish:javax.el/maven-metadata.xml from/to project.local (file:${project.basedir}/src/main/site/resources/repo): /Users/bryanchen/.m2/repository/org/glassfish/javax.el/maven-metadata-project.local.xml.part.lock (Operation not permitted)
+[WARNING] Could not transfer metadata org.glassfish:javax.el/maven-metadata.xml from/to java.net.Releases (https://maven.java.net/content/repositories/releases): /Users/bryanchen/.m2/repository/org/glassfish/javax.el/maven-metadata-java.net.Releases.xml.part.lock (Operation not permitted)
+[WARNING] Could not transfer metadata org.glassfish:javax.el/maven-metadata.xml from/to jvnet-nexus-snapshots (https://maven.java.net/content/repositories/snapshots): /Users/bryanchen/.m2/repository/org/glassfish/javax.el/maven-metadata-jvnet-nexus-snapshots.xml.part.lock (Operation not permitted)
+Downloading from central: https://repo.maven.apache.org/maven2/org/bouncycastle/bcpkix-jdk18on/maven-metadata.xml
+[WARNING] Failed to write tracking file /Users/bryanchen/.m2/repository/org/bouncycastle/bcpkix-jdk18on/resolver-status.properties
+java.io.FileNotFoundException: /Users/bryanchen/.m2/repository/org/bouncycastle/bcpkix-jdk18on/resolver-status.properties (Operation not permitted)
+    at java.io.RandomAccessFile.open0 (Native Method)
+    at java.io.RandomAccessFile.open (RandomAccessFile.java:338)
+    at java.io.RandomAccessFile.<init> (RandomAccessFile.java:257)
+    at java.io.RandomAccessFile.<init> (RandomAccessFile.java:211)
+    at org.eclipse.aether.internal.impl.TrackingFileManager.update (TrackingFileManager.java:86)
+    at org.eclipse.aether.internal.impl.DefaultUpdateCheckManager.write (DefaultUpdateCheckManager.java:590)
+    at org.eclipse.aether.internal.impl.DefaultUpdateCheckManager.touchMetadata (DefaultUpdateCheckManager.java:557)
+    at org.eclipse.aether.internal.impl.DefaultMetadataResolver.resolve (DefaultMetadataResolver.java:367)
+    at org.eclipse.aether.internal.impl.DefaultMetadataResolver.resolveMetadata (DefaultMetadataResolver.java:181)
+    at org.apache.maven.repository.internal.DefaultVersionRangeResolver.getVersions (DefaultVersionRangeResolver.java:198)
+    at org.apache.maven.repository.internal.DefaultVersionRangeResolver.resolveVersionRange (DefaultVersionRangeResolver.java:148)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.cachedResolveRangeResult (DefaultDependencyCollector.java:619)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:392)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:362)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.process (DefaultDependencyCollector.java:349)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.doRecurse (DefaultDependencyCollector.java:506)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:458)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:362)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.process (DefaultDependencyCollector.java:349)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.doRecurse (DefaultDependencyCollector.java:506)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:458)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:362)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.process (DefaultDependencyCollector.java:349)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.doRecurse (DefaultDependencyCollector.java:506)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:458)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:362)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.process (DefaultDependencyCollector.java:349)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.doRecurse (DefaultDependencyCollector.java:506)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:458)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:362)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.process (DefaultDependencyCollector.java:349)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.doRecurse (DefaultDependencyCollector.java:506)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:458)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:362)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.process (DefaultDependencyCollector.java:349)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.collectDependencies (DefaultDependencyCollector.java:254)
+    at org.eclipse.aether.internal.impl.DefaultRepositorySystem.collectDependencies (DefaultRepositorySystem.java:284)
+    at org.apache.maven.project.DefaultProjectDependenciesResolver.resolve (DefaultProjectDependenciesResolver.java:170)
+    at org.apache.maven.lifecycle.internal.LifecycleDependencyResolver.getDependencies (LifecycleDependencyResolver.java:243)
+    at org.apache.maven.lifecycle.internal.LifecycleDependencyResolver.resolveProjectDependencies (LifecycleDependencyResolver.java:147)
+    at org.apache.maven.lifecycle.internal.MojoExecutor.ensureDependenciesAreResolved (MojoExecutor.java:401)
+    at org.apache.maven.lifecycle.internal.MojoExecutor.doExecute (MojoExecutor.java:347)
+    at org.apache.maven.lifecycle.internal.MojoExecutor.execute (MojoExecutor.java:215)
+    at org.apache.maven.lifecycle.internal.MojoExecutor.execute (MojoExecutor.java:171)
+    at org.apache.maven.lifecycle.internal.MojoExecutor.execute (MojoExecutor.java:163)
+    at org.apache.maven.lifecycle.internal.LifecycleModuleBuilder.buildProject (LifecycleModuleBuilder.java:117)
+    at org.apache.maven.lifecycle.internal.LifecycleModuleBuilder.buildProject (LifecycleModuleBuilder.java:81)
+    at org.apache.maven.lifecycle.internal.builder.singlethreaded.SingleThreadedBuilder.build (SingleThreadedBuilder.java:56)
+    at org.apache.maven.lifecycle.internal.LifecycleStarter.execute (LifecycleStarter.java:128)
+    at org.apache.maven.DefaultMaven.doExecute (DefaultMaven.java:294)
+    at org.apache.maven.DefaultMaven.doExecute (DefaultMaven.java:192)
+    at org.apache.maven.DefaultMaven.execute (DefaultMaven.java:105)
+    at org.apache.maven.cli.MavenCli.execute (MavenCli.java:960)
+    at org.apache.maven.cli.MavenCli.doMain (MavenCli.java:293)
+    at org.apache.maven.cli.MavenCli.main (MavenCli.java:196)
+    at jdk.internal.reflect.DirectMethodHandleAccessor.invoke (DirectMethodHandleAccessor.java:104)
+    at java.lang.reflect.Method.invoke (Method.java:565)
+    at org.codehaus.plexus.classworlds.launcher.Launcher.launchEnhanced (Launcher.java:282)
+    at org.codehaus.plexus.classworlds.launcher.Launcher.launch (Launcher.java:225)
+    at org.codehaus.plexus.classworlds.launcher.Launcher.mainWithExitCode (Launcher.java:406)
+    at org.codehaus.plexus.classworlds.launcher.Launcher.main (Launcher.java:347)
+[WARNING] Could not transfer metadata org.bouncycastle:bcpkix-jdk18on/maven-metadata.xml from/to central (https://repo.maven.apache.org/maven2): /Users/bryanchen/.m2/repository/org/bouncycastle/bcpkix-jdk18on/maven-metadata-central.xml.part.lock (Operation not permitted)
+Downloading from central: https://repo.maven.apache.org/maven2/org/bouncycastle/bcutil-jdk18on/maven-metadata.xml
+[WARNING] Failed to write tracking file /Users/bryanchen/.m2/repository/org/bouncycastle/bcutil-jdk18on/resolver-status.properties
+java.io.FileNotFoundException: /Users/bryanchen/.m2/repository/org/bouncycastle/bcutil-jdk18on/resolver-status.properties (Operation not permitted)
+    at java.io.RandomAccessFile.open0 (Native Method)
+    at java.io.RandomAccessFile.open (RandomAccessFile.java:338)
+    at java.io.RandomAccessFile.<init> (RandomAccessFile.java:257)
+    at java.io.RandomAccessFile.<init> (RandomAccessFile.java:211)
+    at org.eclipse.aether.internal.impl.TrackingFileManager.update (TrackingFileManager.java:86)
+    at org.eclipse.aether.internal.impl.DefaultUpdateCheckManager.write (DefaultUpdateCheckManager.java:590)
+    at org.eclipse.aether.internal.impl.DefaultUpdateCheckManager.touchMetadata (DefaultUpdateCheckManager.java:557)
+    at org.eclipse.aether.internal.impl.DefaultMetadataResolver.resolve (DefaultMetadataResolver.java:367)
+    at org.eclipse.aether.internal.impl.DefaultMetadataResolver.resolveMetadata (DefaultMetadataResolver.java:181)
+    at org.apache.maven.repository.internal.DefaultVersionRangeResolver.getVersions (DefaultVersionRangeResolver.java:198)
+    at org.apache.maven.repository.internal.DefaultVersionRangeResolver.resolveVersionRange (DefaultVersionRangeResolver.java:148)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.cachedResolveRangeResult (DefaultDependencyCollector.java:619)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:392)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:362)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.process (DefaultDependencyCollector.java:349)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.doRecurse (DefaultDependencyCollector.java:506)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:458)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:362)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.process (DefaultDependencyCollector.java:349)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.doRecurse (DefaultDependencyCollector.java:506)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:458)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:362)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.process (DefaultDependencyCollector.java:349)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.doRecurse (DefaultDependencyCollector.java:506)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:458)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:362)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.process (DefaultDependencyCollector.java:349)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.doRecurse (DefaultDependencyCollector.java:506)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:458)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:362)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.process (DefaultDependencyCollector.java:349)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.doRecurse (DefaultDependencyCollector.java:506)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:458)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:362)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.process (DefaultDependencyCollector.java:349)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.doRecurse (DefaultDependencyCollector.java:506)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:458)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:362)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.process (DefaultDependencyCollector.java:349)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.collectDependencies (DefaultDependencyCollector.java:254)
+    at org.eclipse.aether.internal.impl.DefaultRepositorySystem.collectDependencies (DefaultRepositorySystem.java:284)
+    at org.apache.maven.project.DefaultProjectDependenciesResolver.resolve (DefaultProjectDependenciesResolver.java:170)
+    at org.apache.maven.lifecycle.internal.LifecycleDependencyResolver.getDependencies (LifecycleDependencyResolver.java:243)
+    at org.apache.maven.lifecycle.internal.LifecycleDependencyResolver.resolveProjectDependencies (LifecycleDependencyResolver.java:147)
+    at org.apache.maven.lifecycle.internal.MojoExecutor.ensureDependenciesAreResolved (MojoExecutor.java:401)
+    at org.apache.maven.lifecycle.internal.MojoExecutor.doExecute (MojoExecutor.java:347)
+    at org.apache.maven.lifecycle.internal.MojoExecutor.execute (MojoExecutor.java:215)
+    at org.apache.maven.lifecycle.internal.MojoExecutor.execute (MojoExecutor.java:171)
+    at org.apache.maven.lifecycle.internal.MojoExecutor.execute (MojoExecutor.java:163)
+    at org.apache.maven.lifecycle.internal.LifecycleModuleBuilder.buildProject (LifecycleModuleBuilder.java:117)
+    at org.apache.maven.lifecycle.internal.LifecycleModuleBuilder.buildProject (LifecycleModuleBuilder.java:81)
+    at org.apache.maven.lifecycle.internal.builder.singlethreaded.SingleThreadedBuilder.build (SingleThreadedBuilder.java:56)
+    at org.apache.maven.lifecycle.internal.LifecycleStarter.execute (LifecycleStarter.java:128)
+    at org.apache.maven.DefaultMaven.doExecute (DefaultMaven.java:294)
+    at org.apache.maven.DefaultMaven.doExecute (DefaultMaven.java:192)
+    at org.apache.maven.DefaultMaven.execute (DefaultMaven.java:105)
+    at org.apache.maven.cli.MavenCli.execute (MavenCli.java:960)
+    at org.apache.maven.cli.MavenCli.doMain (MavenCli.java:293)
+    at org.apache.maven.cli.MavenCli.main (MavenCli.java:196)
+    at jdk.internal.reflect.DirectMethodHandleAccessor.invoke (DirectMethodHandleAccessor.java:104)
+    at java.lang.reflect.Method.invoke (Method.java:565)
+    at org.codehaus.plexus.classworlds.launcher.Launcher.launchEnhanced (Launcher.java:282)
+    at org.codehaus.plexus.classworlds.launcher.Launcher.launch (Launcher.java:225)
+    at org.codehaus.plexus.classworlds.launcher.Launcher.mainWithExitCode (Launcher.java:406)
+    at org.codehaus.plexus.classworlds.launcher.Launcher.main (Launcher.java:347)
+[WARNING] Could not transfer metadata org.bouncycastle:bcutil-jdk18on/maven-metadata.xml from/to central (https://repo.maven.apache.org/maven2): /Users/bryanchen/.m2/repository/org/bouncycastle/bcutil-jdk18on/maven-metadata-central.xml.part.lock (Operation not permitted)
+Downloading from central: https://repo.maven.apache.org/maven2/org/bouncycastle/bcprov-jdk18on/maven-metadata.xml
+[WARNING] Failed to write tracking file /Users/bryanchen/.m2/repository/org/bouncycastle/bcprov-jdk18on/resolver-status.properties
+java.io.FileNotFoundException: /Users/bryanchen/.m2/repository/org/bouncycastle/bcprov-jdk18on/resolver-status.properties (Operation not permitted)
+    at java.io.RandomAccessFile.open0 (Native Method)
+    at java.io.RandomAccessFile.open (RandomAccessFile.java:338)
+    at java.io.RandomAccessFile.<init> (RandomAccessFile.java:257)
+    at java.io.RandomAccessFile.<init> (RandomAccessFile.java:211)
+    at org.eclipse.aether.internal.impl.TrackingFileManager.update (TrackingFileManager.java:86)
+    at org.eclipse.aether.internal.impl.DefaultUpdateCheckManager.write (DefaultUpdateCheckManager.java:590)
+    at org.eclipse.aether.internal.impl.DefaultUpdateCheckManager.touchMetadata (DefaultUpdateCheckManager.java:557)
+    at org.eclipse.aether.internal.impl.DefaultMetadataResolver.resolve (DefaultMetadataResolver.java:367)
+    at org.eclipse.aether.internal.impl.DefaultMetadataResolver.resolveMetadata (DefaultMetadataResolver.java:181)
+    at org.apache.maven.repository.internal.DefaultVersionRangeResolver.getVersions (DefaultVersionRangeResolver.java:198)
+    at org.apache.maven.repository.internal.DefaultVersionRangeResolver.resolveVersionRange (DefaultVersionRangeResolver.java:148)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.cachedResolveRangeResult (DefaultDependencyCollector.java:619)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:392)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:362)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.process (DefaultDependencyCollector.java:349)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.doRecurse (DefaultDependencyCollector.java:506)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:458)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:362)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.process (DefaultDependencyCollector.java:349)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.doRecurse (DefaultDependencyCollector.java:506)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:458)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:362)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.process (DefaultDependencyCollector.java:349)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.doRecurse (DefaultDependencyCollector.java:506)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:458)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:362)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.process (DefaultDependencyCollector.java:349)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.doRecurse (DefaultDependencyCollector.java:506)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:458)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:362)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.process (DefaultDependencyCollector.java:349)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.doRecurse (DefaultDependencyCollector.java:506)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:458)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:362)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.process (DefaultDependencyCollector.java:349)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.doRecurse (DefaultDependencyCollector.java:506)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:458)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:362)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.process (DefaultDependencyCollector.java:349)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.doRecurse (DefaultDependencyCollector.java:506)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:458)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.processDependency (DefaultDependencyCollector.java:362)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.process (DefaultDependencyCollector.java:349)
+    at org.eclipse.aether.internal.impl.collect.DefaultDependencyCollector.collectDependencies (DefaultDependencyCollector.java:254)
+    at org.eclipse.aether.internal.impl.DefaultRepositorySystem.collectDependencies (DefaultRepositorySystem.java:284)
+    at org.apache.maven.project.DefaultProjectDependenciesResolver.resolve (DefaultProjectDependenciesResolver.java:170)
+    at org.apache.maven.lifecycle.internal.LifecycleDependencyResolver.getDependencies (LifecycleDependencyResolver.java:243)
+    at org.apache.maven.lifecycle.internal.LifecycleDependencyResolver.resolveProjectDependencies (LifecycleDependencyResolver.java:147)
+    at org.apache.maven.lifecycle.internal.MojoExecutor.ensureDependenciesAreResolved (MojoExecutor.java:401)
+    at org.apache.maven.lifecycle.internal.MojoExecutor.doExecute (MojoExecutor.java:347)
+    at org.apache.maven.lifecycle.internal.MojoExecutor.execute (MojoExecutor.java:215)
+    at org.apache.maven.lifecycle.internal.MojoExecutor.execute (MojoExecutor.java:171)
+    at org.apache.maven.lifecycle.internal.MojoExecutor.execute (MojoExecutor.java:163)
+    at org.apache.maven.lifecycle.internal.LifecycleModuleBuilder.buildProject (LifecycleModuleBuilder.java:117)
+    at org.apache.maven.lifecycle.internal.LifecycleModuleBuilder.buildProject (LifecycleModuleBuilder.java:81)
+    at org.apache.maven.lifecycle.internal.builder.singlethreaded.SingleThreadedBuilder.build (SingleThreadedBuilder.java:56)
+    at org.apache.maven.lifecycle.internal.LifecycleStarter.execute (LifecycleStarter.java:128)
+    at org.apache.maven.DefaultMaven.doExecute (DefaultMaven.java:294)
+    at org.apache.maven.DefaultMaven.doExecute (DefaultMaven.java:192)
+    at org.apache.maven.DefaultMaven.execute (DefaultMaven.java:105)
+    at org.apache.maven.cli.MavenCli.execute (MavenCli.java:960)
+    at org.apache.maven.cli.MavenCli.doMain (MavenCli.java:293)
+    at org.apache.maven.cli.MavenCli.main (MavenCli.java:196)
+    at jdk.internal.reflect.DirectMethodHandleAccessor.invoke (DirectMethodHandleAccessor.java:104)
+    at java.lang.reflect.Method.invoke (Method.java:565)
+    at org.codehaus.plexus.classworlds.launcher.Launcher.launchEnhanced (Launcher.java:282)
+    at org.codehaus.plexus.classworlds.launcher.Launcher.launch (Launcher.java:225)
+    at org.codehaus.plexus.classworlds.launcher.Launcher.mainWithExitCode (Launcher.java:406)
+    at org.codehaus.plexus.classworlds.launcher.Launcher.main (Launcher.java:347)
+[WARNING] Could not transfer metadata org.bouncycastle:bcprov-jdk18on/maven-metadata.xml from/to central (https://repo.maven.apache.org/maven2): /Users/bryanchen/.m2/repository/org/bouncycastle/bcprov-jdk18on/maven-metadata-central.xml.part.lock (Operation not permitted)
+[WARNING] The artifact com.atlassian.commonmark:commonmark:jar:0.17.0 has been relocated to org.commonmark:commonmark:jar:0.17.0
+[INFO] 
+[INFO] --- maven-clean-plugin:2.5:clean (default-clean) @ phoenix-data-core ---
+[INFO] Deleting /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-data/phoenix-data-core/target
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:clean (flatten.clean) @ phoenix-data-core ---
+[INFO] Deleting /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-data/phoenix-data-core/.flattened-pom.xml
+[INFO] 
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ phoenix-data-core ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] Copying 18 resources
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:flatten (flatten) @ phoenix-data-core ---
+[INFO] Generating flattened POM of project com.phoenix:phoenix-data-core:jar:2.0.0-SNAPSHOT...
+[INFO] 
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ phoenix-data-core ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 182 source files with javac [debug release 21] to target/classes
+[INFO] /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-data/phoenix-data-core/src/main/java/com/phoenix/data/connector/accessor/AbstractAccessor.java: 某些输入文件使用或覆盖了已过时的 API。
+[INFO] /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-data/phoenix-data-core/src/main/java/com/phoenix/data/connector/accessor/AbstractAccessor.java: 有关详细信息, 请使用 -Xlint:deprecation 重新编译。
+[INFO] /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-data/phoenix-data-core/src/main/java/com/phoenix/data/connector/accessor/AbstractAccessor.java: 某些输入文件使用了未经检查或不安全的操作。
+[INFO] /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-data/phoenix-data-core/src/main/java/com/phoenix/data/connector/accessor/AbstractAccessor.java: 有关详细信息, 请使用 -Xlint:unchecked 重新编译。
+[INFO] 
+[INFO] -------------------< com.phoenix:phoenix-data-rest >--------------------
+[INFO] Building phoenix-data-rest 2.0.0-SNAPSHOT                         [9/41]
+[INFO] --------------------------------[ jar ]---------------------------------
+[WARNING] org.glassfish:javax.el/maven-metadata.xmlfailed to transfer from https://repository.apache.org/snapshots during a previous attempt. This failure was cached in the local repository and resolution will not be reattempted until the update interval of apache.snapshots has elapsed or updates are forced. Original error: Could not transfer metadata org.glassfish:javax.el/maven-metadata.xml from/to apache.snapshots (https://repository.apache.org/snapshots): Connect to repository.apache.org:443 [repository.apache.org/37.27.138.133] failed: Connect timed out
+[WARNING] org.glassfish:javax.el/maven-metadata.xmlfailed to transfer from https://maven.java.net/content/repositories/releases during a previous attempt. This failure was cached in the local repository and resolution will not be reattempted until the update interval of java.net.Releases has elapsed or updates are forced. Original error: Could not transfer metadata org.glassfish:javax.el/maven-metadata.xml from/to java.net.Releases (https://maven.java.net/content/repositories/releases): (certificate_unknown) PKIX path validation failed: java.security.cert.CertPathValidatorException: validity check failed
+[WARNING] org.glassfish:javax.el/maven-metadata.xmlfailed to transfer from https://maven.java.net/content/repositories/snapshots during a previous attempt. This failure was cached in the local repository and resolution will not be reattempted until the update interval of jvnet-nexus-snapshots has elapsed or updates are forced. Original error: Could not transfer metadata org.glassfish:javax.el/maven-metadata.xml from/to jvnet-nexus-snapshots (https://maven.java.net/content/repositories/snapshots): (certificate_unknown) PKIX path validation failed: java.security.cert.CertPathValidatorException: validity check failed
+[INFO] 
+[INFO] --- maven-clean-plugin:2.5:clean (default-clean) @ phoenix-data-rest ---
+[INFO] Deleting /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-data/phoenix-data-rest/target
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:clean (flatten.clean) @ phoenix-data-rest ---
+[INFO] Deleting /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-data/phoenix-data-rest/.flattened-pom.xml
+[INFO] 
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ phoenix-data-rest ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-data/phoenix-data-rest/src/main/resources
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:flatten (flatten) @ phoenix-data-rest ---
+[INFO] Generating flattened POM of project com.phoenix:phoenix-data-rest:jar:2.0.0-SNAPSHOT...
+[INFO] 
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ phoenix-data-rest ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 17 source files with javac [debug release 21] to target/classes
+[INFO] 
+[INFO] ----------------------< com.phoenix:phoenix-data >----------------------
+[INFO] Building phoenix-data 2.0.0-SNAPSHOT                             [10/41]
+[INFO] --------------------------------[ pom ]---------------------------------
+[WARNING] org.glassfish:javax.el/maven-metadata.xmlfailed to transfer from https://repository.apache.org/snapshots during a previous attempt. This failure was cached in the local repository and resolution will not be reattempted until the update interval of apache.snapshots has elapsed or updates are forced. Original error: Could not transfer metadata org.glassfish:javax.el/maven-metadata.xml from/to apache.snapshots (https://repository.apache.org/snapshots): Connect to repository.apache.org:443 [repository.apache.org/37.27.138.133] failed: Connect timed out
+[WARNING] org.glassfish:javax.el/maven-metadata.xmlfailed to transfer from https://maven.java.net/content/repositories/releases during a previous attempt. This failure was cached in the local repository and resolution will not be reattempted until the update interval of java.net.Releases has elapsed or updates are forced. Original error: Could not transfer metadata org.glassfish:javax.el/maven-metadata.xml from/to java.net.Releases (https://maven.java.net/content/repositories/releases): (certificate_unknown) PKIX path validation failed: java.security.cert.CertPathValidatorException: validity check failed
+[WARNING] org.glassfish:javax.el/maven-metadata.xmlfailed to transfer from https://maven.java.net/content/repositories/snapshots during a previous attempt. This failure was cached in the local repository and resolution will not be reattempted until the update interval of jvnet-nexus-snapshots has elapsed or updates are forced. Original error: Could not transfer metadata org.glassfish:javax.el/maven-metadata.xml from/to jvnet-nexus-snapshots (https://maven.java.net/content/repositories/snapshots): (certificate_unknown) PKIX path validation failed: java.security.cert.CertPathValidatorException: validity check failed
+[WARNING] The artifact com.atlassian.commonmark:commonmark:jar:0.17.0 has been relocated to org.commonmark:commonmark:jar:0.17.0
+[INFO] 
+[INFO] --- maven-clean-plugin:2.5:clean (default-clean) @ phoenix-data ---
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:clean (flatten.clean) @ phoenix-data ---
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:flatten (flatten) @ phoenix-data ---
+[INFO] Generating flattened POM of project com.phoenix:phoenix-data:pom:2.0.0-SNAPSHOT...
+[INFO] 
+[INFO] -------------------< com.phoenix:phoenix-agent-api >--------------------
+[INFO] Building phoenix-agent-api 2.0.0-SNAPSHOT                        [11/41]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- maven-clean-plugin:2.5:clean (default-clean) @ phoenix-agent-api ---
+[INFO] Deleting /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-agent/phoenix-agent-api/target
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:clean (flatten.clean) @ phoenix-agent-api ---
+[INFO] Deleting /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-agent/phoenix-agent-api/.flattened-pom.xml
+[INFO] 
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ phoenix-agent-api ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-agent/phoenix-agent-api/src/main/resources
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:flatten (flatten) @ phoenix-agent-api ---
+[INFO] Generating flattened POM of project com.phoenix:phoenix-agent-api:jar:2.0.0-SNAPSHOT...
+[INFO] 
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ phoenix-agent-api ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 51 source files with javac [debug release 21] to target/classes
+[INFO] 
+[INFO] -------------------< com.phoenix:phoenix-agent-core >-------------------
+[INFO] Building phoenix-agent-core 2.0.0-SNAPSHOT                       [12/41]
+[INFO] --------------------------------[ jar ]---------------------------------
+[WARNING] org.glassfish:javax.el/maven-metadata.xmlfailed to transfer from https://repository.apache.org/snapshots during a previous attempt. This failure was cached in the local repository and resolution will not be reattempted until the update interval of apache.snapshots has elapsed or updates are forced. Original error: Could not transfer metadata org.glassfish:javax.el/maven-metadata.xml from/to apache.snapshots (https://repository.apache.org/snapshots): Connect to repository.apache.org:443 [repository.apache.org/37.27.138.133] failed: Connect timed out
+[WARNING] org.glassfish:javax.el/maven-metadata.xmlfailed to transfer from https://maven.java.net/content/repositories/releases during a previous attempt. This failure was cached in the local repository and resolution will not be reattempted until the update interval of java.net.Releases has elapsed or updates are forced. Original error: Could not transfer metadata org.glassfish:javax.el/maven-metadata.xml from/to java.net.Releases (https://maven.java.net/content/repositories/releases): (certificate_unknown) PKIX path validation failed: java.security.cert.CertPathValidatorException: validity check failed
+[WARNING] org.glassfish:javax.el/maven-metadata.xmlfailed to transfer from https://maven.java.net/content/repositories/snapshots during a previous attempt. This failure was cached in the local repository and resolution will not be reattempted until the update interval of jvnet-nexus-snapshots has elapsed or updates are forced. Original error: Could not transfer metadata org.glassfish:javax.el/maven-metadata.xml from/to jvnet-nexus-snapshots (https://maven.java.net/content/repositories/snapshots): (certificate_unknown) PKIX path validation failed: java.security.cert.CertPathValidatorException: validity check failed
+[INFO] 
+[INFO] --- maven-clean-plugin:2.5:clean (default-clean) @ phoenix-agent-core ---
+[INFO] Deleting /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-agent/phoenix-agent-core/target
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:clean (flatten.clean) @ phoenix-agent-core ---
+[INFO] Deleting /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-agent/phoenix-agent-core/.flattened-pom.xml
+[INFO] 
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ phoenix-agent-core ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] Copying 3 resources
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:flatten (flatten) @ phoenix-agent-core ---
+[INFO] Generating flattened POM of project com.phoenix:phoenix-agent-core:jar:2.0.0-SNAPSHOT...
+[INFO] 
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ phoenix-agent-core ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 124 source files with javac [debug release 21] to target/classes
+[INFO] /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-agent/phoenix-agent-core/src/main/java/com/phoenix/agent/harness/service/impl/HitlCacheServiceImpl.java: 某些输入文件使用或覆盖了已过时的 API。
+[INFO] /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-agent/phoenix-agent-core/src/main/java/com/phoenix/agent/harness/service/impl/HitlCacheServiceImpl.java: 有关详细信息, 请使用 -Xlint:deprecation 重新编译。
+[INFO] /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-agent/phoenix-agent-core/src/main/java/com/phoenix/agent/hook/AgentSessionInfoSaveHook.java: 某些输入文件使用了未经检查或不安全的操作。
+[INFO] /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-agent/phoenix-agent-core/src/main/java/com/phoenix/agent/hook/AgentSessionInfoSaveHook.java: 有关详细信息, 请使用 -Xlint:unchecked 重新编译。
+[INFO] 
+[INFO] -------------------< com.phoenix:phoenix-agent-rest >-------------------
+[INFO] Building phoenix-agent-rest 2.0.0-SNAPSHOT                       [13/41]
+[INFO] --------------------------------[ jar ]---------------------------------
+[WARNING] org.glassfish:javax.el/maven-metadata.xmlfailed to transfer from https://repository.apache.org/snapshots during a previous attempt. This failure was cached in the local repository and resolution will not be reattempted until the update interval of apache.snapshots has elapsed or updates are forced. Original error: Could not transfer metadata org.glassfish:javax.el/maven-metadata.xml from/to apache.snapshots (https://repository.apache.org/snapshots): Connect to repository.apache.org:443 [repository.apache.org/37.27.138.133] failed: Connect timed out
+[WARNING] org.glassfish:javax.el/maven-metadata.xmlfailed to transfer from https://maven.java.net/content/repositories/releases during a previous attempt. This failure was cached in the local repository and resolution will not be reattempted until the update interval of java.net.Releases has elapsed or updates are forced. Original error: Could not transfer metadata org.glassfish:javax.el/maven-metadata.xml from/to java.net.Releases (https://maven.java.net/content/repositories/releases): (certificate_unknown) PKIX path validation failed: java.security.cert.CertPathValidatorException: validity check failed
+[WARNING] org.glassfish:javax.el/maven-metadata.xmlfailed to transfer from https://maven.java.net/content/repositories/snapshots during a previous attempt. This failure was cached in the local repository and resolution will not be reattempted until the update interval of jvnet-nexus-snapshots has elapsed or updates are forced. Original error: Could not transfer metadata org.glassfish:javax.el/maven-metadata.xml from/to jvnet-nexus-snapshots (https://maven.java.net/content/repositories/snapshots): (certificate_unknown) PKIX path validation failed: java.security.cert.CertPathValidatorException: validity check failed
+[INFO] 
+[INFO] --- maven-clean-plugin:2.5:clean (default-clean) @ phoenix-agent-rest ---
+[INFO] Deleting /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-agent/phoenix-agent-rest/target
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:clean (flatten.clean) @ phoenix-agent-rest ---
+[INFO] Deleting /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-agent/phoenix-agent-rest/.flattened-pom.xml
+[INFO] 
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ phoenix-agent-rest ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-agent/phoenix-agent-rest/src/main/resources
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:flatten (flatten) @ phoenix-agent-rest ---
+[INFO] Generating flattened POM of project com.phoenix:phoenix-agent-rest:jar:2.0.0-SNAPSHOT...
+[INFO] 
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ phoenix-agent-rest ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 9 source files with javac [debug release 21] to target/classes
+[INFO] /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-agent/phoenix-agent-rest/src/main/java/com/phoenix/agent/controller/support/HarnessEventMapper.java: 某些输入文件使用或覆盖了已过时的 API。
+[INFO] /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-agent/phoenix-agent-rest/src/main/java/com/phoenix/agent/controller/support/HarnessEventMapper.java: 有关详细信息, 请使用 -Xlint:deprecation 重新编译。
+[INFO] 
+[INFO] ---------------------< com.phoenix:phoenix-agent >----------------------
+[INFO] Building phoenix-agent 2.0.0-SNAPSHOT                            [14/41]
+[INFO] --------------------------------[ pom ]---------------------------------
+[INFO] 
+[INFO] --- maven-clean-plugin:2.5:clean (default-clean) @ phoenix-agent ---
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:clean (flatten.clean) @ phoenix-agent ---
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:flatten (flatten) @ phoenix-agent ---
+[INFO] Generating flattened POM of project com.phoenix:phoenix-agent:pom:2.0.0-SNAPSHOT...
+[INFO] 
+[INFO] -------------------< com.phoenix:phoenix-admin-api >--------------------
+[INFO] Building phoenix-admin-api 2.0.0-SNAPSHOT                        [15/41]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- maven-clean-plugin:2.5:clean (default-clean) @ phoenix-admin-api ---
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:clean (flatten.clean) @ phoenix-admin-api ---
+[INFO] 
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ phoenix-admin-api ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-admin/phoenix-admin-api/src/main/resources
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:flatten (flatten) @ phoenix-admin-api ---
+[INFO] Generating flattened POM of project com.phoenix:phoenix-admin-api:jar:2.0.0-SNAPSHOT...
+[INFO] 
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ phoenix-admin-api ---
+[INFO] No sources to compile
+[INFO] 
+[INFO] -------------------< com.phoenix:phoenix-admin-core >-------------------
+[INFO] Building phoenix-admin-core 2.0.0-SNAPSHOT                       [16/41]
+[INFO] --------------------------------[ jar ]---------------------------------
+[WARNING] org.glassfish:javax.el/maven-metadata.xmlfailed to transfer from https://repository.apache.org/snapshots during a previous attempt. This failure was cached in the local repository and resolution will not be reattempted until the update interval of apache.snapshots has elapsed or updates are forced. Original error: Could not transfer metadata org.glassfish:javax.el/maven-metadata.xml from/to apache.snapshots (https://repository.apache.org/snapshots): Connect to repository.apache.org:443 [repository.apache.org/37.27.138.133] failed: Connect timed out
+[WARNING] org.glassfish:javax.el/maven-metadata.xmlfailed to transfer from https://maven.java.net/content/repositories/releases during a previous attempt. This failure was cached in the local repository and resolution will not be reattempted until the update interval of java.net.Releases has elapsed or updates are forced. Original error: Could not transfer metadata org.glassfish:javax.el/maven-metadata.xml from/to java.net.Releases (https://maven.java.net/content/repositories/releases): (certificate_unknown) PKIX path validation failed: java.security.cert.CertPathValidatorException: validity check failed
+[WARNING] org.glassfish:javax.el/maven-metadata.xmlfailed to transfer from https://maven.java.net/content/repositories/snapshots during a previous attempt. This failure was cached in the local repository and resolution will not be reattempted until the update interval of jvnet-nexus-snapshots has elapsed or updates are forced. Original error: Could not transfer metadata org.glassfish:javax.el/maven-metadata.xml from/to jvnet-nexus-snapshots (https://maven.java.net/content/repositories/snapshots): (certificate_unknown) PKIX path validation failed: java.security.cert.CertPathValidatorException: validity check failed
+[INFO] 
+[INFO] --- maven-clean-plugin:2.5:clean (default-clean) @ phoenix-admin-core ---
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:clean (flatten.clean) @ phoenix-admin-core ---
+[INFO] 
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ phoenix-admin-core ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-admin/phoenix-admin-core/src/main/resources
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:flatten (flatten) @ phoenix-admin-core ---
+[INFO] Generating flattened POM of project com.phoenix:phoenix-admin-core:jar:2.0.0-SNAPSHOT...
+[INFO] 
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ phoenix-admin-core ---
+[INFO] No sources to compile
+[INFO] 
+[INFO] -----------------< com.phoenix:phoenix-privilege-rest >-----------------
+[INFO] Building phoenix-privilege-rest 2.0.0-SNAPSHOT                   [17/41]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- maven-clean-plugin:2.5:clean (default-clean) @ phoenix-privilege-rest ---
+[INFO] Deleting /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-privilege/phoenix-privilege-rest/target
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:clean (flatten.clean) @ phoenix-privilege-rest ---
+[INFO] Deleting /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-privilege/phoenix-privilege-rest/.flattened-pom.xml
+[INFO] 
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ phoenix-privilege-rest ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-privilege/phoenix-privilege-rest/src/main/resources
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:flatten (flatten) @ phoenix-privilege-rest ---
+[INFO] Generating flattened POM of project com.phoenix:phoenix-privilege-rest:jar:2.0.0-SNAPSHOT...
+[INFO] 
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ phoenix-privilege-rest ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 13 source files with javac [debug release 21] to target/classes
+[INFO] 
+[INFO] ------------------< com.phoenix:phoenix-platform-api >------------------
+[INFO] Building phoenix-platform-api 2.0.0-SNAPSHOT                     [18/41]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- maven-clean-plugin:2.5:clean (default-clean) @ phoenix-platform-api ---
+[INFO] Deleting /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-platform/phoenix-platform-api/target
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:clean (flatten.clean) @ phoenix-platform-api ---
+[INFO] Deleting /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-platform/phoenix-platform-api/.flattened-pom.xml
+[INFO] 
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ phoenix-platform-api ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-platform/phoenix-platform-api/src/main/resources
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:flatten (flatten) @ phoenix-platform-api ---
+[INFO] Generating flattened POM of project com.phoenix:phoenix-platform-api:jar:2.0.0-SNAPSHOT...
+[INFO] 
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ phoenix-platform-api ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 19 source files with javac [debug release 21] to target/classes
+[WARNING] /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-platform/phoenix-platform-api/src/main/java/com/phoenix/platform/model/front/AccountInfo.java:[20,1] Generating equals/hashCode implementation but without a call to superclass, even though this class does not extend java.lang.Object. If this is intentional, add '@EqualsAndHashCode(callSuper=false)' to your type.
+[WARNING] /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-platform/phoenix-platform-api/src/main/java/com/phoenix/platform/model/front/AccountTenantInfo.java:[12,1] Generating equals/hashCode implementation but without a call to superclass, even though this class does not extend java.lang.Object. If this is intentional, add '@EqualsAndHashCode(callSuper=false)' to your type.
+[WARNING] /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-platform/phoenix-platform-api/src/main/java/com/phoenix/platform/model/front/GroupInfo.java:[16,1] Generating equals/hashCode implementation but without a call to superclass, even though this class does not extend java.lang.Object. If this is intentional, add '@EqualsAndHashCode(callSuper=false)' to your type.
+[WARNING] /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-platform/phoenix-platform-api/src/main/java/com/phoenix/platform/model/front/TenantInfo.java:[11,1] Generating equals/hashCode implementation but without a call to superclass, even though this class does not extend java.lang.Object. If this is intentional, add '@EqualsAndHashCode(callSuper=false)' to your type.
+[WARNING] /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-platform/phoenix-platform-api/src/main/java/com/phoenix/platform/model/front/GroupAgentInfo.java:[13,1] Generating equals/hashCode implementation but without a call to superclass, even though this class does not extend java.lang.Object. If this is intentional, add '@EqualsAndHashCode(callSuper=false)' to your type.
+[WARNING] /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-platform/phoenix-platform-api/src/main/java/com/phoenix/platform/model/front/AccountGroupInfo.java:[16,1] Generating equals/hashCode implementation but without a call to superclass, even though this class does not extend java.lang.Object. If this is intentional, add '@EqualsAndHashCode(callSuper=false)' to your type.
+[INFO] 
+[INFO] -----------------< com.phoenix:phoenix-platform-core >------------------
+[INFO] Building phoenix-platform-core 2.0.0-SNAPSHOT                    [19/41]
+[INFO] --------------------------------[ jar ]---------------------------------
+[WARNING] org.glassfish:javax.el/maven-metadata.xmlfailed to transfer from https://repository.apache.org/snapshots during a previous attempt. This failure was cached in the local repository and resolution will not be reattempted until the update interval of apache.snapshots has elapsed or updates are forced. Original error: Could not transfer metadata org.glassfish:javax.el/maven-metadata.xml from/to apache.snapshots (https://repository.apache.org/snapshots): Connect to repository.apache.org:443 [repository.apache.org/37.27.138.133] failed: Connect timed out
+[WARNING] org.glassfish:javax.el/maven-metadata.xmlfailed to transfer from https://maven.java.net/content/repositories/releases during a previous attempt. This failure was cached in the local repository and resolution will not be reattempted until the update interval of java.net.Releases has elapsed or updates are forced. Original error: Could not transfer metadata org.glassfish:javax.el/maven-metadata.xml from/to java.net.Releases (https://maven.java.net/content/repositories/releases): (certificate_unknown) PKIX path validation failed: java.security.cert.CertPathValidatorException: validity check failed
+[WARNING] org.glassfish:javax.el/maven-metadata.xmlfailed to transfer from https://maven.java.net/content/repositories/snapshots during a previous attempt. This failure was cached in the local repository and resolution will not be reattempted until the update interval of jvnet-nexus-snapshots has elapsed or updates are forced. Original error: Could not transfer metadata org.glassfish:javax.el/maven-metadata.xml from/to jvnet-nexus-snapshots (https://maven.java.net/content/repositories/snapshots): (certificate_unknown) PKIX path validation failed: java.security.cert.CertPathValidatorException: validity check failed
+[INFO] 
+[INFO] --- maven-clean-plugin:2.5:clean (default-clean) @ phoenix-platform-core ---
+[INFO] Deleting /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-platform/phoenix-platform-core/target
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:clean (flatten.clean) @ phoenix-platform-core ---
+[INFO] Deleting /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-platform/phoenix-platform-core/.flattened-pom.xml
+[INFO] 
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ phoenix-platform-core ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] Copying 2 resources
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:flatten (flatten) @ phoenix-platform-core ---
+[INFO] Generating flattened POM of project com.phoenix:phoenix-platform-core:jar:2.0.0-SNAPSHOT...
+[INFO] 
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ phoenix-platform-core ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 31 source files with javac [debug release 21] to target/classes
+[INFO] /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-platform/phoenix-platform-core/src/main/java/com/phoenix/platform/service/front/impl/AccountGroupInfoServiceImpl.java: 某些输入文件使用了未经检查或不安全的操作。
+[INFO] /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-platform/phoenix-platform-core/src/main/java/com/phoenix/platform/service/front/impl/AccountGroupInfoServiceImpl.java: 有关详细信息, 请使用 -Xlint:unchecked 重新编译。
+[INFO] 
+[INFO] -----------------< com.phoenix:phoenix-platform-rest >------------------
+[INFO] Building phoenix-platform-rest 2.0.0-SNAPSHOT                    [20/41]
+[INFO] --------------------------------[ jar ]---------------------------------
+[WARNING] org.glassfish:javax.el/maven-metadata.xmlfailed to transfer from https://repository.apache.org/snapshots during a previous attempt. This failure was cached in the local repository and resolution will not be reattempted until the update interval of apache.snapshots has elapsed or updates are forced. Original error: Could not transfer metadata org.glassfish:javax.el/maven-metadata.xml from/to apache.snapshots (https://repository.apache.org/snapshots): Connect to repository.apache.org:443 [repository.apache.org/37.27.138.133] failed: Connect timed out
+[WARNING] org.glassfish:javax.el/maven-metadata.xmlfailed to transfer from https://maven.java.net/content/repositories/releases during a previous attempt. This failure was cached in the local repository and resolution will not be reattempted until the update interval of java.net.Releases has elapsed or updates are forced. Original error: Could not transfer metadata org.glassfish:javax.el/maven-metadata.xml from/to java.net.Releases (https://maven.java.net/content/repositories/releases): (certificate_unknown) PKIX path validation failed: java.security.cert.CertPathValidatorException: validity check failed
+[WARNING] org.glassfish:javax.el/maven-metadata.xmlfailed to transfer from https://maven.java.net/content/repositories/snapshots during a previous attempt. This failure was cached in the local repository and resolution will not be reattempted until the update interval of jvnet-nexus-snapshots has elapsed or updates are forced. Original error: Could not transfer metadata org.glassfish:javax.el/maven-metadata.xml from/to jvnet-nexus-snapshots (https://maven.java.net/content/repositories/snapshots): (certificate_unknown) PKIX path validation failed: java.security.cert.CertPathValidatorException: validity check failed
+[INFO] 
+[INFO] --- maven-clean-plugin:2.5:clean (default-clean) @ phoenix-platform-rest ---
+[INFO] Deleting /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-platform/phoenix-platform-rest/target
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:clean (flatten.clean) @ phoenix-platform-rest ---
+[INFO] Deleting /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-platform/phoenix-platform-rest/.flattened-pom.xml
+[INFO] 
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ phoenix-platform-rest ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-platform/phoenix-platform-rest/src/main/resources
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:flatten (flatten) @ phoenix-platform-rest ---
+[INFO] Generating flattened POM of project com.phoenix:phoenix-platform-rest:jar:2.0.0-SNAPSHOT...
+[INFO] 
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ phoenix-platform-rest ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 12 source files with javac [debug release 21] to target/classes
+[INFO] /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-platform/phoenix-platform-rest/src/main/java/com/phoenix/platform/controller/HarnessFrontController.java: 某些输入文件使用或覆盖了已过时的 API。
+[INFO] /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-platform/phoenix-platform-rest/src/main/java/com/phoenix/platform/controller/HarnessFrontController.java: 有关详细信息, 请使用 -Xlint:deprecation 重新编译。
+[INFO] 
+[INFO] ------------------< com.phoenix:phoenix-common-rest >-------------------
+[INFO] Building phoenix-common-rest 2.0.0-SNAPSHOT                      [21/41]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- maven-clean-plugin:2.5:clean (default-clean) @ phoenix-common-rest ---
+[INFO] Deleting /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-common/phoenix-common-rest/target
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:clean (flatten.clean) @ phoenix-common-rest ---
+[INFO] Deleting /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-common/phoenix-common-rest/.flattened-pom.xml
+[INFO] 
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ phoenix-common-rest ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-common/phoenix-common-rest/src/main/resources
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:flatten (flatten) @ phoenix-common-rest ---
+[INFO] Generating flattened POM of project com.phoenix:phoenix-common-rest:jar:2.0.0-SNAPSHOT...
+[INFO] 
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ phoenix-common-rest ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 2 source files with javac [debug release 21] to target/classes
+[INFO] 
+[INFO] -------------------< com.phoenix:phoenix-admin-rest >-------------------
+[INFO] Building phoenix-admin-rest 2.0.0-SNAPSHOT                       [22/41]
+[INFO] --------------------------------[ jar ]---------------------------------
+[WARNING] org.glassfish:javax.el/maven-metadata.xmlfailed to transfer from https://repository.apache.org/snapshots during a previous attempt. This failure was cached in the local repository and resolution will not be reattempted until the update interval of apache.snapshots has elapsed or updates are forced. Original error: Could not transfer metadata org.glassfish:javax.el/maven-metadata.xml from/to apache.snapshots (https://repository.apache.org/snapshots): Connect to repository.apache.org:443 [repository.apache.org/37.27.138.133] failed: Connect timed out
+[WARNING] org.glassfish:javax.el/maven-metadata.xmlfailed to transfer from https://maven.java.net/content/repositories/releases during a previous attempt. This failure was cached in the local repository and resolution will not be reattempted until the update interval of java.net.Releases has elapsed or updates are forced. Original error: Could not transfer metadata org.glassfish:javax.el/maven-metadata.xml from/to java.net.Releases (https://maven.java.net/content/repositories/releases): (certificate_unknown) PKIX path validation failed: java.security.cert.CertPathValidatorException: validity check failed
+[WARNING] org.glassfish:javax.el/maven-metadata.xmlfailed to transfer from https://maven.java.net/content/repositories/snapshots during a previous attempt. This failure was cached in the local repository and resolution will not be reattempted until the update interval of jvnet-nexus-snapshots has elapsed or updates are forced. Original error: Could not transfer metadata org.glassfish:javax.el/maven-metadata.xml from/to jvnet-nexus-snapshots (https://maven.java.net/content/repositories/snapshots): (certificate_unknown) PKIX path validation failed: java.security.cert.CertPathValidatorException: validity check failed
+[INFO] 
+[INFO] --- maven-clean-plugin:2.5:clean (default-clean) @ phoenix-admin-rest ---
+[INFO] Deleting /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-admin/phoenix-admin-rest/target
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:clean (flatten.clean) @ phoenix-admin-rest ---
+[INFO] Deleting /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-admin/phoenix-admin-rest/.flattened-pom.xml
+[INFO] 
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ phoenix-admin-rest ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-admin/phoenix-admin-rest/src/main/resources
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:flatten (flatten) @ phoenix-admin-rest ---
+[INFO] Generating flattened POM of project com.phoenix:phoenix-admin-rest:jar:2.0.0-SNAPSHOT...
+[INFO] 
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ phoenix-admin-rest ---
+[INFO] No sources to compile
+[INFO] 
+[INFO] -----------------< com.phoenix:phoenix-admin-manager >------------------
+[INFO] Building phoenix-admin-manager 2.0.0-SNAPSHOT                    [23/41]
+[INFO] --------------------------------[ jar ]---------------------------------
+[WARNING] org.glassfish:javax.el/maven-metadata.xmlfailed to transfer from https://repository.apache.org/snapshots during a previous attempt. This failure was cached in the local repository and resolution will not be reattempted until the update interval of apache.snapshots has elapsed or updates are forced. Original error: Could not transfer metadata org.glassfish:javax.el/maven-metadata.xml from/to apache.snapshots (https://repository.apache.org/snapshots): Connect to repository.apache.org:443 [repository.apache.org/37.27.138.133] failed: Connect timed out
+[WARNING] org.glassfish:javax.el/maven-metadata.xmlfailed to transfer from https://maven.java.net/content/repositories/releases during a previous attempt. This failure was cached in the local repository and resolution will not be reattempted until the update interval of java.net.Releases has elapsed or updates are forced. Original error: Could not transfer metadata org.glassfish:javax.el/maven-metadata.xml from/to java.net.Releases (https://maven.java.net/content/repositories/releases): (certificate_unknown) PKIX path validation failed: java.security.cert.CertPathValidatorException: validity check failed
+[WARNING] org.glassfish:javax.el/maven-metadata.xmlfailed to transfer from https://maven.java.net/content/repositories/snapshots during a previous attempt. This failure was cached in the local repository and resolution will not be reattempted until the update interval of jvnet-nexus-snapshots has elapsed or updates are forced. Original error: Could not transfer metadata org.glassfish:javax.el/maven-metadata.xml from/to jvnet-nexus-snapshots (https://maven.java.net/content/repositories/snapshots): (certificate_unknown) PKIX path validation failed: java.security.cert.CertPathValidatorException: validity check failed
+[INFO] 
+[INFO] --- maven-clean-plugin:2.5:clean (default-clean) @ phoenix-admin-manager ---
+[INFO] Deleting /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-admin/phoenix-admin-manager/target
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:clean (flatten.clean) @ phoenix-admin-manager ---
+[INFO] Deleting /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-admin/phoenix-admin-manager/.flattened-pom.xml
+[INFO] 
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ phoenix-admin-manager ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] Copying 0 resource
+[INFO] Copying 5 resources
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:flatten (flatten) @ phoenix-admin-manager ---
+[INFO] Generating flattened POM of project com.phoenix:phoenix-admin-manager:jar:2.0.0-SNAPSHOT...
+[INFO] 
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ phoenix-admin-manager ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 1 source file with javac [debug release 21] to target/classes
+[INFO] 
+[INFO] ---------------------< com.phoenix:phoenix-admin >----------------------
+[INFO] Building phoenix-admin 2.0.0-SNAPSHOT                            [24/41]
+[INFO] --------------------------------[ pom ]---------------------------------
+[WARNING] org.glassfish:javax.el/maven-metadata.xmlfailed to transfer from https://repository.apache.org/snapshots during a previous attempt. This failure was cached in the local repository and resolution will not be reattempted until the update interval of apache.snapshots has elapsed or updates are forced. Original error: Could not transfer metadata org.glassfish:javax.el/maven-metadata.xml from/to apache.snapshots (https://repository.apache.org/snapshots): Connect to repository.apache.org:443 [repository.apache.org/37.27.138.133] failed: Connect timed out
+[WARNING] org.glassfish:javax.el/maven-metadata.xmlfailed to transfer from https://maven.java.net/content/repositories/releases during a previous attempt. This failure was cached in the local repository and resolution will not be reattempted until the update interval of java.net.Releases has elapsed or updates are forced. Original error: Could not transfer metadata org.glassfish:javax.el/maven-metadata.xml from/to java.net.Releases (https://maven.java.net/content/repositories/releases): (certificate_unknown) PKIX path validation failed: java.security.cert.CertPathValidatorException: validity check failed
+[WARNING] org.glassfish:javax.el/maven-metadata.xmlfailed to transfer from https://maven.java.net/content/repositories/snapshots during a previous attempt. This failure was cached in the local repository and resolution will not be reattempted until the update interval of jvnet-nexus-snapshots has elapsed or updates are forced. Original error: Could not transfer metadata org.glassfish:javax.el/maven-metadata.xml from/to jvnet-nexus-snapshots (https://maven.java.net/content/repositories/snapshots): (certificate_unknown) PKIX path validation failed: java.security.cert.CertPathValidatorException: validity check failed
+[INFO] 
+[INFO] --- maven-clean-plugin:2.5:clean (default-clean) @ phoenix-admin ---
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:clean (flatten.clean) @ phoenix-admin ---
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:flatten (flatten) @ phoenix-admin ---
+[INFO] Generating flattened POM of project com.phoenix:phoenix-admin:pom:2.0.0-SNAPSHOT...
+[INFO] 
+[INFO] -------------------< com.phoenix:phoenix-privilege >--------------------
+[INFO] Building phoenix-privilege 2.0.0-SNAPSHOT                        [25/41]
+[INFO] --------------------------------[ pom ]---------------------------------
+[INFO] 
+[INFO] --- maven-clean-plugin:2.5:clean (default-clean) @ phoenix-privilege ---
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:clean (flatten.clean) @ phoenix-privilege ---
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:flatten (flatten) @ phoenix-privilege ---
+[INFO] Generating flattened POM of project com.phoenix:phoenix-privilege:pom:2.0.0-SNAPSHOT...
+[INFO] 
+[INFO] ---------------------< com.phoenix:phoenix-common >---------------------
+[INFO] Building phoenix-common 2.0.0-SNAPSHOT                           [26/41]
+[INFO] --------------------------------[ pom ]---------------------------------
+[INFO] 
+[INFO] --- maven-clean-plugin:2.5:clean (default-clean) @ phoenix-common ---
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:clean (flatten.clean) @ phoenix-common ---
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:flatten (flatten) @ phoenix-common ---
+[INFO] Generating flattened POM of project com.phoenix:phoenix-common:pom:2.0.0-SNAPSHOT...
+[INFO] 
+[INFO] --------------------< com.phoenix:phoenix-platform >--------------------
+[INFO] Building phoenix-platform 2.0.0-SNAPSHOT                         [27/41]
+[INFO] --------------------------------[ pom ]---------------------------------
+[INFO] 
+[INFO] --- maven-clean-plugin:2.5:clean (default-clean) @ phoenix-platform ---
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:clean (flatten.clean) @ phoenix-platform ---
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:flatten (flatten) @ phoenix-platform ---
+[INFO] Generating flattened POM of project com.phoenix:phoenix-platform:pom:2.0.0-SNAPSHOT...
+[INFO] 
+[INFO] --------------------< com.phoenix:phoenix-codegen >---------------------
+[INFO] Building phoenix-codegen 2.0.0-SNAPSHOT                          [28/41]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- maven-clean-plugin:2.5:clean (default-clean) @ phoenix-codegen ---
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:clean (flatten.clean) @ phoenix-codegen ---
+[INFO] 
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ phoenix-codegen ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-codegen/src/main/resources
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:flatten (flatten) @ phoenix-codegen ---
+[INFO] Generating flattened POM of project com.phoenix:phoenix-codegen:jar:2.0.0-SNAPSHOT...
+[INFO] 
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ phoenix-codegen ---
+[INFO] Changes detected - recompiling the module! :source
+[INFO] Compiling 1 source file with javac [debug release 21] to target/classes
+[INFO] 
+[INFO] -------------------< com.phoenix:phoenix-flink-api >--------------------
+[INFO] Building phoenix-flink-api 2.0.0-SNAPSHOT                        [29/41]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- maven-clean-plugin:2.5:clean (default-clean) @ phoenix-flink-api ---
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:clean (flatten.clean) @ phoenix-flink-api ---
+[INFO] 
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ phoenix-flink-api ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-flink/phoenix-flink-api/src/main/resources
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:flatten (flatten) @ phoenix-flink-api ---
+[INFO] Generating flattened POM of project com.phoenix:phoenix-flink-api:jar:2.0.0-SNAPSHOT...
+[INFO] 
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ phoenix-flink-api ---
+[INFO] No sources to compile
+[INFO] 
+[INFO] -------------------< com.phoenix:phoenix-flink-core >-------------------
+[INFO] Building phoenix-flink-core 2.0.0-SNAPSHOT                       [30/41]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- maven-clean-plugin:2.5:clean (default-clean) @ phoenix-flink-core ---
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:clean (flatten.clean) @ phoenix-flink-core ---
+[INFO] 
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ phoenix-flink-core ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-flink/phoenix-flink-core/src/main/resources
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:flatten (flatten) @ phoenix-flink-core ---
+[INFO] Generating flattened POM of project com.phoenix:phoenix-flink-core:jar:2.0.0-SNAPSHOT...
+[INFO] 
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ phoenix-flink-core ---
+[INFO] No sources to compile
+[INFO] 
+[INFO] ------------------< com.phoenix:phoenix-flink-server >------------------
+[INFO] Building phoenix-flink-server 2.0.0-SNAPSHOT                     [31/41]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- maven-clean-plugin:2.5:clean (default-clean) @ phoenix-flink-server ---
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:clean (flatten.clean) @ phoenix-flink-server ---
+[INFO] 
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ phoenix-flink-server ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-flink/phoenix-flink-server/src/main/resources
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:flatten (flatten) @ phoenix-flink-server ---
+[INFO] Generating flattened POM of project com.phoenix:phoenix-flink-server:jar:2.0.0-SNAPSHOT...
+[INFO] 
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ phoenix-flink-server ---
+[INFO] No sources to compile
+[INFO] 
+[INFO] ---------------------< com.phoenix:phoenix-flink >----------------------
+[INFO] Building phoenix-flink 2.0.0-SNAPSHOT                            [32/41]
+[INFO] --------------------------------[ pom ]---------------------------------
+[INFO] 
+[INFO] --- maven-clean-plugin:2.5:clean (default-clean) @ phoenix-flink ---
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:clean (flatten.clean) @ phoenix-flink ---
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:flatten (flatten) @ phoenix-flink ---
+[INFO] Generating flattened POM of project com.phoenix:phoenix-flink:pom:2.0.0-SNAPSHOT...
+[INFO] 
+[INFO] --------------------< com.phoenix:phoenix-rag-api >---------------------
+[INFO] Building phoenix-rag-api 2.0.0-SNAPSHOT                          [33/41]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- maven-clean-plugin:2.5:clean (default-clean) @ phoenix-rag-api ---
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:clean (flatten.clean) @ phoenix-rag-api ---
+[INFO] 
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ phoenix-rag-api ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-rag/phoenix-rag-api/src/main/resources
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:flatten (flatten) @ phoenix-rag-api ---
+[INFO] Generating flattened POM of project com.phoenix:phoenix-rag-api:jar:2.0.0-SNAPSHOT...
+[INFO] 
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ phoenix-rag-api ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 3 source files with javac [debug release 21] to target/classes
+[WARNING] /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-rag/phoenix-rag-api/src/main/java/com/phoenix/rag/model/RagFileInfo.java:[13,1] Generating equals/hashCode implementation but without a call to superclass, even though this class does not extend java.lang.Object. If this is intentional, add '@EqualsAndHashCode(callSuper=false)' to your type.
+[WARNING] /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-rag/phoenix-rag-api/src/main/java/com/phoenix/rag/model/RagCategory.java:[13,1] Generating equals/hashCode implementation but without a call to superclass, even though this class does not extend java.lang.Object. If this is intentional, add '@EqualsAndHashCode(callSuper=false)' to your type.
+[INFO] 
+[INFO] --------------------< com.phoenix:phoenix-rag-core >--------------------
+[INFO] Building phoenix-rag-core 2.0.0-SNAPSHOT                         [34/41]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- maven-clean-plugin:2.5:clean (default-clean) @ phoenix-rag-core ---
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:clean (flatten.clean) @ phoenix-rag-core ---
+[INFO] 
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ phoenix-rag-core ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-rag/phoenix-rag-core/src/main/resources
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:flatten (flatten) @ phoenix-rag-core ---
+[INFO] Generating flattened POM of project com.phoenix:phoenix-rag-core:jar:2.0.0-SNAPSHOT...
+[INFO] 
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ phoenix-rag-core ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 8 source files with javac [debug release 21] to target/classes
+[INFO] 
+[INFO] --------------------< com.phoenix:phoenix-rag-rest >--------------------
+[INFO] Building phoenix-rag-rest 2.0.0-SNAPSHOT                         [35/41]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- maven-clean-plugin:2.5:clean (default-clean) @ phoenix-rag-rest ---
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:clean (flatten.clean) @ phoenix-rag-rest ---
+[INFO] 
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ phoenix-rag-rest ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-rag/phoenix-rag-rest/src/main/resources
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:flatten (flatten) @ phoenix-rag-rest ---
+[INFO] Generating flattened POM of project com.phoenix:phoenix-rag-rest:jar:2.0.0-SNAPSHOT...
+[INFO] 
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ phoenix-rag-rest ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 2 source files with javac [debug release 21] to target/classes
+[INFO] 
+[INFO] ----------------------< com.phoenix:phoenix-rag >-----------------------
+[INFO] Building phoenix-rag 2.0.0-SNAPSHOT                              [36/41]
+[INFO] --------------------------------[ pom ]---------------------------------
+[INFO] 
+[INFO] --- maven-clean-plugin:2.5:clean (default-clean) @ phoenix-rag ---
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:clean (flatten.clean) @ phoenix-rag ---
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:flatten (flatten) @ phoenix-rag ---
+[INFO] Generating flattened POM of project com.phoenix:phoenix-rag:pom:2.0.0-SNAPSHOT...
+[INFO] 
+[INFO] ---------------------< com.phoenix:phoenix-kg-api >---------------------
+[INFO] Building phoenix-kg-api 2.0.0-SNAPSHOT                           [37/41]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- maven-clean-plugin:2.5:clean (default-clean) @ phoenix-kg-api ---
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:clean (flatten.clean) @ phoenix-kg-api ---
+[INFO] 
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ phoenix-kg-api ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-kg/phoenix-kg-api/src/main/resources
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:flatten (flatten) @ phoenix-kg-api ---
+[INFO] Generating flattened POM of project com.phoenix:phoenix-kg-api:jar:2.0.0-SNAPSHOT...
+[INFO] 
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ phoenix-kg-api ---
+[INFO] No sources to compile
+[INFO] 
+[INFO] --------------------< com.phoenix:phoenix-kg-core >---------------------
+[INFO] Building phoenix-kg-core 2.0.0-SNAPSHOT                          [38/41]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- maven-clean-plugin:2.5:clean (default-clean) @ phoenix-kg-core ---
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:clean (flatten.clean) @ phoenix-kg-core ---
+[INFO] 
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ phoenix-kg-core ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-kg/phoenix-kg-core/src/main/resources
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:flatten (flatten) @ phoenix-kg-core ---
+[INFO] Generating flattened POM of project com.phoenix:phoenix-kg-core:jar:2.0.0-SNAPSHOT...
+[INFO] 
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ phoenix-kg-core ---
+[INFO] No sources to compile
+[INFO] 
+[INFO] --------------------< com.phoenix:phoenix-kg-rest >---------------------
+[INFO] Building phoenix-kg-rest 2.0.0-SNAPSHOT                          [39/41]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- maven-clean-plugin:2.5:clean (default-clean) @ phoenix-kg-rest ---
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:clean (flatten.clean) @ phoenix-kg-rest ---
+[INFO] 
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ phoenix-kg-rest ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-kg/phoenix-kg-rest/src/main/resources
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:flatten (flatten) @ phoenix-kg-rest ---
+[INFO] Generating flattened POM of project com.phoenix:phoenix-kg-rest:jar:2.0.0-SNAPSHOT...
+[INFO] 
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ phoenix-kg-rest ---
+[INFO] No sources to compile
+[INFO] 
+[INFO] -----------------------< com.phoenix:phoenix-kg >-----------------------
+[INFO] Building phoenix-kg 2.0.0-SNAPSHOT                               [40/41]
+[INFO] --------------------------------[ pom ]---------------------------------
+[INFO] 
+[INFO] --- maven-clean-plugin:2.5:clean (default-clean) @ phoenix-kg ---
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:clean (flatten.clean) @ phoenix-kg ---
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:flatten (flatten) @ phoenix-kg ---
+[INFO] Generating flattened POM of project com.phoenix:phoenix-kg:pom:2.0.0-SNAPSHOT...
+[INFO] 
+[INFO] ------------------------< com.phoenix:phoenix >-------------------------
+[INFO] Building phoenix 2.0.0-SNAPSHOT                                  [41/41]
+[INFO] --------------------------------[ pom ]---------------------------------
+[INFO] 
+[INFO] --- maven-clean-plugin:2.5:clean (default-clean) @ phoenix ---
+[INFO] ------------------------------------------------------------------------
+[INFO] Reactor Summary for phoenix 2.0.0-SNAPSHOT:
+[INFO] 
+[INFO] phoenix-parent ..................................... SUCCESS [  0.275 s]
+[INFO] phoenix-tool ....................................... SUCCESS [  0.962 s]
+[INFO] phoenix-common-api ................................. SUCCESS [  1.083 s]
+[INFO] phoenix-data-api ................................... SUCCESS [  2.441 s]
+[INFO] phoenix-common-core ................................ SUCCESS [  0.666 s]
+[INFO] phoenix-privilege-api .............................. SUCCESS [  1.202 s]
+[INFO] phoenix-privilege-core ............................. SUCCESS [  0.658 s]
+[INFO] phoenix-data-core .................................. SUCCESS [  3.030 s]
+[INFO] phoenix-data-rest .................................. SUCCESS [  0.659 s]
+[INFO] phoenix-data ....................................... SUCCESS [  0.064 s]
+[INFO] phoenix-agent-api .................................. SUCCESS [  0.646 s]
+[INFO] phoenix-agent-core ................................. SUCCESS [  1.757 s]
+[INFO] phoenix-agent-rest ................................. SUCCESS [  0.654 s]
+[INFO] phoenix-agent ...................................... SUCCESS [  0.021 s]
+[INFO] phoenix-admin-api .................................. SUCCESS [  0.029 s]
+[INFO] phoenix-admin-core ................................. SUCCESS [  0.080 s]
+[INFO] phoenix-privilege-rest ............................. SUCCESS [  0.396 s]
+[INFO] phoenix-platform-api ............................... SUCCESS [  0.403 s]
+[INFO] phoenix-platform-core .............................. SUCCESS [  0.535 s]
+[INFO] phoenix-platform-rest .............................. SUCCESS [  0.522 s]
+[INFO] phoenix-common-rest ................................ SUCCESS [  0.214 s]
+[INFO] phoenix-admin-rest ................................. SUCCESS [  0.077 s]
+[INFO] phoenix-admin-manager .............................. SUCCESS [  0.409 s]
+[INFO] phoenix-admin ...................................... SUCCESS [  0.050 s]
+[INFO] phoenix-privilege .................................. SUCCESS [  0.018 s]
+[INFO] phoenix-common ..................................... SUCCESS [  0.019 s]
+[INFO] phoenix-platform ................................... SUCCESS [  0.020 s]
+[INFO] phoenix-codegen .................................... SUCCESS [  0.144 s]
+[INFO] phoenix-flink-api .................................. SUCCESS [  0.022 s]
+[INFO] phoenix-flink-core ................................. SUCCESS [  0.017 s]
+[INFO] phoenix-flink-server ............................... SUCCESS [  0.017 s]
+[INFO] phoenix-flink ...................................... SUCCESS [  0.014 s]
+[INFO] phoenix-rag-api .................................... SUCCESS [  0.245 s]
+[INFO] phoenix-rag-core ................................... SUCCESS [  0.385 s]
+[INFO] phoenix-rag-rest ................................... SUCCESS [  0.294 s]
+[INFO] phoenix-rag ........................................ SUCCESS [  0.016 s]
+[INFO] phoenix-kg-api ..................................... SUCCESS [  0.022 s]
+[INFO] phoenix-kg-core .................................... SUCCESS [  0.028 s]
+[INFO] phoenix-kg-rest .................................... SUCCESS [  0.023 s]
+[INFO] phoenix-kg ......................................... SUCCESS [  0.015 s]
+[INFO] phoenix ............................................ SUCCESS [  0.000 s]
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  18.672 s
+[INFO] Finished at: 2026-10-07T16:55:52+08:00
+[INFO] ------------------------------------------------------------------------

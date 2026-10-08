@@ -77,12 +77,15 @@ phx_step 2 $TOTAL "引擎就位" && {
   elif [ "$OFFLINE" -eq 1 ]; then
     phx_fail 2 $TOTAL "离线且无 engine/*.deb——参见 docs/OFFLINE-ENGINE.md 手工装引擎后重跑"
   else
-    phx_log INFO "在线安装 Docker Engine（get.docker.com --mirror Aliyun）"
-    if curl -fsSL -m 30 https://get.docker.com -o /tmp/phx-getdocker.sh; then
+    phx_log INFO "在线安装 Docker Engine（get.docker.com --mirror Aliyun；拉不到则回退国内源）"
+    # --mirror Aliyun 只管 deb 包源，安装脚本本体仍在 get.docker.com（境外）⇒ 需国内回退（BUG-145）
+    if curl -fsSL -m 30 https://get.docker.com -o /tmp/phx-getdocker.sh 2>/dev/null; then
+      phx_log INFO "  提示：官方脚本会静默下载引擎包（apt 输出被它丢进 /dev/null），通常 2-5 分钟无输出属正常（BUG-146）"
       # shellcheck disable=SC2086
       $SUDO sh /tmp/phx-getdocker.sh --mirror Aliyun >>"$PHX_LOG_FILE" 2>&1 || phx_fail 2 $TOTAL "引擎安装脚本失败（见日志；断网请加 --offline 并备 engine/*.deb）"
     else
-      phx_fail 2 $TOTAL "get.docker.com 不可达（网络受限？）——加 --offline 走 deb/文档路线"
+      phx_log WARN "get.docker.com 不可达（受限网络）——回退国内源 docker-ce@mirrors.aliyun.com"
+      phx_install_docker_aliyun || phx_fail 2 $TOTAL "国内源装引擎失败（见日志 $PHX_LOG_FILE；断网请加 --offline 并备 engine/*.deb）"
     fi
     $SUDO systemctl enable --now docker >/dev/null 2>&1 || $SUDO service docker start >/dev/null 2>&1 || true
     $SUDO usermod -aG docker "$(id -un)" >/dev/null 2>&1 || true
@@ -101,7 +104,8 @@ phx_step 4 $TOTAL "镜像 load" && {
   if docker image inspect "phoenix-backend:$VERSION" >/dev/null 2>&1 && docker image inspect "phoenix-frontend:$VERSION" >/dev/null 2>&1; then
     phx_log INFO "双镜像已在（同 tag），跳过 load"
   else
-    docker load -i "$PAYLOAD/images/phoenix-images.tar" >>"$PHX_LOG_FILE" 2>&1 || phx_fail 4 $TOTAL "docker load 失败（见日志）"
+    # 数 GB 的 load 全程静默会让人以为卡死（BUG-146）：日志照存，同时透传进度到屏幕
+    docker load -i "$PAYLOAD/images/phoenix-images.tar" 2>&1 | tee -a "$PHX_LOG_FILE" || phx_fail 4 $TOTAL "docker load 失败（见日志 $PHX_LOG_FILE）"
     docker image inspect "phoenix-backend:$VERSION" >/dev/null 2>&1 || phx_fail 4 $TOTAL "load 后仍缺 phoenix-backend:$VERSION"
   fi
   phx_step_mark 4
@@ -156,6 +160,8 @@ phx_step 7 $TOTAL "等待 migrator 完成 + backend healthy（${TIMEOUT}s 上限
     M2=$(docker inspect --format '{{.State.ExitCode}}' "${PROJECT}-migrator-post-1" 2>/dev/null || echo running)
     if [ "$ST" = "healthy" ] && [ "$M1" = "0" ] && [ "$M2" = "0" ]; then break; fi
     i=$((i+5)); sleep 5
+    # 静默等待最长 300s 会让人以为卡死（BUG-146）：每轮把实况透出（写屏幕 + 进日志）
+    phx_log INFO "  等待中 ${i}s/${TIMEOUT}s：backend=$ST migrator=$M1 migrator-post=$M2"
   done
   [ "$ST" = "healthy" ] || phx_fail 7 $TOTAL "backend 未在 ${TIMEOUT}s 内 healthy（当前=$ST；docker logs ${PROJECT}-backend-1 看详情）"
   { [ "$M1" = "0" ] && [ "$M2" = "0" ]; } || phx_fail 7 $TOTAL "migrator 未正常完成（migrator=$M1 migrator-post=$M2；docker logs ${PROJECT}-migrator-1 看详情）"

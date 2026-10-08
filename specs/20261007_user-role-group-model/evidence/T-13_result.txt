@@ -1,0 +1,61 @@
+=== T-13 验收结论（用户表单三维度化：用户·角色·组 / R-02 收尾 + R-03 + BUG-123）===
+日期: 2026-10-07 | 后端 JDK 23 + Maven 3.8.6 + .mvn-home；前端 node v24.21.0
+
+[0] 用户决策（2026-10-07，本会话确认）
+  - 方案 **A**：扩展创建接口，一次事务落库（DTO 增 roleIds/groupIds；而非前端两段式）
+  - **BUG-123 纳入本 spec** 修复
+  说明: plan v1.1.0 的 T-13 原文为「角色/组多选 + 去组织字段」、验收为「只填账号+勾1角色即创建成功」，
+  方案 A 属其**实现路径**（原文未限定仅前端），故未触发已确认文档的改版重确认；两项决策记入本证据与 bugs.md。
+
+[1] 后端（4 文件）
+  - `PrivilegeUserDTO`：增 `List<String> roleIds` / `List<String> groupIds`
+      （语义：**null=不改动**（兼容既有「分配角色/分配组」弹窗路径）；**空列表=清空**）
+  - `IPrivilegeUserService` + `PrivilegeUserServiceImpl`：
+      · `saveUser`：显式选角色 → 按所选落库；未选 → 默认角色兜底；并支持创建即入组（同一事务）
+      · 新增 `updateUser`：更新基本信息 + roleIds/groupIds 非 null 时同步（角色先 remove 再插、
+        组先物理删再插），controller `PUT /api/privilege/user` 改走它
+      · 跨域入组用 `Db.insertBySql` + `insert...select`（phoenix-privilege 不依赖平台模块，
+        沿用 AgentServiceImpl 写 `tbl_platform_group_agent_info` 的既有先例），一次取到 `group_name`，
+        并顺带跳过不存在/已删组；**`del_flag` 显式置 0**（该列 DDL 默认值是 1=已删除，漏写会插出
+        「出生即删除」的行 —— 与 T-01 实勘同一坑）
+      · 补 `@Slf4j`（首轮编译 `找不到符号: 变量 log` ⇒ 该类原本没有 logger，已修）
+
+[2] BUG-123 修复（默认角色大小写）
+  旧: `eq(PrivilegeRole::getSn, "common")` 生成 `sn = 'common'`（大小写敏感）→ 库里 `COMMON` 永不匹配
+  新: Java 侧 `"common".equalsIgnoreCase(sn)`（同 LoginServiceImpl.isSuperAdmin 思路）
+  **实证（T-13_sql-probe.txt）**：`sn = 'common'` → **false**；`upper(sn) = 'COMMON'` → **true**
+
+[3] 前端（2 文件）
+  - `views/system-management/account/data.ts`：表单增 `roleIds`（角色，多选插槽）/ `groupIds`（组，多选插槽）
+  - `views/system-management/account/form.vue`：`ElSelect multiple` 渲染两个插槽；打开时加载角色/组选项
+    （复用「分配角色/分配组」同批接口：`getRolePageApi` / `getGroupInfoPageApi`）；编辑态回显既有角色与组
+    （`getUserRolesByUserIdApi` / `getAccountGroupInfoByAccountApi`）；提交时显式带上 roleIds/groupIds
+  - 组织字段（公司/部门/人员选择器）已由 T-11 摘除 ⇒ 表单现为纯三维度
+
+[4] 验证（真实输出）
+  - 后端 `mvn clean compile` → **BUILD SUCCESS，ERROR=0**（T-13_compile.raw.txt；首轮 24 个错误全部由
+      缺 `@Slf4j` 引起，补后为零）
+  - 前端 `pnpm typecheck` → **207 = T-11 后基线**，逐条 diff **零新增**
+  - 前端 `pnpm build`（vite production）→ **exit=0，built in 4.66s**
+  - **写路径 SQL 实测**（drill 库，事务内执行后 ROLLBACK，不留痕）：建号 + 指定角色 + 入组 →
+      回读 `roles=1, active_groups=1, group_names='通用组'`，组行 `del_flag=0` ✅；
+      ROLLBACK 后探针用户残留 **0** ✅
+
+[5] **阻塞项与顺序依赖（重要，明确记载）**
+  `tbl_privilege_user` 的 NOT NULL 列实测为：`id / code / username / company_id / dept_id`
+  ⇒ 表单去掉组织字段后，**建号会在数据库层被 `company_id` NOT NULL 拦下**
+  （探针首轮即为 `ERROR: null value in column "company_id" violates not-null constraint`）。
+  必须由 **T-14 的 DDL** 一并解除（DROP COLUMN 或 DROP NOT NULL）。
+  已在 `tasks.md` 的 T-14 下追加 Implement 期注记（不改验收口径），并锁定顺序 **T-14 → T-16**。
+
+[6] **延期至 T-16**
+  「只填账号 + 勾 1 个角色即创建成功并可登录」「表单无组织字段、请求/响应无 companyName/deptName」
+  等运行期断言需在 T-14 之后对已部署实例执行 ⇒ **T-13 暂不勾选**。
+
+[7] 过程教训（已入账）
+  L-48（新增）：复刻既有代码行为做验证时，表达式必须与源码**同构** —— 我首轮探针用
+  `lower(sn) = 'common'` 充当"旧 Java 行为"，而旧代码生成的是 `sn = 'common'`（大小写敏感），
+  该列输出 true，**差点据此得出"BUG-123 不成立"的反向结论**；靠"列名与表达式不符"自证伪后改正。
+
+[8] 结论：T-13 代码面完成（后端编译绿、前端 typecheck 零新增且构建通过、写路径 SQL 实测通过、
+    BUG-123 修复实证）；运行期验收挂 T-14 之后（T-16）。

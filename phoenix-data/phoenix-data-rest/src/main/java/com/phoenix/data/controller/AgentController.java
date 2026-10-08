@@ -27,14 +27,21 @@ public class AgentController {
 
     private final AgentService agentService;
 
+    /** R-17（v2.6.0）：超管判定复用 R-08 建立的守卫（口径：超管角色 id 或 upper(sn)=ROLE_ADMIN） */
+    private final com.phoenix.data.component.AdminRoleGuard adminRoleGuard;
+
     /**
      * Get agent list
+     *
+     * <p>R-17（v2.6.0）：**按创建人可见** —— 超管看全部；其余用户只看自己创建的（`admin_id = 当前用户`）。
      */
     @GetMapping("/list")
     public ReturnVo<List<Agent>> list(@RequestParam(value = "status", required = false) String status,
                                       @RequestParam(value = "keyword", required = false) String keyword) {
         // 只列平台内创建的智能体（sn 为空）：Java 自注册的存量智能体不再出现在列表（可逆取舍）
-        return ReturnVo.ok(agentService.listCreatedInPlatform(status, keyword));
+        // R-17：非超管一律附加创建人过滤
+        Long ownerId = isSuperAdmin() ? null : currentUserIdAsLong();
+        return ReturnVo.ok(agentService.listCreatedInPlatform(status, keyword, ownerId));
     }
 
     /**
@@ -47,6 +54,8 @@ public class AgentController {
 
     /**
      * Create agent
+     *
+     * <p>R-17（v2.6.0）：创建人由**服务端**写入 `admin_id = 当前登录用户`，不信任入参。
      */
     @PostMapping
     public Agent create(@RequestBody Agent agent) {
@@ -56,6 +65,8 @@ public class AgentController {
         }
         // R-01：新建一律为对话智能体（type=harness），前端不再选择类型；服务端强制优于入参
         agent.setType(AgentTypeEnm.HARNESS.getCode());
+        // R-17：创建人一律取当前登录用户（覆盖前端可能传入的值）
+        agent.setAdminId(currentUserIdAsLong());
         return agentService.saveAgent(agent);
     }
 
@@ -188,7 +199,9 @@ public class AgentController {
     }
 
     /**
-     * 检查智能体是否存在，不存在则抛出异常
+     * 检查智能体是否存在，不存在则抛出异常；**R-17 起同时校验归属**（非本人且非超管 ⇒ 403）。
+     *
+     * <p>所有单对象端点（详情/编辑/删除/发布/下线/授权/API Key）都经过本方法 ⇒ 归属防线成组生效。
      *
      * @param id 智能体ID
      * @return 智能体实体
@@ -198,7 +211,47 @@ public class AgentController {
         if (agent == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "agent with id: %d not found".formatted(id));
         }
+        if (!isSuperAdmin() && !isOwner(agent)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权访问他人创建的智能体");
+        }
         return agent;
+    }
+
+    /** 当前登录用户 id（取不到返回 null） */
+    private String currentUserId() {
+        try {
+            return cn.dev33.satoken.stp.StpUtil.getLoginIdAsString();
+        }
+        catch (Exception e) {
+            return null;
+        }
+    }
+
+    /** 当前登录用户 id（数值型，用于 admin_id 比较/写入；非数值返回 null） */
+    private Long currentUserIdAsLong() {
+        String uid = currentUserId();
+        if (uid == null) {
+            return null;
+        }
+        try {
+            return Long.valueOf(uid);
+        }
+        catch (NumberFormatException e) {
+            log.warn("[R-17] 登录 id 非数值，无法用于智能体归属: {}", uid);
+            return null;
+        }
+    }
+
+    /** 当前用户是否超管（R-17：超管可见全部智能体） */
+    private boolean isSuperAdmin() {
+        String uid = currentUserId();
+        return uid != null && adminRoleGuard.isAdmin(uid);
+    }
+
+    /** 该智能体是否属当前登录用户（R-17） */
+    private boolean isOwner(Agent agent) {
+        Long uid = currentUserIdAsLong();
+        return uid != null && uid.equals(agent.getAdminId());
     }
 
     /**

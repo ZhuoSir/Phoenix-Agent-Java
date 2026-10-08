@@ -1,4 +1,4 @@
-<#
+﻿<#
 Phoenix 服务控制 · Windows 侧（转发进 WSL）
 用法: .\phoenix-ctl.ps1 start|stop|restart|status|logs|verify [服务名] [-Distro Ubuntu-22.04]
 #>

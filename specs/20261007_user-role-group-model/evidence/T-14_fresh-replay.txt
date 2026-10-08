@@ -1,0 +1,28 @@
+########## T-14 全新库重放（修正后，从零）##########
+all_schema 载入 exit=0
+all_data 载入 exit=3
+--- 基线 ---
+menus=21
+--- 第 1 轮应用 01→04 ---
+  V2.0.0_01__org_dimension_drop_ddl exit=0 psql:<stdin>:54: NOTICE:  relation "tbl_unified_account_map" does not exist, skipping
+  V2.0.0_02__role_backfill_dml exit=0 
+  V2.0.0_03__org_menu_cleanup_dml exit=0 
+  V2.0.0_04__acl_baseline_rebuild_dml exit=0 
+--- 第 2 轮应用 01→04 ---
+  V2.0.0_01__org_dimension_drop_ddl exit=0 psql:<stdin>:40: NOTICE:  column "company_id" of relation "tbl_privilege_user" does not exist, skipping
+  V2.0.0_02__role_backfill_dml exit=0 
+  V2.0.0_03__org_menu_cleanup_dml exit=0 
+  V2.0.0_04__acl_baseline_rebuild_dml exit=0 
+--- 终态 ---
+ org_tables_left | menus | acls | zero_role_users 
+-----------------+-------+------+-----------------
+               0 |    17 |   22 |               0
+(1 row)
+
+
+########## drill 复演（确认 IF EXISTS 改动未破坏原路径）##########
+  正向 OK
+  反向 OK
+company=4
+dept=17
+emp=14

@@ -60,8 +60,10 @@ public interface AgentService extends IService<Agent> {
 	 *
 	 * @param status 可选状态过滤（draft/published/offline）
 	 * @param keyword 可选关键字
+	 * @param ownerId R-17（v2.6.0）：可选创建人过滤 —— **null = 不过滤（超管看全部）**；
+	 *                非 null = 仅返回 `admin_id = ownerId` 的智能体（普通用户只看自己创建的）
 	 */
-	List<Agent> listCreatedInPlatform(String status, String keyword);
+	List<Agent> listCreatedInPlatform(String status, String keyword, Long ownerId);
 
 	/**
 	 * 删除 Agent

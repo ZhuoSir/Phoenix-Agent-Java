@@ -21,9 +21,6 @@ public class PrivilegeUserRole extends BaseEntity {
 	/** 用户ID */
 	private String userId;
 
-	/** 用户工号 */
-	private String userNo;
-
 	/** 角色ID */
 	private String roleId;
 

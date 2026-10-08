@@ -6,7 +6,10 @@ COPY . .
 # 国内网络默认阿里云中央仓；内网/海外用 --build-arg MAVEN_SETTINGS=docker/maven/settings.xml 覆盖
 ARG MAVEN_SETTINGS=docker/maven/settings.aliyun.xml
 COPY ${MAVEN_SETTINGS} /root/.m2/settings.xml
-RUN mvn -q package -DskipTests -Dspring-javaformat.skip=true -pl phoenix-admin/phoenix-admin-manager -am
+# --mount 缓存 .m2/repository：跨构建复用 maven 依赖。web-frontend 改动（如新增 pnpm-lock.yaml）会改变
+# 上层 `COPY . .` 的上下文校验和致其缓存失效，但依赖不必重下（649MB）——挂载点取 repository 子目录
+# 而非 .m2 根，避免遮蔽上一行 COPY 进来的 settings.xml（BUG-149 关联优化，用户 2026-10-08 裁决 B）
+RUN --mount=type=cache,id=phoenix-m2,target=/root/.m2/repository mvn -q package -DskipTests -Dspring-javaformat.skip=true -pl phoenix-admin/phoenix-admin-manager -am
 
 # package.sh 工件提取阶段（docker-auto-pipeline T-02）：编译产物架构无关，
 # native 编译一次 → 任意目标架构薄组装；默认构建目标仍为末阶段 run（身份①不变）

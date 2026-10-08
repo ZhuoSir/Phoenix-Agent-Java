@@ -15,7 +15,10 @@ import com.phoenix.tools.vo.ReturnVo;
  */
 public interface McpAdminService {
 
-    ReturnVo<Page<McpListVO>> page(String keyword, int pageNum, int pageSize);
+    ReturnVo<Page<McpListVO>> page(String keyword, int pageNum, int pageSize, String ownerId);
+
+    /** R-18（CR-01/T-25）：取 MCP 创建人 id（controller 归属校验用）；不存在返回 null。 */
+    String getCreatorById(String id);
 
     ReturnVo<McpDetailVO> detail(String id);
 
@@ -30,7 +33,7 @@ public interface McpAdminService {
     ReturnVo<McpTestResultVO> testConnection(McpTestDTO dto);
 
     /** T-07：智能体编辑页绑定选项池（启用池 ∪ 已绑定，镜像技能 options 语义）。 */
-    ReturnVo<java.util.List<com.phoenix.agent.model.McpOptionVO>> options(Long agentId);
+    ReturnVo<java.util.List<com.phoenix.agent.model.McpOptionVO>> options(Long agentId, String viewerId, boolean superAdmin);
 
     /** T-07：智能体已绑定 MCP id 集。 */
     ReturnVo<java.util.List<String>> boundIds(Long agentId);

@@ -12,6 +12,9 @@ public interface AgentKbaseService {
 
 	List<BindableKbaseVO> bindable(Long agentId);
 
+	/** R-18（CR-01/T-26）：可见集合 = 超管全部；否则 自己的 ∪ 我所在组关联的 ∪ 公共（无组授权行）；已绑不可见者灰显 */
+	List<BindableKbaseVO> bindable(Long agentId, String viewerId, boolean superAdmin);
+
 	/** 全量替换绑定；逐项服务端复核组交集（防绕过前端置灰）。 */
 	void bind(Long agentId, List<Long> kbaseIds, String operator);
 }

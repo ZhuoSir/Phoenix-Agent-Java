@@ -1,4 +1,6 @@
-> 版本: v1.0.0 | 状态: 已确认 | 确认人: 陈卓 | 确认日期: 2026-10-07 | 更新: 2026-10-07（v1.0.0：三重确认第②重通过；正文相对 v0.2.0 无改动，仅版本头转正）
+> 版本: v1.8.0 | 状态: 已确认 | 确认人: 陈卓 | 确认日期: 2026-10-07 | 变更源: CR-02 ⇒ R-19 | 变更源: CR-01 ⇒ R-18 | 变更源: R-17（智能体按创建人可见 + 系统管理员角色不可删）|
+>
+> **v1.1.0 变更（铁律 4：已确认文档被改动 ⇒ 回退待重确认）**：**仅订正事实数字**，无设计变更 —— T-01 活库门禁统计（`evidence/T-01_gate-stats.txt`）推翻了两处口径：普通角色 ACL 由「0 行」订正为「**1 行**（智能体中心）」、名下用户由「10」订正为「**5 个存活用户**」；并在 §数据模型一 追加「活库现值复核」表（dump 为迁移前快照）。**决策 1~6、任务拆解 T-01~T-17、需求条款均不受影响。**
 
 # 技术方案：user-role-group-model
 
@@ -153,6 +155,24 @@
 
 **索引/视图/外键依赖核对（已实测）**：三张组织表**无任何外键被引用**（仅自身 PK）、**无视图/触发器/函数**依赖、组织列上**无索引**（唯一例外是 company 表自身的 `code` 唯一索引，随表删除）⇒ DDL 可安全 `DROP`，无需 `CASCADE`。
 
+**活库现值复核（T-01 门禁统计，2026-10-07；容器 `phoenix-release-postgres-1`／DB `phoenix`，已应用 `V1.7.0_01~04`）**——上表为**迁移前 dump 快照**，下表为**活库现值**，冲突时以本表为准：
+
+| 指标 | 迁移前 dump | 活库现值 | 影响 |
+|---|---|---|---|
+| 组织三表 | 4 / 17 / 14 | **4 / 17 / 14**（一致） | 无 |
+| `tbl_privilege_group` | 0 | **0** | R-09「死代码」定性不变 |
+| `tbl_platform_platform_info` | — | **0 行（空表）** | R-11 删表**零数据损失**（仅结构） |
+| ACL 存活行 | 73（含墓碑） | **61** | 决策 6 清理面以 61 为准（含 **30 行孤儿 `module_id`**、**36 行挂非角色 id**） |
+| 超管可用菜单 | 23 | **24 / 27**（缺「三方平台」「请求管理」「基础管理」） | 与决策 6 一致 |
+| **普通角色 ACL 行** | 0 | **1**（智能体中心 `/agent/chat`） | ⚠️ **订正** plan 前文「0 行」 |
+| **普通角色名下存活用户** | —（seed 口径 10） | **5** | ⚠️ **订正** plan 前文「10 用户」 |
+| 零角色存活用户 | — | **2 / 5** | R-07 补齐对象 |
+| 零组前台账号 | — | **1 / 1** | R-04 口径影响面 |
+| 组授权（del=0 / del=1） | 4/4/11/6 | agent 4/0、kbase 3/2、skill 5/6、mcp 1/5 | BUG-121 墓碑行**实证存在** |
+
+证据：`evidence/T-01_gate-stats.txt`、`evidence/T-01_role-menu-facts.txt`、`evidence/T-01_compile-baseline.raw.txt`（基线构建）、`evidence/T-01_backup-manifest.txt`（备份清单）。
+**关键推论**：启用菜单过滤后，普通角色 5 个用户**只剩「智能体中心」1 个菜单**，而前端 `homePath` 默认 `/agent/list` 未授权 ⇒ **落地即 404/白屏**，T-07 必须在该账号上验证。
+
 ### 二、DDL 草案（Implement 期落 `specs/{本目录}/sql/`，M3 汇总为 `V2.0.0_0x__*.sql`）
 
 ```sql
@@ -291,7 +311,7 @@ COMMIT;
 
 - **采用**：以「菜单全集 × 角色」为口径**重建** ACL 基线，并清理孤儿：
   1. 超管（`428007432736870400`）：授予全部存活菜单（含当前缺的「三方平台 / 基础管理 / 请求管理」），`acl_state='31'`。
-  2. 普通角色（`431285032083144704`，现 **0 行**、名下 10 用户）：授予**非管理类基线菜单集合**（具体集合待用户确认——见「待确认问题 Q-P1」）。
+  2. 普通角色（`431285032083144704`，活库现 **1 行**（智能体中心 `/agent/chat`）、名下 **5 个存活用户**）：授予**非管理类基线菜单集合**（Q-P1 已裁定：自动补默认角色 + 兜底）。〔v1.1.0 订正：原文「0 行 / 10 用户」系 seed 口径，已按活库更正〕
   3. 清理 `71f2934c-…` 名下 50 行与 44 行孤儿 `module_id`（先导出留档再删，遵守 L-40 台账纪律）。
   4. 孤儿 `user_role` 行（BUG-118）：**不擅自删**，按"保留 + 记账"处置（与 BL-05/D6 的孤儿账号口径一致），并在 UPGRADE.md 列为已知项。
 - **被拒绝 A**：直接切 ACL 过滤、数据原样不动 —— 理由：普通角色 0 行 ⇒ 10 个用户零菜单、前端 `homePath` 默认 `/agent/list` ⇒ 白屏/404（实测级后果）；超管缺 3 个菜单。
@@ -318,7 +338,7 @@ COMMIT;
 - **[风险] 存量组织数据不可逆** → 规避：pre-migration 全量 dump + 组织维度专项导出；UPGRADE.md 明确"数据恢复依赖备份"。
 - **[风险] 资源可见性口径已定但**与现状代码语义耦合**（Q-P4 裁定：无授权行＝公开） → 现状代码有三处「**无任何授权行 = 全公开**」分支：`AccountInfoServiceImpl.getMyAgents:96-116`（`published ∧ 无授权行 ⇒ 全员可见`）、`FrontSkillAccessServiceImpl.validateVisible:75-86`、`FrontMcpAccessServiceImpl` 同族；而生产授权行极少（组↔智能体 4、组↔知识库 4、组↔技能 11、组↔MCP 6）⇒ **若解释为"无授权行即不可见"，绝大多数资源会对所有普通用户消失**。规避：Q-P4 定口径（建议保留兼容语义=「有授权行的资源仅授权组可见，无授权行者维持公开」），并在部署前统计「零组用户数 / 各资源授权行数」作为门禁。
 - **[风险] 菜单过滤过严致全员看不到菜单（ACL 数据不完整/过期，L-29 已证 `module_sn` 是过期标签）** → 规避：过滤只用 `module_id`/`url`；超管豁免；上线前统计"每个角色可用菜单数"，出现 0 即拦截发布。
-- **[风险] 最严重的一条：普通角色现 0 行 ACL、名下 10 用户**（BUG-117 实测）→ 规避：实施决策 6 的 ACL 基线重建 + Q-P1 降级口径；上线前用 SQL 统计"每个角色的可用菜单数"与"无角色用户数"双门禁，任一为 0 即阻断发布。
+- **[风险] 最严重的一条：普通角色名下 5 个存活用户仅 1 行 ACL（智能体中心），且其落地页 `/agent/list` 未授权** —— 启用过滤后这 5 人**只看到 1 个菜单且落地 404/白屏**（比"零菜单"更隐蔽）〔v1.1.0 订正：原文「0 行 ACL / 10 用户」为 seed 口径〕→ 规避：实施决策 6 的 ACL 基线重建 + Q-P1 降级口径；上线前用 SQL 统计"每个角色的可用菜单数"与"无角色用户数"双门禁，任一为 0 即阻断发布；T-07 的"不白屏"断言必须**打在该普通角色账号**上
 - **[风险] 过滤菜单但漏了按钮级权限 ⇒ `hasAccessByCodes` 恒真** → 规避：`buildAdminAclMap` 与 `access.ts:123-126` 的 `setAccessCodes` 同批改造（决策 4）；验收须含"未授权按钮不出现/点击被拒"的断言，不能只验菜单。
 - **[风险] 无菜单用户落地白屏/404**（前端 `homePath` 默认 `/agent/list`，`store/auth.ts:49`）→ 规避：Q-P1 口径落定 + 提示页兜底；验收含"零授权账号登录后不白屏"。
 - **[风险] session 里的 ACL 是登录时刻快照**（`LoginServiceImpl:76` 写 `LOGIN_ACLS`）→ 规避：新实现**不得**继续读 session 快照（否则改角色须重登才生效，与 R-04「即时生效」精神相悖）；改为按需查库并说明缓存口径。
@@ -339,3 +359,222 @@ COMMIT;
 - 生产库真实数据统计（部署前门禁）：零角色用户数、零组用户数、各角色可用菜单数、`tbl_privilege_group` 行数与非空业务列比例、组织三表行数。
 - `tbl_phoenix_release` 台账现状核对（BUG-115 补登后是否完整）。
 - 迁移器事实（已确认，供 Implement 参照）：`docker/init/migrate.sh` 扫 `/releases/v*/sql/V*.sql`，`sort -V` 顺序，逐文件 `-1` 事务，成功写 `tbl_phoenix_release`；`rollback/` 子目录**不被扫描**（回滚靠人工执行）。
+
+## R-12 实施方案（v1.2.0 追加）
+
+> 触发：requirements **v2.1.0** 新增 R-12（权限管理 + 前台管理 → 「系统管理」；账号管理唯一化）。
+> 本方案**不新增表/列**，只调整菜单数据与前端页面，属**数据 + 前端**变更。
+
+### 一、数据库（新升级件 `V2.0.0_06__menu_merge_system_management_dml.sql` + rollback）
+
+| # | 操作 | 对象 | 说明 |
+|---|---|---|---|
+| 1 | `UPDATE name/url/sn` | 权限管理 `02b733aa08774219a23c2f21f1b3f6b5` | 更名 **系统管理**；建议 `url` → `/system-management`、`sn` → `SystemManagement`；**id 不变**（保 ACL） |
+| 2 | `UPDATE pid/order_no` | 组管理 `8b1a156184cf49fba34389e8caea4269` | 父 → 系统管理；次序与 账号管理 相邻 |
+| 3 | `UPDATE order_no` | 菜单管理 / 权限值管理 / 日志管理 | 依次后移一位，保持 角色→账号→组→菜单→权限值→日志 |
+| 4 | `DELETE` + ACL | 前台 账号管理 `6752c28a59c048cb9d08179ccadb38b4` | 连同 `tbl_privilege_acl` 中 `module_id` 指向它的行 |
+| 5 | `DELETE` + ACL | 前台管理 `638d2319c2d54f3ea36b2a519c9a1d0f` | 空目录清理 |
+
+- **幂等**：全部按固定 id 操作；重复执行影响 0 行。**自检**：存活菜单 = 19；超管 ACL 行数 = 存活菜单数；普通角色 ACL 仍 7。
+- **回滚**：`rollback/V2.0.0_06__..._rollback.sql` —— 保真重建被删 2 行（原文取自 `sql/all_data.sql` 删除前副本或线上 dump）
+  并把改名/搬迁/次序改回原值。
+- **聚合**：与 01~05 同批放入 `releases/v2.0.0/sql/`（部署台账按 seq 自动应用，已部署环境补跑该件即可）。
+
+### 二、前端（admin-ui）
+
+| 操作 | 对象 |
+|---|---|
+| 删除 4 文件 | `views/account/account-info/{index.vue,form.vue,data.ts,group-form.vue}` |
+| **保留** | 全部 3 个 API 模块（`platform-account-info.ts` 的 `getAccountInfoApi` 被 `api/core/user.ts` 使用；<br>`getAccountGroupInfoByAccountInfoApi` 被 `views/system-management/account/form.vue`（T-13）使用；<br>`platform-account-tenant-info.ts` 的 `getGroupAgentInfoListApi` 被组管理页使用） |
+| 连带核对 | 删除后 `pnpm typecheck` 不新增错误（基线 207）、`pnpm build` 通过、无悬空 import |
+
+### 三、验证
+
+1. **drill 库**：正向 → 菜单 19、两目录消失、组管理在系统管理下；反向 → 复原；各跑两次验幂等。
+2. **洁净库重放**：`all_schema` + `all_data` → 01~06 两轮全 exit=0；终态菜单 19。
+3. **部署栈**：重建前端镜像 + `docker compose up -d` → 台账应用 `V2.0.0_06`；超管导航只见「系统管理」；
+   `/platform-account/account-info` 404；普通角色导航仍 7 条。
+
+## R-13 实施方案（v1.3.0 追加）
+
+> 触发：requirements **v2.2.0** 新增 R-13（账号集合收敛为 admin + chenzhuo；初始化数据同步）。
+> 含**存量清理（DML）**与**种子重写（基线）**，不新增表/列。
+
+### 一、存量清理升级件（`V2.0.0_07__account_prune_dml.sql` + rollback）
+
+| # | 操作 | 对象 |
+|---|---|---|
+| 1 | DELETE | `tbl_privilege_login_log`：`operation_id` 或 `create_by` ∈ 待删账号 id |
+| 2 | DELETE | `tbl_privilege_user_role`：`user_id` ∈ 待删账号 id |
+| 3 | DELETE | `tbl_agent_user_agent_info`：`user_id` ∈ 待删账号 id |
+| 4 | DELETE | `tbl_privilege_user`：liufang / lwj / xtj（存活）+ maliu / wangwu（已软删，物理删） |
+| 5 | 自检 | 存活账号恰为 admin/chenzhuo；无残留账号域行；chenzhuo 角色绑定仍在（L-51：不硬编码环境绝对数） |
+
+- **待删 id（实测）**：liufang `428011841386577920`、lwj `431678413494018048`、xtj `428011841386577921`、
+  maliu `432101006843711488`、wangwu `432061200055025664`
+- **不删**：聊天会话/消息（业务数据；按用户裁定处理）
+- **回滚**：逐行保真重建 5 行用户 + 其角色绑定/登录日志/智能体绑定
+- **审计列**：其他行的 `create_by`/`update_by` 保留原值
+
+### 二、种子/基线重写（全新库 = admin + chenzhuo）
+
+| 表 | 现状 | 改为 |
+|---|---|---|
+| `tbl_privilege_user` | 5 行演示账号 | **1 行 chenzhuo** |
+| `tbl_privilege_user_role` | 19 行（含孤儿） | **仅 chenzhuo 的 1 行** |
+| `tbl_platform_account_info` | lwj | **chenzhuo** |
+| `tbl_platform_account_group_info` | lwj→通用组 | **chenzhuo→通用组** |
+| `tbl_agent_user_agent_info` | 3 行（liufang×2/lwj×1） | **仅 chenzhuo 的 1 行** |
+| `docker/init/10_seed_admin.sql` | 只种 admin | 不变 |
+
+### 三、验证
+
+1. drill：部署时备份重放 01~07 两轮 + 反向 07 + 再正向；存活账号 = 2
+2. 洁净库重放：all_schema/all_data → 01~07 两轮，终态恰为 admin + chenzhuo
+3. 部署：migrator 应用 07 → 存活账号 2；5 旧账号登录失败；admin/chenzhuo 登录成功且菜单 19 / 7
+
+## R-15 实施方案（v1.4.0 追加）
+
+> 触发：requirements **v2.4.0** 新增 R-15。**无表结构变更** ⇒ 不新增迁移件（台账仍 8 件）。
+
+### 一、后端
+
+| 项 | 内容 |
+|---|---|
+| 检索修正 | `pageByQuery` keyword 子句补 **`mobile`**（手机号；BUG-130），保留 `phone`/`tel` |
+| 新增端点 | `PUT /api/privilege/user/status`（{id,status}）、`PUT /api/privilege/user/status/batch`（{ids[],status}→更新行数） |
+| 新增 DTO | `PrivilegeUserStatusDTO`、`PrivilegeUserBatchStatusDTO` |
+| 服务层 | `isSuperAdmin`（**统一口径**，LoginServiceImpl 委托到此）、`updateStatus`、`updateStatusBatch`、`canDisable` |
+| 安全保护 | 控制器：① 禁止操作当前登录账号本人（单/批）；② 禁用后须仍存在 ≥1 启用的超管 |
+
+### 二、前端（admin-ui 账号管理）
+
+| 项 | 内容 |
+|---|---|
+| 搜索 | 提示改为「用户名 / 姓名 / 手机号」 |
+| 勾选 | `useColumns` 头部加 `type: 'checkbox'`；grid `checkboxConfig`；`@checkbox-change/@checkbox-all` 同步已选数 |
+| 批量 | 工具栏「批量启用 / 批量禁用」（未勾选禁用、显示已选数、二次确认、成功后清勾选并刷新） |
+| 行级 | 操作列「启用/禁用」按 `status` 显示对应动作（二次确认） |
+| 收敛 | 删「分配权限」按钮、`RoleModal` 与 `role-form.vue`（角色/组分配统一走编辑，R-03） |
+
+### 三、验证
+
+1. API 级：手机号（全量/片段）、姓名、用户名检索；单/批启停；禁用后登录被拒；两条保护被拒。
+2. 产物级：`account-*.js` 含批量按钮且无「分配权限」；`form-*.js` 含新提示、旧提示 0 命中。
+3. 质量门：后端编译 0 错误、`typecheck` 零新增、`build` 通过、部署后后端 0 ERROR。
+
+## R-16 实施方案（v1.5.0 追加）
+
+> 触发：requirements **v2.5.0** 新增 R-16（用户口径：「admin 超管账号，不能被删除和禁用，这个是基础」）。
+> **无表结构变更** ⇒ 不新增迁移件（台账仍 8 件）。
+
+### 一、后端
+
+| 项 | 内容 |
+|---|---|
+| 保护判定 | `PrivilegeUserServiceImpl.isProtectedAdmin(userId)`：取该行 `username`，与 `admin` **忽略大小写**比较（按用户名而非 id —— id 逐环境不同） |
+| 禁用保护 | 控制器 `PUT /status`、`/status/batch` 先查保护账号（优先于自锁与最后超管），命中即拒；服务层 `updateStatus` 再兜底拒绝、`updateStatusBatch` 剔除保护账号 |
+| 删除保护 | 控制器 `DELETE /{id}` 补三条：① 内置超管不可删 ② 不能删当前登录账号 ③ 须保留≥1 启用超管（**原实现零保护**，见 BUG-132）；服务层 `deleteUser` 兜底拒绝保护账号 |
+| 改名保护 | 控制器 `PUT`（编辑）：保护账号 `username` 不得改为非 `admin`；服务层 `updateUser` 亦强制回填原用户名。注：`PrivilegeUserDTO` **不含 status**，编辑路径本就无法改状态（实测确认） |
+
+### 二、前端
+
+| 项 | 内容 |
+|---|---|
+| 置灰 | 操作列对保护账号的「启用/禁用」「删除」设 `disabled: true` + `tooltip`（VbenTableAction 支持） |
+| 批量预检 | 勾选含保护账号且要禁用时，前端先提示并中止（服务端仍会拒） |
+
+### 三、验证
+
+1. API 级：单个/批量禁用 admin（admin 本人 + chenzhuo 发起）均拒；批量含 admin 整体拒绝且不部分执行；
+   删除 admin（两种身份）均拒；改名 admin 被拒；admin 其他字段可编辑；chenzhuo 删除自己被拒。
+2. 终态：三账号齐全且均启用；admin 可登录且菜单 19。
+3. 质量门：后端编译 0 错误、`typecheck` 零新增、构建通过、部署后 0 ERROR。
+
+## R-17 实施方案（v1.6.0 追加）
+
+> 触发：requirements **v2.6.0** 新增 R-17。**含一条数据回填迁移件**（V2.0.0_09）。
+
+### 一、智能体按创建人可见（phoenix-data）
+
+| 项 | 内容 |
+|---|---|
+| 记录创建人 | `AgentController.create`：`admin_id = 当前登录用户 id`（**服务端取会话，覆盖入参**） |
+| 列表过滤 | `GET /api/agent/list`：超管（`AdminRoleGuard.isAdmin`，口径同 R-08/R-15）→ 不过滤；其余 → `ownerId=本人` |
+| 服务层 | `AgentService.listCreatedInPlatform(status, keyword, Long ownerId)`：`ownerId != null` 时按 `admin_id` 过滤（null=全部） |
+| 越权防线 | **`checkAgentExists(id)` 内统一加归属校验** —— 它是详情/编辑/删除/发布/下线/授权/API Key 等所有单对象端点的共同入口 ⇒ 一处改动成组生效；非本人且非超管 ⇒ 403「无权访问他人创建的智能体」 |
+| 存量回填 | `V2.0.0_09__agent_owner_backfill_dml.sql`：`admin_id IS NULL` 的历史智能体 → 内置 admin 的 id（**子查询动态解析**，跨环境；同 L-51/L-57）。回滚件按**记录的 10 个 id** 复位置空 |
+| 说明 | 列表沿用既有「只列 sn 为空（平台内创建）」口径，Java 自注册智能体（sn 非空）不出现 |
+
+### 二、角色删除保护（phoenix-privilege）
+
+| 项 | 内容 |
+|---|---|
+| 服务层 | `deleteRoleById` 返回 `boolean`：`sn=ROLE_ADMIN` ⇒ false；有持有者 ⇒ false；否则真删（原实现 void 且无校验） |
+| 新增 | `countHolders(roleId)`、`isBuiltInAdminRole(roleId)`（按 sn 判定） |
+| 控制器 | 先判内置角色 → 再判持有者数 → 提示语可区分 |
+
+### 三、验证
+
+1. 列表可见性：超管 5 条（sn 为空的平台内智能体）/ 普通角色 0 条（未创建时）。
+2. 越权：普通角色直连他人智能体的 详情/编辑/发布/删除/下线/授权 → 全部 403；本人与超管放行。
+3. 创建人：普通角色新建后 `admin_id` = 本人；双方列表随之变化。
+4. 角色：`ROLE_ADMIN` 拒绝、`COMMON`（有持有者）拒绝、无持有者角色可删且行消失。
+
+## R-14 实施方案（v1.4.0 追加）
+
+> 触发：requirements **v2.3.0** 新增 R-14（用户类型/IDM 与工号下线）。**含一条 DDL 迁移件**（V2.0.0_08）。
+
+### 一、数据库（`V2.0.0_08__usertype_code_drop_ddl.sql` + rollback）
+
+| # | 操作 | 对象 |
+|---|---|---|
+| 1 | DROP COLUMN | `tbl_privilege_user.{code, user_type, it_user_id, it_user_name}`、`tbl_privilege_user_role.user_no` |
+| 2 | UPDATE | 组归属 `tbl_platform_account_group_info.account_name` 由「工号」改为「用户名」 |
+| 3 | 自检 | 环境无关不变量：待删列 0 个 / 存活账号 ≥1 且 chenzhuo 在 / chenzhuo 角色绑定在 / 组归属名称已同步（L-51） |
+
+- **保留（非本件范围）**：`tbl_platform_account_info.code` 属**前台账号自身标识**，仍被前台登录响应 `userCode`、
+  `getByCode`、列表筛选与关键字搜索使用。
+
+### 二、后端（17 个文件）
+
+| 项 | 内容 |
+|---|---|
+| 删字段 | `PrivilegeUser.{code,userType,itUserId,itUserName}`、`PrivilegeUserRole.userNo`、`PrivilegeUserDTO.{code,userType}`、`PrivilegeUserVO.{code,userType}`、`LoginUserInfoVO.userType`、`PrivilegeUserRoleDTO/VO.userNo` |
+| 删接口/方法 | `GET /api/privilege/user/code/{code}`、`IPrivilegeUserService.getByCode`（+实现）、`saveUserRole` 的 userNo 形参、`pageByQuery` 的工号搜索与 userType 过滤 |
+| 删死代码 | `enums/UserTypeEnum.java`；`ExceptionEnum` 的 `USERCODE_DUPLICATE_EXCEPTION` / `USER_DELETE_ERROR` / `DEPORTMENT_DELETE_ERROR` |
+| 语义替换（工号 → 用户名） | `PrivilegePvalueController` 审计 `createBy`、`addUserGroups` 的 accountName、`AccountInfoServiceImpl` 前台登录载体 `carrier.setCode`、`ReactAgentController` 的 `UserProfile.userCode` |
+| **兼容加固（关键）** | 4 处从**会话**读取 `PrivilegeUser` 的 Jackson 2 `new ObjectMapper()` 显式 `FAIL_ON_UNKNOWN_PROPERTIES=false`（`HarnessController` / `ReactAgentController` / `PrivilegePvalueController` / `LoginHelper`）—— 旧会话含已删字段，否则抛 `UnrecognizedPropertyException`（记 **L-54**） |
+
+### 三、前端（7 个文件）
+
+账号列表工号列与用户类型列/插槽、表单工号项（必填）与用户类型下拉、组管理「工号」搜索框与工号列、
+`api/core/{privilege-user,auth}.ts` 类型字段、无调用方的 `getUserByCodeApi`、`store/auth.ts` 的 userType、
+`mobile-ui/services/authTransport.ts` 类型声明；`router/guard.ts` 移除 `userType !== 1` 死门（实测该门对所有用户都为真）。
+
+### 四、验证
+
+1. drill：01~08 链跑一次（与 migrator 一致）全 exit=0 + 08 单独幂等 + 反向复原列与原值 + 再正向残留列 0。
+2. 洁净库重放：migrate.sh 首启顺序 → 01~08 全 exit=0；终态 accounts=admin,chenzhuo、残留列 0。
+3. 活库：migrator 应用 08（台账 8 件）；实测 目标列消失 / 登录响应无 userType / 账号列表无 code,userType /
+   `GET /code/{code}` 404 / 前台 `userCode`=用户名 / 菜单 19-7 不变 / typecheck 零新增 / 0 ERROR。
+
+## R-18 实施方案（v1.7.0 追加，CR-01）
+
+> 触发：CR-01（major，三确认）。**含 DDL**（V2.0.0_13 skill 加 creator）。
+
+| 层 | 内容 |
+|---|---|
+| SQL | `V2.0.0_13`：skill ADD creator + 存量回填 admin + kbase 'system'→admin（子查询动态解析） |
+| 管理页 | kbase `queryByConditionsWithPage(dto, ownerId)` / skill `page(+ownerId)` / mcp `page(+ownerId)`；ownerId=null=超管 |
+| 单对象 | 三资源 controller 注入 `AdminRoleGuard`，`assertOwner` 非本人且非超管 → 403 |
+| 选择器 | skill/mcp `options(agentId, viewerId, superAdmin)`、kbase `bindable(agentId, viewerId, superAdmin)`：可见集合 own ∪ myGroups ∪ public；bound 灰显 |
+| 坑 | `QueryChain.and` 占位符必须 `?`（`{0}` 不替换 ⇒ BUG-139 / L-64） |
+
+## R-19 实施方案（v1.8.0 追加，CR-02）
+
+| 层 | 内容 |
+|---|---|
+| SQL | `V2.0.0_14`：DROP CONSTRAINT `tbl_harness_skills_name_key`（**是约束非裸索引**，L-66）+ CREATE UNIQUE `(name, coalesce(creator,''))` |
+| 后端 | `SkillAdminServiceImpl.upload` 判重加 `creator=?`；overwrite 仅本人；insert 捕获 DuplicateKey → 友好 fail |
+| 前端 | 无（Q-D1） |

@@ -1,0 +1,22 @@
+=== CR-01 / R-18 / T-24~T-26 验证结论（资源归属可见性）===
+日期: 2026-10-07 | 档位: major | §S/§P/§T 三次确认: 陈卓
+
+[T-24 SQL V2.0.0_13] drill 正向×2/反向/再正向 全 exit=0；活库 migrator 应用（台账 13 件）；
+  自检「admin 1 / 无creator技能 0 / system知识库 0」；skill 7 条 creator=admin、kbase id=1 'system'→admin。
+
+[T-25 管理页归属 + 单对象 403]（活库 API 实测）
+  admin:  知识库 3 / 技能 7 / MCP 1（全量）
+  chenzhuo: 知识库 1（仅自己的「测试知识库」）/ 技能 0 / MCP 0
+  chenzhuo GET 他人知识库 → 403 ✅；DELETE 他人知识库 → 403 ✅；admin GET 同一 → 200 ✅；chenzhuo GET 自己的 → 200 ✅
+
+[T-26 选择器可见集合 own ∪ myGroups ∪ public]
+  基线（全部资源无"chenzhuo 不在的组"授权）: admin 与 chenzhuo 的 skill options 均 6（因均为公共/组内），mcp 1，kbase 3
+  反例（受控）: 把公共技能 chinese-official-writing(id=17) 授权给 chenzhuo 不在的临时组
+    → chenzhuo options 6→5（该技能消失）✅；admin 仍 6 ✅；公共的 12306-skill 仍可见 ✅；测试数据已清理
+  正例: weather(id=10) 本就被授权给 chenzhuo 所在的通用组 ⇒ 加临时组授权后 chenzhuo 仍可见（组关联优先）✅ 符合口径
+
+[过程发现并修复 BUG-139] KnowledgeBaseServiceImpl.queryByConditionsWithPage 用 `chain.and("... {0}", v)`，
+  MyBatis-Flex QueryChain.and **不替换 {0}** ⇒ 生成字面 `creator = {0}` 语法错被 catch 吞成空列表
+  （chenzhuo 知识库一度返回空）。改 `?` 后正常；同方法 name/status 的 {0} 一并修正。
+
+[质量门] 后端 compile/package 0 错误；前端无改动（后端过滤）；部署 backend 镜像重建 + migrator 应用 13；0 ERROR。

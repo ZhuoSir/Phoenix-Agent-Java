@@ -14,7 +14,6 @@ interface BackendLoginResult {
   realName: string;
   email?: string;
   phone?: string;
-  userType?: number;
 }
 
 export const realAuthTransport: AuthTransport = {

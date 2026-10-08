@@ -32,16 +32,7 @@ public class PrivilegeRole extends BaseEntity {
 	/** 有效状态（1：有效；0：失效） */
 	private Integer validState;
 
-	/** 公司id */
-	private Long companyId;
-
 	/** 系统id */
 	private String systemId;
-
-	@Column(ignore = true)
-	private String companyName;
-
-	@Column(ignore = true)
-	private String deptName;
 
 }

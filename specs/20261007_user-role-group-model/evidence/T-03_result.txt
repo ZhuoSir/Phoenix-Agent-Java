@@ -1,0 +1,36 @@
+=== T-03 验收结论（改造三个部分引用文件 + 连带修正）===
+日期: 2026-10-07 | 工具链: JDK 23 + Maven 3.8.6 + -Dmaven.repo.local=$PWD/.mvn-home
+
+[1] 计划内改动（3 个文件）
+  1) phoenix-privilege-core/.../PrivilegeUserServiceImpl.java
+     - 删 import PrivilegeCompany / PrivilegeDepartment
+     - pageByQuery: 去掉 select 中的 company_name/dept_name、两个 leftJoin 与 companyId/deptId 过滤
+  2) phoenix-privilege-rest/.../PrivilegeUserController.java
+     - 删 4 个 import、2 个注入字段（IPrivilegeCompanyService / IPrivilegeDepartmentService）
+     - toVo(): 去掉公司名/部门名回填块
+  3) phoenix-platform-core/.../AccountInfoServiceImpl.java
+     - 删 import IPrivilegeDepartmentService 与字段 departmentService
+     - buildLoginResult(): 去掉 deptIds 计算块
+
+[2] 计划外连带修正（2 类，均为编译暴露）
+  4) phoenix-common-api/.../LoginVO.java：删 deptIds 字段
+     ⇒ 编译暴露 **GraphServiceImpl.java:221** 在系统提示词里使用 loginVO.getDeptIds()（"部门ids:%s"）
+     ⇒ 已同步修正提示词模板（去掉部门 ids 段）。**此项推翻调研报告"零消费方"的结论**，已记 lessons L-45
+  5) PrivilegeUserVO / PrivilegeUserDTO：清空 8 / 6 个组织字段（响应面与入参面）
+     复核：全仓 setCompanyName/setDeptName/setEmployeeId/setItUserId/getDeptIds... 调用 = 0
+
+[3] 顺序约束决策（**实体字段暂留，并入 T-14**）
+  - PrivilegeUser 实体仍保留 companyId/deptId/employeeId/itUserId/itUserName/isLeader 6 个字段
+  - 原因（**已实证**）：DB 列 company_id/dept_id 仍是 NOT NULL ⇒ 省略它们的 INSERT 直接失败：
+      psql> insert into tbl_privilege_user (id, code, username) values ('__probe_t03','__probe_t03','__probe_t03');
+      ERROR:  null value in column "company_id" of relation "tbl_privilege_user" violates not-null constraint
+      （事务已 rollback，库内无残留）
+  - 处置：实体字段清理由 **T-14 与 V2.0.0_01 DDL 原子完成**（先 DROP COLUMN 再删字段，任何一版都不留"字段缺失但列仍 NOT NULL"的窗口）
+  - 因此 T-03 的"Java 侧 grep 为 0"**在 VO/DTO/调用面已达成**，实体面**记入 T-14 验收**（不静默跳过）
+
+[4] 验证（真实输出）
+  - `mvn clean compile -Dspring-javaformat.skip=true -Dmaven.repo.local=$PWD/.mvn-home`
+    → **BUILD SUCCESS**（ERROR 行数 = 0）；原始输出 T-03_compile-after-fix.raw.txt
+  - 对照：删除后未修复时 BUILD FAILURE（T-02_compile-after-delete.raw.txt，2 个错误全在 PrivilegeUserServiceImpl）
+
+[5] 结论：T-03 达成（编译绿 + 响应面无组织字段 + 无残留成员调用）；实体字段清理转入 T-14。

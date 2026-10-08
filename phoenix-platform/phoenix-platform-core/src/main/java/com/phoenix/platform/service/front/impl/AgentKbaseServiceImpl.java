@@ -15,7 +15,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 /**
  * 绑定实现。校验时机=绑定期（A-05）；agent 无组授权时全量可选（plan 风险3 兜底，changelog 注记）。
@@ -32,13 +34,33 @@ public class AgentKbaseServiceImpl implements AgentKbaseService {
 
     @Override
     public List<BindableKbaseVO> bindable(Long agentId) {
+        // 兼容旧签名：无 viewer 上下文时按超管口径（全量），实际调用走带 viewer 的重载
+        return bindable(agentId, null, true);
+    }
+
+    @Override
+    public List<BindableKbaseVO> bindable(Long agentId, String viewerId, boolean superAdmin) {
         List<String> agentGroups = agentGroupIds(agentId);
         List<Long> bound = agentKbaseBindMapper.selectKbIdsByAgent(agentId);
-        List<KnowledgeBase> kbs = QueryChain.of(knowledgeBaseMapper)
-                .eq(KnowledgeBase::getDelFlag, 0)
-                .orderBy(KnowledgeBase::getUpdateTime, false)
-                .list();
-        return kbs.stream().map(kb -> {
+        // R-18（CR-01/T-26）：可见集合 = 超管全部；否则 own ∪ myGroups ∪ public
+        QueryChain<KnowledgeBase> chain = QueryChain.of(knowledgeBaseMapper)
+                .eq(KnowledgeBase::getDelFlag, 0);
+        if (!superAdmin) {
+            List<String> myGroups = myGroupIds(viewerId);
+            StringBuilder cond = new StringBuilder("(creator = ?");
+            List<Object> params = new ArrayList<>();
+            params.add(viewerId);
+            if (!myGroups.isEmpty()) {
+                cond.append(" or id in (select kbase_id from tbl_platform_group_kbase_info where del_flag = 0 and group_id in (")
+                        .append(myGroups.stream().map(g -> "?").collect(java.util.stream.Collectors.joining(",")))
+                        .append("))");
+                params.addAll(myGroups);
+            }
+            cond.append(" or id not in (select kbase_id from tbl_platform_group_kbase_info where del_flag = 0))");
+            chain.and(cond.toString(), params.toArray());
+        }
+        List<KnowledgeBase> kbs = chain.orderBy(KnowledgeBase::getUpdateTime, false).list();
+        List<BindableKbaseVO> result = new ArrayList<>(kbs.stream().map(kb -> {
             boolean selectable = agentGroups.isEmpty() || hasCommonGroup(agentGroups, kb.getId());
             return BindableKbaseVO.builder()
                     .id(kb.getId()).name(kb.getName()).status(kb.getStatus())
@@ -47,7 +69,34 @@ public class AgentKbaseServiceImpl implements AgentKbaseService {
                     .selectable(selectable)
                     .disabledReason(selectable ? null : "该知识库未授权给此智能体所在的任何组")
                     .build();
-        }).toList();
+        }).toList());
+        // 已绑定但不在可见集合：保留灰显（R-04 场景2，不丢已绑关系）
+        Set<Long> visible = kbs.stream().map(KnowledgeBase::getId).collect(java.util.stream.Collectors.toSet());
+        for (Long bid : bound) {
+            if (visible.contains(bid)) {
+                continue;
+            }
+            KnowledgeBase kb = knowledgeBaseMapper.selectOneById(bid);
+            if (kb != null && kb.getDelFlag() != null && kb.getDelFlag() == 0) {
+                result.add(BindableKbaseVO.builder()
+                        .id(kb.getId()).name(kb.getName()).status(kb.getStatus())
+                        .itemCount(knowledgeBaseMapper.countItems(kb.getId()))
+                        .bound(true).selectable(false)
+                        .disabledReason("不在当前可见范围（已绑定，仅可解绑）")
+                        .build());
+            }
+        }
+        return result;
+    }
+
+    /** 当前用户所在组 id 集（R-18 可见集合用） */
+    private List<String> myGroupIds(String userId) {
+        if (userId == null || userId.isBlank()) {
+            return List.of();
+        }
+        return com.mybatisflex.core.row.Db
+                .selectListBySql("select group_id from tbl_platform_account_group_info where account_id = ? and del_flag = 0", userId)
+                .stream().map(r -> r.getString("group_id")).filter(java.util.Objects::nonNull).distinct().toList();
     }
 
     @Override

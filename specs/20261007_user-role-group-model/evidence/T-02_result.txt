@@ -1,0 +1,28 @@
+=== T-02 验收结论（删除组织维度整文件与死代码 VO）===
+日期: 2026-10-07 | 工具链: JDK 23 (~/jdk/jdk-23.0.1.jdk) + Maven 3.8.6 + -Dmaven.repo.local=$PWD/.mvn-home
+
+[1] 删除清单: 25 个文件（git rm）
+    - 组织维度整文件 22:
+      entity 3 / dto 3 / dto/query 1 / vo 3 / mapper 3 / I*Service 3 / *ServiceImpl 3 / *Controller 3
+    - 死代码 VO 3: DepartmentTreeVO / OrganizationTreeVO / PrivilegeGroupVO（R-09）
+    明细见 T-02_delete-and-dangling.txt
+
+[2] 静态复核（完整类型名正则，排除 queryPrivilegeCompanyId 等方法名假阳性）
+    检索式: \b(IPrivilege(Company|Department|Employee)Service|Privilege(Company|Department|Employee)(DTO|Query|VO|Mapper|ServiceImpl|Controller)?|DepartmentTreeVO|OrganizationTreeVO|PrivilegeGroupVO)\b
+    命中文件数 = 3（= T-03 待改文件，符合验收标准）:
+      1) phoenix-platform-core/.../AccountInfoServiceImpl.java        (38, 67)
+      2) phoenix-privilege-core/.../PrivilegeUserServiceImpl.java     (12, 13, 137-140)
+      3) phoenix-privilege-rest/.../PrivilegeUserController.java      (9, 10, 13, 14, 27, 28, 60, 66)
+    证据: T-02_dangling-refs-precise.txt
+
+[3] 编译裁决（mvn clean compile）: BUILD FAILURE —— **预期中的中间态**（T-03 修复后转绿）
+    phoenix-privilege-core 停机构建，2 个错误且均位于 PrivilegeUserServiceImpl.java:
+      [12,36] 找不到符号 类 PrivilegeCompany（包 com.phoenix.privilege.entity）
+      [13,36] 找不到符号 类 PrivilegeDepartment
+    说明: 多模块构建首个失败模块即停 ⇒ phoenix-privilege-rest（PrivilegeUserController）与
+          phoenix-platform（AccountInfoServiceImpl）**尚未编译到**，其残留引用已由 [2] 静态确认，
+          T-03 完成后由全量构建终审。
+    原始输出: T-02_compile-after-delete.raw.txt
+
+[4] 结论: T-02 验收标准达成 —— 25 文件不存在；真实引用仅剩 T-03 的 3 个文件。
+    构建红灯属任务序列的设计内状态（删→改），不构成"未完成"。

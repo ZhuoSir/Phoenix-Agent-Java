@@ -259,6 +259,12 @@
   必须记录**基线错误数**并断言"无新增 + 改动文件 0 命中"，只断言 exit code=0 既永远失败也会掩盖真错；
   ③ 每次改动后跑一次 typecheck 并把总数与基线对比，异常增量立刻定位文件。
 
+- **复发（2026-10-07，T-08）**：用**非贪婪正则**删 `assignLevels` 函数时，`\{.*?\n[ \t]*\}` 只吃到函数**内层**循环的 `}`，
+  留下 `  }\n}` 残片 ⇒ `vue-tsc` 直接报 TS1128 语法错误（类型检查从"213 个既有错误"骤降到"2 个"——
+  **错误数骤降本身就是危险信号**，我先按"通过"读了一眼才发现是解析失败）。修复：手工清残片 + 括号平衡自检（109/109）。
+  追加纪律：③ **删函数一律按"整块行区间"删（先定位起止行号），不要用非贪婪正则**；
+  ④ 基线有大量既有错误时，**错误数骤降 = 先怀疑文件被改坏**，而不是"变好了"。
+
 ## L-33 脚本化写中文台账：引号冲突 + 「凭记忆写 old_string」
 - **现象**：本次连续两次写 `bugs.md` 失败——① Python 字符串用 `"` 包裹，正文里却有中文直引号 `"…"` ⇒ **解析期 SyntaxError**；
   ② `old_string` 凭记忆写成 `…未纳入本版本〕|`，实际文件里是 `…未纳入本版本〕**|`（更早一次改动已经改过该行）⇒ 断言命中 0。
@@ -366,3 +372,300 @@
   三者缺一不得命名，只能照抄代码原名（如"第三方登录策略"）；② 类名/方法名只能生成假设，**假设必须标注为假设**（"疑似扫码登录（未证实调用方）"），不得写成并列事实；
   ③ 写进文档的每个业务名词都要能在证据文件里指到 file:line；④ 被用户纠正后**全库 grep 该词**逐处订正（本次 26 处），只改一处＝留半截错。
 
+## L-45 全称否定结论（"零消费方 / 死代码 / 只写不读"）必须自己复核后才能动手删
+- **现象**：C 路只读调研报告断言 `LoginVO.deptIds`「全仓无消费方（只写不读的死载荷）」，我未复核便写入 plan §字段级表并据此删字段；
+  `mvn clean compile` 立刻在 **`phoenix-data-core/.../GraphServiceImpl.java:221`** 报错 —— 它其实在系统提示词里拼
+  「部门ids:%s」（`JSON.toJSONString(loginVO.getDeptIds())`）。根因：**调研只覆盖了 privilege/platform/common 三个模块**，
+  消费方恰在第四模块 `phoenix-data-core`。
+- **防再犯**：① 「零消费方/死代码/只写不读」这类**全称否定**属高风险断言，动手删前必须**自己跨全仓复核**（`grep -rn` 打到项目根、
+  排除 target/node_modules），并把命令与命中贴进证据；② 复核范围按**项目根**而非"我调研过的那几个模块"；
+  ③ 删除类改动把编译器当终审，但**不能拿编译失败当"发现手段"**——每一次失败都意味着一次本可避免的返工。
+## L-46 构建工具链必须用项目记载的配置：JDK 不在 java_home 列表、本地仓库是项目内 `.mvn-home`
+- **现象**：做 T-01 编译基线时，我用 `which mvn`（无）→ `/usr/libexec/java_home -V`（只列出 25/17/16/11/8，**没有 21/23**）
+  → 便下结论"本机只能拿 JDK 25 编"，用 JDK 25 + 默认 `~/.m2`（28G）跑出了 `BUILD SUCCESS`。
+  用户随即给出真实配置：**JDK 23 在 `~/jdk/jdk-23.0.1.jdk`（不在 `java_home -V` 覆盖范围）**，
+  Maven 在 `~/Documents/work/apache/apache-maven-3.8.6/bin/mvn`（写在 `~/.bash_profile` 的 `MVN_HOME`），
+  **本地仓库是项目内 `<项目根>/.mvn-home`（每次构建带 `-Dmaven.repo.local`）**，Docker CLI 在 `/usr/local/bin/docker`。
+  ⇒ 我的"基线"用的是**错误的工具链与错误的依赖仓库**，结论不可作为后续增量对比的基线。
+- **防再犯**：① 开工前按顺序读 **AGENTS.md / `specs/_project/profile.md` / `~/.bash_profile`·`~/.zprofile`**（PATH 由它们决定），
+  **不要**用 `which` + `java_home -V` 反推项目环境（`~/jdk/**` 不在其覆盖内）；② 构建命令模板必须完整落盘：
+  `JAVA_HOME=<项目 JDK> <mvn 全路径> … -Dmaven.repo.local="$PWD/.mvn-home"`；③ 证据文件命名带**工具链指纹**
+  （JDK 版本 + 仓库路径），配置变更时旧证据改名保留而非删除（本次 `*_WRONGCFG_jdk25_m2repo.raw.txt`）。
+
+## L-52 按**行**编辑 SQL dump 会切断多行语句（必须按语句边界、引号感知地解析）
+- **现象**：T-19 重写基线时，我按行删除 8 张表的 INSERT；`tbl_data_chat_message` 的行是**多行语句**
+  （聊天内容含 HTML 与换行），只删掉 `INSERT INTO ...` 那一行 ⇒ 续行（HTML 片段 + `');`）留成悬空 SQL，
+  基线载入直接 `ERROR: syntax error at or near "<"`（且报错行号在 1.6 万行处，很难肉眼定位）。
+- **防再犯规则**：① 处理 dump/基线一律**先切成语句**（扫到引号外的 `;` 才断句，`''` 转义与 `--`/`/* */` 注释要跳过），
+  再按语句判断删留；② 改完**立刻灌进临时库验证**（`exit=0` 且对象计数符合预期），不要等下一轮演练才发现；
+  ③ 自检"引号数为偶数""目标表语句数"这类廉价不变量，能在打开 DB 前就发现截断。
+
+## L-54 从**会话缓存的实体**上删字段 ⇒ 必须让所有读取点容忍未知属性
+- **现象**：R-14 从 `PrivilegeUser` 删掉 `code`/`userType`/`itUserId`/`itUserName` 后，登录时写入会话的仍是
+  **旧版对象 JSON**；而 `HarnessController` / `ReactAgentController` / `PrivilegePvalueController` /
+  `LoginHelper` 四处都用 Jackson 2 的 `new ObjectMapper()` 读会话（默认 `FAIL_ON_UNKNOWN_PROPERTIES = true`）
+  ⇒ 读旧会话会抛 `UnrecognizedPropertyException`，相关接口全线 500（登录本身却正常，极易漏检）。
+- **防再犯规则**：① 改**会被序列化进会话/缓存/消息**的实体时，先全仓搜索它的读取点
+  （搜会话常量如 `LOGIN_USER_INFO`），逐个确认反序列化是否宽容；
+  ② Jackson 2 手搓 `ObjectMapper` 必须显式 `.configure(FAIL_ON_UNKNOWN_PROPERTIES, false)`，
+  或统一改用容器注入的 ObjectMapper（Spring Boot 默认已关该特性；本项目 Jackson 3 的 `tools.jackson` 注入实例天然宽容）；
+  ③ 部署后要专门验一次"**旧会话 + 新代码**"路径（拿改造前就登录的 token 打一次相关接口），
+  不能只验"重新登录后是否正常"。
+
+## L-66 唯一"约束"与唯一"索引"不是一回事：改唯一性前先查 pg_constraint，DROP INDEX 对约束-backed 索引必报错
+- **现象**：CR-02 要把 `tbl_harness_skills` 的全局 `UNIQUE(name)` 换成按创建人唯一。首版写 `DROP INDEX name_key`，
+  活库报 `cannot drop index ... because constraint name_key requires it`（它是**约束**，索引只是其支撑物）。
+  更阴的是 **drill 先"通过"了**——因为 drill 库早前被另一版（DROP CONSTRAINT）改过、约束已不在，
+  `DROP INDEX IF EXISTS` 变成 no-op ⇒ 假绿；活库首跑才暴露。
+- **防再犯规则**：① 动唯一性/索引前先 `select conname from pg_constraint where conrelid=... ` +
+  `pg_indexes` 辨清是约束还是裸索引，约束用 `ALTER TABLE ... DROP CONSTRAINT`；
+  ② **drill 库是被反复改过的脏环境**，"drill 通过"不等于" virgin 库通过"——关键 DDL 要在**从未应用过该件**的库
+  （洁净库或新建 scratch）上首跑验证；③ 迁移件里对"可能以约束或索引两种形态存在"的对象，
+  用 `DROP CONSTRAINT IF EXISTS` + `DROP INDEX IF EXISTS` 双保险。
+
+## L-65 WebFlux 下 Sa-Token 登录态只能在**请求线程同步段**取，进 fromCallable/弹性线程即 NotLoginException
+- **现象**：CR-01 给 `SkillController.upload`（reactive）加 creator 时，把 `me()` 写进
+  `Mono.fromCallable(...).subscribeOn(Schedulers.boundedElastic())` 的 lambda 内 ⇒ 弹性线程无 Sa-Token 上下文
+  ⇒ `NotLoginException: 未能读取到有效 token` ⇒ 上传全失败（用户报障才发现；我的 CR-01 验证只测了列表/403/options，**漏测上传**）。
+- **防再犯规则**：① reactive 端点里凡需登录态/请求头，一律在 **handler 同步段**先取值存局部变量，再传进 Mono/fromCallable
+  （同仓 `AgentFileController`/`AgentKnowledgeController` 已是该范式，照抄不要创新）；
+  ② 改了哪个端点的签名/调用链，**验证清单必须覆盖该端点的 happy path**（本次漏了 upload）；
+  ③ 报「未能读取到有效 token」先查调用点线程（是否 in fromCallable/subscribeOn/parallel），别先怀疑 token 过期；
+  ④ **二次修正教训**：把 `me()` 提到 handler 同步段仍不够——multipart/reactive 端点的同步段也可能被派发到
+  非请求线程（实测 boundedElastic 上 `SaTokenContext 上下文尚未初始化`）。reactive 端点取登录态的**唯一稳妥**做法是
+  线程无关的 `StpUtil.getLoginIdByToken(token)`（token 从请求头取），或改阻塞端点；
+  ⑤ **编译 exit≠0 时绝不部署**：本次一度把未编译通过的改动"部署"（实际部署了旧 jar），验证"通过"是假象。
+  部署前必须确认 `mvn package` exit=0。
+
+## L-64 MyBatis-Flex `QueryChain.and(String, Object...)` 只认 `?`，`{0}` 原样进 SQL 且错误被吞
+- **现象**：`KnowledgeBaseServiceImpl` 用 `chain.and("creator = {0}", id)`，生成 SQL 为字面 `creator = {0}`
+  ⇒ PostgreSQL 语法错 ⇒ 被 controller 宽 catch 转成**空列表**（接口 200 但数据空，静默失败）；
+  同方法 name/status 的 `{0}` 同病 ⇒ 知识库按名搜索长期失效无人察觉（BUG-139）。
+- **防再犯规则**：① 本项目拼条件一律 `?`（`SkillAdminServiceImpl.page` 为正确范式），**禁 `{0}`**；
+  ② "接口 200 但列表空" 先看后端 SQL 日志 Preparing/Parameters，别先怀疑数据；
+  ③ 新增查询条件后必须用**非超管账号**实测非空路径（宽 catch 会吞语法错）。
+
+## L-63 类型判别列（如 ACL 的 release_sn）必须由服务端写死，绝不能信任前端 DTO
+- **现象**：`tbl_privilege_acl.release_sn` 语义是**释放类型**（恒 'role'），但 `saveModuleAcl` 直接
+  `setReleaseSn(dto.getReleaseSn())`，前端传了**角色的业务 sn**（'COMMON'）⇒ 登录菜单按 `release_sn='role'`
+  过滤时把这些授权行排除 ⇒ "授了权却不生效"。同表的 `saveAllAcl` 却硬编码 'role'（正确）⇒ 同库两套口径。
+  更隐蔽：update 分支按 (release_id,module_id) 命中已有行、不改 release_sn（看似正常），
+  只有 insert 分支暴露错值 ⇒ **同一操作时灵时不灵**，极难复现定位。
+- **防再犯规则**：① **判别列/类型列/枚举列由服务端根据上下文写死**，DTO 只传业务数据；前端传啥都不信；
+  ② 同一张表的同类写入（insert/update/批量）必须共用**同一个常量**，禁止一处硬编码一处信 DTO；
+  ③ "授权了不生效"类问题，先查**过滤口径列**（release_sn/del_flag/state 等）的取值分布
+  （`group by` 对比正常行与异常行），比读代码快；
+  ④ 修复要**代码+存量数据**两手：代码防新增、迁移件修存量（本例 V2.0.0_12），只改代码存量错值仍在。
+
+## L-62 弹窗的「确定」必须是提交点、「取消」必须能丢弃 —— 即时保存会让两者同时失效
+- **现象**：`assign-menu.vue` 把保存挂在每个 checkbox 的 change 上（即时落库）。后果有二：
+  ① 「确定」只剩关窗/刷新，Network 里点确定只看到父列表 `page` 请求、看不到提交请求，用户判定"确定没走确认接口=bug"；
+  ② 「取消」**撤不回**已勾选的修改（一改即落库），取消按钮是骗人的。
+  修 BUG-136（确定无反应）时我只补了"关窗+刷新"，没质疑保存时机本身 ⇒ 用户复核立刻指出仍不对。
+- **防再犯规则**：① 带 确定/取消 的编辑弹窗，**默认设计 = 本地暂存 + 确定批量提交 + 取消丢弃**；
+  即时保存只用于"无取消语义"的场景（开关类单点设置），且界面上不应再放确定/取消按钮；
+  ② 修交互 bug 时先问"这个按钮的**职责**是什么、保存时机在哪"，只补表面症状（关窗）会漏掉语义缺陷；
+  ③ 验收弹窗要按 Network 断言：**勾选阶段无写请求、确定阶段有写请求、取消阶段无写请求**——
+  只看"数据最终对不对"验不出保存时机错。
+
+## L-61 vben 弹窗 `onConfirm` 空实现 = 「确定」按钮静默失效（覆盖即替换，不是追加）
+- **现象**：`assign-menu.vue` 写 `useVbenModal({ async onConfirm() { /* 空 */ } })`，点「确定」**什么都不发生**
+  （不关窗、无提示、无报错）。原因：传入 `onConfirm` 会**覆盖** vben 默认的"确认→关闭"行为，空函数=空操作；
+  而该弹窗的数据保存走的是勾选即时保存路径，与 onConfirm 无关 ⇒ 表面看"修改没生效"，实际已落库。
+- **防再犯规则**：① 写 `useVbenModal` 时 **onConfirm 要么不传（用默认关闭），要么必须有关闭/提交动作**
+  （`modalApi.close()` + `emit('success')`，同仓 7 个 assign-* 弹窗范式）；禁止留空函数体；
+  ② code review 检查项：搜 `onConfirm() {` 后跟空行/空块 = 缺陷；
+  ③ 弹窗类 UI 的验收必须包含"**点确定后窗口关闭且父列表刷新**"这一条人工/浏览器断言，
+  只验"勾选是否落库"会漏掉确认按钮本身的失效（本次即如此：落库是好的、按钮是坏的）。
+
+## L-60 验证用的写操作必须"删行"回到基线，不能只"置 0"——置 0 的授权行仍算已授权
+- **现象**：BUG-135 收尾补 `system_id` 后，回归发现 `chenzhuo` 菜单 7→8，一度误判是补 `system_id` 动了鉴权。
+  真因是**我自己前面"勾选→还原"闭环测试的残留**：还原只把 `tbl_privilege_acl.acl_state` 置 0、**没删行**；
+  而登录可见性判据是"存在 ACL 行即可见"（见 BUG-120 同源），于是 `技能管理/请求管理` 两条 `state=0` 残留行
+  让 chenzhuo 多看一个菜单。
+- **防再犯规则**：① 验证写操作（勾选/授权/建号）做完，**清理要按主键删行回到基线快照**，别只把状态字段归零；
+  ② 回归发现数字变了，**先隔离真因再下结论**——比对 `create_by`/`create_time` 区分"基线来源 vs 我的测试来源"，
+  不要顺着"刚做的改动"直接甩锅（差点把 V2.0.0_11 冤枉成改鉴权）；
+  ③ 测试残留要留备份（本次 `/tmp/acl_residue_backup.json`）并可复述；
+  ④ 若可见性判据是"有行即可见"，那"取消授权"的正确语义应是**删行或置 del_flag=1**，
+  仅 `acl_state=0` 是"可见但无操作"——这是产品语义，别在测试里误当"已撤销"。
+
+## L-59 位掩码列（如菜单 `state`）为空 ⇒ 下游"过滤出空集合"，功能静默不可用
+- **现象**：角色授权树里 技能管理/插件管理/MCP/知识库 无法勾选。根因不是权限逻辑错，而是
+  `tbl_privilege_module.state`（varchar 位掩码）为 NULL：后端 `moduleState = state ?: 0` 再
+  `filter(p -> (moduleState & (1<<pos)) != 0)` ⇒ **空 pvalues**；前端 `v-if="pvalues?.length"` ⇒ 整行无复选框。
+  菜单照常显示、ACL 基线也照样授了超管，唯独"可分配的权限位"这一层因空掩码被清空 —— 极隐蔽。
+- **根因**：功能迁移 `V1.2.0_02 / V1.3.0_02 / V1.6.0_02` 插入 `tbl_privilege_module` 时
+  **INSERT 列清单漏了 state**（老基线菜单都带 '31'，新菜单没带）。
+- **防再犯规则**：① 插入带位掩码/枚举列的行，**列清单必须显式含该列**（别依赖默认，NULL 会被下游当 0）；
+  ② 位掩码列建议 NOT NULL DEFAULT 一个合理值，或后端对 NULL 显式兜底为"全开/全关"而非静默 0；
+  ③ 排查"某项在树/列表里能显示却操作不了"时，先查它依赖的**位掩码/枚举字段是否为空**；
+  ④ 新增功能菜单的迁移，验收要包含"在角色授权界面能勾中并保存"，不能只看菜单出现在导航。
+
+## L-58 「列表可见性」必须与「同族端点的归属校验」成对实施，否则只是"看不见"而非"进不去"
+- **现象**：R-17 要求"每人只看自己创建的智能体"。若只给列表加 owner 过滤，`GET /{id}`、`PUT`、`DELETE`、
+  发布/下线、授权、API Key 等端点仍然**谁都能调**（实测：改前普通角色可直连他人智能体全部端点）——
+  即"列表看不到，但知道 id 就能改/删"，安全上等于没做。
+  本次的省力做法：这些端点的共同入口是 `checkAgentExists(id)`，**在共同入口加一次归属校验**即组队生效（6 类端点实测 403）。
+- **防再犯规则**：① 做可见性/过滤类需求时，同步枚举**对象级端点**并加归属校验（同 L-57 的"同族端点成组加固"）；
+  ② 优先找**共同入口**（如统一的 exists/load 方法）加校验，避免逐个端点漏掉；
+  ③ 验收必须包含"**用他人对象 id 直连**"的越权用例，而不是只看列表条数。
+  ④ 同理：创建类需求要**落库归属字段**（本项目 `admin_id` 列存在却从不写入，导致事后无法追溯）。
+
+## L-57 账号类保护规则要按键值（username）判定，并同步封堵"改名/换绑"绕过
+- **现象**：R-16 要求「`admin` 不可禁用/删除」。若按 **id** 判定会失效 —— id 是逐环境生成的雪花值
+  （活库 `461681072489615360`、全新库种子 `1000000000000000001`）；若只拦禁用/删除而**不管改名**，
+  则"先把 username 改掉、再禁用/删除"即可完全绕过。另实测发现 `DELETE /api/privilege/user/{id}`
+  原本**零保护**（可删自己、可删最后一个超管）——保护只加在了新增的启停端点上（BUG-132）。
+- **防再犯规则**：① 内置/根账号的保护条件用**业务键（username）**而非自增/雪花 id；
+  ② 实现保护时必须自问"有没有**改键**的操作能绕过"（改名、换绑、批量接口、导入接口），一并封堵；
+  ③ **同族端点要成组加固**（启停 / 删除 / 编辑 / 批量），只加在新增端点上必留缺口；
+  ④ 保护规则按**优先级**串起来并区分提示语（内置账号 > 禁自锁 > 留一个超管）。
+
+## L-56 「手机号」在本项目有 `mobile` 与 `phone` 两列：按字段名猜语义必踩空
+- **现象**：R-15 起草时我按代码判断"账号搜索已覆盖手机号"（因为子句里有 `phone`），实际账号手机号存
+  **`mobile`**（活库 3 行 `mobile` 有值、`phone` 座机全为空）⇒ 手机号搜索一直失效，需求起草的"现状已覆盖"
+  结论是错的，直到实测 keyword=手机号 命中为空才发现（已订正 R-15 边界并登记 BUG-130）。
+- **防再犯规则**：① 提到"某字段是否支持"时，**必须在活库核对列语义与数据分布**
+  （`information_schema` 注释 + `count(*) where col is not null` 的实际取值），不能只看代码里的列名；
+  ② 同类成对列（`mobile`/`phone`/`tel`）在需求与验收里要**写清列名**，不要只写中文"手机号"；
+  ③ 搜索类需求的验收必须包含**真实数据取值**（含片段）的实测，而不是断言"子句里有这一列"。
+
+## L-55 升级链的"可重复执行"会在**后面的件删掉前面件用到的列**时终结
+- **现象**：T-20 的 drill 沿用"01~08 跑两轮"验证幂等，第二轮 `V2.0.0_02` 直接失败：
+  `column "user_no" of relation "tbl_privilege_user_role" does not exist` —— 因为 08 删了这一列。
+  真实迁移由台账保证**每件只跑一次**，故生产无风险；但"整链跑两轮"这种自检方式会给出**假失败**。
+- **防再犯规则**：① drill 分两层——**整链跑一次**（与 migrator 语义一致）+ **目标件单独跑两次**（验幂等）；
+  ② 不要用"整链可重放"当作幂等证据；③ DDL 删除型升级件的自检里，务必把"被删对象不存在"写成断言
+  （而不是断言后续件仍能引用它）。
+
+## L-53 种子数据要按**迁移前**的 schema 生成；否则全新库载入即撞 NOT NULL
+- **现象**：T-19 往基线注入 chenzhuo 种子时，行是从**已迁移**的活库导出的 —— 而 `company_id`/`dept_id`
+  已被 `V2.0.0_01` 删除，导出的 INSERT 自然没有这两列；灌入**全新库**（迁移前 schema，两列 NOT NULL）即
+  `ERROR: null value in column "company_id" of relation "tbl_privilege_user"`。
+- **防再犯规则**：① 基线种子必须按**基线 schema（迁移前）**构造：迁移件删掉的 NOT NULL 列要**显式补占位值**；
+  ② 从活库导出种子行时，先对照基线 DDL 列出"基线有而活库已无"的列，逐列决定补值还是改 DDL；
+  ③ 与 L-49/L-51 同源：**升级路径通过 ≠ 全新库通过**，种子类改动必须两类环境都验。
+
+## L-51 升级件自检**禁止硬编码环境相关绝对数**（只校验结构不变量与守恒关系）
+- **现象**：T-18 的 `V2.0.0_06` 首版自检写成 `IF alive <> 19 THEN RAISE EXCEPTION`（19 = 生产升级后的菜单数）。
+  在**生产升级路径**（21 → 19）通过，在**洁净种子库**（`sql/all_data.sql` 本身只有 14 条菜单）直接
+  `ERROR: [V2.0.0_06] 存活菜单数 14 <> 19` ⇒ 升级件 exit=3、整件失败。同一文件在两环境结论相反。
+- **根因**：把"某一次实测的数量"当成不变式。数量随环境（生产/种子/未来版本）而变，
+  **结构关系与守恒关系**才是不变式（如"超管 ACL 行数 == 存活菜单数"、"旧目录必须消失"、"子项数 == 6"）。
+- **防再犯规则**：① 升级件自检只断言**与环境无关**的命题：对象存在/消失、父子归属、次序、守恒等式、
+  残留计数为 0；② 数量类实测值用 `RAISE NOTICE` **打印留痕**而不是作为断言阈值；
+  ③ 若确实需要环境相关阈值，先判断环境形态再分支（并写明判据），不要单口径硬编码；
+  ④ 与 L-49 同一课：**演练库通过 ≠ 洁净库通过**，升级件必须在两类环境都跑。
+
+## L-50 断言"无错误"必须匹配**真实输出格式**，否则拿到"假绿"
+- **现象**：T-14 全新库重放时，我用 `grep -icE "^error|fatal"` 统计导入错误，输出 `error 行数: 0`，
+  据此写下"all_data 0 error ✅"。但 psql 的实际格式是 **`psql:<stdin>:1597: ERROR:  relation ...`**
+  —— 行首是 `psql:`，`^error` 永远匹配不到 ⇒ **假绿**。真实情况是 `all_data` 在同一处因
+  `ON_ERROR_STOP` 中止（BUG-127），其后所有 INSERT 都没执行，我却按"部分载入"的库得出了终态数字。
+  T-15 改用 `grep -icE 'ERROR|FATAL'` **并同时看退出码** 后立刻暴露（exit=3）。
+- **防再犯规则**：① 错误断言用工具**真实**的输出样式（psql: `ERROR|FATAL`；vue-tsc: `error TS`；
+  maven: `[ERROR]`），并**同时**断言进程退出码；② 只统计"行数=0"不够，必须**两个信号都绿**；
+  ③ 结论若依赖"某文件载入成功"，要顺带抽查**该文件后段**的产物（如菜单/用户行数）——
+  因为"前段成功、后段中止"与"全部成功"在只看汇总行数时难以区分。
+
+## L-49 `DROP COLUMN IF EXISTS` 不保护"表不存在"；跨基线迁移件一律写 `ALTER TABLE IF EXISTS`
+- **现象**：T-14 的 `V2.0.0_01` 在演练库跑得干干净净（两轮幂等全绿），一放到**全新库重放**就
+  `exit=3` 整体中断：`ERROR: relation "tbl_unified_account_map" does not exist`。
+  原因：`ALTER TABLE tbl_unified_account_map DROP COLUMN IF EXISTS employee_id;` 里的 `IF EXISTS`
+  只作用于**列**，表本身不存在时仍报错。该表由另一处迁移创建、**不在基线 `sql/all_schema.sql` 里**
+  ⇒ 演练库（从生产拷贝）有它、全新库没有它，两边结论相反。
+- **防再犯规则**：① 迁移件中所有 `ALTER TABLE` 一律写 `ALTER TABLE IF EXISTS`（正向与 rollback 对称）；
+  ② **演练库通过 ≠ 全新库通过**：升级件必须两类环境都跑（本项目已定为 T-14 验收双条件）；
+  ③ 报错"哪张表不在基线里"要用 `to_regclass()` 逐表探测，而不是假设基线覆盖了全部表。
+
+## L-48 复刻既有代码行为做验证时，表达式必须与源码**同构**（"意思差不多"会得出反向结论）
+- **现象**：T-13 验证 BUG-123（默认角色大小写）时，我在探针 SQL 里写了一列 `('common' = lower(sn)) AS old_lowercase_match`
+  来"代表旧 Java 行为"。但旧 Java 生成的是 `sn = 'common'`（**大小写敏感等值**），而我写的 `lower(sn)` 本身
+  已经做了忽略大小写 ⇒ 该列输出 **true**，差点据此得出"旧代码没问题、BUG-123 不成立"的**反向结论**。
+  发现方式是重读自己的列名——列名说 old，表达式却不是 old。改成 `(sn = 'common')` 后输出 **false**，与缺陷成立一致。
+- **防再犯规则**：① 复刻验证的 SQL/断言必须**逐字对应源码生成的语句**（含大小写、函数、NULL 语义），
+  写完先问"这条表达式和代码里那条是同一件事吗"；② 探针列名写成**被测行为的直白描述**
+  （如 `old_java_exact_match_should_be_false`），让列名本身成为断言，名字与表达式不符即刻暴露；
+  ③ **自证伪**：若探针显示"缺陷不存在"，先怀疑探针写错，再怀疑缺陷结论——与 L-45 同源、但更前置一环。
+
+## L-47 幂等 DML 的归档条件必须排除「自己写入的行」，回滚必须按业务唯一键兜底
+- **现象**：V2.0.0_04 的设计是「目标对先清冲突（含墓碑）→ 纯插入」，冲突行入 JSONB 备份表供回滚。
+  但**归档条件没排除本件自己写入的行**（`create_by='V2.0.0_04'`）⇒ 幂等复跑时把自己上一轮的 30 行
+  也当冲突行归档，备份表 57→87 行、且**同一 (release_id, module_id) 在备份里出现两行**；
+  回滚时 `ON CONFLICT (id)` 挡不住业务键冲突 ⇒ `duplicate key value violates unique constraint
+  idx_tbl_privilege_acl_release_module`，整个回滚事务中止（演练当场暴露，未流到生产）。
+- **防再犯**：① 幂等脚本的"归档/备份"条件必须显式排除自己的写入标记（`create_by`/`update_by` 或 id 前缀），
+  否则备份会随复跑线性膨胀并污染回滚数据；② 回滚还原一律用**业务唯一键** `ON CONFLICT (业务键) DO NOTHING`
+  兜底（`ON CONFLICT (id)` 只防主键、不防业务唯一索引）；③ 涉及"先删后插"的迁移，**正反向各跑两遍**
+  才算验证过幂等（本次正是第二遍才暴露）。
+
+## L-67 Windows PowerShell 下 `$ErrorActionPreference="Stop"` + 原生命令 stderr ⇒ 直接抛异常（`2>$null` 拦不住）
+- **分类**：工具链（Windows 脚本）
+- **触发场景**：读/写 `.ps1`；脚本里 `$ErrorActionPreference = "Stop"` 之后调外部命令做探测（`docker info`、`wsl -l` 之类）
+- **现象**：本机 Windows PowerShell 5.1.26100.9444 实测——`& cmd /c "echo boom 1>&2" 2>$null` **抛 NativeCommandError**（`2>$null` 只丢输出，ErrorRecord 先生成）；而 `& cmd /c "exit 3"` **不抛**（单纯退出码非零不致错）。调查"怎么用 bootstrap.ps1"时照此复刻脚本原句 `& docker info --format '{{.OSType}}' 2>$null` → 同样抛（本机 docker 在 PATH、引擎未起）。
+- **根因**：PS 5.1 把原生命令的 stderr 行包成 ErrorRecord，EAP=Stop 使其升级为终止错误——与 `$LASTEXITCODE` 无关；`2>$null` 只是丢弃流输出，不阻止 ErrorRecord 生成
+- **防再犯规则**：① ps1 里探测外部命令一律 `cmd /c "<cmd> 2>nul"`，或 `(& <cmd> 2>&1 | Out-String)` + `try/catch`，**不得假定 `2>$null` 能吞掉 native stderr**；② 用"跑片段"判断脚本行为时必须在**同款 shell**（`powershell.exe` 5.1 与 `pwsh` 7 分开）复刻原句，不得跨版本外推；③ 探测类命令必须为「命令不存在 / 引擎未起 / 权限不足」三条分支各给可见文案，不得靠未捕获异常收场
+- **状态**：active
+- **复发**：×1（本次核实 bootstrap.ps1 安装路径时发现）
+- **关联**：BUG-141、`docker/scripts/bootstrap.ps1:36-39`、`docker/scripts/install.ps1:31-40`。**注意**：本条为片段复现（同 shell 同命令），用户 2026-10-08 现场实跑因引擎已启动而**未命中**——下次遇到"脚本莫名红堆栈"仍按此条先查 native stderr。
+
+## L-68 「文件是 UTF-8」不等于「PowerShell 读得对」——无 BOM 的 `.ps1` 在中文 Windows PS 5.1 下按 GBK 解码
+- **分类**：工具链（编码）
+- **触发场景**：仓库交付的 `.ps1` 含中文；在中文 Windows（系统 ACP=936）用 Windows PowerShell 5.1 运行
+- **现象**：`.\bootstrap.ps1` 直接抛 ParseException（`<` 保留运算符 / `&&` 非法语句分隔符 / 缺 `}`），且报错行里的中文是 `涓嬭浇鍚?` 这类乱码。第一反应容易往"用户命令打错 / 路径不对 / 脚本本身有语法错"上找——实际是 UTF-8 中文字节把**后面的 ASCII 引号吞掉**，双引号字符串永不闭合 → 吞掉后续行 → 连锁报错。
+- **根因**：PS 5.1 对**无 BOM** 的 .ps1 按系统 ANSI 代码页解码（本机 ACP=936 即 GBK），PS 7 才默认 UTF-8；英文 Windows(CP1252) 下同样内容只是乱码不致错 ⇒ **该缺陷只在中文环境致命**，最容易被"我这儿能跑"掩盖。
+- **防再犯规则**：① 仓库内 `.ps1` **一律 UTF-8 带 BOM**（正文一个字节不动、只加 3 字节，PS 5.1/7 双兼容）；② **每次用编辑工具写回 `.ps1` 后都要复查 BOM**——本次 `edit` 工具写回 `bootstrap.ps1` 就把 BOM 抹掉了，解析错误立刻从 0 回到 4 个（`ReadAllBytes` 看前三字节是否 `EF BB BF`）；③ 判断"脚本能不能跑"用 `[System.Management.Automation.Language.Parser]::ParseFile($path,[ref]$null,[ref]$errs)` **数错误**，不要靠肉眼看文件——读工具与编辑器会自动认 UTF-8，看不出问题；④ 用户报"某 .ps1 语法错误"时，先查 BOM 与系统 ACP（`(Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Nls\CodePage').ACP`），再谈命令对不对。
+- **状态**：active
+- **复发**：×2（安装入口不可用 1 次；编辑工具抹 BOM 致复发 1 次）
+- **关联**：BUG-142、`docker/scripts/*.ps1`。**现场验证**：补 BOM 后用户 2026-10-08 13:55 实跑，脚本越过解析进入 WSL 就绪段（exit 2 待重启）
+
+## L-69 「Windows 工作树」不等于「Linux 检出」——autocrlf 的 CRLF 会从入口脚本一路带进容器
+- **分类**：工具链（跨平台）
+- **触发场景**：把 Windows 上的工作树整棵交给 Linux 消费——`cp` 进 WSL、挂进容器、打成 tar 再解包执行
+- **现象**：WSL 内 `bootstrap.sh` 起手即崩：`set: pipefail: invalid option name`、`$'\r': command not found`、`syntax error near $'in\r'`（第 7/10/13 行）。第一反应容易怀疑"脚本逻辑 / 权限 / 路径 / WSL 坏了"，实际是每行结尾多了个 `\r`。
+- **根因**：Git for Windows 默认 `core.autocrlf=true`（本机系统级 gitconfig 实测 true）⇒ **工作树 CRLF、对象库 LF**；只要把工作树整棵搬到 Linux，`\r` 就跟着走。同一份代码在作者机器（mac/Linux 或 `autocrlf=false`）完全正常，故属"只在 Windows 复现"的隐性交付缺陷。
+- **防再犯规则**：① 会被跨 OS 消费的文本资产用 `.gitattributes` **钉死 `eol=lf`**，不要指望检出配置（`*.sh`/`Dockerfile*`/`.env*`/`*.conf`/`*.yaml`）；② 入口脚本要"自我规整"时，**必须选在被消费代码之前执行的那一层**——本例 `bootstrap.sh` 第 13 行就崩，自愈代码写进它等于没写，只能放 Windows 侧（`bootstrap.ps1` 拷贝后、起 bash 前）；③ 取证口诀：`git cat-file -s <rev>:<path>` 与工作树字节数一比，**差值 ≈ 行数就是 CR 差**（本例 4347−4272=75）；④ 规整时按扩展名挑文件（`find … -name '*.sh' … -exec sed -i 's/\r//g'`），**禁止整树 sed**（会毁二进制资产）
+- **状态**：active
+- **复发**：×1（本次 bootstrap.ps1 Windows 全链）
+- **关联**：BUG-143、`docker/scripts/bootstrap.ps1`、根 `.gitattributes`
+
+## L-70 `wsl -l -q` 的输出在 PowerShell 里"字间夹 NUL"——拿它做 `-match` 判定必然误判
+- **分类**：工具链（Windows/WSL 互操作）
+- **触发场景**：在 PowerShell 里调 `wsl.exe` 列举/判定发行版（`wsl -l -q`、`wsl -l -v`），据此决定"要不要装"
+- **现象**：脚本把"已装好的发行版"判成"没装" ⇒ 重复 `wsl --install` ⇒ `Wsl/InstallDistro/ERROR_ALREADY_EXISTS`（错误码 -1）硬失败。首次安装碰巧能过（那时确实没装），**再跑必挂**——症状看起来像"WSL 坏了 / 得用导入法"，很容易被带偏去手工 `wsl --import`。
+- **根因**：`wsl.exe` 写 UTF-16LE，PowerShell 5.1 按控制台编码解码 ⇒ 每个字符后多一个 `\0`（实测码点 `85,0,98,0,117,0,…` = `U\0b\0u\0…`），`-match 'Ubuntu-22.04'` 永不命中；`[regex]::Escape()` 也救不了（病根不在正则）。清洗 NUL 后同一判据立刻变 False，可自证。
+- **防再犯规则**：① 判"某发行版能不能用"**只认直接探测**——`cmd /c "wsl -d <名> -u root -- true 1>nul 2>nul"` 看退出码（0=就绪，-1=不可用），不要解析列表文本；② 万不得已要解析列表，先 `-replace "\`0",''` 清洗再匹配；③ 调 `wsl`/`docker` 这类会往 stderr 说话的外部命令一律走 `cmd /c "… 2>nul"`（配合 `$ErrorActionPreference=Stop` 才不炸，见 L-67）；④ 幂等脚本的"二次重跑"必须真跑一遍才算验证过——首次成功的路径很可能掩盖了检测逻辑的错。
+- **状态**：active
+- **复发**：×1（本次 bootstrap.ps1 / install.ps1 第二次重跑）
+- **关联**：BUG-144、`docker/scripts/bootstrap.ps1`、`docker/scripts/install.ps1`
+
+## L-71 文档说"国内源"时，必须核到**每一条外部 URL**——"镜像参数"不等于"入口也在国内"
+- **分类**：判断 / 交付（受限网络）
+- **触发场景**：交付脚本号称"默认全国内源"；用户直接问"源是国内的吗"
+- **现象**：我照抄 `docker/README.md` 的「引擎安装=get.docker `--mirror Aliyun`」并向用户保证"国内源默认，无需配置"，实际 `curl https://get.docker.com` **本体在境外**、用户网络被 reset ⇒ 一键安装在引擎段即失败。用户一句"源是国内的吗"把我问回现场——**答案一半是国内、一半是国外，我上次给的是错的那半**。
+- **根因**：`--mirror` 只切换**包源**，不切换**引导脚本/元数据来源**。"某环节用了国内镜像" ≠ "该环节的入口在国内"。同类陷阱：`npm --registry=<国内>` 但包内 install 脚本另从他处下载；`pip -i <国内>` 但依赖自带源码包地址。
+- **防再犯规则**：① 回答"是不是国内源"之前，把该环节的**每条外部域名逐一列出核对**（本例：`get.docker.com`=境外被拦 / `mirrors.aliyun.com`=200 / `archive.ubuntu.com`=200），核不到就不下结论；② 交付脚本里凡"境外端点"必须有**国内回退**或写明前置条件，不能把失败留给用户现场（本次回退=apt + docker-ce@aliyun，见 `phx_install_docker_aliyun`）；③ 用户报"网络问题"时先做**可达性对照实验**（同机 curl 国内源 200、境外源 reset ⇒ 结论是"该端点被拦"而不是"没网"），再谈方案。
+- **状态**：active
+- **复发**：×1（本次 bootstrap [A/4] 引擎段）
+- **关联**：BUG-145、`docker/scripts/lib/common.sh`、`docker/README.md`（"国内源说明"节需补"安装脚本本体仍走 get.docker.com"的注记）
+
+## L-72 复测必须用**同一输入**——我拿"干净 URL"复测，把 CRLF 污染误诊成"网络抖动"
+- **分类**：验证盲区（误诊）
+- **触发场景**：外部依赖批量失败后我要下根因结论；尤其"我复测它能用 ⇒ 所以是环境抖动"这种推理
+- **现象**：安装日志显示三个镜像源在**同一秒内**全判死并终止打包（`14:38:41`→`14:38:42`）。我用**自己写的探针脚本**（干净 URL）复测，三个源全部 200/401 ⇒ 我据此向用户断言"**源没死，是瞬时网络抖动**"。**真相**：`mirrors.list` 在 Windows 检出里是 CRLF，`package.sh` 切出的 token 尾部粘 `\r`，每个源都 `code=000`（瞬时失败、8s 超时都用不上）——正是"同秒全死"的特征。A/B 实测：原样 token 全 000；`tr -d '\r'` 后 401/401/200。**我的复测根本没复现用户的输入**，所以"能通"毫无证明力。
+- **根因**：把"复测能通"当成"原故障是瞬时的"——但复测与故障的**输入不同**（干净 URL vs 带 `\r` 的 URL），属于**换了自变量的对照实验**，结论必然无效。这与 L-02（截断视图）、L-37（只看状态码不看内容身份）同族：都是"证据通道/自变量不对齐"却下了全称结论。
+- **防再犯规则**：① 复测前先问"**我的复测和故障现场，输入是不是同一份**"——不同就先把输入对齐（本例：直接用现场那个文件、照现场那条管道切 token），再谈结论；② "瞬时/抖动"这类**不可证伪**的解释要当嫌疑犯而非结论——除非能给出"同一输入、两次不同结果"的证据；③ 数据文件参与的命令链出问题，先 `file` / `od -c` 看**字节**（CRLF/BOM/NUL 都在这一层现形），再怪网络；④ 结论被推翻时当场撤回并把误诊过程写进台账（本例 BUG-147 行内留了自纠记录）。
+- **状态**：active
+- **复发**：×1（本次打包段步骤 2/8 误诊）
+- **关联**：BUG-147（真因=CRLF）、L-69（CRLF 家族）、L-02、L-37、`docker/scripts/lib/common.sh:phx_mirror_pick`、`docker/scripts/mirrors.list`
+
+## L-73 `docker pull` 报 DONE ≠ blob 完整——`short read` 先做**字节数对账**，别先怀疑磁盘/daemon
+- **分类**：验证盲区（供应链完整性）
+- **触发场景**：容器构建死于 `failed to compute cache key: short read: expected N bytes but got 0: unexpected EOF`；或经第三方镜像源拉取的基础镜像首次投入构建
+- **现象**：打包段 frontend 构建在 `RUN corepack enable` 报 `short read: expected 1250677 bytes but got 0`。表面像 BuildKit 缓存/磁盘/daemon 故障；实际是基础镜像拉取时 1.25MB 层长时间停在 `0B / 1.25MB`、整体 pull 却报 `DONE`——**1250677 字节与该层精确对账**，即截断 blob 躺在构建缓存里。我自己的验证也栽了一步：用 `docker run --rm <img> node --version` 验可读性，但构建期基础镜像**不在 `docker images`**（BuildKit 存于构建缓存/内容库），run 隐式转 pull 白烧 120s 超时。
+- **根因**：① 镜像源传输不完整而 pull 未拦截（"成功"信号 ≠ 内容完整，与 L-37"状态码≠内容身份"同族）；② 排障时未按"错误里的字节数 ↔ 拉取日志停滞层大小"对账，就容易误入磁盘满/daemon 重启等歧途；③ 验证命令未先确认镜像在本地（`docker image inspect`），语义从"验证"漂移成"下载"。
+- **防再犯规则**：① 遇 `short read/unexpected EOF` 先做**字节数对账**锁定损坏 blob，再按序排除磁盘（`df`）与 daemon（journalctl 时间线：重启在失败前还是后）；② 修复三件套 = `docker builder prune -af` → 重拉 → `docker run --rm <img> <平凡命令>` **实测**（强制解包全部层）后才准投入构建；③ 重跑构建时把基础镜像**钉死到与本地已验证镜像同名同源**（`--mirror`），不再竞速赌源；④ 验证镜像前先 `docker image inspect` 确认在本地，避免 run 变 pull；⑤ 长构建脚本应有"基础镜像 pre-pull+校验"fail-fast 段（本次缺口 → BUG-148）。
+- **状态**：active
+- **复发**：×1（本次打包段 3/8 frontend 编译）
+- **关联**：BUG-148、BUG-147（镜像源家族）、BL-23（吞吐型探活）、L-37、L-72、`docker/scripts/package.sh`

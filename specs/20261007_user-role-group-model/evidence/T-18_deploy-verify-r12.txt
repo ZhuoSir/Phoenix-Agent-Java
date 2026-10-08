@@ -1,0 +1,39 @@
+########## T-18 部署验证（活库，8090）##########
+=== ① 菜单树（存活 19）===
+   parent   |    name    |                 url                 | order_no 
+------------+------------+-------------------------------------+----------
+ (根)       | 个人中心   | /profile                            |      999
+ 插件管理   | MCP        | /plugin/mcp                         |        0
+ (根)       | 插件管理   | /plugin-manage                      |       17
+ (根)       | 智能体中心 | #/front/chat                        |       -1
+ (根)       | 智能体管理 | /agent-manager                      |        0
+ 智能体管理 | 请求管理   | /monitoring/agent-request           |        3
+ 智能体管理 | 智能体列表 | /agent/list                         |       11
+ 智能体管理 | 模型配置   | /agent/modelconf                    |       12
+ 智能体管理 | 智能体编辑 | /agent/:id                          |       13
+ 智能体管理 | 智能体对话 | /agent/:id/run                      |       14
+ 智能体管理 | 技能管理   | /agent/skill                        |       15
+ (根)       | 知识库     | /knowledge-base                     |       16
+ 系统管理   | 角色管理   | /system-management/role             |        1
+ (根)       | 系统管理   | /system-management                  |        1
+ 系统管理   | 账号管理   | /system-management/account          |        2
+ 系统管理   | 组管理     | /system-management/group            |        3
+ 系统管理   | 菜单管理   | /system-management/menu             |        4
+ 系统管理   | 权限值管理 | /system-management/permission-value |        5
+ 系统管理   | 日志管理   | /system-management/log              |        6
+(19 rows)
+
+=== ② 不变量 ===
+ menus | legacy_dirs | sys_children | admin_acl | common_acl | leftover_acl 
+-------+-------------+--------------+-----------+------------+--------------
+    19 |           0 |            6 |        19 |          7 |            0
+(1 row)
+
+=== ③ 接口层（经 8090）===
+  超管   → menus=19 pvalues=5 顶层=智能体管理,个人中心,知识库,插件管理,智能体中心,系统管理
+  普通   → menus=7 pvalues=5 顶层=智能体管理,个人中心,知识库,智能体中心
+  超管「系统管理」子树: /system-management → 组管理(3) | 角色管理(1) | 账号管理(2) | 菜单管理(4) | 权限值管理(5) | 日志管理(6)
+=== ④ 前端产物与入口 ===
+  8090 首页 HTTP 200｜/auth/login GET 200
+  已删页面路径 /platform-account/account-info → nginx 404（SPA index；路由未注册 ⇒ 前端 404 页）
+  库内是否还有该页面的菜单行: 0

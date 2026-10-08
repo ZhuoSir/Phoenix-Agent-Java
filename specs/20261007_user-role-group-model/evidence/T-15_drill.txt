@@ -1,0 +1,29 @@
+########## T-15 最终演练（洁净库 + 严格错误检测）##########
+=== ① 导入两份基线（先 schema 后 data）===
+  all_schema exit=0 ERROR行=0
+  all_data   exit=0 ERROR行=0
+=== ② 清洗后的基线状态 ===
+ active_menus | targets_left | active_acls 
+--------------+--------------+-------------
+           16 |            0 |          47
+(1 row)
+
+=== ③ 两轮 01~05（幂等）===
+  [轮1] V2.0.0_01__org_dimension_drop_ddl exit=0 ERROR行=0
+  [轮1] V2.0.0_02__role_backfill_dml exit=0 ERROR行=0
+  [轮1] V2.0.0_03__org_menu_cleanup_dml exit=0 ERROR行=0
+  [轮1] V2.0.0_04__acl_baseline_rebuild_dml exit=0 ERROR行=0
+  [轮1] V2.0.0_05__three_party_menu_cleanup_dml exit=0 ERROR行=0
+  [轮2] V2.0.0_01__org_dimension_drop_ddl exit=0 ERROR行=0
+  [轮2] V2.0.0_02__role_backfill_dml exit=0 ERROR行=0
+  [轮2] V2.0.0_03__org_menu_cleanup_dml exit=0 ERROR行=0
+  [轮2] V2.0.0_04__acl_baseline_rebuild_dml exit=0 ERROR行=0
+  [轮2] V2.0.0_05__three_party_menu_cleanup_dml exit=0 ERROR行=0
+=== ④ 终态核对 ===
+ active_menus | targets_left | org_tables_left | active_acls | zero_role_users 
+--------------+--------------+-----------------+-------------+-----------------
+           16 |            0 |               0 |          21 |               0
+(1 row)
+
+=== ⑤ 菜单表中是否还有组织/三方平台字样 ===
+none

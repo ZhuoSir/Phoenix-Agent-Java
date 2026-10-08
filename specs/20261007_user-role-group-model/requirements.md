@@ -1,4 +1,4 @@
-> 版本: v2.0.0 | 状态: 已确认 | 确认人: 陈卓 | 确认日期: 2026-10-07 | 更新: 2026-10-07（v2.0.0 重确认通过：正文相对待重确认稿**无改动**，仅版本头转正） | 挂载: v2.0.0（在途；与本文档版本号同号属巧合，勿混）
+> 版本: v2.8.0 | 状态: 已确认 | 确认人: 陈卓 | 确认日期: 2026-10-07 | 确认记录: CR-02 三确认（§S/§P/§T，陈卓；档位 major；Q-D1 不做UI / Q-D2 overwrite 只覆盖本人）⇒ 新增 R-19、改 R-02 | 确认记录: CR-01 三次确认（§S/§P/§T，陈卓 2026-10-07；档位 major；Q-C1~C3、Q-P1 拍板）⇒ 新增 R-18 | 确认记录: 用户 2026-10-07 口令「确认执行 R-17（确认人：陈卓）」+ 存量回填给 admin + 连编辑/删除等一并限制 + 角色规则原话「role_admin 不可以删除，除此之外都可以删，但是有用户不能删」 | 变更源: 用户 2026-10-07 口令「现在查看智能体列表，是看到所有的吗？这个逻辑不对，每个人只能看到自己创建的智能体，然后系统管理员能看到所有人的，系统管理员这个角色也不可以删除」⇒ 新增 R-17 | 前次确认: v2.5.0 经陈卓 2026-10-07 确认（R-16） | 变更源: 用户 2026-10-07 口令「admin 超管账号，不能被删除和禁用，这个是基础」⇒ 新增 R-16（内置超管账号绝对保护） | 前次确认: v2.4.0 经陈卓 2026-10-07 确认（R-15；口令「确认执行 R-15（确认人：陈卓）」+ 批量仅启用/禁用 + 两条保护都加 + 操作列=启用禁用/设置密码/编辑/删除，实施前已确认，版本头于本条一并转正） | 变更源: 用户 2026-10-07 口令「账号管理里搜索框支持手机号搜索；要有启用/禁用的按钮，可以批量按钮操作，也支持操作增加按钮；把分配权限放到编辑里」⇒ 新增 R-15 | 前次确认: v2.3.0 经陈卓 2026-10-07 确认（R-14） | 变更源: 用户 2026-10-07 口令「只保留 admin 和 chenzhuo 两个账号，其他的全部删掉，包括初始化数据也要改」⇒ 新增 R-13（新增条款 ⇒ MINOR） | 前次确认: v2.1.0 经陈卓 2026-10-07 确认（R-12） | 变更源: 用户 2026-10-07 口令「权限管理和前台管理合并成系统管理，然后前台管理的账号管理删掉，现在只有一套账号管理，不分前后台了」⇒ 新增 R-12（新增条款 ⇒ MINOR）| 前次确认: v2.0.0 经陈卓 2026-10-07 重确认①通过 | 更新: 2026-10-07（v2.0.0 重确认通过：正文相对待重确认稿**无改动**，仅版本头转正） | 挂载: v2.0.0（在途；与本文档版本号同号属巧合，勿混）
 >
 > **v2.0.0 变更（改范围 ⇒ MAJOR）——已于 2026-10-07 经陈卓重确认①通过**
 >
@@ -297,6 +297,356 @@ WHEN 新版本部署完成,
 
 **无**（Q1~Q6 与 Q-P1~Q-P6 已于 2026-10-07 全部裁定，见下表；裁定事实已同步 `changelog.md`）。
 
+### R-12 后台信息架构：权限管理与前台管理合并为「系统管理」（账号管理唯一化）
+
+WHEN 新版本部署完成,
+后台左侧导航 SHALL 只保留**一条**账号管理入口，且 **角色 / 账号 / 组** 三项 SHALL 同处「系统管理」目录之下。
+
+边界（逐项可验；**v2.1.0 新增条款**，来源为用户 2026-10-07 口令）：
+
+1. **目录合并**：「权限管理」目录（id `02b733aa08774219a23c2f21f1b3f6b5`，`/permission-management`）**原地更名为「系统管理」**
+   —— **id 不变** ⇒ 其既有 ACL 行继续有效；其下保留 角色管理 / 账号管理 / 菜单管理 / 权限值管理 / 日志管理。
+2. **组管理归位**：「组管理」（id `8b1a156184cf49fba34389e8caea4269`）的父节点由「前台管理」改为「系统管理」，
+   并调整同级次序使 **角色管理 → 账号管理 → 组管理 相邻**（满足"角色、用户、组都在一起"）。
+3. **账号管理唯一化**：删除「前台管理」下的「账号管理」（id `6752c28a59c048cb9d08179ccadb38b4`，
+   `/platform-account/account-info`，`#/views/account/account-info/index.vue`）及其 ACL 行；
+   仅保留「系统管理 / 账号管理」（`/permission-management/account`）作为唯一入口
+   —— 该页已具备 用户·角色·组 三维度能力（R-03）。
+4. **空目录清理**：「前台管理」目录（id `638d2319c2d54f3ea36b2a519c9a1d0f`）在子项一删一迁后**成为空目录**，
+   SHALL 一并删除（含其 ACL 行），避免导航中残留空分组。
+5. **前端下线**：`apps/admin-ui/src/views/account/account-info/**`（`index.vue` / `form.vue` / `data.ts` / `group-form.vue`）删除；
+   **API 模块保留**：`api/core/platform-account-info.ts`、`platform-account-group-info.ts`、
+   `platform-account-tenant-info.ts` 仍被 `api/core/user.ts`、系统管理/账号 表单（角色与组回显/提交）、
+   组管理页引用，删之会引入悬空引用。
+6. **不变量**：存活菜单数 21 → **19**；超管 ACL 行数与存活菜单数**保持相等**；普通角色基线（7 条）不变；
+   组管理的既有 ACL 行、角色管理的 ACL 行**不得因搬迁/改名而丢失**。
+
+#### 验收场景
+
+- **GIVEN** 管理员登录后台
+  **WHEN** 查看左侧导航
+  **THEN** 只见「系统管理」（其下：角色管理 / 账号管理 / 组管理 / 菜单管理 / 权限值管理 / 日志管理），
+  **不再出现**「权限管理」「前台管理」
+- **GIVEN** 管理员登录后台
+  **WHEN** 打开 系统管理 → 账号管理
+  **THEN** 打开的是唯一账号管理页（表单含 角色、组 选择），全站不存在第二套账号管理入口
+- **GIVEN** 新版本部署完成
+  **WHEN** 直接访问已删页面 URL `/platform-account/account-info`
+  **THEN** 404（路由未注册），不是空白页或 500
+- **GIVEN** 普通角色登录
+  **WHEN** 查看导航
+  **THEN** 仍为 R-05 基线 7 条（不含系统管理任何子项）
+
+### R-13 账号集合收敛：仅保留 `admin` 与 `chenzhuo`（存量清理 + 初始化数据同步）
+
+WHEN 新版本部署完成,
+系统中的账号 SHALL 只有 **`admin`（超管）** 与 **`chenzhuo`（普通角色）** 两个；且**全新库初始化后亦只有这两个账号**。
+
+边界（逐项可验；**v2.2.0 新增条款**，来源为用户 2026-10-07 口令）：
+
+1. **存量清理（活库）**：删除存活账号 `liufang` / `lwj` / `xtj`，并同步删除其**账号域**关联行：
+   `tbl_privilege_user_role`（角色绑定）、`tbl_privilege_login_log`（登录日志）、
+   `tbl_agent_user_agent_info`（账号↔智能体绑定）。
+   同时**物理删除**已软删的 `maliu` / `wangwu`（含其角色绑定），使库内不再残留历史账号行。
+2. **保留账号不动**：`admin`（种子脚本 `docker/init/10_seed_admin.sql` 提供）与 `chenzhuo`
+   （含其角色绑定、前台账号 `tbl_platform_account_info`、组归属 `tbl_platform_account_group_info`、
+   智能体绑定）**保持不变**，其聊天会话等业务数据不受影响。
+3. **初始化数据同步（全新库 = 两个账号）**：基线 `sql/all_data.sql` / `sql/all_schema.sql` 中的
+   **5 个演示账号**（`xtj` / `maliu` / `wangwu` / `lwj` / `liufang`）及其关联行
+   （`tbl_privilege_user_role` 中指向这些账号与孤儿 user_id 的行、`tbl_platform_account_info`、
+   `tbl_platform_account_group_info`、`tbl_agent_user_agent_info`）
+   SHALL 被替换为 **`chenzhuo` 一套完整关联行**；`admin` 仍由初始化脚本提供。
+   ⇒ 全新库初始化后账号集合恰为 `{admin, chenzhuo}`。
+4. **不变量**：存活账号数 = 2；两账号均可正常登录（`admin/123456`、`chenzhuo/12345678`）；
+   `chenzhuo` 登录后菜单仍为 R-05 基线 7 条；超管菜单 19 条（R-12 后口径）；
+   库内**不存在**指向已删账号的残留账号域行（角色绑定/登录日志/智能体绑定）。
+5. **升级件**：新增 `V2.0.0_07__account_prune_dml.sql` + `rollback/`（配对）；自检遵循 L-51
+   （**只校验结构不变量与守恒关系**，不硬编码环境相关绝对数）。
+
+#### 验收场景
+
+- **GIVEN** 新版本部署完成
+  **WHEN** 查询 `tbl_privilege_user WHERE del_flag = 0`
+  **THEN** 恰有 2 行：`admin`、`chenzhuo`
+- **GIVEN** 全新库初始化 + 全部升级件执行完毕
+  **WHEN** 查询存活账号
+  **THEN** 同样恰有 `admin`、`chenzhuo`
+- **GIVEN** 新版本部署完成
+  **WHEN** 以 `liufang` / `lwj` / `xtj` / `maliu` / `wangwu` 任一账号尝试登录
+  **THEN** 登录失败（账号不存在）
+- **GIVEN** 新版本部署完成
+  **WHEN** 以 `admin`、`chenzhuo` 登录
+  **THEN** 均成功，且菜单/权限与各自角色一致
+
+### R-14 用户类型（`user_type`）与 IDM 维度下线 + 工号（`code`）下线
+
+WHEN 新版本部署完成,
+用户类型（自建/IDM）与**工号**SHALL 不再是用户可维护、可筛选或可用于鉴权/审计的属性，相关死代码与死规则 SHALL 一并清除。
+
+> **事实依据（2026-10-07 全栈实测，见 `evidence/T-20_scan.txt`）**：
+> `user_type` 全仓仅 **2** 处 Java 引用（登录透传给前端 + 列表按值过滤）与 14 处前端引用（列表标签/表单下拉/类型声明），
+> **没有任何逻辑分支**；`UserTypeEnum` 除自身定义与一句 javadoc 外**无调用方**；
+> `ExceptionEnum.USER_DELETE_ERROR("该用户为IDM用户，不可删除")` 与
+> `DEPORTMENT_DELETE_ERROR("IDM同步的部门不允许删除")` **定义但从未抛出**；
+> IDM 同步包已随 R-06 整包删除；库内 `user_type = 1` 的记录 **0 条**。
+
+边界（逐项可验）：
+
+1. **数据库**：`tbl_privilege_user.user_type` 列及其注释 SHALL 删除（`ALTER TABLE ... DROP COLUMN IF EXISTS`）。
+2. **后端**：`PrivilegeUser.userType` 实体字段、`PrivilegeUserDTO.userType`、`PrivilegeUserVO.userType`、
+   `LoginUserInfoVO.userType` 字段 SHALL 删除；`LoginServiceImpl` 的 `.userType(...)` 透传与
+   `PrivilegeUserServiceImpl.pageByQuery` 的 `eq(PrivilegeUser::getUserType, ...)` 过滤 SHALL 移除。
+3. **死枚举/死规则**：`enums/UserTypeEnum.java` SHALL 删除；`ExceptionEnum` 中
+   `USER_DELETE_ERROR` 与 `DEPORTMENT_DELETE_ERROR`（后者指向 R-01 已下线的"部门"）SHALL 删除。
+4. **前端**：`system-management/account` 的列表「用户类型」列与 `userTypeSlot`、
+   新增/编辑表单的「用户类型」下拉（含 `idm用户` 选项）、`api/core/privilege-user.ts` 与 `api/core/auth.ts`
+   的 `userType` 字段、`store/auth.ts` 的解构项、`mobile-ui/services/authTransport.ts` 的 `userType` 声明 SHALL 移除。
+5. **`it_user_id` / `it_user_name`（IDM 侧标识，同为死列）SHALL 一并删除**（全仓 0 引用）。
+8. **不变量**：账号列表、新增/编辑账号、登录（后台与前台）、菜单与权限判定 SHALL 不受影响；
+   `typecheck` 不新增错误；`user_type=1` 无数据故无需数据迁移。
+
+6. **工号（`tbl_privilege_user.code`）删除（用户追加裁定「工号也删掉」）**：
+   - **数据库**：`tbl_privilege_user.code`（NOT NULL）与 `tbl_privilege_user_role.user_no`（工号冗余列）SHALL 删除。
+   - **后端**：`PrivilegeUser.code` / `PrivilegeUserDTO.code` / `PrivilegeUserVO.code`、
+     `PrivilegeUserRole.userNo`（+DTO/VO）、`IPrivilegeUserService.getByCode` 及其实现、
+     `PrivilegeUserController` 的 `GET /code/{code}`、`pageByQuery` 关键字中的工号子句 SHALL 移除。
+   - **审计与归属**：`PrivilegePvalueController.save` 的 `setCreateBy(user.getCode())` SHALL 改为写**用户名**；
+     `addUserGroups(..., accountName)` 传入的工号 SHALL 改为**用户名**（`tbl_platform_account_group_info.account_name`）。
+   - **前台链路的兼容处理**：`AccountInfoServiceImpl` 登录载体 `carrier.setCode(unified.getCode())`
+     SHALL 改为取**用户名**（`getUsername()`），使前台登录响应 `userCode` 语义由"工号"变为"用户名"，
+     保证前台登录链路不因工号下线而中断。
+   - **前端**：`system-management/account/data.ts` 的工号列与工号表单项（含必填规则）、
+     `account/group-info/assign-people-form.vue` 的工号列与工号搜索占位、
+     `api/core/privilege-user.ts` 的 `code` 字段与无调用方的 `getUserByCodeApi` SHALL 移除。
+7. **边界（本次保留，非本条款范围）**：前台账号表 `tbl_platform_account_info.code` 属**前台账号自身标识**，
+   仍被前台登录响应 `userCode`、`getByCode`、列表筛选与关键字搜索使用，**本次不删**（其值不再由后台工号派生）。
+
+#### 验收场景
+
+- **GIVEN** 新版本部署完成
+  **WHEN** 打开 系统管理 → 账号管理
+  **THEN** 列表不再有「用户类型」列，新增/编辑表单不再有「用户类型」下拉
+- **GIVEN** 新版本部署完成
+  **WHEN** 登录并取得 `getLoginUserInfo` 响应
+  **THEN** 不含 `userType` 字段
+- **GIVEN** 新版本部署完成
+  **WHEN** 查询 `information_schema.columns`
+  **THEN** `tbl_privilege_user` 不含 `user_type` / `it_user_id` / `it_user_name`
+- **GIVEN** 管理员登录 **WHEN** 查看账号列表与菜单 **THEN** 与 R-12/R-13 后的行为一致（19 / 7 菜单）
+- **GIVEN** 新版本部署完成 **WHEN** 打开 系统管理 → 账号管理 **THEN** 列表与表单**不再出现「工号」**
+- **GIVEN** 新版本部署完成 **WHEN** 调用 `GET /api/privilege/user/code/{code}` **THEN** 404
+- **GIVEN** 新版本部署完成 **WHEN** 查询 `information_schema.columns`
+  **THEN** `tbl_privilege_user` 不含 `code`，`tbl_privilege_user_role` 不含 `user_no`
+- **GIVEN** 前台账号（`chenzhuo`）通过 `POST /auth/login` 登录
+  **THEN** 登录成功，响应 `userCode` 为**用户名**（不再是工号）
+
+### R-15 账号管理操作能力增强（手机号搜索 / 启用禁用与批量 / 权限分配入口收敛）
+
+WHEN 管理员使用 系统管理 → 账号管理,
+系统 SHALL 支持按**手机号**检索账号、按行或按批**启用/禁用**账号，且角色/组分配 SHALL 只在**编辑**入口提供。
+
+边界（逐项可验；**v2.4.0 新增条款**，来源为用户 2026-10-07 口令）：
+
+1. **搜索支持手机号**：前端搜索框提示 SHALL 由「请输入用户名/姓名」改为覆盖**用户名 / 姓名 / 手机号**；
+   后端 `pageByQuery` 的关键字检索 SHALL 覆盖 `username` / `realName` / **`mobile`（手机号）** / `phone`（座机）。
+   > **事实订正（2026-10-07 实测）**：起草时曾判断"后端已覆盖手机号、本项仅改文案" —— **该判断有误**。
+   > 账号手机号存于 **`mobile`** 列，而原检索只含 `phone`（座机，库内为空）⇒ **手机号搜索实际一直失效**。
+   > 故本项包含**后端检索逻辑修正**（补 `mobile`），而非仅文案调整；范围（支持手机号搜索）不变。
+2. **启用/禁用（行级）**：账号列表「操作」列 SHALL 新增 **「禁用」（status=0 时）/「启用」（status=1 时）** 按钮
+   （按当前状态显示对应动作）；后端 SHALL 提供状态更新接口。
+   语义（既有权重）：`status=1` 的账号**无法登录**（`LoginServiceImpl` 返回「用户已被禁用」）⇒ 禁用即停用访问。
+3. **批量操作**：列表 SHALL 提供勾选列（多选）；工具栏 SHALL 提供 **「批量启用」「批量禁用」**
+   （是否含「批量删除」见裁定 Q2）。批量按钮在**未勾选时禁用**；执行前二次确认；执行后刷新列表并清空勾选。
+4. **分配权限入口收敛**：SHALL 移除「操作」列的 **「分配权限」按钮**与独立 `RoleForm` 弹窗 ——
+   编辑弹窗已含 角色 / 组 多选并随 创建/更新 **同事务**提交（R-03 设计）
+   ⇒ 角色与组的唯一分配入口为**编辑**。
+5. **安全保护**：SHALL 禁止对**当前登录账号本人**执行 禁用 / 删除；
+   SHALL 禁止将**最后一个「启用状态且持超管角色」的账号**禁用 / 删除（防自锁与失管）。
+6. **新增接口**（风格对齐既有 `PUT /api/privilege/user`）：
+   - `PUT /api/privilege/user/status`：单个启停，body `{id, status}`
+   - `PUT /api/privilege/user/status/batch`：批量启停，body `{ids[], status}`
+   - 批量删除（若裁定纳入）：`POST /api/privilege/user/batch-delete`，body `{ids[]}`
+7. **不变量**：既有 新增 / 编辑 / 删除 / 设置密码 / 重置密码 能力**不回退**；
+   账号列表与登录判定口径不变；菜单与权限不受影响（admin 19 / chenzhuo 7）；
+   前端 `typecheck` 不新增错误、构建通过。
+
+#### 验收场景
+
+- **GIVEN** 管理员在账号管理
+  **WHEN** 在搜索框输入某账号的**手机号**
+  **THEN** 能检索到该账号
+- **GIVEN** 管理员
+  **WHEN** 点击某行「禁用」
+  **THEN** 该账号 `status` 变为 1；用该账号登录**失败**并提示「用户已被禁用」
+- **GIVEN** 管理员
+  **WHEN** 点击某行「启用」
+  **THEN** 该账号 `status` 变为 0 且可正常登录
+- **GIVEN** 管理员
+  **WHEN** 勾选多行 →「批量禁用」
+  **THEN** 所选账号全部禁用，并提示成功条数；勾选被清空
+- **GIVEN** 管理员
+  **WHEN** 尝试禁用或删除**当前登录账号本人**
+  **THEN** 被拒绝并给出明确提示（不落库）
+- **GIVEN** 管理员
+  **WHEN** 打开某账号的**编辑**弹窗
+  **THEN** 弹窗内含 角色 / 组 选择；「操作」列**不再有**「分配权限」按钮
+
+### R-16 内置超管账号（`admin`）绝对不可禁用、不可删除
+
+WHEN 任何调用者（含超管本人、其他超管、任何 API 直接调用）对**内置超管账号**执行禁用或删除,
+系统 SHALL 拒绝该操作并给出明确提示；该保护 SHALL 在**服务端强制**，不依赖前端置灰。
+
+> **用户口径（2026-10-07）**：「admin 超管账号，不能被删除和禁用，**这个是基础**」。
+
+边界（逐项可验；**v2.5.0 新增条款**）：
+
+1. **保护对象定义**：`username = 'admin'`（**忽略大小写**）的账号为**内置超管账号**。
+   以用户名而非 id 判定 —— id 是逐环境生成的雪花值（活库 `461681072489615360`、全新库种子
+   `1000000000000000001`），用户名才跨环境稳定。
+2. **禁止禁用**：`PUT /api/privilege/user/status` 与 `PUT /api/privilege/user/status/batch`
+   对内置超管账号（单个或出现在批量 ids 中）SHALL 拒绝，不落库。
+3. **禁止删除**：`DELETE /api/privilege/user/{id}` 对内置超管账号 SHALL 拒绝，不落库。
+4. **禁止改名绕过**：编辑内置超管账号时 `username` SHALL 保持不变（拒绝改为其他值）；
+   其余字段（真实姓名 / 手机号 / 邮箱 / 密码 / 角色 / 组）SHALL 仍可正常编辑 ——
+   否则"先改名再禁用/删除"即可绕过第 2/3 条。
+5. **补齐删除端点的历史缺口（BUG-132）**：`DELETE /api/privilege/user/{id}` 现状**零保护**
+   （可删自己、可删最后一个启用的超管）⇒ 本条款同时要求删除端点具备：
+   ① 禁止删除**当前登录账号本人**；② 禁止删除**最后一个「启用且持超管角色」的账号**；③ 第 3 条。
+6. **前端配合（体验层，非唯一防线）**：账号列表「操作」列对内置 admin 账号的
+   **启用/禁用** 与 **删除** 按钮 SHALL 置灰并给出原因提示；
+   批量勾选**包含**内置 admin 时 SHALL 整体拒绝并提示。
+7. **保护优先级**：内置账号保护 > 禁止操作本人 > 保留至少一个启用的超管；
+   任一命中即拒绝，提示语须区分原因。
+8. **不变量**：其余账号的启用/禁用/删除/编辑能力**不回退**；
+   `admin` 可正常登录且菜单为超管口径（19 条）；`typecheck` 不新增错误、构建通过。
+
+#### 验收场景
+
+- **GIVEN** 任一登录用户
+  **WHEN** 对 `admin` 调用 `PUT /api/privilege/user/status`（status=1）
+  **THEN** 返回失败并提示「内置超管账号不可禁用」，且库中 `admin.status` 仍为 0
+- **GIVEN** 任一登录用户
+  **WHEN** 批量 ids 中包含 `admin` 并调用 `/status/batch`
+  **THEN** 整体拒绝（不部分执行）
+- **GIVEN** 任一登录用户
+  **WHEN** 调用 `DELETE /api/privilege/user/{admin 的 id}`
+  **THEN** 返回失败并提示「内置超管账号不可删除」，且该行仍存在
+- **GIVEN** 管理员
+  **WHEN** 编辑 `admin` 并把用户名改成别的值
+  **THEN** 返回失败并提示用户名不可修改
+- **GIVEN** 管理员
+  **WHEN** 编辑 `admin` 只改真实姓名或角色
+  **THEN** 保存成功
+- **GIVEN** 管理员
+  **WHEN** 在界面查看 `admin` 所在行的操作列
+  **THEN** 「禁用」「删除」置灰且提示原因
+
+### R-17 智能体列表按创建人可见 + 系统管理员角色不可删除
+
+WHEN 用户打开 智能体管理 → 智能体列表,
+系统 SHALL 只返回**该用户自己创建的**智能体；**系统管理员**（超管角色）SHALL 能看到全部。
+且**系统管理员角色** SHALL 不可被删除。
+
+> **用户口径（2026-10-07）**：「每个人只能看到自己创建的智能体，然后系统管理员能看到所有人的，
+> 系统管理员这个角色也不可以删除」。
+
+**现状实测（2026-10-07）**：`tbl_data_agent.admin_id` 列存在，但**创建时从不写入**（活库 10 行全为 NULL）；
+`AgentController.list` → `listCreatedInPlatform(status, keyword)` **不做任何用户过滤** ⇒ 人人可见全部；
+`PrivilegeRoleController.delete` → `deleteRoleById` 直接「删用户绑定 + 删 ACL + 删角色」**零保护**。
+
+边界（逐项可验；**v2.6.0 新增条款**）：
+
+1. **记录创建人**：`POST /api/agent` 创建时 SHALL 写入 `admin_id = 当前登录用户 id`（服务端从会话取，
+   不信任入参）。
+2. **列表按创建人过滤**：管理端 `GET /api/agent/list` SHALL
+   - 若当前用户为**超管**（口径同 R-15 的 `isSuperAdmin`：超管角色 id 或 `sn=ROLE_ADMIN`）⇒ 返回全部；
+   - 否则 ⇒ 仅返回 `admin_id = 当前登录用户 id` 的智能体。
+   过滤 SHALL 对 status/keyword 两个查询分支同样生效。
+3. **存量**：活库 10 个 `admin_id IS NULL` 的智能体 SHALL 按裁定处理（见 Q2）：
+   - **A（回填）**：统一回填为内置超管账号（`admin`）的 id ⇒ 归属确定、超管可见；
+   - **B（保持无主）**：`NULL` 视为"无主"，仅超管可见（普通用户不可见）。
+4. **越权防线（按裁定 Q3）**：若纳入，则 `GET /{id}`、`PUT /{id}`、`DELETE /{id}`、发布/下线
+   等**同族端点** SHALL 一并校验归属（非本人且非超管 ⇒ 拒绝），避免"列表看不到但直连 API 能改/删"。
+5. **角色删除规则（用户原话）**：「**role_admin 不可以删除，除此之外都可以删，但是有用户不能删**」
+   ⇒ `DELETE /api/privilege/role/{id}`：
+   - `sn = ROLE_ADMIN`（系统管理员，忽略大小写）⇒ **绝对拒绝**（提示「系统管理员角色不可删除」）；
+   - 其他任何角色（含 `COMMON`）⇒ **可以删**，但**仍有有效持有者时拒绝**（提示「该角色下仍有 N 个用户，请先解除绑定后再删除」）；
+   - 判定以**角色业务键（sn）**为准，不依赖 id（逐环境不同；同 L-57）。
+6. **保护优先级与提示**：先判内置角色、再判持有者数，提示语可区分原因。
+7. **不变量**：普通角色下用户仍只看到自己的智能体；超管仍能看到全部；新建智能体的创建人正确；
+   角色列表、角色授权（R-10）能力不回退；`typecheck` 不新增错误、构建通过。
+
+#### 验收场景
+
+- **GIVEN** `chenzhuo`（普通角色）登录
+  **WHEN** 打开 智能体列表
+  **THEN** 只列出其本人创建的智能体（当前应为其创建过的数量；未创建则为空）
+- **GIVEN** `admin`（超管）登录
+  **WHEN** 打开 智能体列表
+  **THEN** 列出全部智能体（含他人创建的）
+- **GIVEN** `chenzhuo` 新建一个智能体
+  **WHEN** 查看列表与库内 `admin_id`
+  **THEN** 该智能体出现在他的列表里，且 `admin_id` = chenzhuo 的用户 id
+- **GIVEN** 任一用户
+  **WHEN** 调用 `DELETE /api/privilege/role/{系统管理员角色 id}`
+  **THEN** 返回失败并提示「内置角色不可删除」，且该角色及其绑定/授权仍在
+
+### R-18 资源归属可见性（知识库 / 技能 / 插件MCP 对齐智能体 R-17）
+
+WHEN 用户打开 知识库 / 技能 / 插件MCP 的**管理页列表**,
+系统 SHALL 只列出**该用户自己创建的**资源；**系统管理员** SHALL 看到全部。
+
+WHEN 用户对**非本人创建**的上述资源调用 详情 / 编辑 / 删除 / 查询 单对象端点,
+系统 SHALL 拒绝（403）；系统管理员 SHALL 豁免（同 R-17）。
+
+WHEN 用户在**智能体编辑页**选择 skill / 知识库 / 插件MCP,
+系统 SHALL 只展示 **自己的 ∪ 本人所在组关联的 ∪ 公共的**；系统管理员 SHALL 看到全部；
+**已绑定但不在可见集合**的资源 SHALL 保留灰显（不丢已绑关系，R-04 场景2）。
+
+边界（逐项可验；**v2.7.0 新增条款**，来源 CR-01）：
+
+1. **归属列口径**：知识库 `tbl_data_knowledge_base.creator`、MCP `tbl_mcp_server.creator` 存用户 id；
+   技能 `tbl_harness_skills` **新增 `creator` 列**（`V2.0.0_13`），存量 7 条回填 admin、
+   知识库历史 `creator='system'` 归 admin（Q-C2/Q-C3）。
+2. **超管口径**：复用 `AdminRoleGuard.isAdmin`（R-08/R-17 同一实现），不新造判定。
+3. **"我的组"**：`tbl_platform_account_group_info.account_id = 当前用户`（Q-P1：可见集合用我的组）。
+4. **"公共"**：该资源在 `tbl_platform_group_{kbase,skill,mcp}_info` **无授权行**（沿用 Q-P4）。
+5. **selectable（能否绑到该智能体）**：仍按**智能体所在组**（Q-P1），与可见集合职责分离。
+6. **管理页"自己的"含全部状态**（draft/published，Q-C1）；"发布"仅作为对他人/组可见的门槛。
+
+#### 验收场景
+
+- **GIVEN** `chenzhuo`（普通角色） **WHEN** 打开 技能/知识库/MCP 管理页 **THEN** 只见到本人创建的资源
+- **GIVEN** `admin`（超管） **WHEN** 打开同上 **THEN** 见到全部
+- **GIVEN** `chenzhuo` **WHEN** 直连他人资源的 详情/删除 端点 **THEN** 403
+- **GIVEN** 某公共技能被授权给 `chenzhuo` 不在的组 **WHEN** `chenzhuo` 打开智能体编辑技能选择器 **THEN** 该技能不再出现；`admin` 仍见
+- **GIVEN** 某技能授权给 `chenzhuo` 所在的组 **WHEN** `chenzhuo` 打开选择器 **THEN** 该技能可见（组关联）
+
+### R-19 技能名称唯一性按创建人隔离（跨用户同名允许）
+
+WHEN 两个不同用户上传**同名**技能,
+系统 SHALL 允许二者共存（各自一条记录，creator 分别为本人）。
+
+WHEN 同一用户上传与本人已有技能**同名**的包,
+系统 SHALL 在 `overwrite=false` 时拒绝并提示；在 `overwrite=true` 时**仅覆盖本人那条**，
+且 SHALL NOT 影响其他用户的同名技能。
+
+边界（逐项可验；**v2.8.0 新增条款**，来源 CR-02；同时**修改 R-02** 的覆盖语义）：
+
+1. **DB**：全局 `UNIQUE(name)` 约束 SHALL 替换为按创建人唯一索引 `(name, coalesce(creator,''))`
+   （`V2.0.0_14`）；用表达式索引而非给 creator 加 NOT NULL，以免打断运行期不带 creator 的上游插入。
+2. **判重**：`upload` 的重复检测 SHALL 带 `creator = 当前用户`；他人同名 ⇒ 视为不重复 ⇒ 走新建。
+3. **覆盖**：`overwrite=true` 的覆盖对象 SHALL 仅限本人同名技能（R-02 语义收窄）。
+4. **并发**：同用户同名并发插入撞唯一索引 SHALL 返回友好失败（非 500）。
+5. **运行期不受影响**：技能解析/绑定一律按 id（`tbl_data_agent_skill_info.skill_id`），跨用户同名不冲突。
+6. **本次不做**：列表/选择器的创建人区分展示（Q-D1）；MCP/知识库同名策略不变。
+
+#### 验收场景
+
+- **GIVEN** 用户 A 已上传技能 X **WHEN** 用户 B 上传同名 X **THEN** 成功，库内两条 (X,A)/(X,B)
+- **GIVEN** 用户 A 已有 X **WHEN** A 再传 X 且 overwrite=false **THEN** 拒绝并提示同名已存在
+- **GIVEN** 用户 A 已有 X、用户 B 已有 X **WHEN** A 以 overwrite=true 传 X **THEN** 仅 A 的记录被覆盖，B 的不变
+
 ## 已裁定问题（2026-10-07，用户答）
 
 | # | 问题 | 裁定 | 落点 |
@@ -313,3 +663,10 @@ WHEN 新版本部署完成,
 | Q-P4 | 无任何授权行的资源之可见性口径 | **保持兼容：无授权行＝公开** | R-04 边界 |
 | Q-P5 | 三方平台配置（表/CRUD/页面/菜单）是否随免登下线 | **随免登一起下线**（全清，含 `third_party_id` 列与 `PlatformTypeEnm`） | R-11 边界 2/3 |
 | Q-P6 | `apps/mobile-ui` 去留 | **保留 app，只删 SSO 自动登录** | R-11 边界 4 / 假设 7 |
+| Q7 | R-15 批量操作范围 | **仅「批量启用 + 批量禁用」**（不含批量删除） | R-15 边界 3 |
+| Q8 | R-15 安全保护 | **两条都加**：禁止操作当前登录账号本人 + 禁止禁用最后一个启用的超管 | R-15 边界 5 |
+| Q9 | R-15 操作列按钮 | **启用/禁用 · 设置密码 · 编辑 · 删除**（「分配权限」按钮与独立弹窗移除，并入编辑） | R-15 边界 4 |
+| Q10 | R-16 保护范围 | **只保护 `admin` 这一个内置超管账号**（其他超管仍可禁用/删除，但须留≥1 个启用的） | R-16 边界 1 |
+| Q11 | R-17 存量无主智能体（10 行 `admin_id` 为空） | **统一回填给内置 admin** | R-17 边界 3 |
+| Q12 | R-17 越权防线范围 | **连编辑/删除/发布/下线/授权等一并限制**（同族端点成组加固） | R-17 边界 4 |
+| Q13 | R-17 角色删除规则 | **「role_admin 不可以删除，除此之外都可以删，但是有用户不能删」** | R-17 边界 5 |

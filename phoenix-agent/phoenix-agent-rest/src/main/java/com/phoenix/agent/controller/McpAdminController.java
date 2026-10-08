@@ -42,14 +42,39 @@ public class McpAdminController {
     private final McpAdminService mcpAdminService;
     private final com.phoenix.agent.service.FrontMcpAccessService frontMcpAccessService;
 
+    /** R-18（CR-01/T-25）：超管判定复用 R-08/R-17 守卫（单一口径） */
+    private final com.phoenix.data.component.AdminRoleGuard adminRoleGuard;
+
+    private boolean isSuperAdmin() {
+        return adminRoleGuard.isAdmin(operator());
+    }
+
+    /** R-18：列表 owner 过滤值（超管 null=全部） */
+    private String ownerFilter() {
+        return isSuperAdmin() ? null : operator();
+    }
+
+    /** R-18：单对象归属校验（非本人且非超管 → 403） */
+    private void assertOwner(String id) {
+        if (isSuperAdmin()) {
+            return;
+        }
+        String creator = mcpAdminService.getCreatorById(id);
+        if (creator == null || !creator.equals(operator())) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                org.springframework.http.HttpStatus.FORBIDDEN, "无权访问他人创建的 MCP");
+        }
+    }
+
     @GetMapping
     public ReturnVo<Page<McpListVO>> page(@RequestParam(required = false) String keyword,
             @RequestParam(defaultValue = "1") int pageNum, @RequestParam(defaultValue = "20") int pageSize) {
-        return mcpAdminService.page(keyword, pageNum, pageSize);
+        return mcpAdminService.page(keyword, pageNum, pageSize, ownerFilter());
     }
 
     @GetMapping("/{id}")
     public ReturnVo<McpDetailVO> detail(@PathVariable String id) {
+        assertOwner(id);
         return mcpAdminService.detail(id);
     }
 
@@ -60,16 +85,19 @@ public class McpAdminController {
 
     @PutMapping("/{id}/status")
     public ReturnVo<Boolean> toggleStatus(@PathVariable String id, @RequestParam String status) {
+        assertOwner(id);
         return mcpAdminService.toggleStatus(id, status, operator());
     }
 
     @DeleteMapping("/{id}")
     public ReturnVo<Boolean> delete(@PathVariable String id) {
+        assertOwner(id);
         return mcpAdminService.delete(id, operator());
     }
 
     @PutMapping("/{id}/groups")
     public ReturnVo<Boolean> grantGroups(@PathVariable String id, @RequestBody List<String> groupIds) {
+        assertOwner(id);
         return mcpAdminService.grantGroups(id, groupIds);
     }
 
@@ -97,7 +125,7 @@ public class McpAdminController {
     /** T-07：智能体编辑页绑定三端点（options/bound/bind，镜像技能绑定惯例） */
     @GetMapping("/options")
     public ReturnVo<List<com.phoenix.agent.model.McpOptionVO>> options(@RequestParam Long agentId) {
-        return mcpAdminService.options(agentId);
+        return mcpAdminService.options(agentId, operator(), isSuperAdmin());
     }
 
     @GetMapping("/bound")

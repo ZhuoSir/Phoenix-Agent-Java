@@ -1,0 +1,34 @@
+=== T-05 验收结论（角色与用户角色数据订正：存量补齐 + 孤儿处置 + 组织菜单清理）===
+日期: 2026-10-07 | 演练库: phoenix_drill（容器 phoenix-release-postgres-1）
+
+[1] 产出物（4 件 SQL，均在 specs/20261007_user-role-group-model/sql/）
+  - V2.0.0_02__role_backfill_dml.sql（R-07 存量补角色；幂等；含自检 DO 块）
+  - rollback/V2.0.0_02__role_backfill_dml_rollback.sql（按 create_by='V2.0.0_02' 精确撤销）
+  - V2.0.0_03__org_menu_cleanup_dml.sql（R-01 组织菜单 4 行 + 其 ACL 4 行；幂等；含自检）
+  - rollback/V2.0.0_03__org_menu_cleanup_dml_rollback.sql（pg_dump 原始 8 行保真重建）
+
+[2] 正向 + 幂等（evidence/T-05_drill.txt 原始输出）
+  演练前: zero_role=2  org_menu=4  acl=59  user_role=12
+  执行 02: NOTICE 待补 2 人 / 写入 2 行（角色 431285032083144704 普通角色）；自检通过
+          → zero_role=0  user_role=14
+  执行 03: DELETE 4（ACL）+ DELETE 4（菜单）+ 兜底 0 + 自检通过
+          → org_menu=0  acl=55
+  复跑 02: 待补 0 人 / 写入 0 行  **幂等 ✅**
+  复跑 03: DELETE 0 ×4           **幂等 ✅**
+
+[3] 反向（回滚）
+  03-rollback: 重建 4 菜单 + 4 授权，自检通过 → org_menu=4  acl=59  **与演练前一致 ✅**
+  02-rollback: 撤销 2 行 → zero_role=2  user_role=12      **与演练前一致 ✅**
+  两个 rollback 各再复跑一次：无报错、状态不变          **幂等 ✅**
+
+[4] 孤儿 user_role 行（BUG-118 口径：保留 + 记账，不删）
+  导出 5 行 → evidence/T-05_orphan_user_role.csv
+  （引用 0628535e-… ×3 / 845fc488… ×1 / 71f2934c-… ×1，均为库中不存在的角色 id）
+
+[5] 过程发现：BUG-123（P1，已登记）
+  Java `saveUser` 用 sn='common'（小写）查默认角色，库中实为 'COMMON'（大写）⇒ 命中 0 行
+  ⇒ API 新建用户恒零角色（与 R-05 叠加 ⇒ 新用户零菜单/白屏）。
+  本件 SQL 已按 `upper(sn) = 'COMMON'` 规避，并对"找不到角色"直接 RAISE EXCEPTION。
+  **Java 侧 1 行修复（忽略大小写）建议纳入本 spec**（属 R-07 不变量）—— 待用户裁定。
+
+[6] 结论：T-05 达成（正向/反向/幂等三态全过，断言与计划一致）。

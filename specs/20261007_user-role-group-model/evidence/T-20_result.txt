@@ -1,0 +1,64 @@
+=== T-20 验收结论（R-14：用户类型/IDM + 工号下线）===
+日期: 2026-10-07 | 确认人: 陈卓（口令「确认执行 R-14（确认人：陈卓）」+「工号也删掉」+「test01 暂时保留」）
+
+[1] 变更内容
+  升级件 `V2.0.0_08__usertype_code_drop_ddl.sql`（+ rollback，配对 8/8）：
+    · DROP COLUMN：tbl_privilege_user.{code, user_type, it_user_id, it_user_name}、
+      tbl_privilege_user_role.user_no
+    · UPDATE：组归属 tbl_platform_account_group_info.account_name 由「工号」改为「用户名」
+    · 自检（L-51 环境无关）：待删列 0 个 / 存活账号 ≥1 且 chenzhuo 在 / chenzhuo 角色绑定在 / 组归属名称已同步
+  后端（17 个文件）：
+    · 删除字段：PrivilegeUser.{code,userType,itUserId,itUserName}、PrivilegeUserRole.userNo、
+      PrivilegeUserDTO.{code,userType}、PrivilegeUserVO.{code,userType}、LoginUserInfoVO.userType、
+      PrivilegeUserRoleDTO/VO.userNo
+    · 删除接口/方法：`GET /api/privilege/user/code/{code}`、IPrivilegeUserService.getByCode（+实现）、
+      saveUserRole 的 userNo 形参、pageByQuery 的工号搜索与 userType 过滤
+    · 删除死代码：enums/UserTypeEnum.java；ExceptionEnum 的 USERCODE_DUPLICATE_EXCEPTION /
+      USER_DELETE_ERROR / DEPORTMENT_DELETE_ERROR
+    · 语义替换（工号 → 用户名）：PrivilegePvalueController 审计 createBy、addUserGroups 的 accountName、
+      AccountInfoServiceImpl 前台登录载体 carrier.setCode、ReactAgentController 的 UserProfile.userCode
+  前端（7 个文件）：账号列表工号列/用户类型列与 userTypeSlot、表单工号项（必填）与用户类型下拉、
+    组管理「工号」搜索框与工号列（含 assignPeopleCode 状态）、api 类型字段、无调用方的 getUserByCodeApi、
+    store/auth.ts 的 userType、mobile-ui 类型声明
+  兼容加固：4 处从会话读取 PrivilegeUser 的 Jackson 2 `new ObjectMapper()` 显式
+    `FAIL_ON_UNKNOWN_PROPERTIES=false`（HarnessController / ReactAgentController /
+    PrivilegePvalueController / LoginHelper）—— 旧会话里含已下线字段，否则反序列化会抛
+    UnrecognizedPropertyException（见 L-54）
+
+[2] 验证（真实输出，见 T-20_drill.txt / T-20_deploy-verify.txt）
+  ① drill（升级路径）：01~08 链**跑一次**（与 migrator 一致）全 exit=0；08 单独再跑一次 exit=0（幂等）；
+     反向 08 → 列与原值复原（admin 1001 / chenzhuo 1002、user_no 非空 2 行、组归属名回到 1002）；
+     再正向 → 残留列 0
+  ② 洁净库（migrate.sh 首启顺序 → 01~08）：全部 exit=0；终态 accounts=admin,chenzhuo、残留列 0、
+     组归属名=chenzhuo、menus=14（种子库口径）
+  ③ 活库部署：migrator 应用 V2.0.0_08（台账 8 行齐备），自检 NOTICE
+     「待删列 0 个 / 存活账号 3（admin+chenzhuo+test01）/ chenzhuo 角色绑定 1 / 组归属名称已同步」
+  ④ 部署后实测（经 8090）：
+     · 目标列全消失；仅余 tbl_platform_account_info.code（保留项）与 tbl_privilege_dictionary.code（异表）
+     · 登录响应字段 = hasAdminRole,realName,token,userId,username —— **无 userType** ✅（admin/chenzhuo 均如此）
+     · 账号列表首条字段无 code / userType ✅；账号 = admin, chenzhuo, test01（用户选择暂时保留 test01）
+     · 菜单 admin 19 / chenzhuo 7（与 R-12/R-13 一致，未受影响）✅
+     · `GET /api/privilege/user/code/1001` → **404** ✅
+     · 前台登录 `POST /auth/login`（chenzhuo）→ 200，`userCode` = **"chenzhuo"**（用户名，不再是工号）✅
+     · 组归属 account_name = chenzhuo ✅
+     · 8090 首页 / `/auth/login` → 200；`POST /api/admin/agent/chat`（走会话用户读取）正常进入 SSE 流，
+       无 500 / 反序列化异常 ✅
+     · 部署后后端 ERROR 行数 **0**
+  ⑤ 前端：`pnpm typecheck` 204 条错误 —— 与改动前**同一集合（零新增）**；`pnpm build` ✓ built in 6.99s；
+     产物中「idm用户」字样 **0 个文件**
+
+[3] 过程发现（记 L-54）
+  从**会话缓存**的实体上删字段是跨版本风险：会话里是旧版 PrivilegeUser JSON，
+  Jackson 2 默认 FAIL_ON_UNKNOWN_PROPERTIES=true 会在读取时抛异常。已对 4 处读取点显式关闭该特性
+  （LoginServiceImpl 用的是 Spring 注入的 Jackson 3，默认已宽容）。
+
+[4] 边界与遗留（如实记载）
+  · 保留 `tbl_platform_account_info.code`（前台账号自身标识，前台登录/查询/搜索在用）—— 已写入 R-14 边界 7
+  · `router/guard.ts` 的 `userType !== 1` 门移除后，`/front/chat` 对**所有已登录用户**可达；
+    该门原本对所有用户（user_type 全为 0）都重定向，与 R-12「恢复独立 chat 页」矛盾 —— 属修复而非放开
+  · 仍存留的同类死列（本次未动，0 引用、数据全空）：tbl_privilege_user 的
+    is_leader / sex / address / fax / fail_month / failure_time / pwd_ftime / acl_timestamp
+  · 登录响应仍返回 password 字段（BUG-129 已登记，ColumnMask 已脱敏）
+
+[5] 结论：R-14 达成 —— 用户类型（自建/IDM）与工号在数据库、后端、前端三端整体下线；
+    登录/菜单/账号列表/前台登录链路行为符合预期；升级件与回滚件配对（8/8）。

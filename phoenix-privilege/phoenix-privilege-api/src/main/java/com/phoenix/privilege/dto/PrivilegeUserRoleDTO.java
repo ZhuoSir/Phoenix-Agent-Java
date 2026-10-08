@@ -23,8 +23,6 @@ public class PrivilegeUserRoleDTO {
 
 	private String userId;
 
-	private String userNo;
-
 	private String roleId;
 
 	private Date endDate;

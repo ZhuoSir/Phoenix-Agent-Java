@@ -1,0 +1,38 @@
+=== T-18 验收结论（R-12 权限管理+前台管理 →「系统管理」；账号管理唯一化）===
+日期: 2026-10-07 | 确认人: 陈卓（口令「确认执行（确认人：陈卓）」+「URL 一并改成 /system-management」）
+
+[1] 变更内容
+  DB（新升级件 V2.0.0_06 + rollback）:
+    · 「权限管理」原地更名「系统管理」：name/url/sn → 系统管理 / /system-management / SystemManagement（**id 不变 ⇒ ACL 保留**）
+    · 「组管理」迁入系统管理：pid → 系统管理、url → /system-management/group、order_no 2 → 3（与 角色/账号 相邻）
+    · 5 个子菜单 URL 前缀统一：/permission-management/* → /system-management/*
+      （角色/账号/菜单/权限值/日志；全仓无硬编码引用，实测安全）
+    · 删除前台「账号管理」与空目录「前台管理」（各 1 行 module + 1 行 ACL）
+  前端: 删 views/account/account-info/{index.vue,form.vue,data.ts,group-form.vue}
+    · 3 个 API 模块**保留**（getAccountInfoApi 被 api/core/user.ts 用；getAccountGroupInfoByAccountInfoApi 被
+      系统管理/账号 表单用；getGroupAgentInfoListApi 被组管理页用）—— 删之会引入悬空引用
+  基线: sql/all_data.sql 与 sql/all_schema.sql 各删 4 行、改写 5 行 URL（与交付 IA 一致）
+
+[2] 验证（真实输出）
+  ① **drill 演练**（drill 库=部署时备份 + 01~06 两轮）：12 次执行全 exit=0 且 0 错误；
+     终态 系统管理 6 子项次序/URL 全对；不变量 menus=19 / admin_acl=19 / common_acl=7 / legacy_dirs=0；
+     **反向 06 → 21 菜单、权限管理/前台管理复位、组管理 pid 复位、子菜单 URL 复位**；再正向 → 19（可重放）
+  ② **洁净库重放**（更新后基线 + 01~06 两轮）：all_schema/all_data 双 exit=0/0 错误；12 次执行全 exit=0；
+     自检 NOTICE：存活菜单 14 / 超管 14 / 普通 5（**种子库口径**，结构不变量全过）
+  ③ **部署**（活库 phoenix）：重建前端镜像 → `docker compose up -d` → migrator 应用 V2.0.0_06
+     （台账 6 行齐备），自检 NOTICE：**存活菜单 19 / 超管 ACL 19 / 普通角色 ACL 7 / 组管理 ACL 1**
+  ④ **部署后实测（经 8090）**：
+     · 菜单树 19 行；「系统管理」(/system-management) 下 角色(1)→账号(2)→组(3)→菜单(4)→权限值(5)→日志(6)
+     · 超管 menus=19（顶层含 系统管理）、普通角色 menus=7（不变）；pvalues 均 5
+     · 不变量：legacy_dirs=0、sys_children=6、admin_acl=19、common_acl=7、**被删菜单残留授权=0**
+     · `/platform-account/account-info` → **404**；库内已无该页菜单行
+  ⑤ 前端：`pnpm typecheck` **204 < 基线 207（零新增）**；`pnpm build` exit=0；产物中 account-info chunk **0**
+
+[3] 过程发现并修掉的自身缺陷（记 L-51）
+  06 的首版自检**硬编码"存活菜单=19"**，在生产升级路径（21→19）通过，但在**种子库**（本身仅 14 条菜单）直接
+  `RAISE EXCEPTION` 使升级件失败 —— 即"按单一环境口径写断言"。已改为**只校验结构不变量与守恒关系**
+  （旧目录消失 / 系统管理 6 子项 / 组管理归位 / 无残留授权 / 超管 ACL == 存活菜单），绝对数改由 NOTICE 输出。
+  修正后两环境皆通过（生产 19/19/7、种子 14/14/5）。
+
+[4] 结论：T-18 完成。requirements v2.1.0 / plan v1.2.0 / tasks v1.1.0（均 已确认 陈卓）三道门齐备，
+    升级件与回滚件配对（正向 6 / 回滚 6），活库与 8090 已生效。

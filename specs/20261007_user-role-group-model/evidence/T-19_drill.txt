@@ -1,0 +1,50 @@
+########## T-19 验证 ##########
+=== A. drill（升级路径：部署时备份 → 01~07 两轮）===
+  迁移前: exit=0 账号=xtj,lwj,liufang,admin,chenzhuo
+  轮1 V2.0.0_01                                      exit=0 err=0 
+  轮1 V2.0.0_02                                      exit=0 err=0 
+  轮1 V2.0.0_03                                      exit=0 err=0 
+  轮1 V2.0.0_04                                      exit=0 err=0 
+  轮1 V2.0.0_05                                      exit=0 err=0 
+  轮1 V2.0.0_06                                      exit=0 err=0 
+  轮1 V2.0.0_07                                      exit=0 err=0 [V2.0.0_07] 自检通过：存活账号 2（admin+chenzhuo）/ 残留 0 行 / chenzhuo 角色绑定 1 条
+  轮2 V2.0.0_01                                      exit=0 err=0 
+  轮2 V2.0.0_02                                      exit=0 err=0 
+  轮2 V2.0.0_03                                      exit=0 err=0 
+  轮2 V2.0.0_04                                      exit=0 err=0 
+  轮2 V2.0.0_05                                      exit=0 err=0 
+  轮2 V2.0.0_06                                      exit=0 err=0 
+  轮2 V2.0.0_07                                      exit=0 err=0 [V2.0.0_07] 自检通过：存活账号 2（admin+chenzhuo）/ 残留 0 行 / chenzhuo 角色绑定 1 条
+  终态账号: admin,chenzhuo
+  残留: role=0 sess=0 msg=517 mem=0 chen_role=1
+  --- 反向 07（应复原 5 账号 + 聊天/记忆）---
+  rollback exit=0 err=0
+  复原后账号: admin,chenzhuo,liufang,lwj,xtj 会话=170 消息=549
+  再正向后账号数: 2
+
+=== B. 洁净库（migrate.sh 首启顺序：00 → all_data → 10 → 20 → 01~07 两轮）===
+  docker/init/00_baseline_sequences.sql      exit=0 err=0
+  sql/all_data.sql                           exit=0 err=0
+  docker/init/10_seed_admin.sql              exit=0 err=0
+  docker/init/20_seed_runtime_agents.sql     exit=0 err=0
+  init 后账号: admin,chenzhuo
+  轮1 V2.0.0_01                                      exit=0 err=0
+  轮1 V2.0.0_02                                      exit=0 err=0
+  轮1 V2.0.0_03                                      exit=0 err=0
+  轮1 V2.0.0_04                                      exit=0 err=0
+  轮1 V2.0.0_05                                      exit=0 err=0
+  轮1 V2.0.0_06                                      exit=0 err=0
+  轮1 V2.0.0_07                                      exit=0 err=0
+  轮2 V2.0.0_01                                      exit=0 err=0
+  轮2 V2.0.0_02                                      exit=0 err=0
+  轮2 V2.0.0_03                                      exit=0 err=0
+  轮2 V2.0.0_04                                      exit=0 err=0
+  轮2 V2.0.0_05                                      exit=0 err=0
+  轮2 V2.0.0_06                                      exit=0 err=0
+  轮2 V2.0.0_07                                      exit=0 err=0
+  终态账号: admin,chenzhuo
+ u_all | u_alive | role_rows | front_rows | menus | org_tables 
+-------+---------+-----------+------------+-------+------------
+     2 |       2 |         2 |          1 |    14 |          0
+(1 row)
+

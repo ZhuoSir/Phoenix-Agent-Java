@@ -16,6 +16,4 @@ public class PrivilegeRoleQuery extends PageQuery {
 
 	private String sn;
 
-	private Long companyId;
-
 }

@@ -18,7 +18,6 @@ public class LoginVO {
     private String email;
     private String username;
     private String realName;
-    private List<String> deptIds;
     private List<LoginGroupVO> groups;
 
     @Data

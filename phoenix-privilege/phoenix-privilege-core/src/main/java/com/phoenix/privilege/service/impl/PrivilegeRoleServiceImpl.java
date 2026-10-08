@@ -37,19 +37,40 @@ public class PrivilegeRoleServiceImpl extends ServiceImpl<PrivilegeRoleMapper, P
 	private final IPrivilegePvalueService privilegePvalueService;
 	private final IPrivilegeUserRoleService privilegeUserRoleService;
 
+	/** 内置管理员角色 sn（R-17：**绝对不可删除**；按业务键判定，不依赖逐环境的 id —— 同 L-57） */
+	private static final String ROLE_ADMIN_SN = "ROLE_ADMIN";
+
 	@Override
-	public void deleteRoleById(String roleId) {
+	public boolean deleteRoleById(String roleId) {
+		// R-17（v2.6.0）：内置管理员角色绝不可删；其余角色若仍有用户持有，也不得删（避免用户失去全部权限）
+		PrivilegeRole role = getById(roleId);
+		if (role == null) {
+			return false;
+		}
+		if (role.getSn() != null && ROLE_ADMIN_SN.equalsIgnoreCase(role.getSn())) {
+			return false;
+		}
+		if (countHolders(roleId) > 0) {
+			return false;
+		}
 		privilegeUserRoleService.removeUserRoleByRoleId(roleId);
 		privilegeAclService.deleteAclByReleaseId(roleId);
 		removeById(roleId);
+		return true;
 	}
 
 	@Override
-	public List<PrivilegeRole> getByCompanyId(Long companyId) {
-		return QueryChain.of(getMapper())
-			.eq(PrivilegeRole::getCompanyId, companyId)
-			.orderBy(PrivilegeRole::getCreateTime, false)
-			.list();
+	public long countHolders(String roleId) {
+		return privilegeUserRoleService.queryChain()
+			.eq(com.phoenix.privilege.entity.PrivilegeUserRole::getRoleId, roleId)
+			.eq(com.phoenix.privilege.entity.PrivilegeUserRole::getDelFlag, 0)
+			.count();
+	}
+
+	@Override
+	public boolean isBuiltInAdminRole(String roleId) {
+		PrivilegeRole role = getById(roleId);
+		return role != null && role.getSn() != null && ROLE_ADMIN_SN.equalsIgnoreCase(role.getSn());
 	}
 
 	@Override
@@ -109,8 +130,8 @@ public class PrivilegeRoleServiceImpl extends ServiceImpl<PrivilegeRoleMapper, P
 		QueryWrapper qw = QueryWrapper.create()
 			.select("tbl_privilege_role.*")
 			.like(PrivilegeRole::getName, query.getName(), StrUtil.isNotBlank(query.getName()))
-			.eq(PrivilegeRole::getSn, query.getSn(), StrUtil.isNotBlank(query.getSn()))
-			.eq(PrivilegeRole::getCompanyId, query.getCompanyId(), query.getCompanyId() != null);
+			.eq(PrivilegeRole::getSn, query.getSn(), StrUtil.isNotBlank(query.getSn()));
+			// 组织维度已下线（v2.0.0，T-14）：不再按 companyId 过滤
 		qw.orderBy(PrivilegeRole::getCreateTime, false);
 		Page<PrivilegeRole> entityPage = getMapper().paginate(query.getPage(), query.getSize(), qw);
 		Page<PrivilegeRoleVO> voPage = new Page<>(entityPage.getPageNumber(), entityPage.getPageSize(),

@@ -69,9 +69,11 @@ if true; then
   elif [ -n "$MIRROR" ]; then
     MP="${MIRROR%/}"; mph_from "$MP"; phx_log INFO "手工指定 mirror: $MP (镜像前缀 $MPH)"
   else
-    CANDS=$(grep -v '^#' "$HERE/mirrors.list" | grep -v '^[[:space:]]*$' | tr '\n' ' ')
+    # tr -d '\r' 前置：mirrors.list 若是 CRLF（Windows 检出常见），token 尾部会带 \r
+    # 导致 curl 对每个源都返回 000（瞬时判死、连 8s 超时都用不上）——实测复现见 BUG-147。
+    CANDS=$(tr -d '\r' < "$HERE/mirrors.list" | grep -v '^#' | grep -v '^[[:space:]]*$' | tr '\n' ' ')
     # shellcheck disable=SC2086
-    MP=$(phx_mirror_pick $CANDS) || phx_fail 2 $TOTAL "候选 mirror 全不可达（mirrors.list）；可 --mirror 手工指定或 --overseas"
+    MP=$(phx_mirror_pick $CANDS) || phx_fail 2 $TOTAL "候选 mirror 全不可达（已重试 2 轮，见 mirrors.list）——先查该文件行尾（CRLF 会让每个源都 000）与网络，再重跑；仍失败用 --mirror <源> 手工指定，或 --overseas"
     mph_from "$MP"
   fi
 fi
