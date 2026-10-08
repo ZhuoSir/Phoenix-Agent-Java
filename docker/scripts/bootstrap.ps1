@@ -66,6 +66,15 @@ Write-Step "拷贝源码进 WSL: $WslSrc → ~/phoenix-src"
 & wsl -d $Distro -u root -- bash -c "mkdir -p ~/phoenix-src && cp -ru '$WslSrc/.' ~/phoenix-src/"
 if ($LASTEXITCODE -ne 0) { Write-Fail "源码拷贝失败（路径换算: $WslSrc）" }
 
+# ── 4.5 行尾规整 CRLF→LF（BUG-143）──
+# Windows 工作树在 core.autocrlf=true（Git for Windows 默认）下检出为 CRLF，而仓库对象
+# 里存的是 LF。直接把这棵树交给 bash，bash 会崩在 \r 上——bootstrap.sh 自己第 13 行
+# `case "$1" in` 就报 syntax error，跑不到任何自愈代码，所以必须在**外部**先规整。
+# 只规整被 bash/Docker/Compose 消费的文本资产；Java/TS/SQL 的 CRLF 无害，不动。
+Write-Step "规整行尾 CRLF→LF（bash/Docker/Compose 资产）..."
+& wsl -d $Distro -u root -- bash -c "cd ~/phoenix-src && find . -type f \( -name '*.sh' -o -name 'Dockerfile*' -o -name '.env*' -o -name '*.conf' -o -name '*.yaml' -o -name '*.yml' \) -exec sed -i 's/\r//g' {} +"
+if ($LASTEXITCODE -ne 0) { Write-Fail "行尾规整失败（WSL 内 find/sed 不可用？）" }
+
 # ── 5. WSL 内 bootstrap.sh 全链 ──
 $bsArgs = "--project $Project --timeout $Timeout"
 if ($Version) { $bsArgs += " --version $Version" }
