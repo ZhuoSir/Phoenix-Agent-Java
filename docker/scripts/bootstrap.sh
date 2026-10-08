@@ -36,11 +36,18 @@ if docker info >/dev/null 2>&1; then
 elif [ "$(uname -s)" = "Darwin" ]; then
   phx_fail 1 4 "mac 不代装引擎（A-3）：请装 Docker Desktop/Colima 后重跑"
 else
-  phx_log INFO "[A/4] 引擎安装（get.docker.com --mirror Aliyun）"
+  phx_log INFO "[A/4] 引擎安装（get.docker.com --mirror Aliyun；拉不到则回退国内源）"
   SUDO=""; [ "$(id -u)" -ne 0 ] && SUDO="sudo"
-  curl -fsSL -m 30 https://get.docker.com -o /tmp/phx-getdocker.sh || phx_fail 1 4 "get.docker.com 不可达（网络受限？）"
-  # shellcheck disable=SC2086
-  $SUDO sh /tmp/phx-getdocker.sh --mirror Aliyun >>"$PHX_LOG_FILE" 2>&1 || phx_fail 1 4 "引擎安装失败（见日志）"
+  # 注意：--mirror Aliyun 只管 deb 包源，安装脚本本体仍在 get.docker.com（境外）；
+  # 国内受限网络 curl 会被 reset，故此处必须带国内回退（BUG-145）。
+  if curl -fsSL -m 30 https://get.docker.com -o /tmp/phx-getdocker.sh 2>/dev/null; then
+    phx_log INFO "  提示：官方脚本会静默下载引擎包（apt 输出被它丢进 /dev/null），通常 2-5 分钟无输出属正常（BUG-146）"
+    # shellcheck disable=SC2086
+    $SUDO sh /tmp/phx-getdocker.sh --mirror Aliyun >>"$PHX_LOG_FILE" 2>&1 || phx_fail 1 4 "引擎安装失败（见日志）"
+  else
+    phx_log WARN "get.docker.com 不可达（受限网络）——回退国内源 docker-ce@mirrors.aliyun.com"
+    phx_install_docker_aliyun || phx_fail 1 4 "国内源装引擎失败（见日志 $PHX_LOG_FILE）"
+  fi
   $SUDO systemctl enable --now docker >/dev/null 2>&1 || $SUDO service docker start >/dev/null 2>&1 || true
   # shellcheck disable=SC2086
   [ -n "$SUDO" ] && $SUDO usermod -aG docker "$(id -un)" >/dev/null 2>&1
@@ -51,8 +58,14 @@ fi
 phx_log INFO "[B/4] 源码打包 package.sh（--arch $ARCH --version $VERSION）"
 [ "$OFFLINE" -eq 1 ] && phx_log WARN "--offline 仅作用于安装段；打包段需外网（镜像源/依赖源）"
 PKG_MIRROR_ARG=""; [ -n "$MIRROR_OPT" ] && PKG_MIRROR_ARG="--mirror $MIRROR_OPT"
+# 打包 40-70 分钟，全程静默会让人以为卡死（BUG-146）：日志照存、明细仍只进日志，
+# 但把所有 phx_log 行（含 `====> 步骤 N/8` 标记与 INFO/WARN/ERROR）透传到屏幕。
+# grep 无匹配也要算成功（否则 pipefail 会把它当失败），故 || true；package.sh 的失败仍会被捕获。
 # shellcheck disable=SC2086
-bash "$SRC/docker/scripts/package.sh" --arch "$ARCH" --version "$VERSION" $PKG_MIRROR_ARG >>"$PHX_LOG_FILE" 2>&1 || phx_fail 2 4 "打包失败（见日志尾部）"
+bash "$SRC/docker/scripts/package.sh" --arch "$ARCH" --version "$VERSION" $PKG_MIRROR_ARG 2>&1 \
+  | tee -a "$PHX_LOG_FILE" \
+  | { grep --line-buffered -E '\[(INFO|WARN|ERROR)\]' || true; } \
+  || phx_fail 2 4 "打包失败（明细见日志尾部: tail -n 50 $PHX_LOG_FILE）"
 TAR="$SRC/docker/dist/phoenix-${VERSION}-${ARCH}.tar.gz"
 [ -f "$TAR" ] || phx_fail 2 4 "打包产物缺失: $TAR"
 phx_log INFO "[B/4] 产包就绪: $TAR ($(du -h "$TAR" | awk '{print $1}'))——可拷贝至其它机器离线安装"

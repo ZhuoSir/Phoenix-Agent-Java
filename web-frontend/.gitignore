@@ -62,7 +62,7 @@ skills-lock.json
 datalog
 .opencode
 AGENTS.md
-pnpm-lock.yaml
+# pnpm-lock.yaml 不再忽略：Dockerfile 用 --frozen-lockfile，需 lockfile 入库才能可复现构建（BUG-149）
 
 vsh.mjs
 turbo-run.mjs

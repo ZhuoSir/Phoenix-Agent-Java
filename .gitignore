@@ -59,3 +59,6 @@ clean-deploy-all-local.bat
 ### 统一账号迁移的备份/演练产物（v1.7.0 unified-account-center；含生产数据快照，永不入库）
 /backups/
 *.dump
+
+### Phoenix 安装链运行时状态文件（bootstrap.ps1/install.sh 进度标记，本机产物不入库）
+.phoenix-*.state

@@ -200,7 +200,10 @@ DO $$
 DECLARE c_acct int; c_grp int; c_other int;
 BEGIN
   SELECT count(*) INTO c_acct FROM tbl_platform_account_info WHERE id = '9000000000000090001';
-  IF c_acct <> 1 THEN RAISE EXCEPTION 'M8：thinktest 账号行数=%（预期 1），停止', c_acct; END IF;
+  -- BUG-151：thinktest（id 9000000000000090001）是开发数据集特有账号，全新安装库不含它（c_acct=0）属正常，
+  -- 跳过 D7 清理即可；仅 c_acct=1（历史数据集确含 thinktest）才执行删除；c_acct>1 为 id 重复异常，须停
+  IF c_acct = 0 THEN RAISE NOTICE 'M8 跳过：全新安装库无 thinktest 账号（id=9000000000000090001），无需 D7 清理'; RETURN; END IF;
+  IF c_acct > 1 THEN RAISE EXCEPTION 'M8：thinktest 账号行数=%（预期 0 或 1），停止', c_acct; END IF;
   SELECT count(*) INTO c_grp FROM tbl_platform_account_group_info WHERE account_id = '9000000000000090001';
   SELECT count(*) INTO c_other FROM tbl_data_chat_session WHERE user_id = '9000000000000090001';
   IF c_other <> 0 THEN RAISE EXCEPTION 'M8：thinktest 存在 % 条会话，与 D7 前提（零业务足迹）不符，停止', c_other; END IF;

@@ -600,3 +600,72 @@
   兜底（`ON CONFLICT (id)` 只防主键、不防业务唯一索引）；③ 涉及"先删后插"的迁移，**正反向各跑两遍**
   才算验证过幂等（本次正是第二遍才暴露）。
 
+## L-67 Windows PowerShell 下 `$ErrorActionPreference="Stop"` + 原生命令 stderr ⇒ 直接抛异常（`2>$null` 拦不住）
+- **分类**：工具链（Windows 脚本）
+- **触发场景**：读/写 `.ps1`；脚本里 `$ErrorActionPreference = "Stop"` 之后调外部命令做探测（`docker info`、`wsl -l` 之类）
+- **现象**：本机 Windows PowerShell 5.1.26100.9444 实测——`& cmd /c "echo boom 1>&2" 2>$null` **抛 NativeCommandError**（`2>$null` 只丢输出，ErrorRecord 先生成）；而 `& cmd /c "exit 3"` **不抛**（单纯退出码非零不致错）。调查"怎么用 bootstrap.ps1"时照此复刻脚本原句 `& docker info --format '{{.OSType}}' 2>$null` → 同样抛（本机 docker 在 PATH、引擎未起）。
+- **根因**：PS 5.1 把原生命令的 stderr 行包成 ErrorRecord，EAP=Stop 使其升级为终止错误——与 `$LASTEXITCODE` 无关；`2>$null` 只是丢弃流输出，不阻止 ErrorRecord 生成
+- **防再犯规则**：① ps1 里探测外部命令一律 `cmd /c "<cmd> 2>nul"`，或 `(& <cmd> 2>&1 | Out-String)` + `try/catch`，**不得假定 `2>$null` 能吞掉 native stderr**；② 用"跑片段"判断脚本行为时必须在**同款 shell**（`powershell.exe` 5.1 与 `pwsh` 7 分开）复刻原句，不得跨版本外推；③ 探测类命令必须为「命令不存在 / 引擎未起 / 权限不足」三条分支各给可见文案，不得靠未捕获异常收场
+- **状态**：active
+- **复发**：×1（本次核实 bootstrap.ps1 安装路径时发现）
+- **关联**：BUG-141、`docker/scripts/bootstrap.ps1:36-39`、`docker/scripts/install.ps1:31-40`。**注意**：本条为片段复现（同 shell 同命令），用户 2026-10-08 现场实跑因引擎已启动而**未命中**——下次遇到"脚本莫名红堆栈"仍按此条先查 native stderr。
+
+## L-68 「文件是 UTF-8」不等于「PowerShell 读得对」——无 BOM 的 `.ps1` 在中文 Windows PS 5.1 下按 GBK 解码
+- **分类**：工具链（编码）
+- **触发场景**：仓库交付的 `.ps1` 含中文；在中文 Windows（系统 ACP=936）用 Windows PowerShell 5.1 运行
+- **现象**：`.\bootstrap.ps1` 直接抛 ParseException（`<` 保留运算符 / `&&` 非法语句分隔符 / 缺 `}`），且报错行里的中文是 `涓嬭浇鍚?` 这类乱码。第一反应容易往"用户命令打错 / 路径不对 / 脚本本身有语法错"上找——实际是 UTF-8 中文字节把**后面的 ASCII 引号吞掉**，双引号字符串永不闭合 → 吞掉后续行 → 连锁报错。
+- **根因**：PS 5.1 对**无 BOM** 的 .ps1 按系统 ANSI 代码页解码（本机 ACP=936 即 GBK），PS 7 才默认 UTF-8；英文 Windows(CP1252) 下同样内容只是乱码不致错 ⇒ **该缺陷只在中文环境致命**，最容易被"我这儿能跑"掩盖。
+- **防再犯规则**：① 仓库内 `.ps1` **一律 UTF-8 带 BOM**（正文一个字节不动、只加 3 字节，PS 5.1/7 双兼容）；② **每次用编辑工具写回 `.ps1` 后都要复查 BOM**——本次 `edit` 工具写回 `bootstrap.ps1` 就把 BOM 抹掉了，解析错误立刻从 0 回到 4 个（`ReadAllBytes` 看前三字节是否 `EF BB BF`）；③ 判断"脚本能不能跑"用 `[System.Management.Automation.Language.Parser]::ParseFile($path,[ref]$null,[ref]$errs)` **数错误**，不要靠肉眼看文件——读工具与编辑器会自动认 UTF-8，看不出问题；④ 用户报"某 .ps1 语法错误"时，先查 BOM 与系统 ACP（`(Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Nls\CodePage').ACP`），再谈命令对不对。
+- **状态**：active
+- **复发**：×2（安装入口不可用 1 次；编辑工具抹 BOM 致复发 1 次）
+- **关联**：BUG-142、`docker/scripts/*.ps1`。**现场验证**：补 BOM 后用户 2026-10-08 13:55 实跑，脚本越过解析进入 WSL 就绪段（exit 2 待重启）
+
+## L-69 「Windows 工作树」不等于「Linux 检出」——autocrlf 的 CRLF 会从入口脚本一路带进容器
+- **分类**：工具链（跨平台）
+- **触发场景**：把 Windows 上的工作树整棵交给 Linux 消费——`cp` 进 WSL、挂进容器、打成 tar 再解包执行
+- **现象**：WSL 内 `bootstrap.sh` 起手即崩：`set: pipefail: invalid option name`、`$'\r': command not found`、`syntax error near $'in\r'`（第 7/10/13 行）。第一反应容易怀疑"脚本逻辑 / 权限 / 路径 / WSL 坏了"，实际是每行结尾多了个 `\r`。
+- **根因**：Git for Windows 默认 `core.autocrlf=true`（本机系统级 gitconfig 实测 true）⇒ **工作树 CRLF、对象库 LF**；只要把工作树整棵搬到 Linux，`\r` 就跟着走。同一份代码在作者机器（mac/Linux 或 `autocrlf=false`）完全正常，故属"只在 Windows 复现"的隐性交付缺陷。
+- **防再犯规则**：① 会被跨 OS 消费的文本资产用 `.gitattributes` **钉死 `eol=lf`**，不要指望检出配置（`*.sh`/`Dockerfile*`/`.env*`/`*.conf`/`*.yaml`）；② 入口脚本要"自我规整"时，**必须选在被消费代码之前执行的那一层**——本例 `bootstrap.sh` 第 13 行就崩，自愈代码写进它等于没写，只能放 Windows 侧（`bootstrap.ps1` 拷贝后、起 bash 前）；③ 取证口诀：`git cat-file -s <rev>:<path>` 与工作树字节数一比，**差值 ≈ 行数就是 CR 差**（本例 4347−4272=75）；④ 规整时按扩展名挑文件（`find … -name '*.sh' … -exec sed -i 's/\r//g'`），**禁止整树 sed**（会毁二进制资产）
+- **状态**：active
+- **复发**：×1（本次 bootstrap.ps1 Windows 全链）
+- **关联**：BUG-143、`docker/scripts/bootstrap.ps1`、根 `.gitattributes`
+
+## L-70 `wsl -l -q` 的输出在 PowerShell 里"字间夹 NUL"——拿它做 `-match` 判定必然误判
+- **分类**：工具链（Windows/WSL 互操作）
+- **触发场景**：在 PowerShell 里调 `wsl.exe` 列举/判定发行版（`wsl -l -q`、`wsl -l -v`），据此决定"要不要装"
+- **现象**：脚本把"已装好的发行版"判成"没装" ⇒ 重复 `wsl --install` ⇒ `Wsl/InstallDistro/ERROR_ALREADY_EXISTS`（错误码 -1）硬失败。首次安装碰巧能过（那时确实没装），**再跑必挂**——症状看起来像"WSL 坏了 / 得用导入法"，很容易被带偏去手工 `wsl --import`。
+- **根因**：`wsl.exe` 写 UTF-16LE，PowerShell 5.1 按控制台编码解码 ⇒ 每个字符后多一个 `\0`（实测码点 `85,0,98,0,117,0,…` = `U\0b\0u\0…`），`-match 'Ubuntu-22.04'` 永不命中；`[regex]::Escape()` 也救不了（病根不在正则）。清洗 NUL 后同一判据立刻变 False，可自证。
+- **防再犯规则**：① 判"某发行版能不能用"**只认直接探测**——`cmd /c "wsl -d <名> -u root -- true 1>nul 2>nul"` 看退出码（0=就绪，-1=不可用），不要解析列表文本；② 万不得已要解析列表，先 `-replace "\`0",''` 清洗再匹配；③ 调 `wsl`/`docker` 这类会往 stderr 说话的外部命令一律走 `cmd /c "… 2>nul"`（配合 `$ErrorActionPreference=Stop` 才不炸，见 L-67）；④ 幂等脚本的"二次重跑"必须真跑一遍才算验证过——首次成功的路径很可能掩盖了检测逻辑的错。
+- **状态**：active
+- **复发**：×1（本次 bootstrap.ps1 / install.ps1 第二次重跑）
+- **关联**：BUG-144、`docker/scripts/bootstrap.ps1`、`docker/scripts/install.ps1`
+
+## L-71 文档说"国内源"时，必须核到**每一条外部 URL**——"镜像参数"不等于"入口也在国内"
+- **分类**：判断 / 交付（受限网络）
+- **触发场景**：交付脚本号称"默认全国内源"；用户直接问"源是国内的吗"
+- **现象**：我照抄 `docker/README.md` 的「引擎安装=get.docker `--mirror Aliyun`」并向用户保证"国内源默认，无需配置"，实际 `curl https://get.docker.com` **本体在境外**、用户网络被 reset ⇒ 一键安装在引擎段即失败。用户一句"源是国内的吗"把我问回现场——**答案一半是国内、一半是国外，我上次给的是错的那半**。
+- **根因**：`--mirror` 只切换**包源**，不切换**引导脚本/元数据来源**。"某环节用了国内镜像" ≠ "该环节的入口在国内"。同类陷阱：`npm --registry=<国内>` 但包内 install 脚本另从他处下载；`pip -i <国内>` 但依赖自带源码包地址。
+- **防再犯规则**：① 回答"是不是国内源"之前，把该环节的**每条外部域名逐一列出核对**（本例：`get.docker.com`=境外被拦 / `mirrors.aliyun.com`=200 / `archive.ubuntu.com`=200），核不到就不下结论；② 交付脚本里凡"境外端点"必须有**国内回退**或写明前置条件，不能把失败留给用户现场（本次回退=apt + docker-ce@aliyun，见 `phx_install_docker_aliyun`）；③ 用户报"网络问题"时先做**可达性对照实验**（同机 curl 国内源 200、境外源 reset ⇒ 结论是"该端点被拦"而不是"没网"），再谈方案。
+- **状态**：active
+- **复发**：×1（本次 bootstrap [A/4] 引擎段）
+- **关联**：BUG-145、`docker/scripts/lib/common.sh`、`docker/README.md`（"国内源说明"节需补"安装脚本本体仍走 get.docker.com"的注记）
+
+## L-72 复测必须用**同一输入**——我拿"干净 URL"复测，把 CRLF 污染误诊成"网络抖动"
+- **分类**：验证盲区（误诊）
+- **触发场景**：外部依赖批量失败后我要下根因结论；尤其"我复测它能用 ⇒ 所以是环境抖动"这种推理
+- **现象**：安装日志显示三个镜像源在**同一秒内**全判死并终止打包（`14:38:41`→`14:38:42`）。我用**自己写的探针脚本**（干净 URL）复测，三个源全部 200/401 ⇒ 我据此向用户断言"**源没死，是瞬时网络抖动**"。**真相**：`mirrors.list` 在 Windows 检出里是 CRLF，`package.sh` 切出的 token 尾部粘 `\r`，每个源都 `code=000`（瞬时失败、8s 超时都用不上）——正是"同秒全死"的特征。A/B 实测：原样 token 全 000；`tr -d '\r'` 后 401/401/200。**我的复测根本没复现用户的输入**，所以"能通"毫无证明力。
+- **根因**：把"复测能通"当成"原故障是瞬时的"——但复测与故障的**输入不同**（干净 URL vs 带 `\r` 的 URL），属于**换了自变量的对照实验**，结论必然无效。这与 L-02（截断视图）、L-37（只看状态码不看内容身份）同族：都是"证据通道/自变量不对齐"却下了全称结论。
+- **防再犯规则**：① 复测前先问"**我的复测和故障现场，输入是不是同一份**"——不同就先把输入对齐（本例：直接用现场那个文件、照现场那条管道切 token），再谈结论；② "瞬时/抖动"这类**不可证伪**的解释要当嫌疑犯而非结论——除非能给出"同一输入、两次不同结果"的证据；③ 数据文件参与的命令链出问题，先 `file` / `od -c` 看**字节**（CRLF/BOM/NUL 都在这一层现形），再怪网络；④ 结论被推翻时当场撤回并把误诊过程写进台账（本例 BUG-147 行内留了自纠记录）。
+- **状态**：active
+- **复发**：×1（本次打包段步骤 2/8 误诊）
+- **关联**：BUG-147（真因=CRLF）、L-69（CRLF 家族）、L-02、L-37、`docker/scripts/lib/common.sh:phx_mirror_pick`、`docker/scripts/mirrors.list`
+
+## L-73 `docker pull` 报 DONE ≠ blob 完整——`short read` 先做**字节数对账**，别先怀疑磁盘/daemon
+- **分类**：验证盲区（供应链完整性）
+- **触发场景**：容器构建死于 `failed to compute cache key: short read: expected N bytes but got 0: unexpected EOF`；或经第三方镜像源拉取的基础镜像首次投入构建
+- **现象**：打包段 frontend 构建在 `RUN corepack enable` 报 `short read: expected 1250677 bytes but got 0`。表面像 BuildKit 缓存/磁盘/daemon 故障；实际是基础镜像拉取时 1.25MB 层长时间停在 `0B / 1.25MB`、整体 pull 却报 `DONE`——**1250677 字节与该层精确对账**，即截断 blob 躺在构建缓存里。我自己的验证也栽了一步：用 `docker run --rm <img> node --version` 验可读性，但构建期基础镜像**不在 `docker images`**（BuildKit 存于构建缓存/内容库），run 隐式转 pull 白烧 120s 超时。
+- **根因**：① 镜像源传输不完整而 pull 未拦截（"成功"信号 ≠ 内容完整，与 L-37"状态码≠内容身份"同族）；② 排障时未按"错误里的字节数 ↔ 拉取日志停滞层大小"对账，就容易误入磁盘满/daemon 重启等歧途；③ 验证命令未先确认镜像在本地（`docker image inspect`），语义从"验证"漂移成"下载"。
+- **防再犯规则**：① 遇 `short read/unexpected EOF` 先做**字节数对账**锁定损坏 blob，再按序排除磁盘（`df`）与 daemon（journalctl 时间线：重启在失败前还是后）；② 修复三件套 = `docker builder prune -af` → 重拉 → `docker run --rm <img> <平凡命令>` **实测**（强制解包全部层）后才准投入构建；③ 重跑构建时把基础镜像**钉死到与本地已验证镜像同名同源**（`--mirror`），不再竞速赌源；④ 验证镜像前先 `docker image inspect` 确认在本地，避免 run 变 pull；⑤ 长构建脚本应有"基础镜像 pre-pull+校验"fail-fast 段（本次缺口 → BUG-148）。
+- **状态**：active
+- **复发**：×1（本次打包段 3/8 frontend 编译）
+- **关联**：BUG-148、BUG-147（镜像源家族）、BL-23（吞吐型探活）、L-37、L-72、`docker/scripts/package.sh`
