@@ -337,3 +337,13 @@
 - **状态**：active
 - **复发**：×1（本次 bootstrap.ps1 Windows 全链）
 - **关联**：BUG-143、`docker/scripts/bootstrap.ps1`、根 `.gitattributes`
+
+## L-70 `wsl -l -q` 的输出在 PowerShell 里"字间夹 NUL"——拿它做 `-match` 判定必然误判
+- **分类**：工具链（Windows/WSL 互操作）
+- **触发场景**：在 PowerShell 里调 `wsl.exe` 列举/判定发行版（`wsl -l -q`、`wsl -l -v`），据此决定"要不要装"
+- **现象**：脚本把"已装好的发行版"判成"没装" ⇒ 重复 `wsl --install` ⇒ `Wsl/InstallDistro/ERROR_ALREADY_EXISTS`（错误码 -1）硬失败。首次安装碰巧能过（那时确实没装），**再跑必挂**——症状看起来像"WSL 坏了 / 得用导入法"，很容易被带偏去手工 `wsl --import`。
+- **根因**：`wsl.exe` 写 UTF-16LE，PowerShell 5.1 按控制台编码解码 ⇒ 每个字符后多一个 `\0`（实测码点 `85,0,98,0,117,0,…` = `U\0b\0u\0…`），`-match 'Ubuntu-22.04'` 永不命中；`[regex]::Escape()` 也救不了（病根不在正则）。清洗 NUL 后同一判据立刻变 False，可自证。
+- **防再犯规则**：① 判"某发行版能不能用"**只认直接探测**——`cmd /c "wsl -d <名> -u root -- true 1>nul 2>nul"` 看退出码（0=就绪，-1=不可用），不要解析列表文本；② 万不得已要解析列表，先 `-replace "\`0",''` 清洗再匹配；③ 调 `wsl`/`docker` 这类会往 stderr 说话的外部命令一律走 `cmd /c "… 2>nul"`（配合 `$ErrorActionPreference=Stop` 才不炸，见 L-67）；④ 幂等脚本的"二次重跑"必须真跑一遍才算验证过——首次成功的路径很可能掩盖了检测逻辑的错。
+- **状态**：active
+- **复发**：×1（本次 bootstrap.ps1 / install.ps1 第二次重跑）
+- **关联**：BUG-144、`docker/scripts/bootstrap.ps1`、`docker/scripts/install.ps1`
