@@ -37,4 +37,7 @@ public class ChatAttachmentVO {
 	/** 用户可见提示：解析失败原因类别，或"内容已截断"告知（R-08/R-09） */
 	private String notice;
 
+	/** 缩略图端点（仅 IMAGE 类非空）；同样受鉴权保护，前端须用 fetch+blob（<img src> 带不了鉴权头） */
+	private String thumbUrl;
+
 }

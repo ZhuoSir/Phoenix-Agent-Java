@@ -1,6 +1,8 @@
 package com.phoenix.data.service.chat;
 
 import com.phoenix.data.dto.chat.ChatAttachmentUploadItem;
+import com.phoenix.data.entity.ChatAttachment;
+import com.phoenix.data.vo.ChatAttachmentVO;
 import com.phoenix.data.vo.ChatAttachmentUploadResultVO;
 
 import java.util.List;
@@ -24,5 +26,23 @@ public interface ChatAttachmentService {
 	 * @param sessionId 会话 id，可空
 	 */
 	ChatAttachmentUploadResultVO uploadBatch(List<ChatAttachmentUploadItem> items, String uploaderId, String sessionId);
+
+	/**
+	 * R-11：按 id 取附件并做归属校验 —— 非本人且非超管 ⇒ 403；不存在 ⇒ 404。
+	 * 存储路径一律取自库中记录（L-19：不接受入参拼路径）。
+	 */
+	ChatAttachment requireAccessible(Long id, String viewerId, boolean superAdmin);
+
+	/**
+	 * R-10 + L-58：按会话列出附件（与单对象校验**成对**实施）。
+	 * {@code ownerIdOrNull} 非空 = 仅该创建人（普通用户）；null = 不过滤（超管）。
+	 */
+	List<ChatAttachmentVO> listForSession(String sessionId, String ownerIdOrNull);
+
+	/** 打开附件原件（Resource，供下载端点；调用前必须先 requireAccessible） */
+	org.springframework.core.io.Resource openResource(ChatAttachment attachment);
+
+	/** 生成图片缩略图（仅 IMAGE；失败则回退原图字节，仍受鉴权保护） */
+	byte[] buildThumb(ChatAttachment attachment);
 
 }

@@ -1,5 +1,6 @@
 package com.phoenix.data.service.chat;
 
+import com.mybatisflex.core.query.QueryWrapper;
 import com.phoenix.data.dto.chat.ChatAttachmentUploadItem;
 import com.phoenix.data.entity.ChatAttachment;
 import com.phoenix.data.mapper.ChatAttachmentMapper;
@@ -10,8 +11,18 @@ import com.phoenix.data.vo.ChatAttachmentVO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.tika.Tika;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
+import org.springframework.web.server.ResponseStatusException;
+
+import javax.imageio.ImageIO;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
+import java.util.Objects;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -167,9 +178,84 @@ public class ChatAttachmentServiceImpl implements ChatAttachmentService {
 			.sizeBytes(e.getSizeBytes())
 			// 刻意给受鉴权端点而非存储直链（R-11 / L-58：可见性与归属校验成对）
 			.url("/api/chat/attachment/" + e.getId())
+			.thumbUrl("IMAGE".equals(e.getKind()) ? "/api/chat/attachment/" + e.getId() + "/thumb" : null)
 			.extractStatus(e.getStatus())
 			.notice(notice)
 			.build();
+	}
+
+	@Override
+	public ChatAttachment requireAccessible(Long id, String viewerId, boolean superAdmin) {
+		ChatAttachment e = chatAttachmentMapper.selectOneById(id);
+		if (e == null) {
+			throw new ResponseStatusException(HttpStatus.NOT_FOUND, "附件不存在: " + id);
+		}
+		// R-11 + L-58：与列表可见性**成对**的服务端强制校验（不依赖前端隐藏）；超管豁免沿用 R-18 口径
+		if (!superAdmin && !Objects.equals(e.getUploaderId(), viewerId)) {
+			log.warn("越权访问附件被拒: attachmentId={}, owner={}, viewer={}", id, e.getUploaderId(), viewerId);
+			throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权访问他人上传的附件");
+		}
+		return e;
+	}
+
+	@Override
+	public List<ChatAttachmentVO> listForSession(String sessionId, String ownerIdOrNull) {
+		QueryWrapper q = QueryWrapper.create();
+		if (StringUtils.hasText(sessionId)) {
+			q.and("session_id = ?", sessionId);
+		}
+		// 普通用户仅见本人（ownerIdOrNull=本人 id）；超管传 null ⇒ 不过滤
+		if (StringUtils.hasText(ownerIdOrNull)) {
+			q.and("uploader_id = ?", ownerIdOrNull);
+		}
+		q.orderBy("id", true);
+		return chatAttachmentMapper.selectListByQuery(q).stream().map(e -> toVo(e, null)).toList();
+	}
+
+	@Override
+	public Resource openResource(ChatAttachment attachment) {
+		// L-19：路径**只取库中记录**，不接受任何请求入参拼接
+		Resource r = fileStorageService.getFileResource(attachment.getStoragePath());
+		if (r == null || !r.exists()) {
+			throw new ResponseStatusException(HttpStatus.NOT_FOUND, "附件原文件已不存在（可能已被清理）");
+		}
+		return r;
+	}
+
+	@Override
+	public byte[] buildThumb(ChatAttachment attachment) {
+		Resource r = openResource(attachment);
+		try {
+			BufferedImage src = ImageIO.read(r.getInputStream());
+			if (src == null) {
+				// ImageIO 无对应 reader（如 webp）⇒ 回退原图字节（仍受鉴权保护）
+				log.debug("缩略图生成跳过（无 ImageIO reader），回退原图: name={}", attachment.getFileName());
+				return r.getContentAsByteArray();
+			}
+			int max = 256;
+			int w = src.getWidth();
+			int h = src.getHeight();
+			double scale = Math.min(1.0, (double) max / Math.max(w, h));
+			int tw = Math.max(1, (int) Math.round(w * scale));
+			int th = Math.max(1, (int) Math.round(h * scale));
+			BufferedImage out = new BufferedImage(tw, th, BufferedImage.TYPE_INT_RGB);
+			Graphics2D g = out.createGraphics();
+			g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+			g.drawImage(src, 0, 0, tw, th, null);
+			g.dispose();
+			ByteArrayOutputStream bos = new ByteArrayOutputStream();
+			ImageIO.write(out, "png", bos);
+			return bos.toByteArray();
+		}
+		catch (Exception e) {
+			log.warn("缩略图生成失败，回退原图: name={}, reason={}", attachment.getFileName(), e.getMessage());
+			try {
+				return r.getContentAsByteArray();
+			}
+			catch (Exception ex) {
+				throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "附件读取失败");
+			}
+		}
 	}
 
 	private String extOf(String fileName) {
