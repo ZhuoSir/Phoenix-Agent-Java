@@ -307,3 +307,23 @@
 - **防再犯规则**：① 任何"读到了不该读的东西"的判断，必须给出**内容级**证据（首行/文件头/已知标记），不能只看状态码与长度；
   ② 下安全结论前先自问"这个 200/长度还有没有别的解释"（本例 SPA 兜底就是最可能的解释），并**主动证伪**（换编码/换路径/比对真实文件大小）；
   ③ 安全类结论按**最坏情况**取证：先证明"能拿到什么内容"，再定级；④ 结论一旦被推翻，立刻撤回并把过程与教训留痕（不得悄悄改口）。
+
+## L-67 Windows PowerShell 下 `$ErrorActionPreference="Stop"` + 原生命令 stderr ⇒ 直接抛异常（`2>$null` 拦不住）
+- **分类**：工具链（Windows 脚本）
+- **触发场景**：读/写 `.ps1`；脚本里 `$ErrorActionPreference = "Stop"` 之后调外部命令做探测（`docker info`、`wsl -l` 之类）
+- **现象**：本机 Windows PowerShell 5.1.26100.9444 实测——`& cmd /c "echo boom 1>&2" 2>$null` **抛 NativeCommandError**（`2>$null` 只丢输出，ErrorRecord 先生成）；而 `& cmd /c "exit 3"` **不抛**（单纯退出码非零不致错）。调查"怎么用 bootstrap.ps1"时照此复刻脚本原句 `& docker info --format '{{.OSType}}' 2>$null` → 同样抛（本机 docker 在 PATH、引擎未起）。
+- **根因**：PS 5.1 把原生命令的 stderr 行包成 ErrorRecord，EAP=Stop 使其升级为终止错误——与 `$LASTEXITCODE` 无关；`2>$null` 只是丢弃流输出，不阻止 ErrorRecord 生成
+- **防再犯规则**：① ps1 里探测外部命令一律 `cmd /c "<cmd> 2>nul"`，或 `(& <cmd> 2>&1 | Out-String)` + `try/catch`，**不得假定 `2>$null` 能吞掉 native stderr**；② 用"跑片段"判断脚本行为时必须在**同款 shell**（`powershell.exe` 5.1 与 `pwsh` 7 分开）复刻原句，不得跨版本外推；③ 探测类命令必须为「命令不存在 / 引擎未起 / 权限不足」三条分支各给可见文案，不得靠未捕获异常收场
+- **状态**：active
+- **复发**：×1（本次核实 bootstrap.ps1 安装路径时发现）
+- **关联**：BUG-141、`docker/scripts/bootstrap.ps1:36-39`、`docker/scripts/install.ps1:31-40`。**注意**：本条为片段复现（同 shell 同命令），用户 2026-10-08 现场实跑因引擎已启动而**未命中**——下次遇到"脚本莫名红堆栈"仍按此条先查 native stderr。
+
+## L-68 「文件是 UTF-8」不等于「PowerShell 读得对」——无 BOM 的 `.ps1` 在中文 Windows PS 5.1 下按 GBK 解码
+- **分类**：工具链（编码）
+- **触发场景**：仓库交付的 `.ps1` 含中文；在中文 Windows（系统 ACP=936）用 Windows PowerShell 5.1 运行
+- **现象**：`.\bootstrap.ps1` 直接抛 ParseException（`<` 保留运算符 / `&&` 非法语句分隔符 / 缺 `}`），且报错行里的中文是 `涓嬭浇鍚?` 这类乱码。第一反应容易往"用户命令打错 / 路径不对 / 脚本本身有语法错"上找——实际是 UTF-8 中文字节把**后面的 ASCII 引号吞掉**，双引号字符串永不闭合 → 吞掉后续行 → 连锁报错。
+- **根因**：PS 5.1 对**无 BOM** 的 .ps1 按系统 ANSI 代码页解码（本机 ACP=936 即 GBK），PS 7 才默认 UTF-8；英文 Windows(CP1252) 下同样内容只是乱码不致错 ⇒ **该缺陷只在中文环境致命**，最容易被"我这儿能跑"掩盖。
+- **防再犯规则**：① 仓库内 `.ps1` **一律 UTF-8 带 BOM**（正文一个字节不动、只加 3 字节，PS 5.1/7 双兼容）；② 判断"脚本能不能跑"用 `[System.Management.Automation.Language.Parser]::ParseFile($path,[ref]$null,[ref]$errs)` **数错误**，不要靠肉眼看文件——读工具与编辑器会自动认 UTF-8，看不出问题；③ 用户报"某 .ps1 语法错误"时，先查 BOM 与系统 ACP（`(Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Nls\CodePage').ACP`），再谈命令对不对。
+- **状态**：active
+- **复发**：×1（本次 bootstrap.ps1 / install.ps1 安装入口不可用）
+- **关联**：BUG-142、`docker/scripts/*.ps1`。**现场验证**：补 BOM 后用户 2026-10-08 13:55 实跑，脚本越过解析进入 WSL 就绪段（exit 2 待重启）
