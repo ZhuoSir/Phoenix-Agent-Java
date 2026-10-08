@@ -45,4 +45,13 @@ public interface ChatAttachmentService {
 	/** 生成图片缩略图（仅 IMAGE；失败则回退原图字节，仍受鉴权保护） */
 	byte[] buildThumb(ChatAttachment attachment);
 
+	/**
+	 * R-10：把附件绑定到已保存的消息（回填 message_id）。
+	 * 由既有 {@code POST /api/sessions/{sid}/messages} 的副作用调用（plan 共享面 S9）：
+	 * metadata 不含 attachmentIds 时**不会被调用**；解析失败由调用方降级为 WARN，不得影响消息保存。
+	 * 幂等：重复绑定同一 message 不产生副作用；仅绑定**属于该用户**（或超管）的附件。
+	 * @return 实际回填的行数
+	 */
+	int bindToMessage(List<Long> attachmentIds, Long messageId, String uploaderId, boolean superAdmin);
+
 }

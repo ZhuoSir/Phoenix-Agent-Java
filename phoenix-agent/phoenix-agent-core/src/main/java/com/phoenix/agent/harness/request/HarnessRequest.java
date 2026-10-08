@@ -34,4 +34,10 @@ public class HarnessRequest implements Serializable {
      * 抑制未授权技能被自主匹配加载；后台通道不设置。
      */
     private String skillScopeHint;
+
+    /**
+     * 对话附件 id 列表（chat-attachment-understanding T-06；**可选**）。
+     * 不传/为空 ⇒ 装配器短路，行为与改动前逐字节一致（共享面 S1'）。
+     */
+    private java.util.List<Long> attachmentIds;
 }

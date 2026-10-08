@@ -258,6 +258,37 @@ public class ChatAttachmentServiceImpl implements ChatAttachmentService {
 		}
 	}
 
+	@Override
+	public int bindToMessage(List<Long> attachmentIds, Long messageId, String uploaderId, boolean superAdmin) {
+		if (attachmentIds == null || attachmentIds.isEmpty() || messageId == null) {
+			return 0;
+		}
+		int n = 0;
+		for (Long id : attachmentIds) {
+			if (id == null) {
+				continue;
+			}
+			ChatAttachment e = chatAttachmentMapper.selectOneById(id);
+			if (e == null) {
+				log.warn("绑定附件跳过（不存在）: attachmentId={}, messageId={}", id, messageId);
+				continue;
+			}
+			// R-11：只能绑定属于自己（或超管）的附件 —— 防止把他人附件挂到自己消息上
+			if (!superAdmin && !Objects.equals(e.getUploaderId(), uploaderId)) {
+				log.warn("绑定附件被拒（非本人）: attachmentId={}, owner={}, viewer={}", id, e.getUploaderId(), uploaderId);
+				continue;
+			}
+			if (messageId.equals(e.getMessageId())) {
+				continue; // 幂等：已绑定同一消息
+			}
+			e.setMessageId(messageId);
+			e.setUpdateTime(LocalDateTime.now());
+			chatAttachmentMapper.update(e);
+			n++;
+		}
+		return n;
+	}
+
 	private String extOf(String fileName) {
 		int i = fileName.lastIndexOf('.');
 		if (i < 0 || i == fileName.length() - 1) {

@@ -42,6 +42,9 @@ import java.util.Map;
 @Component
 @RequiredArgsConstructor
 public class HarnessChatServiceImpl implements HarnessChatService {
+
+    /** T-06：附件装配器（attachmentIds 为空即短路，S1' 既有行为不变） */
+    private final com.phoenix.agent.harness.attachment.ChatAttachmentAssembler attachmentAssembler;
     private final HarnessStaticLoader harnessStaticLoader;
     private final HarnessAgentRegistry harnessAgentRegistry;
     private final HitlCacheService hitlCacheService;
@@ -61,7 +64,8 @@ public class HarnessChatServiceImpl implements HarnessChatService {
         if (!injection.ok()) {
             return Mono.error(new IllegalArgumentException(injection.errorMsg()));
         }
-        return harnessAgent.call(buildUserMessage(request), buildRuntimeContext(request, injection.block()));
+        return attachmentAssembler.prepare(request.getAttachmentIds(), request.getUserId())
+                .flatMap(ctx -> harnessAgent.call(buildUserMessage(request, ctx), buildRuntimeContext(request, injection.block())));
     }
 
     @Override
@@ -71,7 +75,8 @@ public class HarnessChatServiceImpl implements HarnessChatService {
         if (!injection.ok()) {
             return Mono.error(new IllegalArgumentException(injection.errorMsg()));
         }
-        return harnessAgent.call(buildUserMessage(request), buildRuntimeContext(request, injection.block()));
+        return attachmentAssembler.prepare(request.getAttachmentIds(), request.getUserId())
+                .flatMap(ctx -> harnessAgent.call(buildUserMessage(request, ctx), buildRuntimeContext(request, injection.block())));
     }
 
     @Override
@@ -126,8 +131,9 @@ public class HarnessChatServiceImpl implements HarnessChatService {
         Flux<NodeOutput> body = mcpMountService
             .withMcp(harnessAgent, request.getAgentId(), request.getSessionId(),
                 effectiveMcp(request.getChannel(), request.getUserId(), request.getAgentId()))
-            .flatMapMany(agent -> agent
-                .streamEvents(buildUserMessage(request), buildRuntimeContext(request, injection.block()))
+            .flatMapMany(agent -> attachmentAssembler.prepare(request.getAttachmentIds(), request.getUserId())
+                .flatMapMany(ctx -> agent
+                    .streamEvents(buildUserMessage(request, ctx), buildRuntimeContext(request, injection.block())))
                 .map(event -> toNodeOutput(event, sessionId, textDeltaSeen, effMaxIters)));
         // BL-19：轮末扫 workspace 产物。END 帧从 body 中剥离、在扫描事件之后统一补发——
         // 否则 agentFiles 落在 end=true 之后，前端（按 end 收尾）收不到，还会多渲染一个空消息框。
@@ -417,10 +423,25 @@ public class HarnessChatServiceImpl implements HarnessChatService {
     }
 
     private UserMessage buildUserMessage(HarnessRequest request) {
-        if (request.getSkillScopeHint() == null || request.getSkillScopeHint().isBlank()) {
-            return new UserMessage(request.getMessage());
+        return buildUserMessage(request, com.phoenix.agent.harness.attachment.ChatAttachmentAssembler.Context.none());
+    }
+
+    /**
+     * T-06（共享面 S8）：**无附件时与改动前逐字节一致**（两种既有身份都保留）；
+     * 有附件时顺序为「用户原文 → 附件材料 → [平台约束]」，约束**仍在末尾**（不干扰指令解析）。
+     */
+    private UserMessage buildUserMessage(HarnessRequest request,
+            com.phoenix.agent.harness.attachment.ChatAttachmentAssembler.Context ctx) {
+        StringBuilder sb = new StringBuilder(request.getMessage() == null ? "" : request.getMessage());
+        if (ctx != null && ctx.injectedText() != null && !ctx.injectedText().isBlank()) {
+            sb.append("\n\n").append(ctx.injectedText());
         }
-        // 前台通道技能范围约束（R-09 风险①缓解）；与用户原文拼接在末尾，避免干扰指令解析
-        return new UserMessage(request.getMessage() + "\n\n[平台约束] " + request.getSkillScopeHint());
+        if (request.getSkillScopeHint() == null || request.getSkillScopeHint().isBlank()) {
+            // 既有身份①：无约束 ⇒ 与改动前完全相同（仅当无附件时等价于 new UserMessage(message)）
+            return new UserMessage(sb.length() == (request.getMessage() == null ? 0 : request.getMessage().length())
+                    ? (request.getMessage() == null ? "" : request.getMessage()) : sb.toString());
+        }
+        // 既有身份②：前台通道技能范围约束（R-09 风险①缓解），拼在末尾
+        return new UserMessage(sb + "\n\n[平台约束] " + request.getSkillScopeHint());
     }
 }
