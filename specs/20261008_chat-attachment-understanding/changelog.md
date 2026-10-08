@@ -1,5 +1,24 @@
 # Changelog: chat-attachment-understanding
 
+## v1.2.0（2026-10-09）**待重确认** —— 铁律 6：T-06 施工前侦察推翻 plan 决策1 的事实前提
+
+- **停编码**：T-06 尚未写任何生产代码；发现设计缺陷即回改文档（未"先写了再说"）
+- **事实纠正**：`GET /api/agent/{agentId}/sessions/stream` 只是 **SSE 事件订阅**（`streamSessionUpdates`），
+  **不是发送端点**；真正的运行端点**全是 POST**，共 **6 个**、分两族：
+  harness 族 5 个（`/api/admin/harness/chat`、`/front/stream/chat`、`/platform/harness/chat`、
+  `/api/front/harness/chat`、`/api/front/stream/chat`，共用 `HarnessChatService` + `HarnessRequest`）、
+  react 族 1 个（`/api/admin/agent/chat`，`ChatModelRequest` → `AgentManager.streamCall`）
+- **关键约束**：admin-ui 对话页 `components/run/index.vue` **同时**调用两族 ⇒ 只接一族会造成
+  "上传了附件却不生效"的**静默失效**（违 R-05/R-06 可观察性）
+- **决策1 重写**：附件 id 随 **POST 请求体**传递（两个 DTO 各加可选 `attachmentIds`），
+  在**两个收敛点**下游用**同一个装配器**解析/鉴权/注入（避免 6 处各写一遍，L-06）；
+  **SSE 订阅端点不改** ⇒ 原 S1 风险归零；矩阵新增 **S1'**（两个发送 DTO 的既有调用方）
+- 被拒方案补：原 GET 查询参数方案（前提错误 + id 进访问日志 + URL 长度限制）、只接 harness 族（静默失效）、
+  前端把文件内容塞 content（体积失控 + 绕鉴权 + 无法回看）
+- 影响文档：plan（决策1/接口表/矩阵/数据流/方案概述）、tasks（T-06 标题与验证方式）；**requirements 不变**（R-01~R-12 语义未动）
+- 状态：plan/tasks 均 **待重确认**（确认② 重走）；三重门暂时不齐 ⇒ 继续禁止写生产代码
+
+
 ## v1.1.0 = CR-01 合入（2026-10-08，micro，1 次确认 陈卓）
 
 - **变更**：多模态模型 `qwen-vl-max` → **`qwen3.8-max`**（实测原生支持 `image_url`，两把可用 key 均 200 并正确读图；

@@ -1,4 +1,4 @@
-> 版本: v1.1.0 | 状态: 已确认 | 确认人: 陈卓 | 确认日期: 2026-10-08 | 确认记录: CR-01（micro）合入（陈卓 2026-10-08）⇒ 决策2 模型名、决策3 密钥来源改造 | 确认记录: 用户 2026-10-08 选定「确认通过（确认人：陈卓）」（确认②）+ 施工范围「全量做（两端 + 文档 + 图片多模态 + 历史回看 + 鉴权）」 | 更新: 2026-10-08
+> 版本: v1.2.0 | 状态: **待重确认** | 更新: 2026-10-09 | 变更源: T-06 施工前侦察推翻决策1 的事实前提（铁律 6：停编码→回改文档→重走确认②）| 前次确认: v1.1.0（陈卓 2026-10-08，CR-01）| 确认记录: CR-01（micro）合入（陈卓 2026-10-08）⇒ 决策2 模型名、决策3 密钥来源改造 | 确认记录: 用户 2026-10-08 选定「确认通过（确认人：陈卓）」（确认②）+ 施工范围「全量做（两端 + 文档 + 图片多模态 + 历史回看 + 鉴权）」 | 更新: 2026-10-08
 
 # 技术方案：chat-attachment-understanding（对话附件上传与大模型理解）
 
@@ -30,7 +30,7 @@
 
 ## 方案概述
 
-**附件与消息解耦、上传先于发送**：新增独立上传端点（multipart）→ 落盘（复用 `FileStorageService`，子目录 `chat-attachments`）+ 落**新表** `tbl_data_chat_attachment`（归属/类型/大小/路径/状态）→ 前端拿到 `attachmentId` 挂到**该会话的待发送草稿**；发送时因对话流是 **GET SSE**（不能带 body），由 GET 的**查询参数**携带 `attachmentIds`，后端据此装配模型消息。
+**附件与消息解耦、上传先于发送**：新增独立上传端点（multipart）→ 落盘（复用 `FileStorageService`，子目录 `chat-attachments`）+ 落**新表** `tbl_data_chat_attachment`（归属/类型/大小/路径/状态）→ 前端拿到 `attachmentId` 挂到**该会话的待发送草稿**；发送时由**运行端点的 POST 请求体**携带 `attachmentIds`（两个 DTO：`HarnessRequest` / `ChatModelRequest`），在**两个收敛点**（`HarnessChatService` / `AgentManager.streamCall`）下游的同一装配器里解析、鉴权、注入。
 
 **理解路径分两支**（对应 R-05/R-06）：
 - **文档类** → 复用已在依赖中的 `spring-ai-tika-document-reader` 抽文本 → 受控模板注入提示词（含截断告知，R-08）→ 走既有 `CHAT` 模型。
@@ -60,7 +60,7 @@
        insert tbl_data_chat_attachment(uploader_id,kind,ext,mime,file_name,size_bytes,storage_path,status)
           ↓ 返回 {id,name,kind,ext,sizeBytes,thumbUrl?}
 [前端] 挂到"该会话待发送草稿"(L-20 按会话分片) → 用户点发送
-          ↓ GET /api/agent/{agentId}/sessions/stream?...&attachmentIds=1,2   (GET 无 body ⇒ 查询参数)
+          ↓ POST 运行端点（harness 族 5 个 / react 族 1 个）body 内带 attachmentIds=[1,2]
 [后端] 载入附件行 → 逐个鉴权(R-11/L-58/L-19) → 分派:
          文档 → Tika 抽文本 →(超长顺序截断+告知 R-08)→ 注入提示词 → CHAT 模型
          图片 → image_url 部件 → MULTIMODAL(qwen3.8-max)
@@ -76,7 +76,9 @@
 | POST | `/api/chat/attachment` | multipart：`file`、可选 `sessionId`；header `phoenix-token` | 信封 `{success,data:{id,fileName,kind,ext,sizeBytes,thumbUrl}}` | 白名单外/超限 ⇒ `success=false` + 明确 msg（**HTTP 可能仍 200**，验证断业务码 L-26） |
 | GET | `/api/chat/attachment/{id}` | path id；header `phoenix-token` | 文件流（`Content-Disposition: attachment`）或 **403** | 归属校验：非本人且非超管 → 403（R-11，与列表成对 L-58） |
 | GET | `/api/chat/attachment/{id}/thumb` | 同上 | 图片缩略图 / 403 / 404 | 仅 `kind=IMAGE`；文档类由前端按 kind 渲染图标，不发此请求 |
-| GET | `/api/agent/{agentId}/sessions/stream` | **新增可选** `attachmentIds`（逗号分隔，数量上限同 R-04） | SSE（事件序列不变） | **不传时行为完全不变**（向后兼容，矩阵 S1） |
+| POST | `/api/admin/harness/chat`、`/front/stream/chat`、`/platform/harness/chat`、`/api/front/harness/chat`、`/api/front/stream/chat` | `HarnessRequest` **新增可选** `attachmentIds`（数量上限同 R-04） | SSE（事件序列不变） | 收敛点 `HarnessChatService` 统一处理；**不传时行为完全不变**（矩阵 S1'） |
+| POST | `/api/admin/agent/chat` | `ChatModelRequest` **新增可选** `attachmentIds` | SSE（不变） | 收敛点 `AgentManager.streamCall`；不传时行为不变 |
+| GET | `/api/agent/{agentId}/sessions/stream` | **不改**（v1.1.0 曾计划改，已作废） | SSE | 纯事件订阅，与附件无关 |
 
 错误语义：白名单外/超限/解析失败（加密、损坏、无文本层）= **业务失败 + 原因类别**（R-03/R-04/R-09，不是 500）；MULTIMODAL 不可用 = **正常流式返回但含显式降级告知**（R-07，不是错误）。
 
@@ -117,7 +119,8 @@ CREATE INDEX IF NOT EXISTS idx_chat_attachment_message  ON tbl_data_chat_attachm
 
 | 对象 | 既有身份（方法 × 调用方 × 端点） | 变更后预期行为 | 断言归属任务 |
 |---|---|---|---|
-| **S1** `GET /api/agent/{agentId}/sessions/stream` | SSE 流式对话；调用方 = admin-ui（`components/run/*`）+ mobile-ui（经 `chat-shared`）；**现均不带 attachmentIds** | 不传新参数时**行为不变**（同事件序列）；传了才走附件支路 | T-06 |
+| **S1'** `HarnessRequest` / `ChatModelRequest`（两个发送 DTO） | 既有调用方：admin-ui `streamHarnessChat`/`streamChat`、mobile-ui `stream.ts`、platform `AgentChatController`/`HarnessFrontController`；**现均不带 attachmentIds** | 新增字段为**可选**；不传时装配器短路 ⇒ **行为与事件序列不变**；两端旧调用零改动即可继续工作 | T-06 |
+| **S1** `GET /api/agent/{agentId}/sessions/stream` | SSE **事件订阅**（`streamSessionUpdates`），非发送端点 | **本方案不改它**（v1.1.0 的改动计划作废） | — |
 | **S2** `com.phoenix.data.enums.ModelType` | 取值 `CHAT`/`EMBEDDING`；消费方 ≥4：`HarnessConfig`、`AbstractCompiledGragph`、`MemoryPipelineServiceImpl`、`HarnessModelRegistry`（+ `AiModelConfigEpoch.bump(String,…)`） | 新增 `MULTIMODAL` **不改变** CHAT/EMBEDDING 选取结果；未配 MULTIMODAL 时 CHAT 路径不得抛错 | T-03 |
 | **S3** `tbl_data_model_config.model_type` + 管理页「模型配置」 | 列表/新增/编辑/启用/停用/**设默认**（`is_default`）；现值仅 CHAT/EMBEDDING | 新类型可正常增删改查；**MULTIMODAL 行不得被误设为 CHAT 默认**；既有默认行不变 | T-03 |
 | **S4** `FileStorageService.storeFile(file, subPath)` | 既有调用方 `/api/upload/avatar`（image-only，subPath=avatars）等 | 新 subPath `chat-attachments` **不影响** avatar 上传/读取；目录互不覆盖 | T-02 |
@@ -127,11 +130,28 @@ CREATE INDEX IF NOT EXISTS idx_chat_attachment_message  ON tbl_data_chat_attachm
 
 ## 关键决策
 
-### 决策 1：附件先上传拿 id，再由 GET stream 的查询参数携带
-- **采用**：独立 `POST /api/chat/attachment` + stream GET 加可选 `attachmentIds`。
-- **理由**：对话流实测是 **GET SSE**（`SessionEventController`），**GET 不能带 body**；先上传还能在发送前完成白名单/大小校验与失败反馈（R-01~R-04 要求"拒绝并提示"，混在发送里会丢提示时机）。
-- **被拒**：① 把对话改 POST 流 —— 破坏 S1 既有身份（两端 + 共享包），代价远大于收益；② `metadata` 里塞 base64 —— 消息体膨胀、SSE/DB 双压、无法前置校验大小。
-- **重新评估条件**：若对话入口整体改 POST/WS，附件可随 body 直发。
+### 决策 1（**v1.2.0 重写**）：附件 id 随**发送请求体（POST）**传递，接入两个收敛点
+
+- **事实纠正（v1.1.0 的前提是错的）**：`GET /api/agent/{agentId}/sessions/stream`（`SessionEventController.streamSessionUpdates`）
+  **只是 SSE 事件订阅**，不是发送端点；真正的运行端点**全是 POST**：
+  | 端 | 运行端点 | 后端 | 入参 DTO |
+  |---|---|---|---|
+  | admin-ui | `/api/admin/harness/chat` | HarnessController | `HarnessRequest` |
+  | admin-ui | `/api/admin/agent/chat` | ReactAgentController | `ChatModelRequest` |
+  | admin-ui | `/front/stream/chat`、`/platform/harness/chat` | AgentChatController / FrontHarnessController | `HarnessRequest` |
+  | mobile-ui | `/api/front/harness/chat` | HarnessFrontController | `HarnessRequest` |
+  | mobile-ui | `/api/front/stream/chat` | AgentChatController | `HarnessRequest` |
+  且 admin-ui 对话页 `components/run/index.vue` **同时**调用 `streamChat` 与 `streamHarnessChat`（按智能体类型分流）。
+- **采用**：给两个 DTO 各加**可选** `attachmentIds`，在**两个收敛点**各接入一次：
+  ① `HarnessRequest` + `HarnessChatService`（覆盖上表 5 个 harness 族端点，两端共用）；
+  ② `ChatModelRequest` + `AgentManager.streamCall`（覆盖 react/graph 族）。
+  附件解析、鉴权（T-05）、文档注入与图片多模态装配统一放在收敛点下游的**同一个装配器**里，避免 6 处各写一遍（L-06）。
+- **理由**：POST 天然有 body，无需查询参数 hack；**SSE 订阅端点完全不改** ⇒ 原 S1 风险归零；
+  两条路径都接 ⇒ 不会出现"上传了附件却不生效"的静默失效。
+- **被拒**：① **原 v1.1.0 方案**（GET 查询参数携带）——前提错误，且会把附件 id 写进访问日志、受 URL 长度限制；
+  ② 只接 harness 族 —— admin-ui 的 react/graph 智能体将静默忽略附件（违 R-05/R-06 的可观察性）；
+  ③ 前端把文件内容塞进 `content` 文本 —— 体积失控、绕过归属鉴权、无法历史回看。
+- **重新评估条件**：若将来统一为单一运行端点（收敛为一个 DTO），则只需一处接入。
 
 ### 决策 2：图片走 OpenAI 兼容 `image_url` 部件 + 新增 `MULTIMODAL` 类型
 - **采用**：`ModelType.MULTIMODAL`；模型行复用现有 qwen provider（DashScope compatible-mode，同 id=7 的 base_url/api_key），首行 **`qwen3.8-max`**（用户裁定 Q4-1 + CR-01 修正）。

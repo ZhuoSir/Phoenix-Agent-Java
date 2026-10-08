@@ -79,11 +79,12 @@
   路径只取库中 storage_path（入参仅 {id}，L-19）✅；越权 WARN 日志 2 条 ✅；基线复原 0 行 0 残留 ✅。
   加固：下载与缩略图均加 `X-Content-Type-Options: nosniff`。**交接 T-07**：缩略图须前端 fetch+blob 加载（`<img src>` 带不了鉴权头；刻意不加 `?token=` 以免 token 进访问日志）。
 
-- [ ] T-06 stream 集成 `attachmentIds` + 图片多模态装配 + 降级显式告知 + metadata 标注
+- [ ] T-06 两个发送 DTO 接入 `attachmentIds` + 图片多模态装配 + 降级显式告知 + metadata 标注
   关联: R-06, R-07, R-10
   依赖: T-03, T-04, T-05
-  验证方式: ① **对面断言 S1**：**不带** `attachmentIds` 的既有 stream 调用行为不变
-    （同一 agent 同一提示词，事件序列与改动前一致）；② 带图片附件 ⇒ 走 MULTIMODAL 且回答反映图片内容；
+  验证方式: ① **对面断言 S1'**：**不带** `attachmentIds` 的既有调用（harness 族与 react 族各一条）行为不变
+    （同一 agent 同一提示词，事件序列与改动前一致）；①b `GET /api/agent/{id}/sessions/stream` 订阅端点**未被改动**（diff 为空）；
+    ② 带图片附件 ⇒ 走 MULTIMODAL（qwen3.8-max）且回答反映图片内容；
     ③ 临时停用 MULTIMODAL 行 ⇒ **降级**且回答含「图片未被理解…仅根据文本作答」、
     `metadata.attachmentNotice` 落库、**重开历史会话仍见该标注**；④ 只发图片问「图里是什么」⇒
     明确说明无法理解图片、**不编造**；⑤ **对面断言 S6**：改动前的旧消息（metadata 无新键）渲染不报错；
