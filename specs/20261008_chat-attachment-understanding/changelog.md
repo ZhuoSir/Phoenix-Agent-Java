@@ -1,5 +1,21 @@
 # Changelog: chat-attachment-understanding
 
+## v0.1.0 plan（2026-10-08）Phase 2 技术方案成文（待确认②）
+
+- 坑核对：**已核对全部 73 条 active 坑**，列出 17 组相交项与避开做法（L-65 reactive 登录态、L-64 占位符、
+  L-58 归属成对、L-26 业务码断言、L-06 多入口、L-20 会话分片、L-36 不信能力清单、L-11 环境、L-19 路径同源、
+  L-21 墓碑行、L-13 add 面、L-32 typecheck 增量、L-49/51/53/55/66 迁移纪律、L-03/16/07/50/30 验证与部署、L-44/45 命名与全称否定）
+- 方案：附件先上传拿 id（对话流是 **GET SSE 不能带 body**）→ stream GET 携带 `attachmentIds`；
+  文档走 Tika 抽文本 + CHAT 模型；图片走 OpenAI 兼容 `image_url` + 新增 **MULTIMODAL** 模型（qwen-vl-max）
+- 共享面身份矩阵 **S1~S7**（stream GET / ModelType 枚举 / model_config+管理页 / FileStorageService+avatar /
+  chat-shared 类型 / message.metadata / 路由命名），每身份一条对面断言并指派到 T-02/T-03/T-06/T-07
+- 数据模型：新表 `tbl_data_chat_attachment`（**不设 del_flag**，用 status；无 FK）+ 2 索引；
+  `V2.0.0_15` 幂等插入 MULTIMODAL 行（密钥子查询复用现有 qwen 行，不落明文）；message/config 表**零 DDL**
+- 5 条关键决策各带被拒方案与重新评估条件；9 条风险各带规避
+- 前置阻塞：Implement 首任务 = 多模态可用性探针（真实 image_url 调用），不过即停
+- 状态：**确认②未过**，未进入 Tasks；未触碰源码（铁律 3）
+
+
 ## v1.0.0（2026-10-08）确认① 通过
 
 - 确认人: **陈卓**（用户 2026-10-08 选定「确认通过（确认人：陈卓）」）；三重确认门第 **①** 重达成
