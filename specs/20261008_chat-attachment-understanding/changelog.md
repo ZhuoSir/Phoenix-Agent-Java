@@ -1,5 +1,15 @@
 # Changelog: chat-attachment-understanding
 
+## v1.2.0 确认② 重走通过（2026-10-09）⇒ 三重门恢复齐全
+
+- 确认人 **陈卓**（铁律 6 回改文档后重走确认②，用户选定「确认通过（确认人：陈卓）」）
+- **接入范围裁定：两族都接** —— harness 族 5 端点（`HarnessRequest` + `HarnessChatService`）
+  + react 族 1 端点（`/api/admin/agent/chat`，`ChatModelRequest` + `AgentManager.streamCall`）；
+  理由：admin-ui 对话页 `components/run/index.vue` 同时调用两族，只接一族会造成"上传了附件却静默不生效"
+- 三重门现状：requirements **v1.1.0 已确认** / plan **v1.2.0 已确认** / tasks **v1.2.0 已确认** ⇒ 允许继续 Implement
+- 施工纪律不变：T-06 触碰共享面 S1'（两个发送 DTO）⇒ 提交 body 必须同贴"改好了 + 没改坏"两类实测输出
+
+
 ## v1.2.0（2026-10-09）**待重确认** —— 铁律 6：T-06 施工前侦察推翻 plan 决策1 的事实前提
 
 - **停编码**：T-06 尚未写任何生产代码；发现设计缺陷即回改文档（未"先写了再说"）
