@@ -22,6 +22,9 @@ export interface FrontChatStreamRequest {
   content: string;
   agentSn: string;
   type: string;
+
+  /** 对话附件 id（chat-attachment-understanding T-08；可选，不传即后端短路） */
+  attachmentIds?: number[];
 }
 
 export interface ConfirmButton {
@@ -132,6 +135,9 @@ export interface FrontHarnessChatRequest {
   sessionId: string;
   message: string;
   harnessSn: string;
+
+  /** 对话附件 id（chat-attachment-understanding T-08；可选，不传即后端短路） */
+  attachmentIds?: number[];
 }
 
 export interface FrontHarnessConfirmRequest {

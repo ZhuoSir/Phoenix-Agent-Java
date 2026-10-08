@@ -1,0 +1,45 @@
+=== T-08 验证结论：mobile-ui 附件适配（**部分验证**，浏览器断言未做 —— 见 ⑤）===
+日期: 2026-10-09 | 分支: feature/chat-attachment-understanding | 关联: R-12（两端一致）
+
+--- ① 改动面（与 admin 前台同构，规则/文案同源）---
+  services/attachment.ts（新）：upload / fetchThumbUrl(blob) / downloadAttachment（blob+a[download]）；
+    鉴权走 phoenix-token 头；缩略图**必须 fetch+blob**（<img src> 带不了头，T-05 交接注记）
+  services/stream.ts：FrontChatStreamRequest / FrontHarnessChatRequest 加**可选** attachmentIds
+  services/chatTransport.ts：模块级 pendingAttachments + setPendingAttachments（读取一次即清空，
+    与 admin 前台 explicitSkillIds 同范式）；send() 捕获本轮附件 → userMessage.metadata
+    写 {attachmentIds, attachments}（S9 回填 + R-10 还原）；harness 与 chat 两个 payload 加 attachmentIds
+    （SQL/nl2sql 走 streamFrontChatSql **不接附件**，与 admin 侧口径一致）
+  services/chat.ts：getSessionMessagesApi 映射时从 metadata 还原 attachments（旧消息无键 ⇒ undefined，S6）
+  components/chat/ChatComposer.vue：＋附件按钮 + 隐藏 input(accept 白名单) + 草稿 chips（可删）；
+    **草稿按 activeSessionId 分片**（L-20）；无会话时 toast 提示；空文本但有附件 ⇒ 提示且不丢草稿；
+    规则/文案全部取自 **chat-shared**（R-12 单一来源）；缩略图缓存 + onBeforeUnmount revoke
+  views/chat/ChatPage.vue：历史消息附件条（**插在 ChatBubble 之后** —— v-else 必须紧跟 v-if 兄弟节点，
+    插在前面会打断条件链）；点击经**受鉴权端点**下载（不用直链，R-11）
+
+--- ② S5 对面断言：typecheck 增量（L-32 只认增量）---
+  基线（**用 git stash 暂存本次改动后实测**，非推断）：mobile-ui **11** 条
+  改动后：mobile-ui **11** 条 ⇒ **增量 0** ✅
+  同期 admin-ui：基线 203 → 改动后 **203** ⇒ 增量 0 ✅
+
+--- ③ 生产构建 ---
+  `pnpm run build`（= `vue-tsc --noEmit && vite build`）**exit=2 失败** ——
+  失败原因是**既有的 11 条类型错误**（如 `packages/chat-shared/src/mocks/agents.ts` 缺 `sn`、
+  `ChatPage.vue` 既有 TS2322），**与本次改动无关**（stash 前后同为 11 条）⇒ 登记 **BUG-153**（不顺手修）
+  绕开类型门单跑 `pnpm exec vite build --mode production` → **exit=0**，产物断言 4/4：
+    index.html Oct 9 01:43；`composer__attach` 命中 2 文件；`＋附件` 命中 1；
+    `chat/attachment` 命中 1；`msg-attachment` 命中 2；dist 564K
+  （插曲：首次用 `node ./node_modules/.bin/vite` 失败 —— 那是 shell shim 不是 JS；改 `pnpm exec vite` 即通过）
+
+--- ④ 与 admin 的一致性（R-12 静态核对）---
+  白名单/上限/文案：两端**同一来源** `@phoenix/chat-shared` 的 constants/attachment.ts（非各写一套）✅
+  后端契约：同一批端点（POST /api/chat/attachment、GET /{id}、/{id}/thumb）与同一 metadata 约定 ✅
+  拒绝路径：两端都走"本地预校验 + 后端双判定"，提示文案同源 ✅
+
+--- ⑤ **未验证项（如实报，不虚报）**---
+  1) **浏览器/真机行为未验证**：本栈 nginx **没有 mobile 的 location**（`docker/nginx/phoenix.conf` 仅
+     root /usr/share/nginx/html 服务 admin dist），mobile-ui **未部署** ⇒
+     T-08 验证方式里的「移动端视口下上传文档与图片（相册/拍照/文件逐项记录可用来源）」
+     与 R-12 的两条验收场景（同一非法类型两端提示语义一致 / 同一文档两端都能得到基于内容的回答）
+     **无法在本环境断言** ⇒ **T-08 不勾选**。
+  2) 平台能力差异（iOS/Android 的 input capture、微信内置浏览器限制）未实测。
+  3) mobile 的既有构建门（vue-tsc）为红 ⇒ 若要出 mobile 生产包，需先修 BUG-153 或调整构建脚本（另议）。

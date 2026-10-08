@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import type { ChatAttachmentMeta } from '@phoenix/chat-shared';
+import { downloadAttachment } from '../../services/attachment';
+import { showToast } from 'vant';
+
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { storeToRefs } from 'pinia';
@@ -329,6 +333,16 @@ async function handleRegenerate(idx: number) {
     .find((m) => m.role === 'user');
   if (last) await chat.send(last.content);
 }
+
+/** T-08：点击历史附件 → 经**受鉴权端点**下载（不用直链，R-11） */
+async function onAttachmentDownload(att: ChatAttachmentMeta) {
+  try {
+    await downloadAttachment(att);
+  } catch (error: any) {
+    showToast(error?.message || '下载失败');
+  }
+}
+
 </script>
 
 <template>
@@ -432,6 +446,18 @@ async function handleRegenerate(idx: number) {
                 @copy="handleCopy(msg.content)"
                 @regenerate="handleRegenerate(idx)"
               />
+              <!-- T-08（R-10）：消息附件（历史回看从 metadata 还原；点击经受鉴权端点下载） -->
+              <div v-if="(msg as any).attachments?.length" class="msg-attachments">
+                <span
+                  v-for="att in (msg as any).attachments"
+                  :key="att.id"
+                  class="msg-attachment"
+                  @click="onAttachmentDownload(att)"
+                >
+                  <span class="msg-attachment__name">{{ att.fileName }}</span>
+                  <span v-if="att.notice" class="msg-attachment__notice" :title="att.notice">⚠</span>
+                </span>
+              </div>
             </template>
             <ChatBubble
                 v-if="isActiveSessionSending && !activeMessages.some((m: any) => m.streaming)"
@@ -703,4 +729,14 @@ async function handleRegenerate(idx: number) {
   color: #fff;
   background: #ee0a24;
 }
+
+/* T-08：历史消息附件条 */
+.msg-attachments { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 0 40px; }
+.msg-attachment {
+  display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px;
+  border: 1px solid var(--van-border-color, #ebedf0); border-radius: 10px;
+  background: var(--van-background-2, #f7f8fa); font-size: 12px; max-width: 220px;
+}
+.msg-attachment__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.msg-attachment__notice { color: var(--van-orange, #ed6a0c); }
 </style>

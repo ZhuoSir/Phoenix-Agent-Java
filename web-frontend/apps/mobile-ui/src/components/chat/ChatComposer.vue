@@ -1,5 +1,16 @@
 <script setup lang="ts">
-import { nextTick, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
+import { storeToRefs } from 'pinia';
+import { useChatStore } from '@phoenix/chat-shared';
+import type { ChatAttachmentMeta } from '@phoenix/chat-shared';
+import {
+  ATTACHMENT_MAX_FILES_PER_SEND,
+  attachmentCountMessage,
+  validateAttachmentsLocally,
+} from '@phoenix/chat-shared';
+import { showToast } from 'vant';
+import { fetchThumbUrl, uploadAttachments } from '../../services/attachment';
+import { setPendingAttachments } from '../../services/chatTransport';
 
 interface Props {
   disabled?: boolean;
@@ -14,6 +25,83 @@ const emit = defineEmits<{
 
 const value = ref('');
 const textareaRef = ref<HTMLTextAreaElement | null>(null);
+
+// ===== T-08：对话附件（chat-attachment-understanding）=====
+const chat = useChatStore();
+const { activeSessionId } = storeToRefs(chat);
+/** 待发送附件草稿：**按会话分片**（L-20：切会话不串附件） */
+const drafts = ref<Map<string, ChatAttachmentMeta[]>>(new Map());
+const inputRef = ref<HTMLInputElement | null>(null);
+const uploading = ref(false);
+const thumbs = ref<Map<number, string>>(new Map());
+
+const currentDraft = computed<ChatAttachmentMeta[]>(() => {
+  const sid = activeSessionId.value;
+  return (sid && drafts.value.get(sid)) || [];
+});
+
+function pickFiles() { inputRef.value?.click(); }
+
+function takeDraft(): ChatAttachmentMeta[] {
+  const list = currentDraft.value;
+  const sid = activeSessionId.value;
+  if (sid && list.length) {
+    const next = new Map(drafts.value);
+    next.set(sid, []);
+    drafts.value = next;
+  }
+  return list;
+}
+
+function removeAttachment(id: number) {
+  const sid = activeSessionId.value;
+  if (!sid) return;
+  const next = new Map(drafts.value);
+  next.set(sid, (next.get(sid) || []).filter((a) => a.id !== id));
+  drafts.value = next;
+}
+
+async function onPicked(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const files = [...(input.files || [])];
+  input.value = '';
+  if (!files.length) return;
+  const sid = activeSessionId.value;
+  if (!sid) { showToast('请先选择或创建会话'); return; }
+  const existed = drafts.value.get(sid) || [];
+  if (existed.length + files.length > ATTACHMENT_MAX_FILES_PER_SEND) {
+    showToast(attachmentCountMessage(existed.length + files.length));
+    return;
+  }
+  // 规则与文案来自 chat-shared（两端单一来源，R-12）；后端仍做双判定最终裁决
+  const checked = validateAttachmentsLocally(files);
+  for (const c of checked.filter((x) => x.reason)) showToast(`${c.file.name}：${c.reason}`);
+  const okFiles = checked.filter((x) => !x.reason).map((x) => x.file);
+  if (!okFiles.length) return;
+  uploading.value = true;
+  try {
+    const res = await uploadAttachments(okFiles, sid);
+    for (const r of res.rejected) showToast(`${r.fileName}：${r.reason}`);
+    if (res.accepted.length) {
+      const next = new Map(drafts.value);
+      next.set(sid, [...existed, ...res.accepted]);
+      drafts.value = next;
+      for (const a of res.accepted) {
+        if (a.kind === 'IMAGE' && !thumbs.value.has(a.id)) {
+          const url = await fetchThumbUrl(a.id);
+          if (url) { const t = new Map(thumbs.value); t.set(a.id, url); thumbs.value = t; }
+        }
+      }
+    }
+  } catch (error: any) {
+    showToast(error?.message || '附件上传失败');
+  } finally { uploading.value = false; }
+}
+
+onBeforeUnmount(() => {
+  for (const u of thumbs.value.values()) URL.revokeObjectURL(u);
+  thumbs.value.clear();
+});
 
 const MIN_H = 24;
 const MAX_H = 140;
@@ -32,7 +120,13 @@ watch(value, () => resize());
 
 function handleSubmit() {
   const trimmed = value.value.trim();
-  if (!trimmed || props.disabled) return;
+  if (props.disabled) return;
+  if (!trimmed) {
+    if (currentDraft.value.length) showToast('请输入内容后再发送（已选附件会保留）');
+    return;
+  }
+  // T-08：本轮附件随消息发送（transport 读取一次即清空）
+  setPendingAttachments(takeDraft());
   emit('submit', trimmed);
   value.value = '';
   resize();
@@ -48,7 +142,32 @@ function handleKeydown(event: KeyboardEvent) {
 
 <template>
   <form class="composer" @submit.prevent="handleSubmit">
+    <div v-if="currentDraft.length" class="composer__drafts">
+      <span v-for="att in currentDraft" :key="att.id" class="composer__draft">
+          <img v-if="att.kind === 'IMAGE' && thumbs.get(att.id)" :src="thumbs.get(att.id)" class="composer__draft-thumb" />
+        <span class="composer__draft-name">{{ att.fileName }}</span>
+        <i class="composer__draft-x" @click="removeAttachment(att.id)">×</i>
+      </span>
+    </div>
     <div class="composer__shell">
+      <!-- T-08：附件上传（规则与文案来自 chat-shared，两端一致 R-12） -->
+      <input
+        ref="inputRef"
+        type="file"
+        multiple
+        style="display: none"
+        accept=".doc,.docx,.pdf,.xls,.xlsx,.txt,.md,.png,.jpg,.jpeg,.gif,.webp,.bmp"
+        @change="onPicked"
+      />
+      <button
+        type="button"
+        class="composer__attach"
+        :disabled="uploading || props.disabled"
+        aria-label="上传附件"
+        @click="pickFiles"
+      >
+        {{ uploading ? "…" : "＋附件" }}
+      </button>
       <textarea
         ref="textareaRef"
         v-model="value"
@@ -170,5 +289,21 @@ function handleKeydown(event: KeyboardEvent) {
   &:active {
     transform: scale(0.94);
   }
+}
+
+/* T-08：附件草稿 chips 与上传按钮 */
+.composer__drafts { display: flex; flex-wrap: wrap; gap: 6px; padding: 6px 10px 0; }
+.composer__draft {
+  display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px;
+  border: 1px solid var(--van-border-color, #ebedf0); border-radius: 12px;
+  background: var(--van-background-2, #f7f8fa); font-size: 12px; max-width: 200px;
+}
+.composer__draft-thumb { width: 18px; height: 18px; object-fit: cover; border-radius: 3px; }
+.composer__draft-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.composer__draft-x { font-style: normal; cursor: pointer; color: var(--van-gray-6, #969799); }
+.composer__attach {
+  flex: none; padding: 4px 8px; border: 1px solid var(--van-border-color, #ebedf0);
+  border-radius: 12px; background: var(--van-background-2, #fff); font-size: 12px;
+  color: var(--van-text-color, #323233);
 }
 </style>

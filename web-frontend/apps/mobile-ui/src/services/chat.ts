@@ -104,14 +104,25 @@ export async function getSessionMessagesApi(
     const data = await http.get<BackendChatMessage[]>(
       `/api/sessions/${sessionId}/messages`,
     );
-    return (data ?? []).map((m) => ({
-      id: String(m.id ?? `${Date.now()}-${Math.random()}`),
-      role: (m.role === 'user' ? 'user' : 'assistant') as 'user' | 'assistant',
-      content: m.content ?? '',
-      createdAt: m.createTime ? new Date(m.createTime).getTime() : Date.now(),
-      messageType: m.messageType ?? 'text',
-      metadata: m.metadata,
-    }));
+    return (data ?? []).map((m) => {
+      // T-08（R-10）：从 metadata 还原附件；旧消息无该键 ⇒ undefined（S6 兼容）
+      let attachments;
+      try {
+        const md = typeof m.metadata === 'string' ? JSON.parse(m.metadata) : m.metadata;
+        if (md && Array.isArray(md.attachments)) attachments = md.attachments;
+      } catch {
+        /* metadata 非 JSON：静默 */
+      }
+      return {
+        id: String(m.id ?? `${Date.now()}-${Math.random()}`),
+        role: (m.role === 'user' ? 'user' : 'assistant') as 'user' | 'assistant',
+        content: m.content ?? '',
+        createdAt: m.createTime ? new Date(m.createTime).getTime() : Date.now(),
+        messageType: m.messageType ?? 'text',
+        metadata: m.metadata,
+        attachments,
+      };
+    });
   } catch {
     return [];
   }
