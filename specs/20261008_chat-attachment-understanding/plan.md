@@ -1,4 +1,4 @@
-> 版本: v1.2.0 | 状态: 已确认 | 确认人: 陈卓 | 确认日期: 2026-10-09 | 确认记录: 铁律6 回改后**重走确认②**，用户 2026-10-09 选定「确认通过（确认人：陈卓）」+ 接入范围裁定「两族都接」（harness 族 5 端点 + react 族 1 端点） | 变更源: 决策1 事实前提纠正（发送端点全是 POST，SSE GET 仅事件订阅）| 前次确认: v1.1.0（陈卓 2026-10-08）
+> 版本: v1.3.0 | 状态: **待重确认** | 更新: 2026-10-09 | 变更源: T-06 施工前查实 AgentScope **无 per-call 模型覆盖** ⇒ 决策2 由「image_url 部件直接进对话模型」改为**两阶段（图片→多模态描述→进 agent 循环）**（铁律 6：停编码→回改文档→重走确认②）| 前次确认: v1.2.0（陈卓 2026-10-09）
 
 # 技术方案：chat-attachment-understanding（对话附件上传与大模型理解）
 
@@ -34,8 +34,9 @@
 
 **理解路径分两支**（对应 R-05/R-06）：
 - **文档类** → 复用已在依赖中的 `spring-ai-tika-document-reader` 抽文本 → 受控模板注入提示词（含截断告知，R-08）→ 走既有 `CHAT` 模型。
-- **图片类** → 装配 **OpenAI 兼容 multimodal 内容部件**（`type=image_url`，本地文件转 data URI）→ 走**新增 `MULTIMODAL` 模型**（**`qwen3.8-max`**，复用现有 qwen provider/base_url；api_key 经管理页配置实测可用的一把，CR-01）。
-- **混合**（图 + 文档）→ 走 `MULTIMODAL`，文本部分同时含文档抽取内容。
+- **图片类（两阶段，决策2 v1.3.0）** → **阶段1**：交 `MULTIMODAL`（`qwen3.8-max`）做结构化理解，产出描述文本（版面/文字/图表/要素）；
+  **阶段2**：描述 + 文档文本 + 用户提示词进**正常 agent 循环**（技能/工具/记忆/工作区全保留）。描述与标注写入消息 `metadata`。
+- **混合**（图 + 文档）→ 阶段1 出图片描述，阶段2 与文档抽取文本一并注入同一次 agent 调用。
 - **无可用 MULTIMODAL 模型** → 按 R-07 **降级 + 用户可见告知**，标注写入消息 `metadata`，历史回看同样标注。
 
 满足 R-01~R-05、R-07~R-12；R-06 由 MULTIMODAL 支路满足。
@@ -63,7 +64,8 @@
           ↓ POST 运行端点（harness 族 5 个 / react 族 1 个）body 内带 attachmentIds=[1,2]
 [后端] 载入附件行 → 逐个鉴权(R-11/L-58/L-19) → 分派:
          文档 → Tika 抽文本 →(超长顺序截断+告知 R-08)→ 注入提示词 → CHAT 模型
-         图片 → image_url 部件 → MULTIMODAL(qwen3.8-max)
+         图片 → 阶段1: MULTIMODAL(qwen3.8-max) 结构化理解 → 描述文本
+               → 阶段2: 描述+文档文本+提示词 进 agent 循环（技能/工具/记忆/工作区保留）
          无 MULTIMODAL → 降级 + 显式告知(R-07) → 标注写 metadata
           ↓ SSE 流式返回；消息落 tbl_data_chat_message(content + metadata 标注)；附件回填 message_id
 [历史] 打开会话 → 消息带 attachments 元信息 → 缩略图/文件名 → 点击经鉴权端点取原件
@@ -126,6 +128,7 @@ CREATE INDEX IF NOT EXISTS idx_chat_attachment_message  ON tbl_data_chat_attachm
 | **S4** `FileStorageService.storeFile(file, subPath)` | 既有调用方 `/api/upload/avatar`（image-only，subPath=avatars）等 | 新 subPath `chat-attachments` **不影响** avatar 上传/读取；目录互不覆盖 | T-02 |
 | **S5** `chat-shared` 的 `ChatMessage` 类型 + `useChatSession` + mocks | **两端共用**（admin-ui、mobile-ui），mocks 亦实现该类型 | `attachments` 为**可选字段**；两端 + mocks 的 typecheck **增量错误 0**（L-32）；旧路径不变 | T-07 |
 | **S6** `tbl_data_chat_message.metadata` | 既有写入/读取方（jsonb→String 映射，先例见 `McpServerInfo` 注释） | 仅**新增键**（`attachmentNotice`/`truncated`），不改既有键语义；旧消息（无该键）渲染不报错 | T-06 |
+| **S8** `HarnessChatServiceImpl.buildUserMessage` | 既有身份：① 无附件纯文本 `new UserMessage(message)`；② 带 `skillScopeHint` 时拼接「[平台约束] …」于**末尾**（R-09 风险①缓解） | 无附件时**逐字节不变**（两种既有身份都保留）；有附件时按「文档文本 + 图片描述 + 约束 + 用户原文」顺序组装，约束仍在末尾 | T-06 |
 | **S7** 路由命名 `/api/chat/attachment` | 与既有 `/api/upload/avatar`、`/api/skill/upload`、`AgentKnowledgeController` 上传**并存** | 不与既有路由冲突；`/api/**` 鉴权链覆盖；**不复用** avatar 端点（避免稀释其 image-only 语义） | T-02 |
 
 ## 关键决策
@@ -154,11 +157,31 @@ CREATE INDEX IF NOT EXISTS idx_chat_attachment_message  ON tbl_data_chat_attachm
   ③ 前端把文件内容塞进 `content` 文本 —— 体积失控、绕过归属鉴权、无法历史回看。
 - **重新评估条件**：若将来统一为单一运行端点（收敛为一个 DTO），则只需一处接入。
 
-### 决策 2：图片走 OpenAI 兼容 `image_url` 部件 + 新增 `MULTIMODAL` 类型
-- **采用**：`ModelType.MULTIMODAL`；模型行复用现有 qwen provider（DashScope compatible-mode，同 id=7 的 base_url/api_key），首行 **`qwen3.8-max`**（用户裁定 Q4-1 + CR-01 修正）。
-- **理由**：配置体系已是 DB 驱动 + OpenAI 兼容路径，**零新依赖**即可支持 multimodal；类型独立于 CHAT，避免污染既有选取逻辑（S2）。
-- **被拒**：① OCR 取文字 —— 用户明确要"真多模态"，图表/布局信息会丢；② 复用 `CHAT` 类型换模型名 —— 所有对话都走 VL（成本/延迟），且无法按"是否含图"分派；③ 类型名用 `VISION` —— 用户裁定用 `MULTIMODAL`（语义更宽）；④ 继续用 `qwen-vl-max` —— CR-01 实测其在 id=6 端点 **404 model_not_found**（跨环境不稳），而 `qwen3.8-max` 在两把可用 key 下均 200 并正确读图。
-- **重新评估条件**：探针失败（provider 不支持 `image_url`）⇒ 回用户处重选模型/provider。
+### 决策 2（**v1.3.0 重写**）：图片理解走**两阶段**——多模态描述 → 进 agent 循环
+
+- **硬事实（javap 实证，非推测）**：AgentScope **不提供任何 per-call 模型覆盖**——
+  `HarnessAgent` 只有 `getModel()`（无 setter）；`call(...)` 的 **8 个重载**参数仅
+  `List<Msg>` / `Msg` / `String` / `Class<?>` / `JsonNode` / `RuntimeContext`，**无一接受 model 或 options**；
+  delegate `ReActAgent` 同样只有 `getModel()/getGenerateOptions()/getModelConfig()` 等只读方法；
+  模型只能在 `HarnessAgent.Builder.model(...)` **建实例时绑一次**。
+  而实例由 `harnessAgentRegistry.get(agentId, sessionId)` **按会话缓存**，工作区/记忆/turn 状态都挂在其上
+  （`resolveAgent`，HarnessChatServiceImpl:95-105）。⇒ **"含图就换模型"在不重建实例的前提下做不到**。
+- **采用（用户 2026-10-09 裁定 B）**：
+  **阶段1** 含图请求先用 `MULTIMODAL`（`qwen3.8-max`）对图片做**结构化理解**（版面/文字/图表/关键要素），产出描述文本；
+  **阶段2** 把「图片描述 + 文档抽取文本（T-04，含截断告知）+ 用户提示词」组装进**正常 agent 循环**
+  （`buildUserMessage` 扩展为多块/拼接），技能、工具、记忆、会话工作区**全部保留**。
+  描述文本与降级/截断标注一并写入消息 `metadata`（历史回看可见、可诊断）。
+- **理由**：R-06 要求"图片提交给多模态模型理解（**不是 OCR**）"——阶段1 正是多模态模型在看图（非文字提取），
+  生成结果据此反映视觉内容；同时不破坏会话级实例与其状态，风险最低。
+- **被拒**：
+  ① **A 直连多模态（绕过 agent）**——裸模型调用没有 ReAct 循环 ⇒ 技能不注入、工具不调用、记忆不读写、工作区不碰；
+  ② **C 按请求另建 MULTIMODAL 实例**——`Builder` 虽可接同一 `workspace`/`skillRepositories`/`toolkit`，
+     但同会话双实例会让 `CompactionMiddleware`/`SkillUsageStore`/turn 态**内存分叉**，且 `HarnessAgent implements AutoCloseable`
+     生命周期需自管；**其可行性我未验证**（仅从 Builder 字段推断），不做未验证的高风险改动；
+  ③ **v1.1.0/v1.2.0 原方案**（把 `image_url` 部件直接交给对话模型）——前提错误：对话模型绑死为 CHAT，无法按请求切换；
+  ④ OCR 取文字——用户明确要"真多模态"，图表/版面信息会丢。
+- **重新评估条件**：若 AgentScope 后续提供 per-call model 覆盖，或 registry 支持"按模型分片且共享会话态"，
+  则回到**原生一次调用**（保真更高）；届时以探针实证为准，不凭文档推断。
 
 ### 决策 3（CR-01 改造）：MULTIMODAL 模型行由**管理页配置**，迁移件**只做 DDL**
 - **采用**：`V2.0.0_15` **只建表 + 2 索引**（不含任何模型配置行）；MULTIMODAL 行在 T-03 加完枚举值后，**经「模型配置」管理页**新增（模型名 `qwen3.8-max`，api_key 由配置人填实测可用的一把），并遵守部分唯一索引 `uk_dmc_type_default`（每类型至多一个默认行）。
@@ -190,6 +213,9 @@ CREATE INDEX IF NOT EXISTS idx_chat_attachment_message  ON tbl_data_chat_attachm
 | **大文件打爆内存/磁盘** | 流式落盘（`FilePart` → `storeFile`）；前置 size 校验（R-04）；抽取文本设字符上限；测试件走 `/tmp` 不入库（L-13） |
 | **SVG/HTML 类 XSS**（若白名单被放宽） | `.svg` 明确排除（R-02）；下载端点强制 `Content-Disposition: attachment`，不内联回显 HTML |
 | **前端 typecheck 基线噪声** | 记基线错误数，只认**增量 0**（L-32）；错误数骤降按"文件被改坏"处理 |
+| **描述瓶颈**（阶段1 丢细节） | 结构化描述模板（版面/文字/图表/要素逐项）；用户追问时**允许重跑阶段1**（原图仍在库，可再取） |
+| **双次模型调用**（成本/延迟） | 仅**含图请求**触发阶段1；纯文本与纯文档请求零额外调用 |
+| **描述文本过长** | 描述同样受 R-08 截断规则约束并告知 |
 | **迁移件在活库首跑失败**（drill 脏库假通过） | 关键 DDL 在**从未应用过该件**的库上首跑验证（L-66 教训）；正/反/幂等三跑 |
 
 ## 依赖与前置

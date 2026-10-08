@@ -1,5 +1,25 @@
 # Changelog: chat-attachment-understanding
 
+## v1.3.0（2026-10-09）**待重确认** —— 铁律 6：决策2 改为两阶段（AgentScope 无 per-call 模型覆盖）
+
+- **停编码**：T-06 未写任何生产代码；查实设计前提后回改文档
+- **硬事实（javap 实证）**：`HarnessAgent` 只有 `getModel()` 无 setter；`call(...)` **8 个重载**均不接受 model/options；
+  delegate `ReActAgent` 同为只读；模型仅能在 `Builder.model(...)` 建实例时绑定。
+  实例由 `harnessAgentRegistry.get(agentId, sessionId)` 按会话缓存，工作区/记忆/turn 态挂其上
+  ⇒ **"含图就换模型"在不重建实例前提下不可行**，v1.1.0/v1.2.0 决策2 的"image_url 部件直接进对话模型"前提错误
+- **用户裁定（2026-10-09）：方案 B 两阶段** —— 阶段1 `qwen3.8-max` 对图片做结构化理解产出描述；
+  阶段2 描述 + 文档抽取文本 + 提示词进**正常 agent 循环**（技能/工具/记忆/工作区全保留）
+- **被拒**：A 直连多模态（绕过 agent ⇒ 能力全丢）；C 按请求另建 MULTIMODAL 实例（同会话双实例致
+  Compaction/SkillUsageStore/turn 态分叉 + AutoCloseable 生命周期自管，**其可行性未验证**，不做未验证的高风险改动）；
+  OCR（用户明确要真多模态）
+- **矩阵新增 S8**：`HarnessChatServiceImpl.buildUserMessage`（既有两身份：无附件纯文本 / `skillScopeHint` 末尾拼接）
+- **风险新增 3 条**：描述瓶颈（模板化 + 允许重跑阶段1）、双次调用成本（仅含图触发）、描述过长（同受 R-08 截断）
+- **tasks T-06 重写**：验证方式含 S1'（两族各一条）、S8、阶段1 描述含图中独特事实、R-06 端到端、
+  T-04 遗留的"文档独特事实命中"在此完成、降级与历史标注、S6 旧消息兼容、`message_id` 回填
+- **requirements 不变**（R-06 原文"提交给多模态模型理解、非 OCR"在方案 B 下依然成立）⇒ 无需重走确认①
+- 状态：plan/tasks **v1.3.0 待重确认**（确认② 重走）；三重门暂不齐 ⇒ 继续禁止写生产代码
+
+
 ## v1.2.0 确认② 重走通过（2026-10-09）⇒ 三重门恢复齐全
 
 - 确认人 **陈卓**（铁律 6 回改文档后重走确认②，用户选定「确认通过（确认人：陈卓）」）
