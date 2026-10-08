@@ -43,3 +43,33 @@
      **无法在本环境断言** ⇒ **T-08 不勾选**。
   2) 平台能力差异（iOS/Android 的 input capture、微信内置浏览器限制）未实测。
   3) mobile 的既有构建门（vue-tsc）为红 ⇒ 若要出 mobile 生产包，需先修 BUG-153 或调整构建脚本（另议）。
+
+--- ⑥ 部署验证补充（用户选择「我把 mobile 也部署起来验」后执行）---
+  部署改造（仅本环境，未改任何 mobile 产品代码）:
+  - mobile 以 `--base=/m/` 构建（router 用 createWebHistory(import.meta.env.BASE_URL) 自动跟随）
+  - docker/Dockerfile.frontend 加 `COPY docker/.stage/dist-mobile /usr/share/nginx/html-mobile`
+  - docker/nginx/phoenix.conf 加 `location = /m {301}` 与 `location ^~ /m/ {alias …; try_files … /m/index.html}`
+    （^~ 前缀优先，避免与既有 `location ~* ^/(js|css|assets)/` 正则冲突）
+  - 三段证明：compose build nginx exit=0 → up exit=0 → healthy；`GET /m/` **HTTP 200**；
+    `GET /m/assets/index-*.js` **200/202426B**，含 composer__attach=1、＋附件=1、chat/attachment=1
+  - **对面断言**：admin 侧 `GET /` 200、`/js/ChatComposer-*.js` 200、`/api/chat/attachment` 200 ⇒ 未受影响 ✅
+  浏览器（iPhone-14 视口 390x844）实测:
+  - `GET /m/` 渲染 mobile 登录页正常（banner/账号/密码/登录/用户协议/vConsole 全在）
+  - 路由 base 生效：未登录访问 /m/chat ⇒ 重定向 **/m/login?redirect=/chat**（history 模式 + /m/ 前缀正确）
+  - 用 chenzhuo/12345678 点「登录」⇒ **未跳转**；network 抓到 `POST /api/auth/login` **404**
+  ⇒ 追因得 **BUG-154**（mobile 生产 API 前缀错配，登录与对话流双挂），已登记并实测坐实：
+     `POST /api/auth/login`→404 / `POST /auth/login`→200 出 token /
+     `POST /api/api/front/stream/chat`→**410 Gone**（nginx 止血块）/ `POST /api/front/stream/chat`→200 SSE
+  曾尝试的绕行（均不通，如实记）:
+  - 构建期把 VITE_GLOB_API_URL 置空 ⇒ **无效**：`|| '/api'` 对空串兜底（bundle 哈希未变，md5 相同）
+  - 借 admin 登录态共享 token ⇒ **无效**：mobile 用 `mobile-ui:auth:token`，admin 用 `phoenix-token`（命名空间不同）
+  附件路径自身正确（不受 BUG-154 影响）:
+  - `services/attachment.ts` 用绝对路径 `/api/chat/attachment`；实测带前台 token
+    `GET /api/chat/attachment?sessionId=none` → **HTTP 200** `{"data":[],"message":"查询成功","success":true}`
+
+--- ⑦ 结论：T-08 **不勾选** ---
+  已验证：typecheck 增量 0（两端）、vite 生产构建 exit=0 + 产物断言 4/4、mobile 部署上线且 /m/ 可访问、
+          登录页与路由 base 正常、附件端点路径与鉴权正确。
+  未验证：**移动端上传交互与两端一致性（R-12）** —— 被 BUG-154 阻塞（登不进 ⇒ 到不了对话页 ⇒ 无法上传/发送）。
+  另：文件选择器交互本身也无法由浏览器自动化完成（工具不支持为 file input 指定本地文件），
+      即使 BUG-154 修复，「相册/拍照/文件」逐项可用性仍需真机人工验证。
