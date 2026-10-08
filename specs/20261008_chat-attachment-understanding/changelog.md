@@ -1,5 +1,15 @@
 # Changelog: chat-attachment-understanding
 
+## v1.4.0 确认② 重走通过（2026-10-09）⇒ 三重门恢复齐全，T-06 开工
+
+- 确认人 **陈卓**；plan **v1.4.0 已确认** / tasks **v1.4.0 已确认**
+- 三重门：requirements v1.1.0 / plan v1.4.0 / tasks v1.4.0 ⇒ 允许继续 Implement
+- T-06 施工顺序（本轮起）：① 两个 DTO 加可选 `attachmentIds` ② `ChatAttachmentAssembler`（解析/鉴权/文档注入/图片阶段1/降级）
+  ③ harness 族接入（`doStream` 既有 flatMapMany 链前插）+ `buildUserMessage(request, ctx)`（S8 两身份不变）
+  ④ react 族接入（`enrichContent` 复用同一装配器）⑤ `saveMessage` 副作用回填 `message_id`（S9 四身份不变）
+  ⑥ 部署 + 七组断言（S1'/S8/S9/S6 + 阶段1 描述含图中事实 + R-06 端到端 + 降级不编造）
+
+
 ## v1.4.0（2026-10-09）**待重确认** —— 铁律 6：消息由前端落库 ⇒ metadata/回填改经既有 saveMessage 副作用
 
 - **停编码**：T-06 仍未写任何生产代码
