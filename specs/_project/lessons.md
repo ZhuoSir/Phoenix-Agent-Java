@@ -367,3 +367,13 @@
 - **状态**：active
 - **复发**：×1（本次打包段步骤 2/8 误诊）
 - **关联**：BUG-147（真因=CRLF）、L-69（CRLF 家族）、L-02、L-37、`docker/scripts/lib/common.sh:phx_mirror_pick`、`docker/scripts/mirrors.list`
+
+## L-73 `docker pull` 报 DONE ≠ blob 完整——`short read` 先做**字节数对账**，别先怀疑磁盘/daemon
+- **分类**：验证盲区（供应链完整性）
+- **触发场景**：容器构建死于 `failed to compute cache key: short read: expected N bytes but got 0: unexpected EOF`；或经第三方镜像源拉取的基础镜像首次投入构建
+- **现象**：打包段 frontend 构建在 `RUN corepack enable` 报 `short read: expected 1250677 bytes but got 0`。表面像 BuildKit 缓存/磁盘/daemon 故障；实际是基础镜像拉取时 1.25MB 层长时间停在 `0B / 1.25MB`、整体 pull 却报 `DONE`——**1250677 字节与该层精确对账**，即截断 blob 躺在构建缓存里。我自己的验证也栽了一步：用 `docker run --rm <img> node --version` 验可读性，但构建期基础镜像**不在 `docker images`**（BuildKit 存于构建缓存/内容库），run 隐式转 pull 白烧 120s 超时。
+- **根因**：① 镜像源传输不完整而 pull 未拦截（"成功"信号 ≠ 内容完整，与 L-37"状态码≠内容身份"同族）；② 排障时未按"错误里的字节数 ↔ 拉取日志停滞层大小"对账，就容易误入磁盘满/daemon 重启等歧途；③ 验证命令未先确认镜像在本地（`docker image inspect`），语义从"验证"漂移成"下载"。
+- **防再犯规则**：① 遇 `short read/unexpected EOF` 先做**字节数对账**锁定损坏 blob，再按序排除磁盘（`df`）与 daemon（journalctl 时间线：重启在失败前还是后）；② 修复三件套 = `docker builder prune -af` → 重拉 → `docker run --rm <img> <平凡命令>` **实测**（强制解包全部层）后才准投入构建；③ 重跑构建时把基础镜像**钉死到与本地已验证镜像同名同源**（`--mirror`），不再竞速赌源；④ 验证镜像前先 `docker image inspect` 确认在本地，避免 run 变 pull；⑤ 长构建脚本应有"基础镜像 pre-pull+校验"fail-fast 段（本次缺口 → BUG-148）。
+- **状态**：active
+- **复发**：×1（本次打包段 3/8 frontend 编译）
+- **关联**：BUG-148、BUG-147（镜像源家族）、BL-23（吞吐型探活）、L-37、L-72、`docker/scripts/package.sh`
