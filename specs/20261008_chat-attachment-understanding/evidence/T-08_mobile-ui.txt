@@ -73,3 +73,27 @@
   未验证：**移动端上传交互与两端一致性（R-12）** —— 被 BUG-154 阻塞（登不进 ⇒ 到不了对话页 ⇒ 无法上传/发送）。
   另：文件选择器交互本身也无法由浏览器自动化完成（工具不支持为 file input 指定本地文件），
       即使 BUG-154 修复，「相册/拍照/文件」逐项可用性仍需真机人工验证。
+
+
+--- ⑧ BUG-154 修复与浏览器级验证（用户口令：现在修 BUG-154）---
+  修复（3 处，均在 mobile 自身，未动 admin/后端）:
+  - services/http.ts / services/stream.ts：`import.meta.env.VITE_GLOB_API_URL || '/api'` → `?? ''`
+    （**空串是合法配置**；`||` 把空串当 falsy 兜回 /api 是根因）
+  - .env.production：`VITE_GLOB_API_URL=`（置空）；**.env.development 保持 /api**
+    （dev 的 vite proxy 有 `rewrite: path.replace(/^\/api/,'')` 剥一层，双前缀在 dev 是自洽的；
+      生产 nginx 按 BL-18 只透传不剥层 ⇒ 生产必须单前缀。两端语义各自自洽）
+  修复后产物断言：bundle 哈希变化（index-FUgGxFz8.js，md5 f7d0a74…）；`/api/auth/login` 拼接痕迹 **0**；
+    `auth/login` 1、`/api/front/stream/chat` 2、`/api/sessions/` 5；附件代码仍在
+  部署三段证明：typecheck **11=基线（增量 0）**；build exit=0；up exit=0；nginx healthy；
+    GET /m/ 200；线上 /m/assets/index-FUgGxFz8.js 200/202418B 含 composer__attach/＋附件/chat/attachment；
+    **对面断言**：admin 的 / 与其 chunk 全 200 ⇒ 未受影响
+  浏览器级验证（iPhone-14 390x844，截图入档）:
+  - chenzhuo 登录 **成功跳转**（BUG-154 修复生效；此前 POST /api/auth/login 404）
+  - 对话页渲染历史会话；**历史附件条渲染**：用户消息下方出现 `02-需求规格说明书.docx` 圆角 pill
+    （证据 T-08_mobile_history-attachment.jpg）⇒ R-10 历史回看在移动端成立
+  - **composer 出现「＋附件」按钮**（证据 T-08_mobile_composer-button.jpg）⇒ T-08 UI 在移动端真实渲染
+  仍需真机人工（浏览器自动化无法为 file input 指定本地文件）:
+  - 相册/拍照/文件逐项上传可用性；上传后非法类型本地拦截提示；两端提示语义一致（R-12 场景①）
+  - 移动端发起的"同一文档得到基于内容的回答"（R-12 场景②）—— 后端能力已由 T-06 全绿覆盖，
+    移动端发起路径待人工一次上传即可闭环
+  ⇒ T-08 维持**未勾选**，待用户真机上传结果
