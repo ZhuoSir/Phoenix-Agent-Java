@@ -29,6 +29,27 @@ function Write-Fail($msg) {
 function Mark-Done($k) { Add-Content -Path $StateFile -Value $k }
 function Test-Done($k) { return (Test-Path $StateFile) -and (@(Get-Content $StateFile) -contains $k) }
 
+# ── 0. 参数守卫（BUG-161）──
+# PowerShell 只把【单横线】当参数名（-Version）。若按 WSL bash 的习惯写成 `--version`，
+# 它不会被认成参数名，而是按【位置】绑到第一个参数上：$Version="--version"、后一个值顺位
+# 顶给 $Project —— 一路静默带到 docker tag 才炸（`invalid tag "phx-tmp-jar:--version"`），
+# 报错完全指不到根因（实测两次白跑）。这里在动手前把这类误用拦下并打印正确用法。
+$argErrs = @()
+if ($Version -like '-*') { $argErrs += "-Version 收到以 '-' 开头的值：'$Version'（是不是把 -Version 写成了 --version？）" }
+if ($Project -like '-*') { $argErrs += "-Project 收到以 '-' 开头的值：'$Project'（是不是把 -Project 写成了 --project？）" }
+if ($Distro  -like '-*') { $argErrs += "-Distro 收到以 '-' 开头的值：'$Distro'" }
+if ($Mirror  -like '-*') { $argErrs += "-Mirror 收到以 '-' 开头的值：'$Mirror'" }
+if ($Version -and ($Version -notmatch '^v?\d+\.\d+(\.\d+)?([-.+][0-9A-Za-z.+-]+)?$')) { $argErrs += "-Version 值 '$Version' 不像版本号（应形如 1.7.0）" }
+if ($Project -match '^\d+\.\d+') { $argErrs += "-Project 值 '$Project' 像版本号 ⇒ 参数整体错位了（典型：-Version 写成了 --version）" }
+if ($args.Count -gt 0) { $argErrs += "有多余的位置参数：$($args -join ' ')" }
+if ($argErrs.Count -gt 0) {
+  Write-Host "[bootstrap.ps1] 参数有误，已在动手前拦下：" -ForegroundColor Red
+  foreach ($e in $argErrs) { Write-Host "  × $e" -ForegroundColor Red }
+  Write-Host "  正确用法: .\docker\scripts\bootstrap.ps1 -Version 1.7.0 [-Project phoenix] [-Port 9080] [-Distro Ubuntu-22.04] [-Mirror <源前缀>] [-Offline]" -ForegroundColor Yellow
+  Write-Host "  提示: PowerShell 参数一律【单横线】；双横线写法（--version）是给 WSL 内 bash 脚本用的。" -ForegroundColor Yellow
+  exit 1
+}
+
 # ── 1. 管理员 ──
 $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 if (-not $isAdmin) { Write-Fail "请以管理员身份运行 PowerShell" }
