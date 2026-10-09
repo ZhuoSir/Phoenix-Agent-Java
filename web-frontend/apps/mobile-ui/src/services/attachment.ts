@@ -75,3 +75,50 @@ export async function downloadAttachment(
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+
+/** 预览用的确定性 mime（不信服务器 mime 的怪值：如 md 被 Tika 判成 text/x-web-markdown，Chrome 不认会转下载） */
+const PREVIEW_MIME: Record<string, string> = {
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  gif: 'image/gif',
+  webp: 'image/webp',
+  bmp: 'image/bmp',
+  pdf: 'application/pdf',
+  txt: 'text/plain;charset=utf-8',
+  md: 'text/plain;charset=utf-8',
+};
+/** 浏览器可在线预览的扩展名（其余回退下载） */
+const PREVIEWABLE_EXTENSIONS = [
+  'png',
+  'jpg',
+  'jpeg',
+  'gif',
+  'webp',
+  'bmp',
+  'pdf',
+  'txt',
+  'md',
+];
+
+/**
+ * BUG-157（确认人澄清：R-10「取件」= **展示优先**）：点击附件 = 预览。
+ * 可预览格式经**受鉴权端点**取 blob 后新标签页打开；其余回退下载，返回 'downloaded'。
+ */
+export async function previewAttachment(
+  att: ChatAttachmentMeta,
+): Promise<'downloaded' | 'previewed'> {
+  const res = await fetch(`${BASE}/${att.id}`, { headers: authHeaders() });
+  if (!res.ok) throw new Error(describe(res.status));
+  const blob = await res.blob();
+  const ext = (att.ext || '').toLowerCase();
+  if (PREVIEWABLE_EXTENSIONS.includes(ext)) {
+    const viewBlob = new Blob([blob], { type: PREVIEW_MIME[ext] || blob.type });
+    const url = URL.createObjectURL(viewBlob);
+    window.open(url, '_blank');
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    return 'previewed';
+  }
+  await downloadAttachment(att);
+  return 'downloaded';
+}

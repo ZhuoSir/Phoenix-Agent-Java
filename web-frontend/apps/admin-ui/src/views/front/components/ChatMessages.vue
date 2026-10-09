@@ -14,9 +14,9 @@ import DOMPurify from 'dompurify';
 // T-07（chat-attachment-understanding）：附件渲染/下载/缩略图
 import type { ChatAttachmentMeta } from '@phoenix/chat-shared';
 import {
-  downloadAttachmentApi,
   fetchAttachmentThumbUrlApi,
   formatAttachmentSize,
+  previewAttachmentApi,
 } from '#/api/core/chatAttachment';
 
 const chat = useChatStore();
@@ -189,11 +189,15 @@ watch(
   { immediate: true },
 );
 
+/** BUG-157：点击附件 = **展示优先**（可预览格式新标签页打开；office 类回退下载并提示） */
 async function onDownloadAttachment(att: ChatAttachmentMeta) {
   try {
-    await downloadAttachmentApi(att);
+    const result = await previewAttachmentApi(att);
+    if (result === 'downloaded') {
+      ElMessage.info('该格式浏览器无法在线预览，已改为下载');
+    }
   } catch (error: any) {
-    ElMessage.error(error?.message || '下载失败');
+    ElMessage.error(error?.message || '打开附件失败');
   }
 }
 

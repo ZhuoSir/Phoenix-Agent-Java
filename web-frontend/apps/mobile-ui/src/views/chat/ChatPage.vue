@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { ChatAttachmentMeta } from '@phoenix/chat-shared';
-import { downloadAttachment } from '../../services/attachment';
+import { previewAttachment } from '../../services/attachment';
 import { showToast } from 'vant';
 
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
@@ -335,11 +335,13 @@ async function handleRegenerate(idx: number) {
 }
 
 /** T-08：点击历史附件 → 经**受鉴权端点**下载（不用直链，R-11） */
+/** BUG-157：点击附件 = **展示优先**（可预览格式新标签页打开；office 类回退下载并提示） */
 async function onAttachmentDownload(att: ChatAttachmentMeta) {
   try {
-    await downloadAttachment(att);
+    const result = await previewAttachment(att);
+    if (result === 'downloaded') showToast('该格式浏览器无法在线预览，已改为下载');
   } catch (error: any) {
-    showToast(error?.message || '下载失败');
+    showToast(error?.message || '打开附件失败');
   }
 }
 

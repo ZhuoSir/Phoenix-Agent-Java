@@ -500,6 +500,24 @@ export const apiChatTransport: ChatTransport = {
     };
     await saveMessageApi(sessionId, userMessage);
 
+    // BUG-156：本地气泡是 store 自建的占位消息（只有 content），不带 attachments ⇒
+    // 当轮不显示、刷新后靠 metadata 还原才有。这里把本轮附件**回写 store 内存消息**（响应式，立即渲染）。
+    if (attachmentsForThisTurn?.length) {
+      try {
+        const chatStore = useChatStore();
+        const list = (chatStore.messagesByS as Record<string, any[]>)[sessionId] ?? [];
+        for (let i = list.length - 1; i >= 0; i--) {
+          const m = list[i];
+          if (m && m.role === 'user' && m.content === content) {
+            m.attachments = attachmentsForThisTurn;
+            break;
+          }
+        }
+      } catch {
+        /* 回写失败不影响发送主流程（刷新后仍可从 metadata 还原） */
+      }
+    }
+
     const agentStore = useAgentStore();
     const currentAgent = agentStore.agents.find((a) => a.id === agentId);
     const isSql = currentAgent?.type === 'sql';

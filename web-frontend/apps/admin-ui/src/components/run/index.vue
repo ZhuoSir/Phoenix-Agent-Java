@@ -84,9 +84,9 @@ import { downloadHtmlReportApi } from '#/api/core/chat';
 
 // T-07：对话附件（chat-attachment-understanding）—— API 封装 + 两端规则单一来源
 import {
-  downloadAttachmentApi,
   fetchAttachmentThumbUrlApi,
   formatAttachmentSize,
+  previewAttachmentApi,
   uploadChatAttachmentsApi,
 } from '#/api/core/chatAttachment';
 import type { ChatAttachmentMeta } from '@phoenix/chat-shared';
@@ -704,11 +704,15 @@ function cachedThumb(id: number): string | undefined {
   return thumbUrlCache.get(id);
 }
 
+/** BUG-157：点击附件 = **展示优先**（可预览格式新标签页打开；office 类回退下载并提示） */
 async function onDownloadAttachment(att: ChatAttachmentMeta) {
   try {
-    await downloadAttachmentApi(att);
+    const result = await previewAttachmentApi(att);
+    if (result === 'downloaded') {
+      ElMessage.info('该格式浏览器无法在线预览，已改为下载');
+    }
   } catch (error: any) {
-    ElMessage.error(error?.message || '下载失败');
+    ElMessage.error(error?.message || '打开附件失败');
   }
 }
 
