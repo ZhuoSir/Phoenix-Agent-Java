@@ -771,3 +771,54 @@
   ② 向用户报告"某分支异常/名字怪"之前，必须用完整 refname 复核（`git for-each-ref --format='%(refname)'`
   或 `ls .git/refs/heads/`）；③ 删除类操作先用完整 ref 验证存在性再动手（与 L-81 同源）。
 - 关联: L-81（删除类操作守卫）；本次最终按"= 远端同名 && 已并入 v2.0.0"两条断言清理，本地仅留 main 与 v2.0.0
+
+## L-83 同一条消息里并存两种横线写法（bash `--version` / PowerShell `-Version`）⇒ 用户混用，白跑两轮
+- 场景: 我一条消息里既给了 WSL bash 用的 `bash docker/scripts/bootstrap.sh --version 1.7.0`，又给了 Windows 用的
+  `.\docker\scripts\bootstrap.ps1 -Version 1.7.0`。用户两次都按 `--version` 跑 ps1 ⇒ PowerShell 把 `--version`
+  当**位置参数**绑进 `$Version`、`1.7.0` 顺位顶给 `$Project` ⇒ 版本号成 `--version` ⇒ docker tag 非法，
+  两次各白跑一轮（BUG-161）。
+- 根因: 两个入口参数风格相反（bash 双横线 / PowerShell 单横线），我却把它们并列摆出，没做视觉区分、没标"给哪个脚本用"。
+- 防再犯规则: ① 同轮给多入口命令时，每条必须显式标注适用环境（`# WSL bash` / `# Windows PowerShell`），
+  横线写法加粗或单独成块；② 优先只给一种入口，另一种折叠为备选；③ 用户复述命令失败后，
+  第一件事是核对他实际敲的那一条（本轮本可第一轮就发现）。
+- 关联: BUG-161；L-67（ps1 入口族）
+
+## L-84 `bash -c '...'` 里内嵌双引号经 PowerShell→wsl 会被吃掉 ⇒ bash 把 `A|B` 当命令执行
+- 场景: 我发 `wsl -d Ubuntu-22.04 -u root -- bash -c 'ls -t ... | xargs grep -E "====|ERROR|WARN" | tail -12'`，
+  返回 `/bin/bash: line 1: ERROR: command not found`、`WARN | tail -12: command not found`——双引号丢失后
+  `|` 变成真管道，`ERROR`/`WARN` 成了命令名。同轮另一条更长的命令则整条零输出（stderr 被 `2>$null` 吞掉，见 L-85）。
+- 根因: pwsh → wsl.exe → bash 三层各自解析一遍，内嵌双引号在传参过程中被剥离；不是 bash 的问题。
+- 防再犯规则: ① 经 PowerShell 调 wsl bash 时，**payload 内一律不用双引号**；需要多模式匹配就用
+  `grep -e A -e B -e C`；② 复杂逻辑一律落成脚本文件（`/mnt/d/...`）再 `bash <file>`，用 write 工具写（LF），
+  绕开三层引号；③ 报错里出现"某个词被当成命令"立刻想到本坑。
+- 关联: L-85；本轮诊断命令两次自伤
+
+## L-85 诊断命令外层加 `2>$null` 会把 wsl 的错误一起吞掉 ⇒ 制造"无输出、exit 1"假象
+- 场景: 为压掉 pwsh 的 localhost 代理告警，我在 `wsl ... 2>$null` 上套了重定向；某次命令整条零输出 + exit 1，
+  我据此怀疑"命令被 PowerShell 解析坏了"，实为 wsl/bash 的报错被 `2>$null` 吞掉，多跑一轮才定位到 L-84。
+- 根因: `2>$null` 屏蔽的是**整条 wsl 调用**的 stderr，不只是那条代理告警；而诊断类命令最需要 stderr。
+- 防再犯规则: ① 诊断/取证类命令**不吞 stderr**（代理告警只是噪音，可容忍）；② 只在"确定只看 stdout 且
+  已知告警存在"的批量命令上才压 stderr；③ 遇到"无输出"先重跑一次**不带任何重定向**的版本再下结论。
+- 关联: L-84
+
+## L-86 中文 Windows 下读台账/跑表检的编码双坑：`PYTHONIOENCODING=utf-8` + 别裸用 `Get-Content` 读 UTF-8 无 BOM 的 .md
+- 场景: ① 跑 skill 的 `mdtable_check.py` 直接崩 `UnicodeEncodeError: 'gbk' codec can't encode character '\u2713'`
+  ——崩在**最后打印** `✓` 那一行，检查本身其实已完成，极易误判成"脚本坏了/表有问题"；
+  ② `Get-Content specs/_project/version.md` 出来整片乱码（`鐗堟湰鍙拌处`），我一度以为台账被写坏。
+- 根因: 本机 Python 与 Windows PowerShell 5.1 的 stdout/默认读文件编码都是 ACP=936(GBK)，而仓库里这些
+  文本文件是 **UTF-8 无 BOM**（PS 5.1 对无 BOM 文件按 ANSI 解码）。
+- 防再犯规则: ① 跑表检固定 `$env:PYTHONIOENCODING="utf-8"; python <skill>/scripts/mdtable_check.py <file>`；
+  ② 读 `.md`/台账一律用 read 工具（或 `Get-Content -Encoding UTF8`），**不要裸 Get-Content**；
+  ③ 看到中文乱码先怀疑编码，不要先怀疑文件被改坏（与 BUG-142/L-68 同族：PS 5.1 + 无 BOM + 中文 = 坑）。
+- 关联: BUG-142；L-68；铁律 8（表检）
+
+## L-87 判断"在途版本"必须读**版本分支线**上的 version.md —— 我读了施工分支上的旧台账，误判"无在途版本"
+- 场景: 我在 `hotfix/ps1-utf8-bom` 上读 `specs/_project/version.md`，该副本停在 2026-10-08、写着"当前仍无在途版本"，
+  我据此向用户报告并据此出方案；用户一句"换个分支，2.0.0，有这个分支，试试"才揭穿——**v2.0.0 正是在途版本分支**
+  （领先 main 143 条、已并入安装链修复包、BUG-141~151 的修复版本列都写着 v2.0.0）。
+- 根因: "全局账永远活在版本分支线"是规范要求，但现实里施工分支上的账本是**旧快照**；
+  我把分支上的文件当成了全局事实，且没做多分支交叉核对。
+- 防再犯规则: ① 报"在途版本/台账现状"前先 `git branch -r` 列全远端分支，再对**每个候选版本分支**核对
+  `version.md` 与 `git merge-base`；② 判断"最新代码"以实测 ref 为准（本次 `origin/v2.0.0` 领先 main 143 条），
+  不以分支名或某一份台账叙述为准；③ 给用户的方案里主动标注"依据来自哪个分支的台账"。
+- 关联: 本轮 install-chain-hardening 立项；L-82（ref/事实核对同族）
