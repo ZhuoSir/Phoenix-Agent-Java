@@ -127,15 +127,13 @@ public class ChatAttachmentAssembler {
 					}
 				}
 				else {
-					// 文档：EXTRACT_FAILED 或需重新抽取（进程重启后内存无缓存）⇒ 就地抽取
-					if ("EXTRACT_FAILED".equals(att.getStatus())) {
-						out.add(new Loaded(att, null, "附件《" + att.getFileName() + "》无法解析，其内容未参与本次回答", null));
-						continue;
-					}
+					// 文档：一律就地重新抽取（status 可能陈旧；且需要**具体失败原因**注入，R-09）。
+					// 注意：不得对 EXTRACT_FAILED 短路成笼统文案 —— 否则模型不知道"为什么"，
+					// 会回答"没收到附件"而不是"这是扫描件、本期不支持"（用户实测反馈 2026-10-09）。
 					ChatDocumentExtractor.ExtractResult er = documentExtractor.extract(bytes, att.getMime(), att.getFileName());
 					if (!er.isOk()) {
-						out.add(new Loaded(att, null,
-								"附件《" + att.getFileName() + "》解析失败：" + er.getFailureReason(), null));
+						out.add(new Loaded(att, null, "附件《" + att.getFileName() + "》解析失败：" + er.getFailureReason()
+								+ "（其内容未参与本次回答）", null));
 						continue;
 					}
 					String notice = er.isTruncated() ? ("附件《" + att.getFileName() + "》内容较长，已按顺序截断至前 "
@@ -250,7 +248,9 @@ public class ChatAttachmentAssembler {
 		else if (!notices.isEmpty()) {
 			// 全部附件都不可用：把原因作为材料注入，要求模型如实告知（R-09：不得用空内容继续生成）
 			injected = "[附件状态]\n" + String.join("\n", notices)
-					+ "\n[附件状态结束]\n请向用户明确说明上述附件不可用的原因，不要编造其内容。";
+					+ "\n[附件状态结束]\n**回答要求（必须遵守）**：你的回答**第一句**就要直接照抄上面的原因类别"
+					+ "（例如「该附件为扫描件/图片型 PDF，没有可提取的文本层」或「文档受保护或已加密」），"
+					+ "明确告知用户本次无法读取其内容；**不得自我介绍、不得声称收到过附件正文、不得编造内容**。";
 		}
 		return new Context(injected, List.copyOf(notices), degraded);
 	}
