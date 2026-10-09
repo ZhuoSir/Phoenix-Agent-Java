@@ -99,3 +99,14 @@ export async function checkModelConfigReadyApi() {
     responseReturn: 'body',
   });
 }
+
+/**
+ * R-05：拉取 Ollama 本机已安装模型列表。
+ *
+ * 走服务端代理（浏览器无法访问内网/宿主地址，且需统一鉴权与超时治理）。
+ */
+export async function fetchOllamaModelsApi(baseUrl: string) {
+  return requestClient.get<string[]>(`${API_BASE_URL}/ollama/models`, {
+    params: { baseUrl },
+  });
+}
