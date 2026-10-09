@@ -62,3 +62,9 @@ clean-deploy-all-local.bat
 
 ### Phoenix 安装链运行时状态文件（bootstrap.ps1/install.sh 进度标记，本机产物不入库）
 .phoenix-*.state
+
+### 外部交付物与本机产物（2026-10-09 用户口令「未跟踪的也不要跟踪了」）
+/HJP-智能审核智能体方案/
+/docs/0919HJP-标准智能体需求说明.docx
+__pycache__/
+*.pyc
