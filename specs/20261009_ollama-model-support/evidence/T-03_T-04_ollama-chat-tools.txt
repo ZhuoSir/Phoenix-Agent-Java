@@ -1,0 +1,30 @@
+=== T-03 / T-04 部署后行为验证证据（Ollama 对话与工具调用）===
+日期: 2026-10-10（会话跨零点） | 分支: feature/ollama-model-support
+环境: 宿主 Ollama 0.40.2；容器经 host.docker.internal:11434 访问；配置行 id=17（ollama / qwen2.5:7b / CHAT / active）
+
+--- T-03 Ollama CHAT 装配与流式对话 ---
+  方法: 将 agent43 运行配置 modelConfigId 临时置 17（原值 5）→ 发起 SSE 对话 → 验证后还原
+  结果: 时长 168s | 回答长度 649 | **含结束帧 end:true** ✅
+  协议证据: Ollama 服务端日志出现 **11 次 /api/chat**（Ollama 原生协议；非 OpenAI 兼容层）
+  装配证据: 后端日志含 "按 provider=ollama 装配模型" 分支日志与 model-call 事件
+  ⇒ R-03（CHAT 承载）与 R-06（流式 + 结束语义）通过
+
+--- T-04 工具调用（正例 + 反例）---
+  正例（qwen2.5:7b，支持工具调用）:
+    后端日志工具名统计: **getRagInfo 14** / knowledge_retrieval 2 / session_list 5 / read_file 5 /
+      list_files 5 / glob_files 5 / execute 4
+    ⇒ 工具被**真实调用**（含知识库检索工具），结果回填后产出回答（R-07 正例通过）
+    观察（非缺陷）: 该轮触发 **maxIterations=60 上限**被中断（168s）；本地小模型在"查一条规则"这类
+      任务上反复调用工具，效率偏低 —— 属选型/提示词效率问题，与 BL-39（ReAct 往返优化）同域
+  反例（gemma3:latest，不支持工具调用）:
+    Ollama 返回 HTTP 400：`{"error":"registry.ollama.ai/library/gemma3:latest does not support tools"}`
+    平台回显（错误帧）: `⚠️ 模型或流错误中断：HttpTransportException：HTTP request failed with status 400
+      | {"error":"...does not support tools"} | Response body: ...`
+    ⇒ **不是静默空答**（R-07 明令禁止的情形未发生）：用户可见根因，且带 provider 原文
+    改进候选（非阻塞）: 文案目前是原始 provider 错误；可考虑识别 "does not support tools" 并给出
+      「该模型不支持工具调用，请改用支持工具调用的模型或关闭知识库检索」的本地化提示
+
+--- 环境还原核实 ---
+  agent43 运行配置已还原: modelConfigId=5、knowledgeEnabled=true、maxIterations=60 ✅
+  临时 gemma3 CHAT 行（id=18）已停用并删除（软删）✅
+  保留: id=17（ollama/qwen2.5:7b，active）供后续 T-05/T-06/T-07 验证使用
