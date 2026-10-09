@@ -126,13 +126,15 @@ phx_disk_ok() { # phx_disk_ok <路径> <需要MB>
   [ -n "$free" ] && [ "$free" -ge "$2" ]
 }
 
-# ---------- 引擎安装：受限网络下的国内回退（BUG-145） ----------
+# ---------- 引擎安装：受限网络下的国内回退（BUG-145 / BUG-162） ----------
 # get.docker.com 的 **安装脚本本体在境外**（`--mirror Aliyun` 只管 deb 包源），
 # 国内受限网络下 curl 会被 reset ⇒ 脚本判定"引擎装不上"直接失败。
-# 本函数改走 docker-ce@mirrors.aliyun.com 的 apt 仓库，全程国内源。
-# 成功返回 0；过程输出进 $PHX_LOG_FILE（调用方负责报错文案）。
+# 本函数改走 docker-ce 的国内 apt 仓库；**多源有序回退**——BUG-162：此前只硬编码阿里云单源，
+# 阿里云 docker-ce 子仓索引 CDN 未同步时报 `File has unexpected size … Mirror sync in progress?`
+# ⇒ `docker-ce has no installation candidate` ⇒ 整条安装链在 A/4 硬失败且无第二源可退。
+# 成功返回 0 并在日志里留下实际生效的源；过程输出进 $PHX_LOG_FILE（调用方负责报错文案）。
 phx_install_docker_aliyun() {
-  local s="" arch="" codename=""
+  local s="" arch="" codename="" m ok=0
   [ "$(id -u)" -ne 0 ] && s="sudo"
   case "$(uname -m)" in
     x86_64) arch=amd64;;
@@ -144,16 +146,26 @@ phx_install_docker_aliyun() {
     codename=$(. /etc/os-release 2>/dev/null; echo "${VERSION_CODENAME:-}")
   fi
   [ -n "$codename" ] || codename=jammy
-  phx_log INFO "回退安装: docker-ce@mirrors.aliyun.com ($codename/$arch)"
   {
     export DEBIAN_FRONTEND=noninteractive
     $s apt-get update -qq
     $s apt-get install -y -qq ca-certificates curl gnupg
     $s install -m 0755 -d /etc/apt/keyrings
-    curl -fsSL -m 60 https://mirrors.aliyun.com/docker-ce/linux/ubuntu/gpg | $s gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-    $s chmod a+r /etc/apt/keyrings/docker.gpg
-    echo "deb [arch=$arch signed-by=/etc/apt/keyrings/docker.gpg] https://mirrors.aliyun.com/docker-ce/linux/ubuntu $codename stable" | $s tee /etc/apt/sources.list.d/docker.list >/dev/null
-    $s apt-get update -qq
-    $s apt-get install -y -qq docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
   } >>"$PHX_LOG_FILE" 2>&1
+  for m in \
+    https://mirrors.aliyun.com/docker-ce/linux/ubuntu \
+    https://mirrors.tuna.tsinghua.edu.cn/docker-ce/linux/ubuntu \
+    https://mirrors.ustc.edu.cn/docker-ce/linux/ubuntu ; do
+    phx_log INFO "回退安装: docker-ce@${m#https://} ($codename/$arch)"
+    {
+      curl -fsSL -m 60 "$m/gpg" | $s gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+      $s chmod a+r /etc/apt/keyrings/docker.gpg
+      echo "deb [arch=$arch signed-by=/etc/apt/keyrings/docker.gpg] $m $codename stable" | $s tee /etc/apt/sources.list.d/docker.list >/dev/null
+      $s apt-get update -qq
+      $s apt-get install -y -qq docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+    } >>"$PHX_LOG_FILE" 2>&1 && ok=1 && break
+    phx_log WARN "  源不可用（索引未同步或被拦？）——换下一个国内源: $m"
+  done
+  [ "$ok" -eq 1 ] || { phx_log ERROR "三个国内源全部失败（明细见 $PHX_LOG_FILE）"; return 1; }
+  return 0
 }
