@@ -1,0 +1,29 @@
+=== BUG-164 智能体无法安装 Python 依赖（报告类技能失败）修复证据 ===
+日期: 2026-10-09 | 版本: v2.0.0 | 来源: 用户实测反馈 + 本次只读探针 + 端到端验证
+
+--- 根因（探针实测，非推断）---
+  运行身份: uid=10001 gid=0；HOME=/（root 所有）
+  系统 site-packages: /usr/local/lib64/python3.9/site-packages → drwxr-xr-x root root（10001 不可写）
+  探针A（普通 pip install）  → ERROR: Could not install packages due to an OSError: [Errno 13] Permission denied: '/.local'
+  探针C（--target 可写目录） → 成功（docx + python_docx-1.2.0.dist-info）⇒ **不是"离线"，是权限**
+  镜像源可达性: pypi.org / tuna / aliyun 均 HTTP 200，但索引页很大（15s 仅取 392KB/46MB）⇒ 默认 15s 超时易失败
+  "两个智能体能力不一致"的真相: agent-33 工作区留着 _libs/docx + python_docx-1.2.0.dist-info（当年用 --target 装成功）；
+  agent-44 今日 07:17 产出的 .docx 含 python-docx 默认模板指纹（styles.xml 349KB + stylesWithEffects.xml 438KB）；
+  但全盘 find 无任何 docx 包 ⇒ 装在**容器层**（非挂载卷），当日多次重建容器后丢失 ⇒ 同一技能时好时坏
+
+--- 修复（docker/Dockerfile.backend + docker/docker-compose.yaml）---
+  ① 预装常用文档依赖: python-docx / openpyxl / python-pptx / pillow（构建日志 Successfully installed
+     XlsxWriter-3.2.9 et-xmlfile-2.0.0 lxml-6.1.3 openpyxl-3.1.5 python-docx-1.2.0 python-pptx-1.0.2 typing-extensions-4.16.0）
+  ② 放开权限: ENV PYTHONUSERBASE=/app/.local + PIP_USER=1 ⇒ 普通 `pip install X` 落到可写目录且 Python 自动可见
+  ③ 持久化: compose 增 named volume `pylibs:/app/.local`（首次创建从镜像预置内容 ⇒ 预装包一并带入，跨容器重建保留）
+  ④ 网络健壮: /etc/pip.conf → index-url=清华 + extra-index=pypi.org + timeout=120 + retries=5
+
+--- 验证（全部实跑）---
+
+  | # | 验证项 | 结果 |
+  |---|---|---|
+  | ① | 预装依赖可导入（`import docx,openpyxl,pptx,PIL`） | ✅ 全部 OK（容器默认用户 uid10001） |
+  | ② | 运行期普通 `pip install six`（uid10001） | ✅ 成功，落在 /app/.local/lib/python3.9/site-packages/six.py |
+  | ③ | `--force-recreate` 后 `import docx, six` | ✅ 仍可导入（预装与运行期安装都在卷里） |
+  | ④ | **智能体端到端**（agent-19，让它跑 pip install + import） | ✅ 智能体执行 `pip install tabulate` 输出 `Looking in indexes: https://pypi.tuna.tsinghua.edu.cn/simple, https://pypi.org/simple` + `Requirement already satisfied: tabulate in /app/.local/lib/python3.9/site-packages (0.9.0)`；`python3 -c "import tabulate;print(tabulate.__version__)"` → 0.9.0；退出码均 0 |
+  | ⑤ | 容器侧复核 | ✅ `tabulate 0.9.0 @ /app/.local/lib/python3.9/site-packages/tabulate/__init__.py`（该包不在预装清单内 ⇒ 确系智能体自行安装） |
