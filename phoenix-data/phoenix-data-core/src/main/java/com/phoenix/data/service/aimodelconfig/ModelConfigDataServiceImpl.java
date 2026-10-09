@@ -1,11 +1,13 @@
 package com.phoenix.data.service.aimodelconfig;
 
+import com.phoenix.data.exception.InvalidInputException;
 import com.mybatisflex.core.query.QueryChain;
 import com.mybatisflex.spring.service.impl.ServiceImpl;
 import com.phoenix.data.converter.ModelConfigConverter;
 import com.phoenix.data.dto.ModelConfigDTO;
 import com.phoenix.data.entity.ModelConfig;
 import com.phoenix.data.enums.ModelType;
+import com.phoenix.data.enums.ModelProvider;
 import com.phoenix.data.mapper.ModelConfigMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -63,10 +65,30 @@ public class ModelConfigDataServiceImpl extends ServiceImpl<ModelConfigMapper, M
 		save(toEntity(dto));
 	}
 
+	/**
+	 * R-01/R-02：服务端收敛 provider 取值域，并对 Ollama 做密钥语义归一。
+	 *
+	 * <p>未知 provider 直接拒绝（L-63：不得信任前端 DTO、不得静默落默认分支）。
+	 */
+	private void normalizeProvider(ModelConfigDTO dto) {
+		ModelProvider provider = ModelProvider.fromCode(dto.getProvider());
+		if (provider == null) {
+			throw new InvalidInputException(
+					"不支持的模型提供商: " + dto.getProvider() + "（可选: " + ModelProvider.codes() + "）");
+		}
+		dto.setProvider(provider.getCode());
+		log.info("模型配置保存: provider={}, modelType={}, modelName={}, endpoint={}, apiKey={}",
+				provider.getCode(), dto.getModelType(), dto.getModelName(), dto.getBaseUrl(),
+				(dto.getApiKey() == null || dto.getApiKey().isEmpty()) ? "empty" : "set(***)");
+	}
+
 	private void clean(ModelConfigDTO dto) {
 		dto.setModelName(dto.getModelName().trim());
 		dto.setBaseUrl(dto.getBaseUrl().trim());
-		dto.setApiKey(dto.getApiKey().trim());
+		// BUG-164 同源教训（L-76）：空串是合法配置值——Ollama 无鉴权，key 允许为空，必须归一为**空串**
+		// 而非 null（表列 NOT NULL），且不得用"为空则套默认"的写法把空串吞掉
+		dto.setApiKey(dto.getApiKey() == null ? "" : dto.getApiKey().trim());
+		normalizeProvider(dto);
 		if (dto.getCompletionsPath() != null) {
 			dto.setCompletionsPath(dto.getCompletionsPath().trim());
 		}
