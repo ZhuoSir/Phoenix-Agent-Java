@@ -17,7 +17,7 @@ import com.phoenix.data.entity.Agent;
 import io.agentscope.core.skill.repository.postgresql.PostgresSkillRepository;
 import io.agentscope.core.tool.Toolkit;
 import io.agentscope.core.tool.builtin.TodoTools;
-import io.agentscope.extensions.model.openai.OpenAIChatModel;
+import io.agentscope.core.model.ChatModelBase;
 import io.agentscope.extensions.postgresql.state.PostgresAgentStateStore;
 import io.agentscope.extensions.redis.RedisDistributedStore;
 import io.agentscope.harness.agent.HarnessAgent;
@@ -133,7 +133,7 @@ public class HarnessAgentFactory {
             throw new IllegalArgumentException("智能体不存在或缺少 id，无法构建运行时实例");
         }
         AgentRuntimeConfig config = agentRuntimeConfigService.resolve(agent.getId());
-        OpenAIChatModel model = harnessModelRegistry.getOpenAIChatModel(config.getModelConfigId());
+        ChatModelBase model = harnessModelRegistry.getOpenAIChatModel(config.getModelConfigId());
         ToolkitBundle bundle = buildToolkit(agent, config);
         // R-06：会话级工作区（会话空则回落智能体级，零行为变化）
         Path workspace = WorkspacePaths.sessionRoot(workspaceRoot, runtimeKey(agent), sessionId);
@@ -310,7 +310,7 @@ public class HarnessAgentFactory {
         return DEFAULT_SYS_PROMPT.formatted(agent.getName(), desc).trim();
     }
 
-    private MemoryConfig memoryConfig(OpenAIChatModel model) {
+    private MemoryConfig memoryConfig(ChatModelBase model) {
         return MemoryConfig.builder()
             .model(model)
             .consolidationMaxTokens(2000)

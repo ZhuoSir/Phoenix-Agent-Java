@@ -7,6 +7,7 @@ import com.phoenix.data.service.aimodelconfig.ModelConfigDataService;
 import io.agentscope.core.embedding.EmbeddingModel;
 import io.agentscope.core.embedding.dashscope.DashScopeTextEmbedding;
 import io.agentscope.core.model.GenerateOptions;
+import io.agentscope.core.model.ChatModelBase;
 import io.agentscope.extensions.model.openai.OpenAIChatModel;
 import io.agentscope.extensions.model.openai.formatter.DeepSeekFormatter;
 import lombok.RequiredArgsConstructor;
@@ -26,17 +27,17 @@ public class HarnessModelRegistry {
     private final ModelConfigDataService modelConfigDataService;
     // 缓存对象 (volatile 保证可见性)
     private volatile EmbeddingModel currentEmbeddingModel;
-    private volatile OpenAIChatModel currentChatModel;
+    private volatile ChatModelBase currentChatModel;
 
     /** 多模态模型缓存（chat-attachment-understanding T-03） */
-    private volatile OpenAIChatModel currentMultimodalModel;
+    private volatile ChatModelBase currentMultimodalModel;
     /** 指定模型配置ID 的对话模型缓存（R-03：智能体可自选模型） */
-    private final Map<Long, OpenAIChatModel> configuredChatModels = new ConcurrentHashMap<>();
+    private final Map<Long, ChatModelBase> configuredChatModels = new ConcurrentHashMap<>();
 
     /**
      * 获取全局 ChatClient（懒加载 + 双重检查锁缓存）
      */
-    public OpenAIChatModel getOpenAIChatModel() {
+    public ChatModelBase getOpenAIChatModel() {
         if (currentChatModel == null) {
             synchronized (this) {
                 if (currentChatModel == null) {
@@ -80,7 +81,7 @@ public class HarnessModelRegistry {
      *
      * <p>空 → 全局默认；配置不存在或非 CHAT 类型 → 降级全局默认并告警（不阻断对话）。
      */
-    public OpenAIChatModel getOpenAIChatModel(Long modelConfigId) {
+    public ChatModelBase getOpenAIChatModel(Long modelConfigId) {
         if (modelConfigId == null) {
             return getOpenAIChatModel();
         }
@@ -139,7 +140,7 @@ public class HarnessModelRegistry {
      * <p>**未配置或不可用时返回 null**，由调用方按 R-07 降级并显式告知；
      * 刻意**不回退 CHAT 模型**——那会造成"假装看过图"的回答（requirements R-07 明令禁止）。
      */
-    public OpenAIChatModel getOpenAIMultimodalModel() {
+    public ChatModelBase getOpenAIMultimodalModel() {
         if (currentMultimodalModel == null) {
             synchronized (this) {
                 if (currentMultimodalModel == null) {

@@ -24,6 +24,12 @@
             <groupId>io.agentscope</groupId>
             <artifactId>agentscope-extensions-model-openai</artifactId>
         </dependency>
+
+        <!-- R-01/R-03：Ollama 本地/内网模型（jar 在本机仓，离线可编） -->
+        <dependency>
+            <groupId>io.agentscope</groupId>
+            <artifactId>agentscope-extensions-model-ollama</artifactId>
+        </dependency>
         <dependency>
             <groupId>io.agentscope</groupId>
             <artifactId>agentscope-extensions-skill-postgresql-repository</artifactId>

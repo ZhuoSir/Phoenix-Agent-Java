@@ -96,6 +96,11 @@
             </dependency>
             <dependency>
                 <groupId>io.agentscope</groupId>
+                <artifactId>agentscope-extensions-model-ollama</artifactId>
+                <version>${agentscope.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.agentscope</groupId>
                 <artifactId>agentscope-extensions-skill-postgresql-repository</artifactId>
                 <version>${agentscope.version}</version>
             </dependency>
