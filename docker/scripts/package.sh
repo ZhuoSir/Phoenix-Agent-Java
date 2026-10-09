@@ -103,11 +103,11 @@ phx_step 3 $TOTAL "容器内编译 jar+dist（native，产物架构无关）" &&
     -t "phx-tmp-dist:$VERSION" "$REPO" >>"$PHX_LOG_FILE" 2>&1 \
     || phx_fail 3 $TOTAL "frontend 编译失败（详见日志尾部）"
   CID=$(docker create "phx-tmp-jar:$VERSION") && docker cp "$CID:/out/phoenix-admin.jar" "$WORK/artifacts/phoenix-admin.jar" && docker rm "$CID" >/dev/null
-  CID=$(docker create "phx-tmp-dist:$VERSION") && docker cp "$CID:/out/dist" "$WORK/artifacts/dist" && docker rm "$CID" >/dev/null
+  CID=$(docker create "phx-tmp-dist:$VERSION") && docker cp "$CID:/out/dist" "$WORK/artifacts/dist" && docker cp "$CID:/out/dist-mobile" "$WORK/artifacts/dist-mobile" && docker rm "$CID" >/dev/null
   docker rmi "phx-tmp-jar:$VERSION" "phx-tmp-dist:$VERSION" >/dev/null 2>&1
-  [ -s "$WORK/artifacts/phoenix-admin.jar" ] && [ -f "$WORK/artifacts/dist/index.html" ] \
-    || phx_fail 3 $TOTAL "工件提取核验失败（jar 或 dist/index.html 缺失）"
-  phx_log INFO "工件就绪: jar=$(du -m "$WORK/artifacts/phoenix-admin.jar" | awk '{print $1}')MB dist=$(du -sm "$WORK/artifacts/dist" | awk '{print $1}')MB"
+  [ -s "$WORK/artifacts/phoenix-admin.jar" ] && [ -f "$WORK/artifacts/dist/index.html" ] && [ -f "$WORK/artifacts/dist-mobile/index.html" ] \
+    || phx_fail 3 $TOTAL "工件提取核验失败（jar / dist/index.html / dist-mobile/index.html 有缺）"
+  phx_log INFO "工件就绪: jar=$(du -m "$WORK/artifacts/phoenix-admin.jar" | awk '{print $1}')MB dist=$(du -sm "$WORK/artifacts/dist" | awk '{print $1}')MB mobile=$(du -sm "$WORK/artifacts/dist-mobile" | awk '{print $1}')MB"
   phx_step_mark 3
 }
 
@@ -115,6 +115,8 @@ phx_step 4 $TOTAL "组装双侧镜像 + 基础运行时三件备齐（--platform
   mkdir -p "$REPO/docker/.stage"
   cp "$WORK/artifacts/phoenix-admin.jar" "$REPO/docker/.stage/phoenix-admin.jar"
   rm -rf "$REPO/docker/.stage/dist" && cp -r "$WORK/artifacts/dist" "$REPO/docker/.stage/dist"
+  # BUG-167: mobile 产物也要 staging —— Dockerfile.frontend:7 会 COPY docker/.stage/dist-mobile
+  rm -rf "$REPO/docker/.stage/dist-mobile" && cp -r "$WORK/artifacts/dist-mobile" "$REPO/docker/.stage/dist-mobile"
   # 组装用基础镜像预拉取 + 完整性校验（BUG-163）：nginx / JRE 基座 / 三件基础运行时
   PHX_PREFETCH_PLATFORM="linux/$ARCH"
   # shellcheck disable=SC2046
