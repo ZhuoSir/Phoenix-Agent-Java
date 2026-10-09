@@ -8,14 +8,14 @@
 
 ## 1. 基础（依赖与类型）
 
-- [ ] T-01 引入 Ollama 扩展依赖并把 harness 模型类型从具体类上移到框架抽象
+- [x] T-01 引入 Ollama 扩展依赖并把 harness 模型类型从具体类上移到框架抽象
   关联: R-03
   依赖: 无
   验证方式: ①`mvn -o -q package -DskipTests` 编译通过（贴退出码）②既有 provider 回归：默认 deepseek CHAT 跑一轮真实对话（SSE 收到 `end:true`）
   验收标准: 编译 0 错误；`HarnessModelRegistry`/`HarnessAgentFactory` 中不再以 `OpenAIChatModel` 作为字段/签名类型（`grep -c OpenAIChatModel` 归零或仅剩装配点）；既有对话行为与改动前一致
   （共享面对象 4 身份 1~4 的编译级保障）
 
-- [ ] T-02 服务端 provider 归一与 apiKey 空串处理（含 ollama 白名单）
+- [x] T-02 服务端 provider 归一与 apiKey 空串处理（含 ollama 白名单）
   关联: R-01, R-02
   依赖: T-01
   验证方式: ①`POST /api/model-config/add` 传 `provider=ollama` + 空 `apiKey` → 成功（贴响应）②传非法 `provider=foo` → 被拒且提示明确 ③DB 查询该行 `api_key` 为空串（`select length(api_key)` = 0）
