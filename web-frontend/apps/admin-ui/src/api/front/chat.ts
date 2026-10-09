@@ -21,14 +21,17 @@ export interface ApiChatMessage {
   titleNeeded?: boolean;
 }
 
+// CR-03（R-13）：前台 chat 会话空间 = FRONT_CHAT（与 admin 运行页 ADMIN_RUN 隔离）
+const SESSION_SCOPE = 'FRONT_CHAT';
+
 export async function getAgentSessionsApi(
   agentId: number | string,
 ): Promise<ChatSession[]> {
   try {
     return (
-      (await requestClient.get<ChatSession[]>(
-        `/api/agent/${agentId}/sessions`,
-      )) ?? []
+      (await requestClient.get<ChatSession[]>(`/api/agent/${agentId}/sessions`, {
+        params: { scope: SESSION_SCOPE },
+      })) ?? []
     );
   } catch {
     return [];
@@ -43,7 +46,7 @@ export async function getSessionMessagesApi(
       (await requestClient.get<ApiChatMessage[]>(
         `/api/sessions/${sessionId}/messages`,
         // long-turn-resilience：长轮期间后端负载高，默认超时易触发前端"请求超时" → 与运行页对齐放宽 60s
-        { timeout: 60_000 },
+        { timeout: 60_000, params: { scope: SESSION_SCOPE } },
       )) ?? []
     );
   } catch {
@@ -56,7 +59,7 @@ export async function renameSessionApi(
   title: string,
 ): Promise<void> {
   await requestClient.put(`/api/sessions/${sessionId}/rename`, null, {
-    params: { title: title.trim() },
+    params: { title: title.trim(), scope: SESSION_SCOPE },
   });
 }
 
@@ -65,12 +68,14 @@ export async function pinSessionApi(
   isPinned: boolean,
 ): Promise<void> {
   await requestClient.put(`/api/sessions/${sessionId}/pin`, null, {
-    params: { isPinned },
+    params: { isPinned, scope: SESSION_SCOPE },
   });
 }
 
 export async function deleteSessionApi(sessionId: string): Promise<void> {
-  await requestClient.delete(`/api/sessions/${sessionId}`);
+  await requestClient.delete(`/api/sessions/${sessionId}`, {
+    params: { scope: SESSION_SCOPE },
+  });
 }
 
 export interface PresetQuestion {

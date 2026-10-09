@@ -187,10 +187,13 @@
     **实测结果（2026-10-09，证据 evidence/CR-03_T-10_session-isolation-backend.txt）**：矩阵 #1~#8、#12 **12/12 全绿**；
       存量 173 条回填 FRONT_CHAT；P-4 四类日志齐；SSE/附件对面断言无破坏；rollback 事务演练通过。
       **事故如实记**：rollback 文件误入 migrator 扫描目录致线上列被 drop，已止血（移入 rollback/ 子目录+清账+重跑），记 L-78
-- [ ] T-11 前端三端传 scope（运行页=ADMIN_RUN；admin 前台与 mobile=FRONT_CHAT）全调用点
+- [x] T-11 前端三端传 scope（运行页=ADMIN_RUN；admin 前台与 mobile=FRONT_CHAT）全调用点
     关联: R-13, R-12　依赖: T-10　CR: CR-03　处置: 改造三端会话 API 封装
     验证方式: typecheck 增量 0（203/11 基线）；产物断言；浏览器三端互不可见；对面断言附件/预览/SSE 不受影响
     验收标准: 三端互不可见实测 + 增量 0 + 对面断言无破坏
+    **实测结果（2026-10-09，证据 evidence/CR-03_T-11_session-isolation-frontend.txt）**：浏览器抓包运行页=ADMIN_RUN、
+      前台=FRONT_CHAT 且两空间列表集合不同；mobile bundle 含 scope=FRONT_CHAT；typecheck 增量 0（203/11）；
+      运行页自动新建会话落 ADMIN_RUN、用户真实会话落 FRONT_CHAT
 - [ ] T-12 隔离端到端汇总与证据落盘（存量回填核对 + 附件/理解链路回归）
     关联: R-13, R-10, R-11　依赖: T-10, T-11　CR: CR-03　处置: 新增 evidence/CR-03_session-isolation.txt
     验证方式: e2e 两空间互不可见 + 跨空间 404；附件回归；DB source 分布核对；证据落盘

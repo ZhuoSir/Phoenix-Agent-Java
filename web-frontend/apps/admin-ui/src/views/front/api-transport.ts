@@ -324,7 +324,8 @@ export const apiChatTransport: ChatTransport = {
   },
 
   async createSession(agentId: string): Promise<ChatSession> {
-    const session = await createSessionApi(Number(agentId), '新会话');
+    // CR-03：前台空间 = FRONT_CHAT
+    const session = await createSessionApi(Number(agentId), '新会话', undefined, 'FRONT_CHAT');
     if (!session) throw new Error('创建会话失败');
     return {
       id: String(session.id),

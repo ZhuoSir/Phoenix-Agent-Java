@@ -1,4 +1,7 @@
 <script setup lang="ts">
+// CR-03（R-13）：运行页会话空间 = ADMIN_RUN（与前台 chat/mobile 的 FRONT_CHAT 隔离）
+const SESSION_SCOPE = 'ADMIN_RUN';
+
 import { watch, onBeforeUnmount } from 'vue';
 import ChatFilesPanel from '#/views/front/components/ChatFilesPanel.vue';
 import ThinkingBlock from '#/views/front/components/ThinkingBlock.vue';
@@ -453,7 +456,7 @@ async function selectSession(session: ChatSession | null) {
     syncStateToView(session.id, { isStreaming, remoteRunning, nodeBlocks });
     syncConfirmFromState(session.id);
     // T-04：join 续渲需要"原始 markdown 基线"（applyServerRowRender 会把 content 转成 HTML），故转换前先取
-    const rows = (await getSessionMessagesApi(session.id)) as any[];
+    const rows = (await getSessionMessagesApi(session.id, SESSION_SCOPE)) as any[];
     let joinBase = '';
     let joinBaseThinking = '';
     for (let i = rows.length - 1; i >= 0; i--) {
@@ -530,7 +533,7 @@ async function selectSession(session: ChatSession | null) {
           st.remoteRunning = false;
           try {
             // 末次拉取：以服务端定稿行为准（join 只负责"看得见"，落库不归它管）
-            currentMessages.value = applyServerRowRender(await getSessionMessagesApi(session.id) as any[]) as any;
+            currentMessages.value = applyServerRowRender(await getSessionMessagesApi(session.id, SESSION_SCOPE) as any[]) as any;
           } catch { /* ignore */ }
         };
 
@@ -754,7 +757,7 @@ async function sendMessage() {
   (userMessage as any).attachments = sentAttachments.length ? sentAttachments : undefined;
 
   try {
-    await saveMessageApi(sessionId, userMessage);
+    await saveMessageApi(sessionId, userMessage, SESSION_SCOPE);
     currentMessages.value.push(userMessage);
 
     const sessionState = getSessionState(sessionId);
@@ -822,7 +825,7 @@ async function sendGraphRequest(request: GraphRequest, rejectedPlan: boolean) {
               content: first.text,
               messageType: 'result-set',
             };
-            await saveMessageApi(sessionId, aiMessage);
+            await saveMessageApi(sessionId, aiMessage, SESSION_SCOPE);
             return;
           }
         } catch {
@@ -837,7 +840,7 @@ async function sendGraphRequest(request: GraphRequest, rejectedPlan: boolean) {
         content: nodeHtml,
         messageType: 'html',
       };
-      await saveMessageApi(sessionId, aiMessage);
+      await saveMessageApi(sessionId, aiMessage, SESSION_SCOPE);
     };
 
     let closeStreamFn: (() => void) | null = null;
@@ -894,7 +897,7 @@ async function sendGraphRequest(request: GraphRequest, rejectedPlan: boolean) {
               messageType: 'html-report',
             };
             try {
-              await saveMessageApi(sessionId, htmlReportMessage);
+              await saveMessageApi(sessionId, htmlReportMessage, SESSION_SCOPE);
               if (currentSession.value?.id === sessionId) {
                 currentMessages.value.push(htmlReportMessage);
               }
@@ -914,7 +917,7 @@ async function sendGraphRequest(request: GraphRequest, rejectedPlan: boolean) {
               messageType: 'markdown-report',
             };
             try {
-              await saveMessageApi(sessionId, markdownMessage);
+              await saveMessageApi(sessionId, markdownMessage, SESSION_SCOPE);
               if (currentSession.value?.id === sessionId) {
                 currentMessages.value.push(markdownMessage);
               }
@@ -941,7 +944,7 @@ async function sendGraphRequest(request: GraphRequest, rejectedPlan: boolean) {
                 messageType: 'markdown-report',
               };
               try {
-                await saveMessageApi(sessionId, reportMessage);
+                await saveMessageApi(sessionId, reportMessage, SESSION_SCOPE);
                 if (currentSession.value?.id === sessionId) {
                   currentMessages.value.push(reportMessage);
                 }
@@ -1218,7 +1221,7 @@ async function sendGraphRequest(request: GraphRequest, rejectedPlan: boolean) {
           metadata: thinkingMetaOf(sessionId), // thinking-display R-05
         } as any;
         try {
-          await saveMessageApi(sessionId, htmlReportMessage);
+          await saveMessageApi(sessionId, htmlReportMessage, SESSION_SCOPE);
           if (currentSession.value?.id === sessionId) {
             currentMessages.value.push(htmlReportMessage);
           }
@@ -1234,7 +1237,7 @@ async function sendGraphRequest(request: GraphRequest, rejectedPlan: boolean) {
           metadata: thinkingMetaOf(sessionId), // thinking-display R-05
         } as any;
         try {
-          await saveMessageApi(sessionId, markdownMessage);
+          await saveMessageApi(sessionId, markdownMessage, SESSION_SCOPE);
           if (currentSession.value?.id === sessionId) {
             currentMessages.value.push(markdownMessage);
           }
@@ -1542,7 +1545,7 @@ async function handlePresetQuestionClick(question: string) {
 
   if (!currentSession.value) {
     try {
-      const newSession = await createSessionApi(agentId.value, '新会话');
+      const newSession = await createSessionApi(agentId.value, '新会话', undefined, SESSION_SCOPE);
       if (!newSession) {
         ElMessage.error('创建会话失败');
         return;
@@ -1583,7 +1586,7 @@ async function stopStreaming() {
       sessionState.closeJoin = null;
       remoteRunning.value = false;
       sessionState.remoteRunning = false;
-      currentMessages.value = applyServerRowRender(await getSessionMessagesApi(sessionId) as any[]) as any;
+      currentMessages.value = applyServerRowRender(await getSessionMessagesApi(sessionId, SESSION_SCOPE) as any[]) as any;
       ElMessage.success('已停止对话');
     } catch {
       ElMessage.error('停止对话失败');
@@ -1611,7 +1614,7 @@ async function stopStreaming() {
           messageType: 'html',
         };
         try {
-          await saveMessageApi(sessionId, aiMessage);
+          await saveMessageApi(sessionId, aiMessage, SESSION_SCOPE);
         } catch {
           /* ignore */
         }

@@ -1,4 +1,7 @@
 <script setup lang="ts">
+// CR-03（R-13）：运行页会话空间
+const SESSION_SCOPE = 'ADMIN_RUN';
+
 import { ref, onMounted, onUnmounted, computed, nextTick } from 'vue';
 import { useRoute } from 'vue-router';
 import {
@@ -237,7 +240,7 @@ const saveSessionTitle = async (session: ExtendedChatSession) => {
   }
 
   try {
-    await renameSessionApi(session.id, newTitle);
+    await renameSessionApi(session.id, newTitle, SESSION_SCOPE);
     session.title = newTitle;
     session.editing = false;
     ElMessage.success('会话标题已更新');
@@ -255,6 +258,7 @@ const loadSessions = async () => {
   try {
     sessions.value = (await getAgentSessionsApi(
       Number.parseInt(agentId.value),
+      SESSION_SCOPE,
     )) as ExtendedChatSession[];
     if (sessions.value.length > 0) {
       if (sessions.value[0]) emit('select-session', sessions.value[0]);
@@ -272,6 +276,8 @@ const createNewSession = async () => {
     const newSession = await createSessionApi(
       Number.parseInt(agentId.value),
       '新会话',
+      undefined,
+      SESSION_SCOPE,
     );
     if (!newSession) return;
     sessions.value.unshift(newSession);
@@ -285,7 +291,7 @@ const createNewSession = async () => {
 
 const togglePinSession = async (session: ChatSession) => {
   try {
-    await pinSessionApi(session.id, !session.isPinned);
+    await pinSessionApi(session.id, !session.isPinned, SESSION_SCOPE);
     session.isPinned = !session.isPinned;
     ElMessage.success(session.isPinned ? '会话已置顶' : '会话已取消置顶');
   } catch (error) {
@@ -301,7 +307,7 @@ const deleteSession = async (session: ChatSession) => {
       cancelButtonText: '取消',
       confirmButtonType: 'danger',
     });
-    await deleteSessionApi(session.id);
+    await deleteSessionApi(session.id, SESSION_SCOPE);
     emit('delete-session-state', session.id);
     sessions.value = sessions.value.filter(
       (s: ChatSession) => s.id !== session.id,
@@ -329,7 +335,7 @@ const clearAllSessions = async () => {
         type: 'warning',
       },
     );
-    await clearAgentSessionsApi(Number.parseInt(agentId.value));
+    await clearAgentSessionsApi(Number.parseInt(agentId.value), SESSION_SCOPE);
     sessions.value.forEach((session: ChatSession) => {
       emit('delete-session-state', session.id);
     });
