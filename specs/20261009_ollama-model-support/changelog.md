@@ -7,3 +7,8 @@
   - 立项同轮实勘（写入 requirements 假设与待确认问题）：本机 Ollama 0.40.2 已装 `gemma3:latest`；
     容器经 `host.docker.internal:11434` 实测可达；框架自带 `agentscope-extensions-model-ollama:2.0.0`（jar 在本机仓）
   - 用户范围拍板（2026-10-09）：三类模型类型**都支持** / provider 加 `ollama` 一等项 / **要做**模型列表拉取 / 本机已装 Ollama / **要求**工具调用 / 认可 `host.docker.internal` 写法
+- **2026-10-09 确认①（Phase 1 门）**：requirements **v1.0.0 已确认**（确认人 **陈卓**，确认日期 2026-10-09）。
+  - 用户原话：「确认，陈卓」
+  - 同轮状态归位：**Q2 已随 Non-goals 一并确认**（存量 512 维只做拒绝提示 + 迁移指引，不做自动重建）；
+    **Q1/Q3 转为"待授权"**（embedding 模型与工具调用模型的安装授权，影响 Phase 4 验收，不阻塞 Phase 2 设计）
+- **2026-10-09 进入 Phase 2**：Plan 撰写中（坑核对 / 共享面身份矩阵 / 关键日志点清单 / 被拒方案）。
