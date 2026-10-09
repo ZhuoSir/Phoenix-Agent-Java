@@ -276,3 +276,8 @@
 - 挂接 spec: 20261008_chat-attachment-understanding（v1.5.0）
 - 升级件: V2.0.0_16（source 列+回填+索引，见该 spec artifacts.md）
 - 任务: T-10~T-12 全勾；事故 L-78 已记
+
+## 部署面决定（2026-10-09，陈卓拍板）
+- v2.0.0 **携带移动端**：前端镜像含 /m/ 挂载（docker/.stage/dist-mobile + nginx `location ^~ /m/`），
+  mobile-ui 以 --base=/m/ 构建；BUG-154/155 修复后移动端登录与对话可用
+- BUG-153（mobile `build` 脚本类型门常红）**不修复**（批准：陈卓）；mobile 出包走 `pnpm exec vite build` 单跑
