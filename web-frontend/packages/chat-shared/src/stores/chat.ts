@@ -19,6 +19,53 @@ export const useChatStore = defineStore('phoenix-chat-shared/chat', () => {
   const loadingSessions = ref(false);
   const loadingMessages = ref(false);
   const sendingSessions = ref(new Set<string>());
+  /**
+   * BUG-158（方案 B）：已"视觉收尾"的会话 —— 轮末框架尾巴（记忆 flush 等同步收尾，实测 18~24s）
+   * 期间流仍开着但不会再有内容帧；静默≥阈值且已有内容时把会话从 sending 摘除并停打字光标，
+   * 让用户感知立即结束；真 end 帧到达后照常收尾（幂等）。
+   */
+  const settledSessions = ref(new Set<string>());
+
+  /** 静默判定阈值（ms）：phase=IDLE 且 silenceMs 达此值且本轮已有内容 ⇒ 视觉收尾 */
+  const SETTLE_SILENCE_MS = 8000;
+
+  function settleSession(sessionId: string) {
+    if (!sendingSessions.value.has(sessionId)) return;
+    const nextSending = new Set(sendingSessions.value);
+    nextSending.delete(sessionId);
+    sendingSessions.value = nextSending;
+    const nextSettled = new Set(settledSessions.value);
+    nextSettled.add(sessionId);
+    settledSessions.value = nextSettled;
+    // 停打字光标/思考动画
+    const msgs = messagesByS.value[sessionId] ?? [];
+    for (let i = msgs.length - 1; i >= 0; i--) {
+      const m = msgs[i] as any;
+      if (m.role === 'assistant' && m.streaming) {
+        m.streaming = false;
+        break;
+      }
+    }
+  }
+
+  function clearSettled(sessionId: string) {
+    if (!settledSessions.value.has(sessionId)) return;
+    const next = new Set(settledSessions.value);
+    next.delete(sessionId);
+    settledSessions.value = next;
+  }
+
+  /** 传输层调用：静默帧达阈值且本轮已有内容 ⇒ 视觉收尾 */
+  function maybeSettleFromSilence(
+    sessionId: string,
+    frame: { phase?: string; silenceMs?: number },
+    hasContent: boolean,
+  ) {
+    if (!hasContent) return;
+    if (frame?.phase !== 'IDLE') return;
+    if ((frame.silenceMs ?? 0) < SETTLE_SILENCE_MS) return;
+    settleSession(sessionId);
+  }
 
   const abortControllers = new Map<string, AbortController>();
 
@@ -183,6 +230,7 @@ export const useChatStore = defineStore('phoenix-chat-shared/chat', () => {
     if (sendingSessions.value.has(activeSessionId.value)) return;
     await persistCurrentSessionIfNeeded();
     const sessionId = activeSessionId.value;
+    clearSettled(sessionId);
     // 乐观写入用户消息
     const msgs = messagesByS.value[sessionId] ?? [];
     const optimistic: ChatMessage = {
@@ -310,6 +358,7 @@ export const useChatStore = defineStore('phoenix-chat-shared/chat', () => {
       const next = new Set(sendingSessions.value);
       next.delete(sessionId);
       sendingSessions.value = next;
+      clearSettled(sessionId);
       abortControllers.delete(sessionId);
     }
   }
@@ -343,6 +392,11 @@ export const useChatStore = defineStore('phoenix-chat-shared/chat', () => {
     loadingMessages,
     sending,
     sendingSessions,
+    settledSessions,
+    settleSession,
+    clearSettled,
+    maybeSettleFromSilence,
+    SETTLE_SILENCE_MS,
     isActiveSessionSending,
     setTransport,
     loadSessions,

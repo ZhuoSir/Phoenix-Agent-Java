@@ -553,6 +553,11 @@ export const apiChatTransport: ChatTransport = {
           },
           async (response) => {
             if (abortRequested) return;
+            // BUG-158（方案 B）：轮末框架尾巴（记忆 flush 等同步收尾，实测 18~24s）期间只有静默帧；
+            // 静默达阈值且本轮已有内容 ⇒ 视觉收尾（store 摘 sending、停打字光标），真 end 帧到达照常收尾（幂等）
+            if ((response as any).phase) {
+              useChatStore().maybeSettleFromSilence(sessionId, response as any, fullText.length > 0);
+            }
             if (response.error) return;
             // BL-19：本轮产物登记成功（轮末扫描事件），刷新文件面板
             if ((response as any).agentFiles) notifyFilesChanged();

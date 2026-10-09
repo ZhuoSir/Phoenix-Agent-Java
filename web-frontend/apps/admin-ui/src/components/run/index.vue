@@ -558,6 +558,15 @@ async function selectSession(session: ChatSession | null) {
             async (response) => {
               if (currentSession.value?.id !== session.id) return; // BUG-74 会话守卫
               applySilenceFrame(session.id, response);
+              // BUG-158（方案 B）：轮末框架尾巴（记忆 flush 等同步收尾，实测 18~24s）期间只有静默帧；
+              // 静默≥8s 且本轮已有内容 ⇒ 视觉收尾（停"正在执行"、放开输入）；真 end 帧到达仍照常收尾
+              if ((response as any).phase === 'IDLE' && Number((response as any).silenceMs || 0) >= 8000) {
+                const st = getSessionState(session.id);
+                if (st && (st.snapText || '').length > 0) {
+                  st.isStreaming = false;
+                  isStreaming.value = false;
+                }
+              }
               if ((response as any).agentFiles) notifyFilesChanged();
               const piece = String((response as any).text || '');
               const th = String((response as any).thinking || '');
@@ -994,6 +1003,13 @@ async function sendGraphRequest(request: GraphRequest, rejectedPlan: boolean) {
         harnessRequest,
         async (response: GraphNodeResponse) => {
           applySilenceFrame(sessionId, response);
+          // BUG-158（方案 B）：轮末框架尾巴（记忆 flush 等同步收尾）期间只有静默帧；
+          // 静默≥8s 且本轮已有内容 ⇒ 视觉收尾；真 end 帧到达仍照常走收尾逻辑（幂等）
+          if ((response as any).phase === 'IDLE' && Number((response as any).silenceMs || 0) >= 8000
+              && (sessionState.snapText || '').length > 0) {
+            sessionState.isStreaming = false;
+            isStreaming.value = false;
+          }
           // BL-19：本轮产物登记事件 → 刷新文件面板（admin 运行页）
           if ((response as any).agentFiles) notifyFilesChanged();
           if ((response as any).text) {
