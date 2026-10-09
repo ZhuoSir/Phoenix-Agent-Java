@@ -660,6 +660,28 @@
 - **复发**：×1（本次打包段步骤 2/8 误诊）
 - **关联**：BUG-147（真因=CRLF）、L-69（CRLF 家族）、L-02、L-37、`docker/scripts/lib/common.sh:phx_mirror_pick`、`docker/scripts/mirrors.list`
 
+## L-75 「构建成功」≠「改动已包含」——脚本化改文件后必须 grep 断言落盘再构建
+- **现象**：用 python heredoc 批量改 Java 白名单时，脚本本身 `SyntaxError`（跨行单引号串）**修改未落盘**；
+  紧接着 `mvn package` 仍 **exit=0**（因为源码没变、当然能编译），我差点把这版"旧行为"当新实现去部署验证。
+  同轮还有一个同源假信号：验证落盘文件时按 `uploads/chat-attachments` 查得 0 个文件，
+  而真实存储根是 `uploads/data-agent/`（avatar 的返回 url 早就暴露了该前缀）⇒ "文件没落盘"是**我查错路径**。
+- **防再犯规则**：① 任何**脚本化/批量**改文件后，构建前必须 `grep` 断言目标字符串**已出现**（并打印命中次数）；
+  ② 编译/打包 exit=0 只证明"能编译"，**不证明改动在里面**——两者要分开断言；
+  ③ 断言"文件/产物不存在"之前，先用**已知存在的同类产物**（如 avatar 的 url）反推真实路径，
+  否则"查不到"很可能只是查错地方（与 L-45 全称否定须复核同源）；
+  ④ python heredoc 里避免跨行单引号串；多行替换用三引号或改用 edit 工具。
+
+## L-74 改「配置类」数据前必须先读**选取代码**，且改完要确认运行时缓存/启动期实例
+- **现象**：线上对话打到余额不足的 deepseek。我按常识把可用行设成 `is_default=true` 并重启，**对话依旧 402**——
+  因为图工作流走的是 `selectActiveByType`（`is_active=true LIMIT 1`，**无 ORDER BY、不看 is_default**），
+  与 `HarnessModelRegistry` 的 `selectDefaultByType` 语义不一致（BUG-152）。真正生效的动作是**停用那条死行**。
+  另一次弯路：同事务里先设新默认再摘旧默认 ⇒ 撞部分唯一索引 `uk_dmc_type_default`（每类型一个默认），整事务回滚。
+- **防再犯规则**：① 改配置数据前先 grep **谁在读它、按什么条件读**（`is_default`? `is_active`? LIMIT 1 有无 ORDER BY?），
+  别按字段名的常识推断；② 改完确认**运行时是否缓存/启动期实例化**（本项目模型配置有 epoch 缓存、
+  图工作流 ChatModel 启动期创建 ⇒ 必须重启或触发 bump）；③ 验证只认**端到端真实调用**（对话返回真内容），
+  配置回显不算证据；④ 涉及"每类型唯一默认"这类**部分唯一索引**时，单事务内**先摘旧再设新**；
+  ⑤ 运维绕行（停用死行）与代码缺陷（选取语义不一致）**分开记账**：绕行入证据、缺陷登 BUG，不混为一谈。
+
 ## L-73 `docker pull` 报 DONE ≠ blob 完整——`short read` 先做**字节数对账**，别先怀疑磁盘/daemon
 - **分类**：验证盲区（供应链完整性）
 - **触发场景**：容器构建死于 `failed to compute cache key: short read: expected N bytes but got 0: unexpected EOF`；或经第三方镜像源拉取的基础镜像首次投入构建
@@ -669,3 +691,36 @@
 - **状态**：active
 - **复发**：×1（本次打包段 3/8 frontend 编译）
 - **关联**：BUG-148、BUG-147（镜像源家族）、BL-23（吞吐型探活）、L-37、L-72、`docker/scripts/package.sh`
+
+## L-76 空串是合法配置值：`|| 默认值` 会把空串吞掉（用 `??`）；且 dev 代理剥层≠生产透传
+- 场景: mobile-ui 的 `BASE_URL = import.meta.env.VITE_GLOB_API_URL || '/api'`。为修 BUG-154 把生产 env 置空，
+  构建后 bundle md5 **完全没变** —— 因为空串是 falsy，`||` 又兜回 '/api'，等于没改。
+- 根因: ① `||` 对 `''`/`0`/`false` 一律兜底，**配置语义里"显式空"与"未配置"是两回事**，必须用 `??` 区分；
+  ② dev 的 vite proxy 有 `rewrite: path.replace(/^\/api/,'')` **剥一层**，所以 mobile 代码里"路径自带 /api +
+  基址再叠 /api"的双前缀在 dev 是自洽的；生产 nginx 按 BL-18 **只透传不剥层** ⇒ 同一份代码在生产全挂
+  （`/api/auth/login` 404、`/api/api/...` 撞 410 止血块）。**dev 能跑 ≠ 生产能跑**，前缀口径必须按部署拓扑逐环境核。
+- 规避: ① 基址/前缀类配置一律 `?? 默认值`；② 改 env 后**必须核对产物哈希或产物内字面量**（L-75 同源），
+  哈希没变 = 改动没生效；③ 涉及代理/网关的请求路径，dev 与生产的 rewrite/透传差异要写进部署文档并在
+  部署验证里逐端点实测（本次用 curl 逐端点 404/410/200 对照坐实）。
+- 关联: BUG-154；L-75（产物断言）；L-06（多入口/多环境枚举）
+
+## L-77 验证工具链放 /tmp 会被重启清掉 ⇒「0 错误」可能是**假绿**
+- 场景: 为绕开环境缺 pnpm 可执行文件，造了 `/tmp/pnbin/pnpm` shim 并 export PATH。电脑重启后 /tmp 被清，
+  `pnpm run typecheck` 变成 `pnpm: command not found`，日志里**一条 error TS 都没有** ⇒
+  我一度读到「admin 0 错误 / mobile 0 错误（增量 -203/-11）」并差点当成通过。
+- 根因: ① /tmp 不持久，会话级工具链不能住在那；② **错误数骤降（尤其到 0）永远先怀疑"没跑成"**（L-32④ 同源），
+  而不是"变好了"——本次正是命令 127/未找到 导致的空日志。
+- 防再犯规则: ① 工具链 shim/脚本放**工作区内**（如 `.devbin/`，入 .gitignore）或每次会话开头**重建并自检**
+  （`pnpm --version` 必须输出版本号才继续）；② 任何 typecheck/build 断言前先确认日志里有**执行痕迹**
+  （如 vue-tsc/vite .banner、exit code 非 127），错误数与基线差值异常（|Δ| 大或归零）一律先查"跑没跑"。
+- 关联: L-32④（错误数骤降先疑改坏/没跑）；L-75（产物断言）
+
+## L-78 rollback SQL **绝不进 migrator 扫描目录**——它会真被执行
+- 场景: CR-03 的 `V2.0.0_16__..._rollback.sql` 被我拷进 `releases/v2.0.0/sql/`（migrator 扫描目录，按文件名逐条执行、
+  按文件名去重）⇒ 开机时 **ddl 与 rollback 先后都跑了**，线上刚加的 source 列被 drop，ledger 还留下两条"已应用"。
+- 根因: ① 项目既有约定是 rollback 放 `releases/vX.Y.Z/sql/rollback/` **子目录**（15 号就是这么放的），我抄 15 号时抄错了层级；
+  ② migrator 对"扫到的每个 .sql"无条件执行，**文件名里的 rollback 字样没有任何豁免语义**。
+- 规避: ① 升级件投放时**逐文件核对目录层级**（ddl 进 sql/、rollback 进 sql/rollback/），投放后 `ls` 回验；
+  ② 每次开机/部署后核对 ledger：**同一 seq 出现多条 = 事故信号**（本次就是 16 出现 ddl+rollback 两条）；
+  ③ 迁移后必查"列/索引/回填"三件套，而不是只看 ledger 有记录（ledger 有记录 ≠ 状态正确，rollback 也有记录）。
+- 关联: L-75（产物/状态断言）；CR-03 T-10

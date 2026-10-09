@@ -27,6 +27,9 @@ public class HarnessModelRegistry {
     // 缓存对象 (volatile 保证可见性)
     private volatile EmbeddingModel currentEmbeddingModel;
     private volatile OpenAIChatModel currentChatModel;
+
+    /** 多模态模型缓存（chat-attachment-understanding T-03） */
+    private volatile OpenAIChatModel currentMultimodalModel;
     /** 指定模型配置ID 的对话模型缓存（R-03：智能体可自选模型） */
     private final Map<Long, OpenAIChatModel> configuredChatModels = new ConcurrentHashMap<>();
 
@@ -131,6 +134,45 @@ public class HarnessModelRegistry {
     }
 
     /**
+     * 获取多模态模型（图片理解；T-03 / R-06）。
+     *
+     * <p>**未配置或不可用时返回 null**，由调用方按 R-07 降级并显式告知；
+     * 刻意**不回退 CHAT 模型**——那会造成"假装看过图"的回答（requirements R-07 明令禁止）。
+     */
+    public OpenAIChatModel getOpenAIMultimodalModel() {
+        if (currentMultimodalModel == null) {
+            synchronized (this) {
+                if (currentMultimodalModel == null) {
+                    try {
+                        ModelConfigDTO config = modelConfigDataService.getDefaultConfigByType(ModelType.MULTIMODAL);
+                        if (config == null) {
+                            log.warn("未配置 MULTIMODAL 模型：带图请求将按 R-07 降级并显式告知");
+                            return null;
+                        }
+                        log.info("多模态模型: configId={}, provider={}, modelName={}", config.getId(),
+                                config.getProvider(), config.getModelName());
+                        currentMultimodalModel = OpenAIChatModel.builder()
+                                .apiKey(config.getApiKey())
+                                .modelName(config.getModelName())
+                                .baseUrl(config.getBaseUrl())
+                                .stream(true)
+                                .formatter(new DeepSeekFormatter())
+                                .generateOptions(GenerateOptions.builder()
+                                        .maxTokens(config.getMaxTokens())
+                                        .temperature(config.getTemperature())
+                                        .build())
+                                .build();
+                    } catch (Exception e) {
+                        log.error("多模态模型初始化失败（将按 R-07 降级）: {}", e.getMessage());
+                        return null;
+                    }
+                }
+            }
+        }
+        return currentMultimodalModel;
+    }
+
+    /**
      * 刷新 Chat 缓存（用于热切换）
      */
     public void refreshChat() {
@@ -145,6 +187,14 @@ public class HarnessModelRegistry {
     public void refreshEmbedding() {
         this.currentEmbeddingModel = null;
         log.info("Embedding cache cleared.");
+    }
+
+    /**
+     * 刷新多模态模型缓存（用于热切换；T-03）
+     */
+    public void refreshMultimodal() {
+        this.currentMultimodalModel = null;
+        log.info("Multimodal cache cleared.");
     }
 
 }

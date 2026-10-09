@@ -1,4 +1,4 @@
-> 版本: v1.0.0 | 状态: 已确认 | 确认人: 陈卓 | 确认日期: 2026-10-08 | 确认记录: 用户 2026-10-08 选定「确认通过（确认人：陈卓）」（确认①）+ 同轮裁定 Q4-1：模型类型枚举用 **MULTIMODAL**、首行模型名 **qwen-vl-max**、探针驱动 | 更新: 2026-10-08
+> 版本: v1.5.0 | 状态: 已确认 | 确认人: 陈卓 | 确认日期: 2026-10-09 | 确认记录: CR-03（major）三轮确认完成（§S/§P/§T，陈卓 2026-10-09；拍板：回填=A 存量→FRONT_CHAT、跨空间拒绝=404-as-不存在）⇒ 新增 R-13/R-14、修改 R-10/R-11、新增 T-10~T-12 | 更新: 2026-10-09
 
 # 需求规格：chat-attachment-understanding（对话附件上传与大模型理解）
 
@@ -185,7 +185,7 @@ WHEN 同一后端契约被 admin-ui 与 mobile-ui 调用,
 1. ✅（Q1）**附件语义 = 会话级材料**（当次对话 + 历史回看），不入知识库、不做检索索引。（如不成立请现在指出，否则按此执行）
 2. ✅（Q2）**文件白名单** = `.doc/.docx/.pdf/.xls/.xlsx/.txt/.md`；`.csv/.rtf/.html` 未纳入（Q2 决定）。
 3. ✅（Q2）**图片白名单** = `.png/.jpg/.jpeg/.gif/.webp/.bmp`；**`.svg` 默认排除**（可内嵌脚本，XSS 面）；`.heic/.tiff` 未纳入（Q2 决定）。
-4. ✅（Q4 + Q4-1）**多模态模型接入方式** = 在既有 `tbl_data_model_config` 增加一行 `model_type=`**`MULTIMODAL`**（新增枚举值，语义=多模态大模型；未来 qwen3.8 类原生图文模型同归此类型），首行 `model_name=`**`qwen-vl-max`**，provider/base_url/api_key 复用现有 qwen（DashScope compatible-mode，同 id=7）；走 OpenAI 兼容 multimodal 消息格式（`image_url` 内容部件）；**不新增第三方 SDK 依赖**。
+4. ✅（Q4 + Q4-1）**多模态模型接入方式** = 在既有 `tbl_data_model_config` 增加一行 `model_type=`**`MULTIMODAL`**（新增枚举值，语义=多模态大模型；未来 qwen3.8 类原生图文模型同归此类型），首行 `model_name=`**`qwen3.8-max`**（CR-01 修正；实测原生支持 `image_url`），provider/base_url 复用现有 qwen（DashScope compatible-mode），**api_key 由配置人经管理页填入实测可用的一把**（不由迁移件搬运；原"复用 id=7 行密钥"经实测为欠费死 key，已废）；走 OpenAI 兼容 multimodal 消息格式（`image_url` 内容部件）；**不新增第三方 SDK 依赖**。
 5. ✅ **文档文本抽取**复用已在依赖中的 `spring-ai-tika-document-reader`，**不引入新解析库**。
 6. **附件存储**复用既有 `FileStorageService`/`FileStorageProperties`；附件元数据记录在
    `tbl_data_chat_message.metadata`(jsonb)；是否需要独立附件表由 Plan 阶段按检索/清理需求评估（可能产生 DDL）。
@@ -208,8 +208,21 @@ WHEN 同一后端契约被 admin-ui 与 mobile-ui 调用,
 ## 待确认问题（已全部裁定）
 
 - **Q4-1 已裁定（2026-10-08 用户）**：模型类型枚举值用 **`MULTIMODAL`**（多模态大模型，qwen3.8 那类原生图文模型亦归此类型）；
-  本次首行配置 `model_name = qwen-vl-max`。
-  **兜底纪律不变**：Implement 第一个任务 SHALL 是「多模态可用性探针」——用该模型名发一次带 `image_url` 的真实请求，
+  本次首行配置 `model_name = `**`qwen3.8-max`**（CR-01 修正：原裁定 qwen-vl-max 在 id=6 端点 404 model_not_found，跨环境不稳）。
+  **兜底纪律不变**：Implement 第一个任务 SHALL 是「多模态可用性探针」——用 `qwen3.8-max` 发一次带 `image_url` 的真实请求（**已于 2026-10-08 执行并通过**，证据 `evidence/T-01_multimodal-probe.txt`），
   拿到成功响应才继续；探针失败即停并回报，不带病施工。
 
 **无其他待确认问题 ⇒ 确认① 已通过（陈卓 2026-10-08），进入 Phase 2 Plan。**
+
+## CR-03 新增/修改条款（v1.5.0，会话空间隔离）
+
+- **R-13 会话空间隔离**：WHEN 会话在 admin 运行页创建或列表，系统 SHALL 仅使其在运行页空间（ADMIN_RUN）可见；
+  WHEN 会话在前台 chat（admin 前台页或 mobile）创建或列表，系统 SHALL 仅使其在聊天空间（FRONT_CHAT）可见；
+  两空间的会话与消息 SHALL 互不显示。
+  验收: GIVEN 同一用户 WHEN 分别在运行页与前台各建一会话 THEN 两侧列表互不可见，且跨空间直连会话 id 读取被拒
+- **R-14 存量会话归属**：WHEN 本变更上线，系统 SHALL 将存量会话回填为 FRONT_CHAT（拍板口径 A），
+  且回填 SHALL 有配对 rollback 可复原。
+  验收: GIVEN 上线前 N 条存量会话 WHEN 迁移执行 THEN 全部 source=FRONT_CHAT 且 rollback 后恢复原状
+- **R-10 补充（v1.5.0）**：历史回看的会话集合 SHALL 受 R-13 空间约束；同空间内回看行为不变
+- **R-11 补充（v1.5.0）**：空间归属 SHALL 与用户归属叠加校验；跨空间读取单个会话/消息/附件 SHALL 以
+  404-as-不存在 拒绝（拍板口径），不泄露另一空间会话的存在性

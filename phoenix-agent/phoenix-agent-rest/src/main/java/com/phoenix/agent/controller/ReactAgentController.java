@@ -39,6 +39,9 @@ public class ReactAgentController {
     private final AgentManager agentManager;
     private final GraphService graphService;
 
+    /** T-06：对话附件装配（两阶段方案 B）；attachmentIds 为空即短路，既有行为不变（共享面 S1'） */
+    private final com.phoenix.agent.harness.attachment.ChatAttachmentAssembler attachmentAssembler;
+
     @PostMapping(value = "/chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<Map<String, Object>> chat(@RequestBody ChatModelRequest request) {
         try {
@@ -50,7 +53,12 @@ public class ReactAgentController {
             String sessionId = request.getSessionId();
             // R-14（v2.3.0）：工号已下线 ⇒ userCode 传用户名（原为 privilegeUser.getCode()）
             var userProfile = UserProfile.builder().sessionId(sessionId).userCode(privilegeUser.getUsername()).userId(userId).email(privilegeUser.getEmail()).email(privilegeUser.getEmail()).name(privilegeUser.getRealName()).build();
-            AgentInfoDto agentInfoDto = AgentInfoDto.builder().sn(request.getAgentSn()).userProfile(userProfile).message(request.getContent()).build();
+            // T-06（react 族接入）：附件装配为异步（阶段1 需调多模态模型），故包一层 flatMapMany；
+            // attachmentIds 为空时 prepare 立即返回空上下文、enrich 原样返回 content ⇒ 既有行为逐字节不变（S1'）
+            return attachmentAssembler.prepare(request.getAttachmentIds(), userId).flatMapMany(ctx -> {
+            // streamCall 声明 checked Exception；lambda 内无法向外层 try 传播 ⇒ 就地转 Flux.error
+            try {
+            AgentInfoDto agentInfoDto = AgentInfoDto.builder().sn(request.getAgentSn()).userProfile(userProfile).message(attachmentAssembler.enrich(request.getContent(), ctx)).build();
             return agentManager.streamCall(agentInfoDto).map(output -> {
                         Map<String, Object> event = new LinkedHashMap<>();
                         event.put("content", "");
@@ -63,6 +71,10 @@ public class ReactAgentController {
                         }
                         return event;
                     });
+            } catch (Exception e) {
+                return Flux.error(e);
+            }
+            });
         } catch (Exception e) {
             return Flux.error(e);
         }

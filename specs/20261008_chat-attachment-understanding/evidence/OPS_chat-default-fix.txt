@@ -1,0 +1,39 @@
+=== 运维配置动作：修复 CHAT 死链（用户 2026-10-08 授权）===
+日期: 2026-10-08 | 性质: **环境配置动作**（不改代码、不入迁移件）| 授权: 用户选定「授权我改默认 CHAT 配置」
+密钥纪律: 全程只记 md5 前 8 位与长度，**明文未落盘未打印**
+
+--- 起点故障（实测）---
+  id=5 deepseek-v4-flash (CHAT, is_default=true) → HTTP 402 Insufficient Balance
+  id=7 qwen3.8-flash     (CHAT)                  → HTTP 400 Arrearage
+  ⇒ 线上对话不可用（与本需求无关的既有环境故障）
+
+--- 第 1 次尝试：失败（被 DB 约束拦住，**库未变更**）---
+  动作: 同一事务里「id=7 设默认 + 换 key」与「id=5 摘默认」顺序不当
+  结果: ERROR duplicate key value violates unique constraint "uk_dmc_type_default"
+        Key (model_type)=(CHAT) already exists ⇒ 整事务回滚
+  发现: uk_dmc_type_default = **部分唯一索引** CREATE UNIQUE INDEX ... ON tbl_data_model_config (model_type)
+        WHERE (is_default = true AND is_deleted = 0) ⇒ 每类型至多一个默认行（T-03 插 MULTIMODAL 行须遵守）
+
+--- 第 2 次尝试：库改成功，但**对话仍然 402** ---
+  动作: 先摘 id=5 默认 → 再把 id=7 的 api_key 换成实测可用 key（复制自 id=11）→ id=7 设默认；重启后端
+  结果: 真实对话仍报 402 from https://api.deepseek.com/v1/chat/completions
+  根因（**代码实证，非猜测**）:
+    · 图工作流 `AbstractCompiledGragph.createChatModel()` → `getActiveConfigByType(CHAT)`
+      → `ModelConfigMapper.selectActiveByType` = `WHERE model_type=? AND is_active=true AND is_deleted=0 LIMIT 1`
+      ⇒ **无 ORDER BY、完全不看 is_default**，多行启用时取到 id 最小的 deepseek
+    · 而 `HarnessModelRegistry:42` 走 `getDefaultConfigByType(CHAT)` → `selectDefaultByType`（**看 is_default**）
+    ⇒ 两条选取路径语义不一致 ⇒ 已登记 **BUG-152**（不顺手修）；教训 **L-74**
+
+--- 第 3 次动作：停用死行 + 重启 ⇒ 成功 ---
+  动作: `UPDATE tbl_data_model_config SET is_active=false WHERE id=5;`（**api_key 原值保留**，充值后翻回即可）
+        重启 backend（图工作流 ChatModel 在启动期创建，不重启不脱离旧实例）
+  终态: id=5 CHAT is_active=f / id=7 CHAT is_active=t,is_default=t,key_fp=4025b1ff(len117) / CHAT 启用行数=1 ✅
+  **验证（真实对话，非配置回显）**:
+    POST /api/admin/agent/chat {agentSn:BpmReactAgent, content:"只回复两个字：正常"}
+    → HTTP 200 text/event-stream，收到 **21 个事件**，内容**含「正常」** ✅
+    （对照：修复前同一调用 4 个空事件 + 日志 402 deepseek）
+
+--- 回退方式 ---
+  恢复 deepseek: `UPDATE tbl_data_model_config SET is_active=true WHERE id=5;`（key 未动）+ 重启后端；
+  若要恢复原默认: id=5 is_default=true / id=7 is_default=false（注意 uk_dmc_type_default 单事务顺序：先摘后设）；
+  id=7 的原 api_key 明文**未留存**（指纹 2dc48ecc, len=116），如需还原须由用户重新提供。

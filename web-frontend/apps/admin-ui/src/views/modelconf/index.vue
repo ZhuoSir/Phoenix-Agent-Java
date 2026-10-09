@@ -66,6 +66,7 @@ const [FilterForm] = useVbenForm({
         options: [
           { label: '全部', value: '' },
           { label: '对话模型 (CHAT)', value: 'CHAT' },
+          { label: '多模态模型 (MULTIMODAL)', value: 'MULTIMODAL' },
           { label: '嵌入模型 (EMBEDDING)', value: 'EMBEDDING' },
         ],
       },
@@ -470,10 +471,16 @@ onMounted(loadConfigs);
               </template>
               <template v-else-if="col.slot === 'modelType'">
                 <ElTag
-                  :type="scope.row.modelType === 'CHAT' ? 'primary' : 'success'"
+                    :type="
+                      scope.row.modelType === 'CHAT'
+                        ? 'primary'
+                        : scope.row.modelType === 'MULTIMODAL'
+                          ? 'warning'
+                          : 'success'
+                    "
                   size="small"
                 >
-                  {{ scope.row.modelType === 'CHAT' ? '对话模型' : (scope.row.modelType === 'EMBEDDING' ? '嵌入模型' : (scope.row.modelType === 'AUDIO' ? '音频模型' : scope.row.modelType)) }}
+                  {{ scope.row.modelType === 'CHAT' ? '对话模型' : (scope.row.modelType === 'MULTIMODAL' ? '多模态模型' : (scope.row.modelType === 'EMBEDDING' ? '嵌入模型' : (scope.row.modelType === 'AUDIO' ? '音频模型' : scope.row.modelType))) }}
                 </ElTag>
               </template>
               <template v-else-if="col.slot === 'path'">
@@ -568,6 +575,7 @@ onMounted(loadConfigs);
         <ElFormItem label="模型类型" prop="modelType">
           <ElRadioGroup v-model="formData.modelType">
             <ElRadio label="CHAT">对话模型</ElRadio>
+            <ElRadio label="MULTIMODAL">多模态模型</ElRadio>
             <ElRadio label="EMBEDDING">嵌入模型</ElRadio>
           </ElRadioGroup>
         </ElFormItem>
@@ -606,7 +614,7 @@ onMounted(loadConfigs);
         </ElFormItem>
 
         <ElFormItem
-          v-if="formData.modelType === 'CHAT'"
+          v-if="formData.modelType === 'CHAT' || formData.modelType === 'MULTIMODAL'"
           label="Completions路径"
           prop="completionsPath"
         >

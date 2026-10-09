@@ -1,0 +1,50 @@
+=== T-05 验证结论：附件归属鉴权 + 下载/缩略图端点（R-11，L-58 成对实施）===
+日期: 2026-10-08 | 分支: feature/chat-attachment-understanding | 三身份: chenzhuo(本人) / test01(他人·非超管) / admin(超管)
+断言口径: 业务字段 + 响应体身份（L-26/L-37），不以 HTTP 状态码单独定性
+
+--- 实现 ---
+- Service: requireAccessible(id, viewer, superAdmin)（不存在→404；非本人且非超管→403 并留 WARN 日志）、
+  listForSession(sessionId, ownerIdOrNull)（普通用户仅本人；超管 null=不过滤）、
+  openResource（**路径只取库中 storage_path**，L-19）、buildThumb（ImageIO 缩放至 ≤256px；无 reader 如 webp → 回退原图字节）
+- Controller: GET /api/chat/attachment（列表）、GET /{id}（下载）、GET /{id}/thumb（缩略图，仅 IMAGE）；
+  超管判定复用 AdminRoleGuard（R-08/R-17/R-18 同一口径，不新造）；登录态用 phoenix-token 反查（L-65）
+- 加固: 下载与缩略图均加 `X-Content-Type-Options: nosniff`；下载强制 `Content-Disposition: attachment; filename*=UTF-8''…`
+
+--- ① 列表可见性（与单对象校验**成对**，L-58）---
+  chenzhuo(本人) → 2 条 ✅ | test01(他人) → **0 条** ✅ | admin(超管) → 2 条 ✅
+
+--- ② 下载原件：三身份 ---
+  chenzhuo → HTTP 200，CD="attachment; filename*=UTF-8''sample.docx"，nosniff=nosniff，**PK 魔数=True（真文件 36670B）** ✅
+  test01   → **HTTP 403**，CT=application/json（错误信封，非文件）✅
+  admin    → HTTP 200（超管豁免，同 R-18 口径）✅
+  注: Content-Type 为资源真实类型（Spring 按 Resource 覆盖了我显式设的 octet-stream）——
+      安全属性由 `attachment` + `nosniff` 保证，不内联、不嗅探；此为框架行为非缺陷，如实记录。
+
+--- ③ 缩略图：三身份 + 类型限制 ---
+  chenzhuo → 200，**PNG 魔数 True**（127B）✅ | test01 → **403** ✅ | admin → 200 ✅
+  文档类取缩略图 → **404**（仅 IMAGE 提供）✅
+
+--- ④ 无 token / 不存在 id ---
+  无 token → HTTP 200 但**业务 code=401**、响应体 62 字节 = `{"code":401,"msg":"未授权，请先登录","data":null}`，
+             **PK 魔数=False ⇒ 未泄漏任何文件内容** ✅（Sa-Token 过滤器业务信封；正是 L-26 所述项目惯例）
+  不存在 id=999999999 → **HTTP 404** ✅
+
+--- ⑤ L-19 路径同源 ---
+  端点入参**仅 {id}**（无 path/filename 参数面）；实际读取路径取自 DB：
+  storage_path=data-agent/chat-attachments/15dfb13c-6705-4000-bd72-c5f87851ea5b.docx ✅
+
+--- ⑥ 越权留痕 ---
+  日志 WARN「越权访问附件被拒: attachmentId=…, owner=…, viewer=…」命中 2 条（test01 的下载与缩略图各一次）✅
+
+--- ⑦ 复原基线（L-60）---
+  删除验证行 + 清理落盘 ⇒ 附件行数 **0**、chat-attachments 残留 **0** ✅
+
+--- ⑧ 我自己的两处断言错误（如实留痕，均已修正后重跑）---
+  1) 断言下载 CT 必须是 octet-stream ⇒ 实为资源真实类型（Spring 覆盖）。任务要求的是 **CD=attachment**，已满足；
+     改为断言安全属性本身（attachment + nosniff + PK 魔数）。
+  2) 断言"无 token → HTTP 401" ⇒ 实为 HTTP 200 + 业务 code 401（L-26）。**差点误判为鉴权失效**；
+     改为断业务码 + 断响应体未含文件魔数（L-37 响应内容身份）。
+
+--- ⑨ 交接给 T-07 的实现注记 ---
+  `<img src>` 无法携带 `phoenix-token` 头 ⇒ 缩略图**必须由前端 fetch + blob URL** 加载（本任务刻意不加 `?token=`，
+  避免 token 落访问日志）。该注记已写入 VO 注释与 T-07 验证方式。

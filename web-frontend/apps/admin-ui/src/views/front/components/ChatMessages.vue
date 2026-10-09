@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useAgentStore, useChatStore } from '@phoenix/chat-shared';
 import { ElMessage } from 'element-plus';
@@ -10,6 +10,14 @@ import ResultSetDisplay from '#/components/run/ResultSetDisplay.vue';
 import { confirmFrontHarnessSignal } from '#/api/front/chat';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
+
+// T-07（chat-attachment-understanding）：附件渲染/下载/缩略图
+import type { ChatAttachmentMeta } from '@phoenix/chat-shared';
+import {
+  fetchAttachmentThumbUrlApi,
+  formatAttachmentSize,
+  previewAttachmentApi,
+} from '#/api/core/chatAttachment';
 
 const chat = useChatStore();
 const agentStore = useAgentStore();
@@ -150,6 +158,54 @@ async function handleConfirmAction(
     confirming.value = false;
   }
 }
+
+// ===== T-07：消息附件渲染（R-10 历史回看）=====
+/** 缩略图 object URL 缓存；必须 fetch+blob（<img src> 带不了鉴权头，T-05 交接注记） */
+const attachmentThumbs = ref<Map<number, string>>(new Map());
+
+async function ensureAttachmentThumbs() {
+  const list = (activeMessages.value || []) as any[];
+  for (const m of list) {
+    const atts: ChatAttachmentMeta[] | undefined = m?.attachments;
+    if (!atts?.length) continue;
+    for (const a of atts) {
+      if (a.kind === 'IMAGE' && !attachmentThumbs.value.has(a.id)) {
+        const url = await fetchAttachmentThumbUrlApi(a.id);
+        if (url) {
+          const next = new Map(attachmentThumbs.value);
+          next.set(a.id, url);
+          attachmentThumbs.value = next;
+        }
+      }
+    }
+  }
+}
+
+watch(
+  activeMessages,
+  () => {
+    ensureAttachmentThumbs();
+  },
+  { immediate: true },
+);
+
+/** BUG-157：点击附件 = **展示优先**（可预览格式新标签页打开；office 类回退下载并提示） */
+async function onDownloadAttachment(att: ChatAttachmentMeta) {
+  try {
+    const result = await previewAttachmentApi(att);
+    if (result === 'downloaded') {
+      ElMessage.info('该格式浏览器无法在线预览，已改为下载');
+    }
+  } catch (error: any) {
+    ElMessage.error(error?.message || '打开附件失败');
+  }
+}
+
+onBeforeUnmount(() => {
+  for (const u of attachmentThumbs.value.values()) URL.revokeObjectURL(u);
+  attachmentThumbs.value.clear();
+});
+
 </script>
 
 <template>
@@ -172,6 +228,24 @@ async function handleConfirmAction(
         </div>
 
         <div class="chat-message__content">
+          <!-- T-07（R-10）：消息附件；点击经**受鉴权端点**下载（不用直链，R-11） -->
+          <div v-if="(msg as any).attachments?.length" class="chat-message__attachments">
+            <span
+              v-for="att in (msg as any).attachments"
+              :key="att.id"
+              class="chat-attachment"
+              @click="onDownloadAttachment(att)"
+            >
+              <img
+                v-if="att.kind === 'IMAGE' && attachmentThumbs.get(att.id)"
+                :src="attachmentThumbs.get(att.id)"
+                class="chat-attachment__thumb"
+              />
+              <span class="chat-attachment__name">{{ att.fileName }}</span>
+              <span class="chat-attachment__size">{{ formatAttachmentSize(att.sizeBytes) }}</span>
+              <span v-if="att.notice" class="chat-attachment__notice" :title="att.notice">⚠</span>
+            </span>
+          </div>
           <div
             v-if="(msg as any).metadata && (msg as any).metadata.interrupted"
             class="chat-message__interrupted"
@@ -733,6 +807,43 @@ async function handleConfirmAction(
   66% {
     content: '...';
   }
+}
+
+/* T-07：消息附件条 */
+.chat-message__attachments {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+.chat-attachment {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border: 1px solid var(--el-border-color-lighter, #e4e7ed);
+  border-radius: 6px;
+  background: var(--el-fill-color-lighter, #fafafa);
+  font-size: 12px;
+  cursor: pointer;
+  max-width: 420px;
+}
+.chat-attachment__thumb {
+  width: 28px;
+  height: 28px;
+  object-fit: cover;
+  border-radius: 4px;
+}
+.chat-attachment__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.chat-attachment__size {
+  color: var(--el-text-color-secondary, #909399);
+}
+.chat-attachment__notice {
+  color: var(--el-color-warning, #e6a23c);
 }
 </style>
 

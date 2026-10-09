@@ -18,6 +18,12 @@ public enum ModelType {
 	 */
 	EMBEDDING("EMBEDDING"),
 
+	/**
+	 * 多模态大模型（图片 + 文本理解；chat-attachment-understanding R-06 / CR-01 裁定模型 qwen3.8-max）。
+	 * 与 CHAT 分离，避免纯文本对话也走多模态模型（成本/延迟）。
+	 */
+	MULTIMODAL("MULTIMODAL"),
+
 	AUDIO("AUDIO");
 
 	private final String code;

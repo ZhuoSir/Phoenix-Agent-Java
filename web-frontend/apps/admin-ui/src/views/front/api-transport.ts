@@ -5,6 +5,7 @@ import type {
   ChatSession,
   ChatTransport,
   SendPayload,
+  ChatAttachmentMeta,
 } from '@phoenix/chat-shared';
 import { useChatStore, useAgentStore } from '@phoenix/chat-shared';
 
@@ -46,6 +47,8 @@ function toStoreMessage(api: any): ChatMessage {
   // thinking-display R-05：历史消息 metadata.thinking 回显（旧行无键=undefined 静默）
   let thinking: string | undefined;
   let thinkingMs: number | undefined;
+  // T-07（R-10）：历史回看附件；旧消息无该键 ⇒ undefined（S6 兼容）
+  let attachments: ChatAttachmentMeta[] | undefined;
   // long-turn-resilience T-04：服务端进行中轮次（status=generating）刷新后须仍标流式，
   // 否则思考区误显"Think Done"、正文区按完成态渲染（用户实测：明明是 thinking，刷新后 think done）
   let streaming = false;
@@ -58,6 +61,9 @@ function toStoreMessage(api: any): ChatMessage {
     if (md && md.status === 'generating') {
       streaming = true;
     }
+    if (md && Array.isArray(md.attachments)) {
+      attachments = md.attachments as ChatAttachmentMeta[];
+    }
   } catch { /* metadata 非 JSON 或为空：按无思考处理（R-04） */ }
   return {
     id: String(api.id ?? `${Date.now()}-${Math.random()}`),
@@ -69,6 +75,7 @@ function toStoreMessage(api: any): ChatMessage {
     thinking,
     thinkingMs,
     streaming,
+    attachments,
   };
 }
 
@@ -237,6 +244,16 @@ export function setExplicitSkillIds(ids: number[]) {
   explicitSkillIds = Array.isArray(ids) ? [...ids] : [];
 }
 
+/**
+ * T-07（chat-attachment-understanding）：本轮待发送附件。
+ * 与 explicitSkillIds 同范式 —— **读取一次即清空**，仅对下一条消息生效，不持久。
+ */
+let pendingAttachments: ChatAttachmentMeta[] = [];
+
+export function setPendingAttachments(list: ChatAttachmentMeta[]) {
+  pendingAttachments = Array.isArray(list) ? [...list] : [];
+}
+
 export const apiChatTransport: ChatTransport = {
   async listSessions(): Promise<ChatSession[]> {
     throw new Error('listSessions is not supported via API transport');
@@ -307,7 +324,8 @@ export const apiChatTransport: ChatTransport = {
   },
 
   async createSession(agentId: string): Promise<ChatSession> {
-    const session = await createSessionApi(Number(agentId), '新会话');
+    // CR-03：前台空间 = FRONT_CHAT
+    const session = await createSessionApi(Number(agentId), '新会话', undefined, 'FRONT_CHAT');
     if (!session) throw new Error('创建会话失败');
     return {
       id: String(session.id),
@@ -457,14 +475,49 @@ export const apiChatTransport: ChatTransport = {
       }
     })();
 
+    // T-07：本轮附件（读取一次即清空，仅对本条消息生效）
+    const attachmentsForThisTurn =
+      pendingAttachments.length > 0 ? [...pendingAttachments] : undefined;
+    const attachmentIdsForThisTurn = attachmentsForThisTurn?.map((a) => a.id);
+    pendingAttachments = [];
+
     const userMessage: any = {
       sessionId,
       role: 'user',
       content,
       messageType: 'text',
       titleNeeded: needsTitle,
+      // R-10/S9：附件写入 metadata ⇒ 后端回填 message_id；历史回看可还原
+      ...(attachmentIdsForThisTurn?.length
+          ? {
+              metadata: JSON.stringify({
+                attachmentIds: attachmentIdsForThisTurn,
+                attachments: attachmentsForThisTurn,
+              }),
+          }
+        : {}),
+      // 本地即时渲染（当轮不必等刷新）
+      ...(attachmentsForThisTurn?.length ? { attachments: attachmentsForThisTurn } : {}),
     };
     await saveMessageApi(sessionId, userMessage);
+
+    // BUG-156：本地气泡是 store 自建的占位消息（只有 content），不带 attachments ⇒
+    // 当轮不显示、刷新后靠 metadata 还原才有。这里把本轮附件**回写 store 内存消息**（响应式，立即渲染）。
+    if (attachmentsForThisTurn?.length) {
+      try {
+        const chatStore = useChatStore();
+        const list = (chatStore.messagesByS as Record<string, any[]>)[sessionId] ?? [];
+        for (let i = list.length - 1; i >= 0; i--) {
+          const m = list[i];
+          if (m && m.role === 'user' && m.content === content) {
+            m.attachments = attachmentsForThisTurn;
+            break;
+          }
+        }
+      } catch {
+        /* 回写失败不影响发送主流程（刷新后仍可从 metadata 还原） */
+      }
+    }
 
     const agentStore = useAgentStore();
     const currentAgent = agentStore.agents.find((a) => a.id === agentId);
@@ -495,6 +548,8 @@ export const apiChatTransport: ChatTransport = {
             agentId: Number(agentId),
             harnessSn: currentAgent?.sn ?? undefined,
             enabledSkillIds: skillIdsForThisTurn,
+            // T-07：附件 id（不传即后端短路，行为不变 —— S1'）
+            attachmentIds: attachmentIdsForThisTurn,
           },
           async (response) => {
             if (abortRequested) return;
@@ -851,6 +906,8 @@ export const apiChatTransport: ChatTransport = {
             content,
             agentSn: currentAgent?.sn ?? '',
             type: currentAgent?.type || '',
+            // T-07：附件 id（SQL/nl2sql 走 streamFrontChatSql，不接附件：模态不同且为 GET 传参）
+            attachmentIds: attachmentIdsForThisTurn,
           },
           async (response) => {
             if (abortRequested) return;

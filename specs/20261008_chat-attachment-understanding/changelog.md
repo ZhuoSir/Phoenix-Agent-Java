@@ -1,5 +1,120 @@
 # Changelog: chat-attachment-understanding
 
+## v1.4.0 确认② 重走通过（2026-10-09）⇒ 三重门恢复齐全，T-06 开工
+
+- 确认人 **陈卓**；plan **v1.4.0 已确认** / tasks **v1.4.0 已确认**
+- 三重门：requirements v1.1.0 / plan v1.4.0 / tasks v1.4.0 ⇒ 允许继续 Implement
+- T-06 施工顺序（本轮起）：① 两个 DTO 加可选 `attachmentIds` ② `ChatAttachmentAssembler`（解析/鉴权/文档注入/图片阶段1/降级）
+  ③ harness 族接入（`doStream` 既有 flatMapMany 链前插）+ `buildUserMessage(request, ctx)`（S8 两身份不变）
+  ④ react 族接入（`enrichContent` 复用同一装配器）⑤ `saveMessage` 副作用回填 `message_id`（S9 四身份不变）
+  ⑥ 部署 + 七组断言（S1'/S8/S9/S6 + 阶段1 描述含图中事实 + R-06 端到端 + 降级不编造）
+
+
+## v1.4.0（2026-10-09）**待重确认** —— 铁律 6：消息由前端落库 ⇒ metadata/回填改经既有 saveMessage 副作用
+
+- **停编码**：T-06 仍未写任何生产代码
+- **查实事实**：agent 侧**不写消息表**；消息由前端 `saveMessageApi` 落库
+  （`components/run/index.vue:637` 用户消息、`:698/:713` 助手消息）⇒ 后端拿不到 message id，
+  原 T-06 验收里「`metadata.attachmentNotice` 落库」「附件回填 `message_id`」两条**无法只靠后端达成**
+- **方案（不新增端点）**：扩展既有 `POST /api/sessions/{sessionId}/messages` —— 前端把 `attachmentIds` 与告知写入
+  `metadata`，后端 `saveMessage` 见该键即回填附件 `message_id`；**不含该键时行为逐字节不变**
+- **新增共享面 S9**：`ChatController.saveMessage` 的四个既有身份（保存用户消息 / 保存助手消息 /
+  `titleNeeded` 触发标题生成 / 每次更新会话时间）逐一列出变更后预期；metadata 畸形不得影响消息保存（降级 WARN，不 500）
+- **新增 plan 小节「T-06 / T-07 责任边界」**：R-07/R-08 告知的「当次用户可见」由 T-06 写进回答内容；
+  「历史回看仍可见」由前端写 metadata + 后端回填共同达成；缩略图必须 fetch+blob（不支持 `?token=`）
+- **T-06 可独立验证**：直接以带 `attachmentIds` 的 metadata 调既有端点即可断言回填，**不依赖 T-07 完成**
+- 影响文档：plan（接口表 / S9 / 数据流 / 分工小节）、tasks（T-06 ⑤b·⑦、T-07 ④⑤⑥）；**requirements 不变**
+- 状态：plan/tasks **v1.4.0 待重确认**（确认② 重走）；三重门暂不齐 ⇒ 继续禁止写生产代码
+
+
+## v1.3.0 确认② 重走通过（2026-10-09）⇒ 三重门恢复齐全
+
+- 确认人 **陈卓**（用户选定「确认通过（确认人：陈卓）」）；plan **v1.3.0 已确认** / tasks **v1.3.0 已确认**
+- 决策2 定案：**两阶段（方案 B）**——阶段1 `qwen3.8-max` 结构化理解图片产出描述；
+  阶段2 描述 + 文档抽取文本 + 提示词进正常 agent 循环（技能/工具/记忆/工作区全保留）
+- 三重门：requirements v1.1.0 / plan v1.3.0 / tasks v1.3.0 均 已确认 ⇒ **允许继续 Implement（T-06 起）**
+- T-06 施工纪律：触碰共享面 S1'（两个发送 DTO）与 S8（buildUserMessage）⇒ 提交 body 必须同贴
+  "改好了 + 没改坏"两类实测输出；SSE 订阅端点保持 diff 为空
+
+
+## v1.3.0（2026-10-09）**待重确认** —— 铁律 6：决策2 改为两阶段（AgentScope 无 per-call 模型覆盖）
+
+- **停编码**：T-06 未写任何生产代码；查实设计前提后回改文档
+- **硬事实（javap 实证）**：`HarnessAgent` 只有 `getModel()` 无 setter；`call(...)` **8 个重载**均不接受 model/options；
+  delegate `ReActAgent` 同为只读；模型仅能在 `Builder.model(...)` 建实例时绑定。
+  实例由 `harnessAgentRegistry.get(agentId, sessionId)` 按会话缓存，工作区/记忆/turn 态挂其上
+  ⇒ **"含图就换模型"在不重建实例前提下不可行**，v1.1.0/v1.2.0 决策2 的"image_url 部件直接进对话模型"前提错误
+- **用户裁定（2026-10-09）：方案 B 两阶段** —— 阶段1 `qwen3.8-max` 对图片做结构化理解产出描述；
+  阶段2 描述 + 文档抽取文本 + 提示词进**正常 agent 循环**（技能/工具/记忆/工作区全保留）
+- **被拒**：A 直连多模态（绕过 agent ⇒ 能力全丢）；C 按请求另建 MULTIMODAL 实例（同会话双实例致
+  Compaction/SkillUsageStore/turn 态分叉 + AutoCloseable 生命周期自管，**其可行性未验证**，不做未验证的高风险改动）；
+  OCR（用户明确要真多模态）
+- **矩阵新增 S8**：`HarnessChatServiceImpl.buildUserMessage`（既有两身份：无附件纯文本 / `skillScopeHint` 末尾拼接）
+- **风险新增 3 条**：描述瓶颈（模板化 + 允许重跑阶段1）、双次调用成本（仅含图触发）、描述过长（同受 R-08 截断）
+- **tasks T-06 重写**：验证方式含 S1'（两族各一条）、S8、阶段1 描述含图中独特事实、R-06 端到端、
+  T-04 遗留的"文档独特事实命中"在此完成、降级与历史标注、S6 旧消息兼容、`message_id` 回填
+- **requirements 不变**（R-06 原文"提交给多模态模型理解、非 OCR"在方案 B 下依然成立）⇒ 无需重走确认①
+- 状态：plan/tasks **v1.3.0 待重确认**（确认② 重走）；三重门暂不齐 ⇒ 继续禁止写生产代码
+
+
+## v1.2.0 确认② 重走通过（2026-10-09）⇒ 三重门恢复齐全
+
+- 确认人 **陈卓**（铁律 6 回改文档后重走确认②，用户选定「确认通过（确认人：陈卓）」）
+- **接入范围裁定：两族都接** —— harness 族 5 端点（`HarnessRequest` + `HarnessChatService`）
+  + react 族 1 端点（`/api/admin/agent/chat`，`ChatModelRequest` + `AgentManager.streamCall`）；
+  理由：admin-ui 对话页 `components/run/index.vue` 同时调用两族，只接一族会造成"上传了附件却静默不生效"
+- 三重门现状：requirements **v1.1.0 已确认** / plan **v1.2.0 已确认** / tasks **v1.2.0 已确认** ⇒ 允许继续 Implement
+- 施工纪律不变：T-06 触碰共享面 S1'（两个发送 DTO）⇒ 提交 body 必须同贴"改好了 + 没改坏"两类实测输出
+
+
+## v1.2.0（2026-10-09）**待重确认** —— 铁律 6：T-06 施工前侦察推翻 plan 决策1 的事实前提
+
+- **停编码**：T-06 尚未写任何生产代码；发现设计缺陷即回改文档（未"先写了再说"）
+- **事实纠正**：`GET /api/agent/{agentId}/sessions/stream` 只是 **SSE 事件订阅**（`streamSessionUpdates`），
+  **不是发送端点**；真正的运行端点**全是 POST**，共 **6 个**、分两族：
+  harness 族 5 个（`/api/admin/harness/chat`、`/front/stream/chat`、`/platform/harness/chat`、
+  `/api/front/harness/chat`、`/api/front/stream/chat`，共用 `HarnessChatService` + `HarnessRequest`）、
+  react 族 1 个（`/api/admin/agent/chat`，`ChatModelRequest` → `AgentManager.streamCall`）
+- **关键约束**：admin-ui 对话页 `components/run/index.vue` **同时**调用两族 ⇒ 只接一族会造成
+  "上传了附件却不生效"的**静默失效**（违 R-05/R-06 可观察性）
+- **决策1 重写**：附件 id 随 **POST 请求体**传递（两个 DTO 各加可选 `attachmentIds`），
+  在**两个收敛点**下游用**同一个装配器**解析/鉴权/注入（避免 6 处各写一遍，L-06）；
+  **SSE 订阅端点不改** ⇒ 原 S1 风险归零；矩阵新增 **S1'**（两个发送 DTO 的既有调用方）
+- 被拒方案补：原 GET 查询参数方案（前提错误 + id 进访问日志 + URL 长度限制）、只接 harness 族（静默失效）、
+  前端把文件内容塞 content（体积失控 + 绕鉴权 + 无法回看）
+- 影响文档：plan（决策1/接口表/矩阵/数据流/方案概述）、tasks（T-06 标题与验证方式）；**requirements 不变**（R-01~R-12 语义未动）
+- 状态：plan/tasks 均 **待重确认**（确认② 重走）；三重门暂时不齐 ⇒ 继续禁止写生产代码
+
+
+## v1.1.0 = CR-01 合入（2026-10-08，micro，1 次确认 陈卓）
+
+- **变更**：多模态模型 `qwen-vl-max` → **`qwen3.8-max`**（实测原生支持 `image_url`，两把可用 key 均 200 并正确读图；
+  原 `qwen-vl-max` 在 id=6 端点 404 model_not_found、在原 CHAT 行 key 下 400 Arrearage）
+- **变更**：plan 决策 3 改造 —— `V2.0.0_15` **只做 DDL**（建表+2 索引），MULTIMODAL 模型行**改由管理页配置**；
+  理由：原方案"子查询复用现有 qwen 行密钥"实测指向**欠费死 key**，会把死 key 带进所有新环境；密钥不入版本库
+- **新增纪律**（写入 plan/tasks）：`ModelType.fromCode()` 对未知值抛异常 ⇒ **先发代码加枚举值、再写 MULTIMODAL 数据行**；
+  遵守部分唯一索引 `uk_dmc_type_default`（每类型至多一个默认行）
+- **T-01 达成并勾选**：探针 HTTP 200 且读出图内编码 `PROBE-4821-KQ`（证据 `evidence/T-01_multimodal-probe.txt`）
+- **三文档 bump**：requirements v1.1.0 / plan v1.1.0 / tasks v1.1.0（本 CR 的 1 次确认即其重确认）
+- **关联账**：BUG-152（CHAT 选取两路径语义不一致，新建·不顺手修）、L-74（改配置前先读选取代码+确认运行时缓存）、
+  运维证据 `evidence/OPS_chat-default-fix.txt`（CHAT 死链修复 + 端到端复验 SSE 21 事件含真实回答）
+- 八动作：①②③④⑤⑥⑦⑧ 全勾（⑥ 本 CR 不涉新 SQL 件：`V2.0.0_15` 仍 1 件、范围收窄，待 T-02 落地登记 artifacts）
+
+
+## Implement 阻塞（2026-10-08）：T-01 探针未通过 ⇒ 按 plan 停工回报
+
+- **T-01 未通过**：`qwen-vl-max` 真实带 `image_url` 调用 → **HTTP 400 `Arrearage`**（阿里云百炼账号欠费/状态异常）。
+  失败原因**不是**模型名、不是 provider 不支持多模态、不是本需求代码（尚未写任何生产代码）。
+- **影响面诊断**：既有 **默认 CHAT（deepseek）HTTP 402 Insufficient Balance**、qwen CHAT 400 Arrearage
+  ⇒ **当前环境所有 CHAT/多模态链路不可用**；embedding 链路**正常**（/v1/embeddings → 200，1024 维）。
+- **自我纠错留痕**：首次用 `/v1/chat/completions` 探 embedding 模型得到 404 `model_not_supported`，
+  属**探错端点**的假信号；按 L-45/L-37 复核后撤销，**未登记假 BUG**。
+- **按 tasks 依赖图判定**：T-01/T-03/T-06/T-09 阻塞，T-04 验证阻塞（代码可写但**不得声称验证通过**，铁律 5）；
+  **T-02/T-05/T-07/T-08 不依赖模型**（若用户授权可先做，属对 plan「探针为阻塞前置」的偏离，需明确同意并留账）。
+- **未勾选任何任务**；证据 `evidence/T-01_multimodal-probe.txt`（含 request_id、三条链路诊断、解除条件 A/B/C）。
+- 密钥全程仅脚本内读取，**未落盘未打印**。
+
+
 ## v1.0.0 tasks 确认③ 通过 ⇒ **三重确认门达成**（2026-10-08）
 
 - **确认③**：tasks **v1.0.0 已确认**，确认人 **陈卓**
@@ -73,3 +188,13 @@
 - 功能名: `chat-attachment-understanding`（用户从两个候选中选定）
 - 范围拍板（用户 2026-10-08）：入口 = **admin-ui + mobile-ui 两端**；图片理解 = **真多模态（新增视觉模型）**
 - requirements v0.1.0 草稿成文，含 8 条待确认问题（阻塞项 6 条）——**未确认，禁止进入 Plan**
+
+## v1.5.0（2026-10-09）CR-03 会话空间隔离（major，三轮确认）
+- CR-03 §S 确认（陈卓 2026-10-09）：新增 R-13/R-14、修改 R-10/R-11；Non-goals 与「为何不另立 spec」在案
+- CR-03 §P 确认（陈卓 2026-10-09）：12 身份矩阵 + 处置表 + 被拒方案（含另立新 spec）；
+  拍板：存量回填=**A（存量→FRONT_CHAT）**、跨空间拒绝=**404-as-不存在**
+- CR-03 §T 确认（陈卓 2026-10-09）：新增 T-10~T-12（矩阵断言+日志断言+rollback 演练）；作废任务=无
+- 父文档 bump：requirements v1.1.0→v1.5.0、plan v1.4.0→v1.5.0、tasks v1.4.0→v1.5.0（三文档同序列）
+- 施工停摆记录：开 CR 时 T-09 暂停；§T 确认后恢复施工（先 T-10）
+- CR-03 §I 执行（2026-10-09）：T-10（后端隔离+SQL V2.0.0_16+rollback 演练，矩阵 12/12）→
+  T-11（三端 scope，浏览器抓包实证）→ T-12（e2e 汇总）；事故 L-78（rollback 误入 migrator 扫描目录）已止血

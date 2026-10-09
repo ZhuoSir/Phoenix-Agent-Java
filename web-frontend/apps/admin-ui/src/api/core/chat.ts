@@ -24,10 +24,10 @@ export interface ChatMessage {
 
 const API_BASE_URL = '/api';
 
-export async function getAgentSessionsApi(agentId: number): Promise<ChatSession[]> {
+export async function getAgentSessionsApi(agentId: number, scope?: string): Promise<ChatSession[]> {
   const response = await requestClient.get<{ success: boolean; data: ChatSession[] }>(
     `${API_BASE_URL}/agent/${agentId}/sessions`,
-    { responseReturn: 'body' },
+    { responseReturn: 'body', params: scope ? { scope } : undefined },
   );
   if (!response.success) {
     return [];
@@ -35,11 +35,11 @@ export async function getAgentSessionsApi(agentId: number): Promise<ChatSession[
   return response.data ?? [];
 }
 
-export async function createSessionApi(agentId: number, title?: string, userId?: number): Promise<ChatSession | null> {
+export async function createSessionApi(agentId: number, title?: string, userId?: number, scope?: string): Promise<ChatSession | null> {
   const response = await requestClient.post<{ success: boolean; data: ChatSession }>(
     `${API_BASE_URL}/agent/${agentId}/sessions`,
     { title, userId },
-    { responseReturn: 'body' },
+    { responseReturn: 'body', params: scope ? { scope } : undefined },
   );
   if (!response.success) {
     return null;
@@ -47,21 +47,21 @@ export async function createSessionApi(agentId: number, title?: string, userId?:
   return response.data;
 }
 
-export async function clearAgentSessionsApi(agentId: number): Promise<void> {
+export async function clearAgentSessionsApi(agentId: number, scope?: string): Promise<void> {
   const response = await requestClient.delete<{ success: boolean; message?: string }>(
     `${API_BASE_URL}/agent/${agentId}/sessions`,
-    { responseReturn: 'body' },
+    { responseReturn: 'body', params: scope ? { scope } : undefined },
   );
   if (!response.success) {
     throw new Error(response.message || '清除会话失败');
   }
 }
 
-export async function getSessionMessagesApi(sessionId: string): Promise<ChatMessage[]> {
+export async function getSessionMessagesApi(sessionId: string, scope?: string): Promise<ChatMessage[]> {
   const response = await requestClient.get<{ success: boolean; data: ChatMessage[] }>(
     `${API_BASE_URL}/sessions/${sessionId}/messages`,
     // BUG-76：长轮期间后端负载高，默认超时易触发前端"请求超时"toast 与误判 → 放宽到 60s
-    { responseReturn: 'body', timeout: 60_000 },
+    { responseReturn: 'body', timeout: 60_000, params: scope ? { scope } : undefined },
   );
   if (!response.success) {
     return [];
@@ -69,43 +69,43 @@ export async function getSessionMessagesApi(sessionId: string): Promise<ChatMess
   return response.data ?? [];
 }
 
-export async function saveMessageApi(sessionId: string, message: ChatMessage): Promise<void> {
+export async function saveMessageApi(sessionId: string, message: ChatMessage, scope?: string): Promise<void> {
   const response = await requestClient.post<{ success: boolean; message?: string }>(
     `${API_BASE_URL}/sessions/${sessionId}/messages`,
     { ...message, sessionId },
-    { responseReturn: 'body' },
+    { responseReturn: 'body', params: scope ? { scope } : undefined },
   );
   if (!response.success) {
     throw new Error(response.message || '保存消息失败');
   }
 }
 
-export async function pinSessionApi(sessionId: string, isPinned: boolean): Promise<void> {
+export async function pinSessionApi(sessionId: string, isPinned: boolean, scope?: string): Promise<void> {
   const response = await requestClient.put<{ success: boolean; message?: string }>(
     `${API_BASE_URL}/sessions/${sessionId}/pin`,
     null,
-    { params: { isPinned }, responseReturn: 'body' },
+    { params: { isPinned, ...(scope ? { scope } : {}) }, responseReturn: 'body' },
   );
   if (!response.success) {
     throw new Error(response.message || '置顶操作失败');
   }
 }
 
-export async function renameSessionApi(sessionId: string, title: string): Promise<void> {
+export async function renameSessionApi(sessionId: string, title: string, scope?: string): Promise<void> {
   const response = await requestClient.put<{ success: boolean; message?: string }>(
     `${API_BASE_URL}/sessions/${sessionId}/rename`,
     null,
-    { params: { title: title.trim() }, responseReturn: 'body' },
+    { params: { title: title.trim(), ...(scope ? { scope } : {}) }, responseReturn: 'body' },
   );
   if (!response.success) {
     throw new Error(response.message || '重命名失败');
   }
 }
 
-export async function deleteSessionApi(sessionId: string): Promise<void> {
+export async function deleteSessionApi(sessionId: string, scope?: string): Promise<void> {
   const response = await requestClient.delete<{ success: boolean; message?: string }>(
     `${API_BASE_URL}/sessions/${sessionId}`,
-    { responseReturn: 'body' },
+    { responseReturn: 'body', params: scope ? { scope } : undefined },
   );
   if (!response.success) {
     throw new Error(response.message || '删除会话失败');

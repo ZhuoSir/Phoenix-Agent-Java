@@ -12,7 +12,7 @@
 
 | spec | 版本 | 状态 | 新增 | 变更 | 摘要 |
 |---|---|---|---|---|---|
-| specs/20261008_chat-attachment-understanding | requirements **v0.1.0 草稿** / plan v0.1.0 草稿 / tasks v0.1.0 草稿 | **立项中**（Phase 1 Specify；确认①未过，6 条阻塞问题待答） | R-01~R-12（草案） | 无 | 对话附件上传与大模型理解：文档（word/pdf/excel/txt/md）+ 图片（常见格式）白名单，其他一律不支持；**admin-ui + mobile-ui 两端**；图片走**真多模态视觉模型**（拟在 `tbl_data_model_config` 增 `model_type=VISION`）；复用既有 Tika 解析与 FileStorage 存储 |
+| specs/20261008_chat-attachment-understanding | requirements **v1.1.0 已确认** / plan **v1.1.0 已确认** / tasks **v1.1.0 已确认**（确认人 陈卓 2026-10-08；含 CR-01 micro 合入） | **Implement 进行中（T-01 完成，1/9）** | R-01~R-12 | CR-01（多模态模型改 `qwen3.8-max`；迁移件只 DDL、模型行经管理页配置） | 对话附件上传与大模型理解：文档（word/pdf/excel/txt/md）+ 图片（常见格式）白名单，其他一律不支持；**admin-ui + mobile-ui 两端**；图片走**真多模态视觉模型**（拟在 `tbl_data_model_config` 增 `model_type=VISION`）；复用既有 Tika 解析与 FileStorage 存储 |
 | specs/20261007_user-role-group-model | requirements **v2.8.0 已确认（陈卓 2026-10-07；v2.0.0 重确认① + R-12~R-19 逐版确认）** / plan **v1.8.0 已确认** / tasks **v1.8.0 已确认** | **Implement 完成（T-01~T-28，28/28）**；R-12（信息架构）、**R-13（账号集合收敛）** 与 **R-14（用户类型/IDM + 工号下线）**、R-15~R-17 与 **CR-01(R-18)/CR-02(R-19)** 追加（requirements v2.2.0→v2.8.0 / plan v1.3.0→v1.8.0 / tasks v1.2.0→v1.8.0 均 已确认 陈卓） | 全部 R-01~R-19 均已实施（T-01~T-28 全勾，见 tasks 覆盖矩阵） | 删除组织三表 + **用户模型三表**组织列 + 后台数据组 + **三方平台配置表**；下线三方集成三层（同步/免登/平台配置，含 SDK、`PlatformTypeEnm` 家族、`third_party_id`、前端页面与菜单行）；**只保留账号密码登录**；ACL 基线重建 | 需求 **19 条 R**（R-01~R-19）；Q1~Q6 + Q-P1~Q-P6 + Q7~Q13 全部裁定；调研登记 BUG-116~122（后续本轮 BUG-127~140）；教训 L-43/L-44（后续 L-48~L-66） |
 
 ## 二、纳入缺陷（随版修复批）
@@ -259,3 +259,25 @@
     共 **21 条补登「二、纳入缺陷」**（原表只到 BUG-127）。
   - **未纳入本版的 open 缺陷**（状态=新建，如实留账）：BUG-128（dev 代理冲突）、
     **BUG-129（P2 登录接口回传 password 等敏感列）**、**BUG-131（P2 用户管理端点缺管理员守卫）**。
+
+- **2026-10-08 新 spec 立项并三重确认通过**：`specs/20261008_chat-attachment-understanding`
+  （对话附件上传与大模型理解；入口=admin-ui+mobile-ui 两端；图片=真多模态）。
+  requirements/plan/tasks 均 **v1.0.0 已确认（陈卓）**，随后 **CR-01（micro）** 合入 ⇒ 三文档 **v1.1.0**。
+  施工分支 `feature/chat-attachment-understanding`（基点 = 本版分支）。**T-01 探针已完成**：
+  `qwen3.8-max` 带 `image_url` 真实调用 HTTP 200 且读出图内编码（两把可用 key 各验一次）。
+- **2026-10-08 运维配置动作（非代码、非迁移件）**：修复 CHAT 死链 —— deepseek 行 402 余额不足、qwen CHAT 行 400 欠费
+  ⇒ id=7 换实测可用 key 并设默认、id=5 停用（api_key 原值保留可回退）+ 重启后端；
+  **端到端复验**：`POST /api/admin/agent/chat` → HTTP 200 SSE **21 事件、内容含真实回答**（修复前 4 空事件 + 402）。
+  证据 `specs/20261008_chat-attachment-understanding/evidence/OPS_chat-default-fix.txt`。
+  衍生缺陷 **BUG-152**（`selectActiveByType` = `is_active LIMIT 1` 无 ORDER BY、不看 `is_default`，
+  与 `getDefaultConfigByType` 语义不一致 ⇒ 管理页设的默认对话模型对图工作流无效）**已登记不顺手修**；教训 **L-74**。
+
+## CR-03 会话空间隔离（2026-10-09，major，三轮确认）
+- 挂接 spec: 20261008_chat-attachment-understanding（v1.5.0）
+- 升级件: V2.0.0_16（source 列+回填+索引，见该 spec artifacts.md）
+- 任务: T-10~T-12 全勾；事故 L-78 已记
+
+## 部署面决定（2026-10-09，陈卓拍板）
+- v2.0.0 **携带移动端**：前端镜像含 /m/ 挂载（docker/.stage/dist-mobile + nginx `location ^~ /m/`），
+  mobile-ui 以 --base=/m/ 构建；BUG-154/155 修复后移动端登录与对话可用
+- BUG-153（mobile `build` 脚本类型门常红）**不修复**（批准：陈卓）；mobile 出包走 `pnpm exec vite build` 单跑

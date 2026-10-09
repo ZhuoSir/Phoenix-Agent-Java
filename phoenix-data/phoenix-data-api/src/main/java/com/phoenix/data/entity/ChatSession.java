@@ -33,6 +33,12 @@ public class ChatSession {
 	@Builder.Default
 	private Boolean isPinned = false; // Whether pinned
 
+	/**
+	 * 会话空间（CR-03）: ADMIN_RUN=管理端运行页 / FRONT_CHAT=前台聊天(含mobile)。
+	 * 默认 FRONT_CHAT = 存量回填口径 A + 旧客户端不传 scope 的兼容默认。
+	 */
+	private String source = "FRONT_CHAT";
+
 	private String userId;
 
 	private LocalDateTime createTime;
