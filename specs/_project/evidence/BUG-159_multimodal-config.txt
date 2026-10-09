@@ -1,0 +1,36 @@
+=== BUG-159 定位与修复证据：MULTIMODAL 行连接测试必失败 + 停用默认行文案 ===
+日期: 2026-10-09
+
+--- 复现（修复前，真实请求）---
+  ① POST /api/model-config/test（MULTIMODAL 行 id13 数据）
+     → {"success":false,"message":"连接测试失败: 未知的模型类型: MULTIMODAL"}
+  ② POST /api/model-config/deactivate/13
+     → {"success":false,"message":"该模型是「MULTIMODAL」类型的默认模型，请先将其他模型设为默认后再停用"}
+
+--- 根因 ---
+  ① `ModelConfigOpsService.testConnection()` 仅分支 `CHAT`/`EMBEDDING`，其余一律抛 `未知的模型类型` ⇒
+     MULTIMODAL **没有任何测试通路**（CR-01 新增该类型时漏了测试分支）
+  ② 停用守卫本身是设计行为（默认模型需先改默认），但文案用**英文枚举名** `MULTIMODAL`，且未说明可操作路径
+     （当时 MULTIMODAL 仅 id13 一条 active，用户读起来像报错）
+
+--- 修复 ---
+  ① `testConnection` 增加 MULTIMODAL 分支 → 复用最轻量 chat 探针（多模态与 CHAT 同为 OpenAI 兼容 chat 端点，
+     差异在能否吃图；**本探针只验 base_url/key/model 可达，不验视觉能力**，已在代码注释写明）
+  ② `ModelType` 增加**中文展示名**（对话模型/向量模型/多模态模型/语音模型）；守位文案改用标签并给出可行路径：
+     「需先启用另一条同类型模型并设为默认，或直接删除本行，之后才能停用」
+
+--- 修复后实测 ---
+
+  | 项 | 结果 |
+  |---|---|
+  | ① MULTIMODAL 连接测试（id13） | success=true「连接测试成功！模型可用。」✅（修复前恒失败） |
+  | ② CHAT 回归（qwen3.8-flash） | success=true ✅ |
+  | ③ EMBEDDING 回归（qwen3.7-text-embedding-flash） | success=true ✅ |
+  | ④ 停用默认行文案 | 「该模型是「**多模态模型**」类型当前的默认模型，需先启用另一条同类型模型并设为默认，或直接删除本行，之后才能停用」✅ |
+  | ⑤ 新文案指引的路径**真能走通** | 新建合法 MULTIMODAL 行 15 → activate「模型切换成功！」→ default「已设为默认模型」→ deactivate 13「模型已停用」→ 复原 13 为默认 → 停用并删除 15 ✅（终态仅 13 active+default） |
+  | ⑥ 视觉链路回归 | 附件图上传 + 提问可答（链路通）；但把图中 `IMG-7391-KQ` 误读为 `IMG-7391-KML` —— **模型字符级误差**（样本图放大核对清晰为 KQ），即 T-06 已记录的「多模态轮次波动」风险，非本次改动引入 |
+
+--- 验证过程中的两个发现（如实记）---
+  1. 我最初用**软删除行 id14** 验证路径 ⇒ `default/14` 返回 **HTTP 500 服务器内部错误**
+     （真因 `IllegalArgumentException: 模型配置不存在或已删除: 14`，被兜成 500）⇒ 已登记 **BUG-160**（错误信封一致性问题）
+  2. 同上，说明当时那条"可操作路径"其实拿不到合法同类型行 —— 改用**新建行**才验证通过（见 ⑤）
