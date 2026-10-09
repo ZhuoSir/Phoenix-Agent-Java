@@ -1,4 +1,4 @@
-> 版本: v1.4.0 | 状态: 已确认 | 确认人: 陈卓 | 确认日期: 2026-10-09 | 确认记录: 铁律6 回改后**重走确认②**，用户 2026-10-09 选定「确认通过（确认人：陈卓）」（metadata/回填经既有 saveMessage 副作用；新增 S9 与 T-06/T-07 分工） | 前次确认: v1.3.0（陈卓 2026-10-09）
+> 版本: v1.5.0 | 状态: 已确认 | 确认人: 陈卓 | 确认日期: 2026-10-09 | 确认记录: CR-03（major）三轮确认完成（§S/§P/§T，陈卓 2026-10-09；拍板：回填=A 存量→FRONT_CHAT、跨空间拒绝=404-as-不存在）⇒ 新增 R-13/R-14、修改 R-10/R-11、新增 T-10~T-12 | 更新: 2026-10-09
 
 # 技术方案：chat-attachment-understanding（对话附件上传与大模型理解）
 
@@ -241,3 +241,17 @@ CREATE INDEX IF NOT EXISTS idx_chat_attachment_message  ON tbl_data_chat_attachm
 - **依赖既有能力**：`FileStorageService`/`FileStorageProperties`、`spring-ai-tika-document-reader`、`tbl_data_model_config` + `HarnessModelRegistry`/`AiModelConfigEpoch`、`tbl_data_chat_message.metadata`、`chat-shared`。
 - **无新增第三方依赖**；**无 nginx/网关新路径**（`/api/**` 已被既有鉴权链与代理覆盖）—— 若实测发现新路径需代理规则，**回改本 plan 并重走确认②**（铁律 6）。
 - **版本归属**：v2.0.0（在途）；升级件序号 **V2.0.0_15**（现台账 14 件，续号；M3 汇总时统一复核编号）。
+
+## CR-03 设计（v1.5.0，会话空间隔离）
+
+- **承载**：`tbl_data_chat_session` 新列 `source varchar(16) NOT NULL DEFAULT 'FRONT_CHAT'`
+  （SQL `V2.0.0_16__chat_session_source_ddl.sql` + rollback；M3 并入升级件）
+- **声明方式**：调用方显式传 `scope`（query/body）；**旧客户端不传 ⇒ 默认 FRONT_CHAT**（兼容旧包）
+- **校验点**：列表/创建/按 id 操作（消息、pin、rename、delete）三处统一；不符 ⇒ 404-as-不存在；
+  `DELETE /api/agent/{id}/sessions`（清空）**仅清声明空间**
+- **不改**：SSE 订阅、SessionTitleService、updateSessionTime、ChatAttachmentService.listForSession、
+  HarnessAgentRegistry 缓存（非可见性面，理由见 CR-03 §P-2 #9~#11）
+- **日志点**（CR-03 §P-4）：列表 INFO（agentId/scope/命中条数/userId）、跨空间 WARN（sessionId/声明/库内/userId）、
+  创建 INFO（sessionId/source/userId）、迁移 INFO（影响行数）
+- **坑核对**：L-06（多入口/多身份枚举 ⇒ 矩阵 12 身份逐条断言）、L-32（typecheck 只认增量）、
+  L-75/L-77（产物与执行痕迹断言）、L-58（鉴权口径单一来源）；被拒方案见 CR-03 §P-6（含「另立新 spec」）
