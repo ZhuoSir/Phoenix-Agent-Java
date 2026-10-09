@@ -96,6 +96,30 @@ public class EmbeddingDimensionResolver {
 		}
 	}
 
+	/**
+	 * R-09（表无关版）：校验**所有**向量表的既有维度是否与当前模型维度一致。
+	 *
+	 * <p>用于写入/检索入口——这些入口由 Spring 注入具体 {@code VectorStore} bean，代码层拿不到表名；
+	 * 与其猜表，不如校验全部向量表：当前 embedding 模型必须能适配**将被写入的任意表**，
+	 * 任一表维度不一致即拒绝（含表名与处置建议），避免"静默写坏/检索空结果"。
+	 */
+	public void assertAllTablesCompatible() {
+		int modelDims = resolve();
+		java.util.List<String> tables = jdbcTemplate.queryForList(
+				"select c.table_name from information_schema.columns c "
+						+ "where c.column_name = 'embedding' and c.udt_name = 'vector'", String.class);
+		for (String table : tables) {
+			Integer tableDims = tableDimensions(table);
+			if (tableDims != null && tableDims != modelDims) {
+				String msg = "向量维度不一致：表 " + table + " 为 " + tableDims + " 维，当前 embedding 模型为 "
+						+ modelDims + " 维。本期不支持自动重建：请改用与原表维度一致的 embedding 模型，"
+						+ "或在确认可丢弃/重建既有向量后由运维执行迁移（参见 BL-34）。";
+				log.warn("{}（R-09 显式拒绝，写入/检索前拦截）", msg);
+				throw new DimensionMismatchException(msg);
+			}
+		}
+	}
+
 	/** 读取表 embedding 列的实际维度；表或列不存在返回 null */
 	private Integer tableDimensions(String tableName) {
 		try {
