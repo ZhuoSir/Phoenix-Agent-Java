@@ -6,6 +6,7 @@ import com.phoenix.data.enums.ModelType;
 import com.phoenix.data.service.aimodelconfig.ModelConfigDataService;
 import io.agentscope.core.embedding.EmbeddingModel;
 import io.agentscope.core.embedding.dashscope.DashScopeTextEmbedding;
+import io.agentscope.core.embedding.ollama.OllamaTextEmbedding;
 import io.agentscope.core.model.GenerateOptions;
 import io.agentscope.core.model.ChatModelBase;
 import io.agentscope.extensions.model.ollama.formatter.OllamaChatFormatter;
@@ -29,6 +30,9 @@ import java.util.concurrent.ConcurrentHashMap;
 @RequiredArgsConstructor
 public class HarnessModelRegistry {
     private final ModelConfigDataService modelConfigDataService;
+
+    /** R-08：Ollama embedding 维度探测（以模型实际输出为准，不写死 512） */
+    private final com.phoenix.data.service.aimodelconfig.OllamaApiClient ollamaApiClient;
     // 缓存对象 (volatile 保证可见性)
     private volatile EmbeddingModel currentEmbeddingModel;
     private volatile ChatModelBase currentChatModel;
@@ -147,11 +151,24 @@ public class HarnessModelRegistry {
                     try {
                         ModelConfigDTO config = modelConfigDataService.getActiveConfigByType(ModelType.EMBEDDING);
                         if (config != null) {
-                            currentEmbeddingModel = DashScopeTextEmbedding.builder()
-                                    .apiKey(config.getApiKey())
-                                    .modelName(config.getModelName())
-                                    .dimensions(512)
-                                    .build();
+                            if (ModelProvider.OLLAMA.getCode().equalsIgnoreCase(config.getProvider())) {
+                                // R-08/R-03：Ollama embedding —— 维度**探测自模型实际输出**（如 nomic-embed-text=768），不写死 512
+                                int dims = ollamaApiClient.probeEmbeddingDimension(config.getBaseUrl(), config.getModelName());
+                                log.info("按 provider=ollama 装配 EmbeddingModel: modelName={}, endpoint={}, dimensions={}",
+                                        config.getModelName(), config.getBaseUrl(), dims);
+                                currentEmbeddingModel = OllamaTextEmbedding.builder()
+                                        .baseUrl(config.getBaseUrl())
+                                        .modelName(config.getModelName())
+                                        .dimensions(dims)
+                                        .build();
+                            }
+                            else {
+                                currentEmbeddingModel = DashScopeTextEmbedding.builder()
+                                        .apiKey(config.getApiKey())
+                                        .modelName(config.getModelName())
+                                        .dimensions(512)
+                                        .build();
+                            }
                         }
                     } catch (Exception e) {
                         log.error("Failed to initialize EmbeddingModel: {}", e.getMessage());

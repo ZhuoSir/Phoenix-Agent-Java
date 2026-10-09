@@ -2,6 +2,7 @@ package com.phoenix.data.service.aimodelconfig;
 
 import com.phoenix.data.dto.ModelConfigDTO;
 import com.phoenix.data.entity.ModelConfig;
+import com.phoenix.data.enums.ModelProvider;
 import com.phoenix.data.enums.ModelType;
 import com.phoenix.data.event.AiModelConfigChangedEvent;
 import com.phoenix.data.exception.InvalidInputException;
@@ -25,6 +26,9 @@ import tools.jackson.databind.ObjectMapper;
 @Transactional(rollbackFor = Exception.class)
 @AllArgsConstructor
 public class ModelConfigOpsService {
+
+	@org.springframework.beans.factory.annotation.Autowired
+	private OllamaApiClient ollamaApiClient;
 
 	private final org.springframework.context.ApplicationEventPublisher eventPublisher;
 
@@ -199,6 +203,11 @@ public class ModelConfigOpsService {
 		String modelType = config.getModelType();
 
 		try {
+			// R-04：provider=ollama 走**原生** /api/tags 探针（既有分支走 OpenAI 兼容协议，路径不同）
+			if (ModelProvider.OLLAMA.getCode().equalsIgnoreCase(config.getProvider())) {
+				testOllamaConnection(config);
+				return;
+			}
 			if (ModelType.CHAT.getCode().equalsIgnoreCase(modelType)) {
 				testChatModel(config);
 			}
@@ -226,6 +235,33 @@ public class ModelConfigOpsService {
 			// 如果是 OpenAiHttpException，通常包含具体的 API 错误信息
 			throw new RuntimeException(parseErrorMessage(e));
 		}
+	}
+
+	/**
+	 * R-04：Ollama 连接测试 —— 走原生 {@code /api/tags} 探活，并**校验所配模型确实已安装**。
+	 *
+	 * <p>失败信息必须可据以定位（地址不通 / 服务异常 / 模型未安装并列出本机已装模型）。
+	 */
+	private void testOllamaConnection(ModelConfigDTO config) {
+		java.util.List<String> models = ollamaApiClient.listModels(config.getBaseUrl());
+		String name = config.getModelName() == null ? "" : config.getModelName().trim();
+		boolean installed = models.stream().anyMatch(m -> m.equals(name) || m.startsWith(name + ":"));
+		if (!installed) {
+			throw new InvalidInputException("Ollama 服务可达，但未安装模型「" + name + "」（本机已装: "
+					+ String.join(", ", models) + "）");
+		}
+		log.info("Ollama 连接测试通过: modelType={}, endpoint={}, model={}", config.getModelType(),
+				config.getBaseUrl(), name);
+	}
+
+	/**
+	 * R-05：列出 Ollama 本机模型（服务端代理，前端不直连内网/宿主地址）。
+	 */
+	public java.util.List<String> listOllamaModels(String baseUrl) {
+		if (!org.springframework.util.StringUtils.hasText(baseUrl)) {
+			throw new InvalidInputException("baseUrl 不能为空");
+		}
+		return ollamaApiClient.listModels(baseUrl);
 	}
 
 	/**

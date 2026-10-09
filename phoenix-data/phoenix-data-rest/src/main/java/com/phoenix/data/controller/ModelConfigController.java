@@ -149,6 +149,22 @@ public class ModelConfigController {
 	/**
 	 * 7. 检查模型配置是否就绪（聊天模型和嵌入模型都需要配置）
 	 */
+	/**
+	 * R-05：获取 Ollama 本机已安装模型列表（服务端代理 /api/tags）。
+	 *
+	 * @param baseUrl Ollama 根地址（如 http://host.docker.internal:11434）
+	 * @return 模型名列表
+	 */
+	@GetMapping("/ollama/models")
+	public com.phoenix.data.vo.ApiResponse<java.util.List<String>> ollamaModels(@RequestParam String baseUrl) {
+		try {
+			return com.phoenix.data.vo.ApiResponse.success("查询成功", modelConfigOpsService.listOllamaModels(baseUrl));
+		}
+		catch (Exception e) {
+			return com.phoenix.data.vo.ApiResponse.error("获取模型列表失败: " + e.getMessage());
+		}
+	}
+
 	@GetMapping("/check-ready")
 	public ApiResponse<ModelCheckVo> checkReady() {
 		// 检查聊天模型是否已配置且启用

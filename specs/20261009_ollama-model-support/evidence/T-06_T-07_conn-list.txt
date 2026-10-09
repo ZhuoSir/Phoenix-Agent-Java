@@ -1,0 +1,32 @@
+=== T-06 / T-07 部署后验证证据（Ollama 连接测试 + 模型列表接口）===
+日期: 2026-10-10 | 部署: mvn package exit=0 → compose build/up exit=0 → backend healthy
+
+--- 环境准备 ---
+  三类 ollama 配置行（provider=ollama, baseUrl=http://host.docker.internal:11434, apiKey 空）：
+    17 | CHAT       | qwen2.5:7b
+    19 | MULTIMODAL | gemma3:latest
+    20 | EMBEDDING  | nomic-embed-text
+
+--- T-06 连接测试（R-04）---
+  CHAT       qwen2.5:7b        → success=true 「连接测试成功！模型可用。」
+  MULTIMODAL gemma3:latest     → success=true 「连接测试成功！模型可用。」
+  EMBEDDING  nomic-embed-text  → success=true 「连接测试成功！模型可用。」
+  ⇒ **三类均有测试通路**（原实现只有 CHAT/EMBEDDING/MULTIMODAL 的 OpenAI 兼容分支，Ollama 会打到错误路径）
+  失败路径（不可达端口 11999）：
+    success=false「连接测试失败: 无法连接 Ollama（http://host.docker.internal:11999/api/tags）: ClosedChannelException: null」
+    ⇒ 带**目标 URL 与根因**（L-09：不得把超时/不可达写成无原因的"不可用"；也不得写成"离线"）
+
+--- T-07 模型列表接口（R-05）---
+  GET /api/model-config/ollama/models?baseUrl=http://host.docker.internal:11434
+    success=true | data=['gemma3:latest', 'qwen2.5:7b', 'nomic-embed-text:latest']
+    ⇒ 与 Ollama /api/tags 一致（服务端代理，前端不直连内网/宿主地址）
+  鉴权断言（L-58：列表可见性须与归属校验成对）：
+    无 token 调用 → {"code":401,"msg":"未授权，请先登录"} ✅
+
+--- T-05 状态（部分实现，未勾选）---
+  已实现：HarnessModelRegistry 按 provider 分派 EmbeddingModel；provider=ollama 时经
+    OllamaApiClient.probeEmbeddingDimension() **探测模型实际维度**（R-08 模型侧），再以该维度构建
+    OllamaTextEmbedding（baseUrl + modelName + dimensions）
+  未完成（阻塞 T-05 验收）：向量**存储侧**维度仍写死 512（VectorConfig:32/49、HarnessConfig:109/127、
+    DataAgentConfiguration:313）⇒ 768 维写入会被 vector(512) 表拒绝；需连同 R-09（维度不一致显式拒绝）
+    一起做（原计划 T-08），故 T-05 暂不勾选，避免"未验证声称完成"
