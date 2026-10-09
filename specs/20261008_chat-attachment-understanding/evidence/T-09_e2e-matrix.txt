@@ -1,0 +1,34 @@
+=== T-09 端到端汇总矩阵（12 条 R + 共享面身份对面断言）===
+日期: 2026-10-09 | 分支: feature/chat-attachment-understanding | 版本: spec v1.5.0（含 CR-01/02/03）
+说明: 本件为**汇总件**，逐条指向各任务证据文件（均为真实命令/浏览器输出，非声称）
+
+--- R 条款 × 实测断言 ---
+| R | 断言（摘要） | 证据件 |
+|---|---|---|
+| R-01 文档白名单 | docx/pdf/xlsx/txt/md 收、zip/svg 拒（逐个原因） | T-02_upload-endpoint.txt |
+| R-02 图片白名单 | png/jpg/jpeg/gif/webp/bmp 收、svg 拒 | T-02_upload-endpoint.txt |
+| R-03 拒绝不留脏行/脏文件 | 被拒者 0 行 0 文件 | T-02_upload-endpoint.txt |
+| R-04 20MB/单次5个 | 21MB 拒、6 个拒（提示含上限值） | T-02_upload-endpoint.txt |
+| R-05 文档理解 | 回答精确命中 HT-2026-4821 / 137000（两族+前台端点） | T-04 / T-06_stream-integration.txt |
+| R-06 真多模态 | 回答精确为图中编码 IMG-7391-KQ（qwen3.8-max 阶段1） | T-01 / T-06_stream-integration.txt |
+| R-07 降级显式告知 | MULTIMODAL 双 false ⇒「多模态模型不可用…不会猜测或编造」；只发图同 | T-06_stream-integration.txt |
+| R-08 顺序截断+告知 | 29028 字符 → 截断至 24000 + 截断告知 | T-04_document-extraction.txt |
+| R-09 解析失败原因 | 加密/损坏/扫描件三类原因各自可见；扫描件原因保真度修补后首句照抄 | T-04 / T-06 ⑨ 段 |
+| R-10 持久化/历史回看 | message_id 回填（28→4418 等）；三端历史附件条渲染（截图）；空间隔离后按空间回看 | T-06 ⑤b / T-07 / T-08 / CR-03_T-12 |
+| R-11 归属鉴权 | 非本人 403、超管可见、无 token 业务 401 信封、直链不可绕 | T-05_attachment-authz.txt |
+| R-12 两端一致 | 规则/文案同源 chat-shared；admin 前台与 mobile 同 FRONT_CHAT 空间；typecheck 增量 0 | T-07 / T-08 / CR-03_T-11 |
+
+--- 共享面身份对面断言 ---
+| 身份/面 | 对面断言 | 证据 |
+|---|---|---|
+| S1' 不带附件的既有调用 | react 18 事件「正常」/ harness 5 事件「正常」/ 前台 85 事件「正常」 | T-06 ① |
+| S1 SSE 订阅端点 | git diff 0 行 + curl 200 存活 | T-06 ①b / CR-03_T-10 |
+| S5 typecheck 增量 | admin 203=基线 / mobile 11=基线（多轮复测） | T-07/T-08/T-11 |
+| S6 旧消息兼容 | metadata=NULL 旧消息读取 200；旧签名委托 FRONT_CHAT | T-06 ⑥ / CR-03_T-10 |
+| S8 两身份 | 身份①行为不变实测；身份②（skillScopeHint 末尾）**仅代码审查**（前台通道环境未运行时断言）——验证缺口，见 completion.md | T-06 ⑧ |
+| S9 metadata 回填四身份 | 有键回填 / 无键不变 / 畸形不 500 / 归属校验 | T-06 ⑤b |
+| CR-03 空间 12 身份 | 矩阵 #1~#8、#12 全绿 + 三端 scope 抓包 | CR-03_T-10/T-11/T-12 |
+
+--- 部署三段证明（最终时点，见本件头部命令输出）---
+  backend/nginx/postgres/redis healthy；/ 与 /m/ 与 /echo/ok 均 200；
+  迁移账本含 V2.0.0_16 且仅 ddl 一条；source 分布 FRONT_CHAT=174/ADMIN_RUN=2（探针已清）
