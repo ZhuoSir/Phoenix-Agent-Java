@@ -194,7 +194,9 @@
     **实测结果（2026-10-09，证据 evidence/CR-03_T-11_session-isolation-frontend.txt）**：浏览器抓包运行页=ADMIN_RUN、
       前台=FRONT_CHAT 且两空间列表集合不同；mobile bundle 含 scope=FRONT_CHAT；typecheck 增量 0（203/11）；
       运行页自动新建会话落 ADMIN_RUN、用户真实会话落 FRONT_CHAT
-- [ ] T-12 隔离端到端汇总与证据落盘（存量回填核对 + 附件/理解链路回归）
+- [x] T-12 隔离端到端汇总与证据落盘（存量回填核对 + 附件/理解链路回归）
     关联: R-13, R-10, R-11　依赖: T-10, T-11　CR: CR-03　处置: 新增 evidence/CR-03_session-isolation.txt
     验证方式: e2e 两空间互不可见 + 跨空间 404；附件回归；DB source 分布核对；证据落盘
     验收标准: 隔离矩阵全绿 + 回归无破坏 + 证据入档
+    **实测结果（2026-10-09，证据 evidence/CR-03_T-12_isolation-e2e.txt）**：同用户两空间互不可见 ✅、
+      跨空间直连 404-as-不存在 ✅、FRONT_CHAT 会话附件上传/列表不受隔离影响 ✅、source 分布核对 ✅、清理 0 ✅

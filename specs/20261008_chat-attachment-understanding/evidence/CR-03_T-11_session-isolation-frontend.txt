@@ -17,7 +17,10 @@
     前台   → GET /api/agent/41/sessions?scope=FRONT_CHAT 200（解码 2360B，**与运行页集合不同**）
              GET /api/sessions/{id}/messages?scope=FRONT_CHAT 200
     运行页加载时自动新建的会话落 ADMIN_RUN；用户真实会话 e5003de2 落 FRONT_CHAT ✅
-  线上 bundle 断言：admin chat-*.js 含 ADMIN_RUN 与 FRONT_CHAT；mobile index-*.js 含 scope=FRONT_CHAT ✅
+  线上/产物 bundle 断言（**纠正 2026-10-09 首版错误断言**：minify 后 "scope=FRONT_CHAT" 不连续、
+    admin 入口 html 不直接引用懒加载 chunk，首版两条 grep 写法错误返回 0，已改用正确字面量重查）：
+    mobile 线上 /m/assets/index-*.js：FRONT_CHAT=1、"?scope="=1 ✅
+    admin 产物 chunk：ChatSessionSidebar-*.js 与 run-*.js 含 ADMIN_RUN=1；chat-*.js（前台）含 FRONT_CHAT=1 ✅
 
 --- 对面断言 ---
   不传 scope 的旧客户端 ⇒ 后端默认 FRONT_CHAT（T-10 兼容断言已绿）；SSE/附件/标题不受影响（T-10 已验）

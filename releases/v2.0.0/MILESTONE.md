@@ -271,3 +271,8 @@
   证据 `specs/20261008_chat-attachment-understanding/evidence/OPS_chat-default-fix.txt`。
   衍生缺陷 **BUG-152**（`selectActiveByType` = `is_active LIMIT 1` 无 ORDER BY、不看 `is_default`，
   与 `getDefaultConfigByType` 语义不一致 ⇒ 管理页设的默认对话模型对图工作流无效）**已登记不顺手修**；教训 **L-74**。
+
+## CR-03 会话空间隔离（2026-10-09，major，三轮确认）
+- 挂接 spec: 20261008_chat-attachment-understanding（v1.5.0）
+- 升级件: V2.0.0_16（source 列+回填+索引，见该 spec artifacts.md）
+- 任务: T-10~T-12 全勾；事故 L-78 已记
