@@ -24,13 +24,62 @@ public class ChatSessionServiceImpl extends ServiceImpl<ChatSessionMapper, ChatS
 	@Override
 	@Transactional(readOnly = true)
 	public List<ChatSession> findByAgentIdAndUserId(Integer agentId, String userId) {
+		// 旧签名保留：默认 FRONT_CHAT（CR-03 兼容决策：旧客户端不传 scope）
+		return findByAgentIdAndUserId(agentId, userId, SOURCE_FRONT_CHAT);
+	}
+
+	/**
+	 * CR-03：按空间过滤的会话列表（R-13）
+	 */
+	@Override
+	@Transactional(readOnly = true)
+	public List<ChatSession> findByAgentIdAndUserId(Integer agentId, String userId, String source) {
+		String src = ChatSessionService.normalizeSource(source);
 		return QueryChain.of(getMapper())
 			.eq(ChatSession::getAgentId, agentId)
 			.eq(ChatSession::getUserId, userId)
+			.eq(ChatSession::getSource, src)
 			.ne(ChatSession::getStatus, "deleted")
 			.orderBy(ChatSession::getIsPinned, false)
 			.orderBy(ChatSession::getUpdateTime, false)
 			.list();
+	}
+
+	/**
+	 * CR-03：带空间创建（R-13）
+	 */
+	@Override
+	public ChatSession createSession(Integer agentId, String title, String userId, String source) {
+		ChatSession session = createSession(agentId, title, userId);
+		if (session != null) {
+			session.setSource(ChatSessionService.normalizeSource(source));
+			getMapper().update(session);
+		}
+		return session;
+	}
+
+	/**
+	 * CR-03：仅清指定空间（防运行页清空误删聊天历史，R-13）
+	 */
+	@Override
+	public void clearSessionsByAgentIdAndSource(Integer agentId, String source) {
+		String src = ChatSessionService.normalizeSource(source);
+		QueryChain.of(getMapper())
+			.eq(ChatSession::getAgentId, agentId)
+			.eq(ChatSession::getSource, src)
+			.ne(ChatSession::getStatus, "deleted")
+			.list()
+			.forEach(s -> deleteSession(s.getId()));
+	}
+
+	/**
+	 * CR-03：查会话所属空间；不存在返回 null（R-11 叠加校验用）
+	 */
+	@Override
+	@Transactional(readOnly = true)
+	public String findSourceBySessionId(String sessionId) {
+		ChatSession s = findBySessionId(sessionId);
+		return s == null ? null : ChatSessionService.normalizeSource(s.getSource());
 	}
 
 	/**

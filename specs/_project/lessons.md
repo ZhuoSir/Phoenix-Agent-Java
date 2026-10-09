@@ -714,3 +714,13 @@
   （`pnpm --version` 必须输出版本号才继续）；② 任何 typecheck/build 断言前先确认日志里有**执行痕迹**
   （如 vue-tsc/vite .banner、exit code 非 127），错误数与基线差值异常（|Δ| 大或归零）一律先查"跑没跑"。
 - 关联: L-32④（错误数骤降先疑改坏/没跑）；L-75（产物断言）
+
+## L-78 rollback SQL **绝不进 migrator 扫描目录**——它会真被执行
+- 场景: CR-03 的 `V2.0.0_16__..._rollback.sql` 被我拷进 `releases/v2.0.0/sql/`（migrator 扫描目录，按文件名逐条执行、
+  按文件名去重）⇒ 开机时 **ddl 与 rollback 先后都跑了**，线上刚加的 source 列被 drop，ledger 还留下两条"已应用"。
+- 根因: ① 项目既有约定是 rollback 放 `releases/vX.Y.Z/sql/rollback/` **子目录**（15 号就是这么放的），我抄 15 号时抄错了层级；
+  ② migrator 对"扫到的每个 .sql"无条件执行，**文件名里的 rollback 字样没有任何豁免语义**。
+- 规避: ① 升级件投放时**逐文件核对目录层级**（ddl 进 sql/、rollback 进 sql/rollback/），投放后 `ls` 回验；
+  ② 每次开机/部署后核对 ledger：**同一 seq 出现多条 = 事故信号**（本次就是 16 出现 ddl+rollback 两条）；
+  ③ 迁移后必查"列/索引/回填"三件套，而不是只看 ledger 有记录（ledger 有记录 ≠ 状态正确，rollback 也有记录）。
+- 关联: L-75（产物/状态断言）；CR-03 T-10

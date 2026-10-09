@@ -179,11 +179,14 @@
 
 ## CR-03 新增任务（v1.5.0）
 
-- [ ] T-10 后端：source 列 + scope 入参/校验（404-as-不存在）+ 清空仅本空间 + P-4 日志点
+- [x] T-10 后端：source 列 + scope 入参/校验（404-as-不存在）+ 清空仅本空间 + P-4 日志点
     关联: R-13, R-14, R-10(改), R-11(改)　依赖: CR-03 确认　CR: CR-03　处置: 改造 ChatController 六处 + SQL V2.0.0_16
     验证方式: SQL 三段（含 rollback 演练）；矩阵 #1~#8、#12 逐条 curl；不传 scope 默认 FRONT_CHAT 兼容断言；
       存量回填核对；四类日志行齐；对面断言 SSE/标题/附件不变
     验收标准: 矩阵后端身份全绿 + rollback 演练通过 + 日志齐 + 对面断言无破坏
+    **实测结果（2026-10-09，证据 evidence/CR-03_T-10_session-isolation-backend.txt）**：矩阵 #1~#8、#12 **12/12 全绿**；
+      存量 173 条回填 FRONT_CHAT；P-4 四类日志齐；SSE/附件对面断言无破坏；rollback 事务演练通过。
+      **事故如实记**：rollback 文件误入 migrator 扫描目录致线上列被 drop，已止血（移入 rollback/ 子目录+清账+重跑），记 L-78
 - [ ] T-11 前端三端传 scope（运行页=ADMIN_RUN；admin 前台与 mobile=FRONT_CHAT）全调用点
     关联: R-13, R-12　依赖: T-10　CR: CR-03　处置: 改造三端会话 API 封装
     验证方式: typecheck 增量 0（203/11 基线）；产物断言；浏览器三端互不可见；对面断言附件/预览/SSE 不受影响

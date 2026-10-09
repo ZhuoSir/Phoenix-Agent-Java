@@ -56,8 +56,12 @@ public class ChatController {
      * Get session list for an agent
      */
     @GetMapping("/agent/{id}/sessions")
-    public ReturnVo<List<ChatSession>> getAgentSessions(@PathVariable(value = "id") Integer id) {
-        List<ChatSession> sessions = chatSessionService.findByAgentIdAndUserId(id, StpUtil.getLoginIdAsString());
+    public ReturnVo<List<ChatSession>> getAgentSessions(@PathVariable(value = "id") Integer id,
+            @RequestParam(value = "scope", required = false) String scope) {
+        // CR-03（R-13）：按空间过滤；旧客户端不传 scope ⇒ 默认 FRONT_CHAT
+        String source = ChatSessionService.normalizeSource(scope);
+        List<ChatSession> sessions = chatSessionService.findByAgentIdAndUserId(id, StpUtil.getLoginIdAsString(), source);
+        log.info("会话列表: agentId={}, scope={}, 命中={}, userId={}", id, source, sessions.size(), StpUtil.getLoginIdAsString());
         return ReturnVo.ok(sessions);
     }
 
@@ -75,9 +79,15 @@ public class ChatController {
      */
     @PostMapping("/agent/{id}/sessions")
     public ReturnVo<ChatSession> createSession(@PathVariable(value = "id") Integer id,
+                                               @RequestParam(value = "scope", required = false) String scopeParam,
                                                @RequestBody(required = false) Map<String, Object> request) {
         String title = request != null ? (String) request.get("title") : null;
-        ChatSession session = chatSessionService.createSession(id, title, StpUtil.getLoginIdAsString());
+        // CR-03：scope 优先 body、其次 query、缺省 FRONT_CHAT
+        Object bodyScope = request != null ? request.get("scope") : null;
+        String source = ChatSessionService.normalizeSource(bodyScope != null ? String.valueOf(bodyScope) : scopeParam);
+        ChatSession session = chatSessionService.createSession(id, title, StpUtil.getLoginIdAsString(), source);
+        log.info("会话创建: sessionId={}, source={}, userId={}", session != null ? session.getId() : null, source,
+                StpUtil.getLoginIdAsString());
         return ReturnVo.ok(session);
     }
 
@@ -85,8 +95,12 @@ public class ChatController {
      * Clear all sessions for an agent
      */
     @DeleteMapping("/agent/{id}/sessions")
-    public ReturnVo<ApiResponse> clearAgentSessions(@PathVariable(value = "id") Integer id) {
-        chatSessionService.clearSessionsByAgentId(id);
+    public ReturnVo<ApiResponse> clearAgentSessions(@PathVariable(value = "id") Integer id,
+            @RequestParam(value = "scope", required = false) String scope) {
+        // CR-03（R-13）：仅清声明空间，防运行页清空误删聊天历史
+        String source = ChatSessionService.normalizeSource(scope);
+        chatSessionService.clearSessionsByAgentIdAndSource(id, source);
+        log.info("会话清空: agentId={}, scope={}, userId={}", id, source, StpUtil.getLoginIdAsString());
         return ReturnVo.ok(ApiResponse.success("会话已清空"));
     }
 
@@ -94,7 +108,11 @@ public class ChatController {
      * Get message list for a session
      */
     @GetMapping("/sessions/{sessionId}/messages")
-    public ReturnVo<List<ChatMessage>> getSessionMessages(@PathVariable(value = "sessionId") String sessionId) {
+    public ReturnVo<List<ChatMessage>> getSessionMessages(@PathVariable(value = "sessionId") String sessionId,
+            @RequestParam(value = "scope", required = false) String scope) {
+        if (crossSpace(sessionId, scope)) {
+            return ReturnVo.ok(new java.util.ArrayList<>()); // CR-03：404-as-不存在（R-11 补充）
+        }
         List<ChatMessage> messages = chatMessageService.findBySessionId(sessionId);
         return ReturnVo.ok(messages);
     }
@@ -104,7 +122,11 @@ public class ChatController {
      */
     @PostMapping("/sessions/{sessionId}/messages")
     public ReturnVo<ChatMessage> saveMessage(@PathVariable(value = "sessionId") String sessionId,
+                                             @RequestParam(value = "scope", required = false) String scope,
                                              @RequestBody ChatMessageDTO request) {
+        if (crossSpace(sessionId, scope)) {
+            return ReturnVo.fail("会话不存在"); // CR-03：404-as-不存在
+        }
         try {
             if (request == null) {
                 return ReturnVo.error("参数不能为空！");
@@ -135,6 +157,24 @@ public class ChatController {
             log.error("Save message error for session {}: {}", sessionId, e.getMessage(), e);
             return ReturnVo.error(e.getMessage());
         }
+    }
+
+    /**
+     * CR-03（R-11 补充）：跨空间访问判定 —— 声明 scope 与库内 source 不符 ⇒ true（调用方按 404-as-不存在 处理）；
+     * 会话本身不存在 ⇒ false（走原有不存在分支，不改变既有语义）。
+     */
+    private boolean crossSpace(String sessionId, String scope) {
+        String actual = chatSessionService.findSourceBySessionId(sessionId);
+        if (actual == null) {
+            return false;
+        }
+        String declared = ChatSessionService.normalizeSource(scope);
+        boolean mismatch = !actual.equals(declared);
+        if (mismatch) {
+            log.warn("跨空间访问被拒: sessionId={}, 声明scope={}, 库内source={}, userId={}", sessionId, declared, actual,
+                    StpUtil.getLoginIdAsString());
+        }
+        return mismatch;
     }
 
     /**
@@ -181,7 +221,11 @@ public class ChatController {
      */
     @PutMapping("/sessions/{sessionId}/pin")
     public ReturnVo<ApiResponse> pinSession(@PathVariable(value = "sessionId") String sessionId,
+                                            @RequestParam(value = "scope", required = false) String scope,
                                             @RequestParam(value = "isPinned") Boolean isPinned) {
+        if (crossSpace(sessionId, scope)) {
+            return ReturnVo.fail("会话不存在");
+        }
         try {
             chatSessionService.pinSession(sessionId, isPinned);
             String message = isPinned ? "会话已置顶" : "会话已取消置顶";
@@ -197,7 +241,11 @@ public class ChatController {
      */
     @PutMapping("/sessions/{sessionId}/rename")
     public ReturnVo<ApiResponse> renameSession(@PathVariable(value = "sessionId") String sessionId,
+                                               @RequestParam(value = "scope", required = false) String scope,
                                                @RequestParam(value = "title") String title) {
+        if (crossSpace(sessionId, scope)) {
+            return ReturnVo.fail("会话不存在");
+        }
         try {
             if (!StringUtils.hasText(title)) {
                 return ReturnVo.error("标题不能为空");
@@ -215,7 +263,11 @@ public class ChatController {
      * Delete a single session
      */
     @DeleteMapping("/sessions/{sessionId}")
-    public ReturnVo<ApiResponse> deleteSession(@PathVariable(value = "sessionId") String sessionId) {
+    public ReturnVo<ApiResponse> deleteSession(@PathVariable(value = "sessionId") String sessionId,
+            @RequestParam(value = "scope", required = false) String scope) {
+        if (crossSpace(sessionId, scope)) {
+            return ReturnVo.fail("会话不存在");
+        }
         try {
             chatSessionService.deleteSession(sessionId);
             return ReturnVo.ok(ApiResponse.success("会话已删除"));
