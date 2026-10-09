@@ -73,11 +73,20 @@ public class HarnessFrontController {
     @PostMapping(value = "/chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<org.springframework.http.codec.ServerSentEvent<Map<String, Object>>> harnessChat(@RequestBody HarnessRequest  harnessRequest) {
         String userId = StpUtil.getLoginIdAsString();
-        HarnessRequest request = HarnessRequest.builder().userId(userId).sessionId(harnessRequest.getSessionId()).message(harnessRequest.getMessage()).channel("front")
-                // T-06：转抄附件 id —— 不转抄则该入口静默丢附件（L-06 多入口枚举）
-                .attachmentIds(harnessRequest.getAttachmentIds()).build();
+        HarnessRequest request = HarnessRequest.builder().userId(userId).sessionId(harnessRequest.getSessionId())
+                .message(harnessRequest.getMessage())
+                // BUG-155：必须转抄寻址字段并改走**统一寻址重载** stream(request) ——
+                // 旧写法 stream(harnessRequest.getHarnessSn(), request) 走 sn-only 旧重载（恒静态加载器、
+                // 不看 agentId），对库配置智能体（R-08 主路径）恒抛 NoSuchElementException ⇒ 500。
+                // 与 HarnessController（admin 端点）保持同一范式。
+                .agentId(harnessRequest.getAgentId())
+                .harnessSn(harnessRequest.getHarnessSn())
+                .enabledSkillIds(harnessRequest.getEnabledSkillIds())
+                .attachmentIds(harnessRequest.getAttachmentIds())
+                .channel("front")
+                .build();
         return com.phoenix.agent.harness.sse.SseSupport.withHeartbeat(turnManager.openOrReject(harnessRequest.getSessionId(),
-            () -> harnessChatService.stream(harnessRequest.getHarnessSn(), request)
+            () -> harnessChatService.stream(request)
                 .map(output -> {
                     Map<String, Object> eventMap = new LinkedHashMap<>();
                     eventMap.put("content", "");
