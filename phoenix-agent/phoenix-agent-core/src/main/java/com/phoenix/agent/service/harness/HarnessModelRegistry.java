@@ -149,7 +149,10 @@ public class HarnessModelRegistry {
                 if (currentEmbeddingModel == null) {
                     log.info("Initializing global EmbeddingModel...");
                     try {
-                        ModelConfigDTO config = modelConfigDataService.getActiveConfigByType(ModelType.EMBEDDING);
+                        ModelConfigDTO config = modelConfigDataService.getDefaultConfigByType(ModelType.EMBEDDING);
+                            if (config == null) {
+                                config = modelConfigDataService.getActiveConfigByType(ModelType.EMBEDDING);
+                            }
                         if (config != null) {
                             if (ModelProvider.OLLAMA.getCode().equalsIgnoreCase(config.getProvider())) {
                                 // R-08/R-03：Ollama embedding —— 维度**探测自模型实际输出**（如 nomic-embed-text=768），不写死 512

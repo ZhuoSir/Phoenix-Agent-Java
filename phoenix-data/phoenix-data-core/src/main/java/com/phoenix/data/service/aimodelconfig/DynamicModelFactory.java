@@ -1,6 +1,7 @@
 package com.phoenix.data.service.aimodelconfig;
 
 import com.phoenix.data.dto.ModelConfigDTO;
+import com.phoenix.data.enums.ModelProvider;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.hc.client5.http.auth.AuthScope;
@@ -35,6 +36,10 @@ import reactor.netty.transport.ProxyProvider;
 @RequiredArgsConstructor
 public class DynamicModelFactory {
 
+	/** R-08：向量维度统一由当前 EMBEDDING 模型解析（不再写死 512） */
+	@org.springframework.beans.factory.annotation.Autowired
+	private EmbeddingDimensionResolver embeddingDimensionResolver;
+
     /**
      * 创建 ChatModel 实例，通过 OpenAiChatModel 和 baseUrl 实现多厂商兼容
      */
@@ -46,7 +51,11 @@ public class DynamicModelFactory {
         checkBasic(config);
 
         // 2. 构建 OpenAiApi (核心通讯对象)
-        String apiKey = StringUtils.hasText(config.getApiKey()) ? config.getApiKey() : "";
+        // R-02（BUG 级缺口修复）：Ollama 本地服务无鉴权 ⇒ 平台把空 key 存为空串；
+        // 但 Spring AI 的 OpenAiApi **强制要求非空 apiKey**（实测报 "apiKey must not be empty" 后回退 DummyEmbeddingModel
+        // ⇒ 知识入库整体失败）。故 provider=ollama 时用占位 key（Ollama 忽略该请求头）。
+        boolean ollama = ModelProvider.OLLAMA.getCode().equalsIgnoreCase(config.getProvider());
+        String apiKey = StringUtils.hasText(config.getApiKey()) ? config.getApiKey() : (ollama ? "ollama" : "");
         OpenAiApi.Builder apiBuilder = OpenAiApi.builder()
                 .apiKey(apiKey)
                 .baseUrl(config.getBaseUrl())
@@ -77,6 +86,9 @@ public class DynamicModelFactory {
                 config.getModelName(), config.getBaseUrl());
         checkBasic(config);
 
+        // R-02：Ollama 空 key 在 Spring AI OpenAiApi 下不合法（apiKey must not be empty）⇒ 用占位值
+        boolean ollama = ModelProvider.OLLAMA.getCode().equalsIgnoreCase(config.getProvider());
+
         String apiKey = StringUtils.hasText(config.getApiKey()) ? config.getApiKey() : "";
         OpenAiApi.Builder apiBuilder = OpenAiApi.builder()
                 .apiKey(apiKey)
@@ -87,10 +99,15 @@ public class DynamicModelFactory {
         if (StringUtils.hasText(config.getEmbeddingsPath())) {
             apiBuilder.embeddingsPath(config.getEmbeddingsPath());
         }
+        else if (ollama) {
+            // Ollama 的 OpenAI 兼容端点在 /v1 下（配置里存的是 Ollama 根地址，供原生 /api/* 使用）
+            apiBuilder.embeddingsPath("/v1/embeddings");
+        }
 
         OpenAiApi openAiApi = apiBuilder.build();
         return new OpenAiEmbeddingModel(openAiApi, MetadataMode.EMBED,
-                OpenAiEmbeddingOptions.builder().model(config.getModelName()).dimensions(512).build(),
+                OpenAiEmbeddingOptions.builder().model(config.getModelName())
+                        .dimensions(ollama ? embeddingDimensionResolver.resolve() : EmbeddingDimensionResolver.DEFAULT_DIMENSIONS).build(),
                 RetryUtils.DEFAULT_RETRY_TEMPLATE);
     }
 

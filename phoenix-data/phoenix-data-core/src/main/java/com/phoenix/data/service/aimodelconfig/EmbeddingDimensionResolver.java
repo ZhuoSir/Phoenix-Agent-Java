@@ -56,7 +56,11 @@ public class EmbeddingDimensionResolver {
 			}
 			int dims = DEFAULT_DIMENSIONS;
 			try {
-				ModelConfigDTO config = modelConfigDataService.getActiveConfigByType(ModelType.EMBEDDING);
+				// R-08：先取**默认**行（与 CHAT/MULTIMODAL 的默认机制一致）；无默认再退"任一启用行"
+				ModelConfigDTO config = modelConfigDataService.getDefaultConfigByType(ModelType.EMBEDDING);
+				if (config == null) {
+					config = modelConfigDataService.getActiveConfigByType(ModelType.EMBEDDING);
+				}
 				if (config != null && ModelProvider.OLLAMA.getCode().equalsIgnoreCase(config.getProvider())) {
 					dims = ollamaApiClient.probeEmbeddingDimension(config.getBaseUrl(), config.getModelName());
 					log.info("向量维度解析: provider=ollama, model={}, dimensions={}", config.getModelName(), dims);
