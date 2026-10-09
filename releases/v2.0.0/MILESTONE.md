@@ -14,6 +14,7 @@
 |---|---|---|---|---|---|
 | specs/20261008_chat-attachment-understanding | requirements **v1.1.0 已确认** / plan **v1.1.0 已确认** / tasks **v1.1.0 已确认**（确认人 陈卓 2026-10-08；含 CR-01 micro 合入） | **Implement 进行中（T-01 完成，1/9）** | R-01~R-12 | CR-01（多模态模型改 `qwen3.8-max`；迁移件只 DDL、模型行经管理页配置） | 对话附件上传与大模型理解：文档（word/pdf/excel/txt/md）+ 图片（常见格式）白名单，其他一律不支持；**admin-ui + mobile-ui 两端**；图片走**真多模态视觉模型**（拟在 `tbl_data_model_config` 增 `model_type=VISION`）；复用既有 Tika 解析与 FileStorage 存储 |
 | specs/20261007_user-role-group-model | requirements **v2.8.0 已确认（陈卓 2026-10-07；v2.0.0 重确认① + R-12~R-19 逐版确认）** / plan **v1.8.0 已确认** / tasks **v1.8.0 已确认** | **Implement 完成（T-01~T-28，28/28）**；R-12（信息架构）、**R-13（账号集合收敛）** 与 **R-14（用户类型/IDM + 工号下线）**、R-15~R-17 与 **CR-01(R-18)/CR-02(R-19)** 追加（requirements v2.2.0→v2.8.0 / plan v1.3.0→v1.8.0 / tasks v1.2.0→v1.8.0 均 已确认 陈卓） | 全部 R-01~R-19 均已实施（T-01~T-28 全勾，见 tasks 覆盖矩阵） | 删除组织三表 + **用户模型三表**组织列 + 后台数据组 + **三方平台配置表**；下线三方集成三层（同步/免登/平台配置，含 SDK、`PlatformTypeEnm` 家族、`third_party_id`、前端页面与菜单行）；**只保留账号密码登录**；ACL 基线重建 | 需求 **19 条 R**（R-01~R-19）；Q1~Q6 + Q-P1~Q-P6 + Q7~Q13 全部裁定；调研登记 BUG-116~122（后续本轮 BUG-127~140）；教训 L-43/L-44（后续 L-48~L-66） |
+| specs/20261009_ollama-model-support | requirements **v0.1.0 草稿** | **立项中**（2026-10-09） | 待 Phase 1 定稿 | 待 Phase 1 定稿 | Ollama 本地/内网模型接入：provider 一等项 + CHAT/MULTIMODAL/EMBEDDING 三类 + 模型列表拉取 + 工具调用 + 可变向量维度 |
 
 ## 二、纳入缺陷（随版修复批）
 
@@ -60,7 +61,7 @@
 
 ## 四、汇总进度（由里程碑审计从事实重算，手工勾而无判据 = 无效勾）
 
-- [ ] 全部 spec 已合并（M2 冻结前置；以 git 合并记录为准）
+- [x] 全部 spec 已合并（M2 冻结前置；以 git 合并记录为准）—— **2026-10-09 审计补勾**：`user-role-group-model`（58 commit）/ `chat-attachment-understanding`（41 commit）均已并入 v2.0.0（判据 = `git log v2.0.0 --grep="Spec: specs/<目录>"`）
 - [x] SQL 汇总编号 + rollback 配对（`sql/` 件数 == artifacts 行数）—— 2026-10-07 实测：正向 14 / 回滚 14 / artifacts 14 行，三者一致（**非冻结动作，仅事实核对**；其余项待冻结口令）
 - [ ] 配置汇总 `config/changes.md`（覆盖全部 artifacts 配置行）
 - [ ] `RELEASE-NOTES.md`（「包含需求」覆盖纳入表）
