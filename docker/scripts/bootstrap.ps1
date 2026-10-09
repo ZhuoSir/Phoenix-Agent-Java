@@ -96,9 +96,12 @@ if (Test-Distro $Distro) {
 $WinPath = ($SrcRoot -replace '\\','/')
 $Drv = $WinPath.Substring(0,1).ToLower(); $Rest = $WinPath.Substring(2)
 $WslSrc = "/mnt/$Drv$Rest"
-Write-Step "拷贝源码进 WSL: $WslSrc → ~/phoenix-src"
-& wsl -d $Distro -u root -- bash -c "mkdir -p ~/phoenix-src && cp -ru '$WslSrc/.' ~/phoenix-src/"
-if ($LASTEXITCODE -ne 0) { Write-Fail "源码拷贝失败（路径换算: $WslSrc）" }
+Write-Step "镜像源码进 WSL: $WslSrc → ~/phoenix-src（先清空，避免陈旧文件残留）"
+# BUG-166: 原用 cp -ru（只增不删）⇒ 切分支/删文件后 WSL 里是「陈旧并集」，会拿已删除的源码去编译
+# （实测：v2.0.0 下线组织维度删掉的 PrivilegeDepartmentServiceImpl.java 残留 ⇒ 编译报 getDeptId 找不到）。
+# 改真镜像：docker/dist（断点状态+已产出工件，约 1.5G）先暂存、整棵重拷（源码+.git 约 110MB、秒级）、再把 dist 放回。
+& wsl -d $Distro -u root -- bash -c "rm -rf /tmp/phx-dist-keep; { mv ~/phoenix-src/docker/dist /tmp/phx-dist-keep 2>/dev/null || true; }; rm -rf ~/phoenix-src; mkdir -p ~/phoenix-src; cp -r '$WslSrc/.' ~/phoenix-src/; { mv /tmp/phx-dist-keep ~/phoenix-src/docker/dist 2>/dev/null || true; }"
+if ($LASTEXITCODE -ne 0) { Write-Fail "源码镜像失败（路径换算: $WslSrc）" }
 
 # ── 4.5 行尾规整 CRLF→LF（BUG-143）──
 # Windows 工作树在 core.autocrlf=true（Git for Windows 默认）下检出为 CRLF，而仓库对象
