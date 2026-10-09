@@ -8,6 +8,10 @@ import io.agentscope.core.embedding.EmbeddingModel;
 import io.agentscope.core.embedding.dashscope.DashScopeTextEmbedding;
 import io.agentscope.core.model.GenerateOptions;
 import io.agentscope.core.model.ChatModelBase;
+import io.agentscope.extensions.model.ollama.formatter.OllamaChatFormatter;
+import io.agentscope.extensions.model.ollama.OllamaChatModel;
+import io.agentscope.extensions.model.ollama.options.OllamaOptions;
+import com.phoenix.data.enums.ModelProvider;
 import io.agentscope.extensions.model.openai.OpenAIChatModel;
 import io.agentscope.extensions.model.openai.formatter.DeepSeekFormatter;
 import lombok.RequiredArgsConstructor;
@@ -48,19 +52,7 @@ public class HarnessModelRegistry {
                             // 可诊断：换默认后新构建即用新模型，需能看出用的是哪一条
                             log.info("默认对话模型: configId={}, provider={}, modelName={}", config.getId(),
                                     config.getProvider(), config.getModelName());
-                            currentChatModel = OpenAIChatModel.builder()
-                                    .apiKey(config.getApiKey())
-                                    .modelName(config.getModelName())
-                                    .baseUrl(config.getBaseUrl())
-                                    .stream(true)
-                                    .formatter(new DeepSeekFormatter())
-                                    // BUG-35：模型管理的 maxTokens/temperature 此前从未传给对话请求，
-                                    // 长输出被服务端默认上限截断
-                                    .generateOptions(GenerateOptions.builder()
-                                            .maxTokens(config.getMaxTokens())
-                                            .temperature(config.getTemperature())
-                                            .build())
-                                    .build();
+                            currentChatModel = buildChatModel(config);
                         }
                     } catch (Exception e) {
                         log.error("Failed to initialize ChatClient: {}", e.getMessage(), e);
@@ -94,18 +86,54 @@ public class HarnessModelRegistry {
                 return getOpenAIChatModel();
             }
             log.info("初始化智能体指定对话模型: modelConfigId={}, modelName={}", id, config.getModelName());
-            return OpenAIChatModel.builder()
-                    .apiKey(config.getApiKey())
-                    .modelName(config.getModelName())
-                    .baseUrl(config.getBaseUrl())
-                    .stream(true)
-                    .formatter(new DeepSeekFormatter())
-                    .generateOptions(GenerateOptions.builder()
-                            .maxTokens(config.getMaxTokens())
-                            .temperature(config.getTemperature())
+            return buildChatModel(config);
+        });
+    }
+
+    /**
+     * R-01/R-03：按 provider 分派模型实现（供对话 / 多模态共用）。
+     *
+     * <p>**ollama** → {@code OllamaChatModel}（Ollama 原生 {@code /api/chat}；本地服务无鉴权 ⇒ 不传 apiKey）
+     * + {@code OllamaChatFormatter}；温度与最大输出经 {@code OllamaOptions} 传入（对应 numPredict）。
+     * <p>**其余 provider** → {@code OpenAIChatModel} + {@code DeepSeekFormatter}，含 BUG-35 的
+     * maxTokens/temperature 传递 —— **既有行为零变化**。
+     */
+    private ChatModelBase buildChatModel(ModelConfigDTO config) {
+        return buildChatModel(config.getProvider(), config.getApiKey(), config.getModelName(),
+                config.getBaseUrl(), config.getTemperature(), config.getMaxTokens());
+    }
+
+    private ChatModelBase buildChatModel(ModelConfig config) {
+        return buildChatModel(config.getProvider(), config.getApiKey(), config.getModelName(),
+                config.getBaseUrl(), config.getTemperature(), config.getMaxTokens());
+    }
+
+    private ChatModelBase buildChatModel(String provider, String apiKey, String modelName, String baseUrl,
+            Double temperature, Integer maxTokens) {
+        if (ModelProvider.OLLAMA.getCode().equalsIgnoreCase(provider)) {
+            // 可诊断：provider/模型名/端点三件套（不含密钥）
+            log.info("按 provider=ollama 装配模型: modelName={}, endpoint={}", modelName, baseUrl);
+            return OllamaChatModel.builder()
+                    .baseUrl(baseUrl)
+                    .modelName(modelName)
+                    .formatter(new OllamaChatFormatter())
+                    .defaultOptions(OllamaOptions.builder()
+                            .temperature(temperature)
+                            .numPredict(maxTokens)
                             .build())
                     .build();
-        });
+        }
+        return OpenAIChatModel.builder()
+                .apiKey(apiKey)
+                .modelName(modelName)
+                .baseUrl(baseUrl)
+                .stream(true)
+                .formatter(new DeepSeekFormatter())
+                .generateOptions(GenerateOptions.builder()
+                        .maxTokens(maxTokens)
+                        .temperature(temperature)
+                        .build())
+                .build();
     }
 
     /**
@@ -152,17 +180,7 @@ public class HarnessModelRegistry {
                         }
                         log.info("多模态模型: configId={}, provider={}, modelName={}", config.getId(),
                                 config.getProvider(), config.getModelName());
-                        currentMultimodalModel = OpenAIChatModel.builder()
-                                .apiKey(config.getApiKey())
-                                .modelName(config.getModelName())
-                                .baseUrl(config.getBaseUrl())
-                                .stream(true)
-                                .formatter(new DeepSeekFormatter())
-                                .generateOptions(GenerateOptions.builder()
-                                        .maxTokens(config.getMaxTokens())
-                                        .temperature(config.getTemperature())
-                                        .build())
-                                .build();
+                        currentMultimodalModel = buildChatModel(config);
                     } catch (Exception e) {
                         log.error("多模态模型初始化失败（将按 R-07 降级）: {}", e.getMessage());
                         return null;
