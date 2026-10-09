@@ -87,8 +87,8 @@ public class ModelConfigOpsService {
 			throw new InvalidInputException("配置不存在");
 		}
 		if (modelConfigDataService.isDefaultConfig(id)) {
-			throw new InvalidInputException("该模型是「" + entity.getModelType().getCode()
-					+ "」类型的默认模型，请先将其他模型设为默认后再停用");
+			throw new InvalidInputException("该模型是「" + entity.getModelType().getLabel()
+					+ "」类型当前的默认模型，需先启用另一条同类型模型并设为默认，或直接删除本行，之后才能停用");
 		}
 		modelConfigDataService.deactivateConfig(id);
 		// 先落库后刷新：否则重建时仍会读到旧状态
@@ -204,6 +204,12 @@ public class ModelConfigOpsService {
 			}
 			else if (ModelType.EMBEDDING.getCode().equalsIgnoreCase(modelType)) {
 				testEmbeddingModel(config);
+			}
+			else if (ModelType.MULTIMODAL.getCode().equalsIgnoreCase(modelType)) {
+				// BUG-159：多模态模型与 CHAT 同为 OpenAI 兼容 chat 端点（差异在能否吃图），
+				// 连接测试复用最轻量 chat 探针验证 base_url / key / model 可达；视觉能力不在本探针范围
+				log.info("Testing Multimodal Model connection (reuse chat probe), modelName: {}", config.getModelName());
+				testChatModel(config);
 			}
 			else {
 				throw new IllegalArgumentException("未知的模型类型: " + modelType);
