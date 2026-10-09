@@ -62,6 +62,15 @@ public class HarnessAgentFactory {
     @Value("${phoenix.agent.compaction-keep-messages:20}")
     private int compactionKeepMessagesDefault;
 
+    /**
+     * BUG-158：轮末 pending 异步工具 drain 的等待上限。开启 enablePendingToolRecovery 后，框架在
+     * POST_REASONING→POST_CALL 之间会等待 pending 异步工具，**未设超时即用框架默认（实测 ≈24s 空尾**，
+     * 用户感知为"输出已结束但一直提示正在执行"）。默认 5s：把空尾压到可感知阈值内；
+     * 确需更长异步工具等待的智能体可经配置调大。
+     */
+    @Value("${phoenix.agent.async-tool-timeout-seconds:5}")
+    private long asyncToolTimeoutSeconds;
+
     @Value("${phoenix.agent.tool-result-max-chars:8192}")
     private int toolResultMaxCharsDefault;
 
@@ -154,6 +163,8 @@ public class HarnessAgentFactory {
             .stateStore(postgresAgentStateStore)
             .skillRepository(skillRepository(agent))
             .enablePendingToolRecovery(true)
+            // BUG-158：给轮末 pending 工具 drain 设上限（否则框架默认 ≈24s 空尾）
+            .asyncToolTimeout(java.time.Duration.ofSeconds(asyncToolTimeoutSeconds))
             .middlewares(List.of(new StopOnAllDeniedMiddleware(), new ExplicitSkillMiddleware(),
                 // T-08/R-02/R-03：知识库原件访问护栏（默认 observe 只记日志；PHOENIX_KB_PATH_GUARD=enforce 执行拒绝）
                 new KnowledgePathGuardMiddleware(workspace.toString()),

@@ -270,6 +270,10 @@ export const realChatTransport: ChatTransport = {
           },
           (response) => {
             if (abortRequested) return;
+            // BUG-158（方案 B）：轮末框架尾巴期间只有静默帧；达阈值且已有内容 ⇒ 视觉收尾
+            if ((response as any).phase) {
+              useChatStore().maybeSettleFromSilence(sessionId, response as any, fullText.length > 0);
+            }
             if (response.error) return;
             if (response.needConfirm && response.buttons) {
               onNodeMessage?.({

@@ -1,0 +1,35 @@
+=== BUG-158 定位与修复证据 ===
+日期: 2026-10-09 | 关联: harness 轮末尾巴致 UI 长时间"正在执行"
+
+--- 实测时间线（curl -sN 逐行时间戳，3 model calls + 工具轮的会话）---
+  内容帧持续到 30s → 45s 出现 {"phase":"IDLE","silenceMs":15153,…}（静默心跳）→ 54s 收 {"end":true}
+  ⇒ **最后内容帧到 end 帧空窗 24s**；后端日志对齐：最后 `ModelCallEndEvent` 13:17:16.600 →
+  `AgentTraceMiddleware POST_REASONING` 13:17:16.600 → **POST_CALL 13:17:40.480**（空窗 23.9s，且未换出任何
+  model-call 日志）⇒ 尾巴在框架轮末收尾，不在前端状态机。
+
+--- 对照实验（分离变量）---
+
+  | 场景 | 最后内容→end 尾 |
+  |---|---|
+  | 无工具短答 | 2.7s |
+  | 带工具（list_files）修复前 | ~24s |
+  | 带工具（list_files）**设 asyncToolTimeout=5s 后** | **0.0s** |
+  | 长内容（memory_search + 长回答） | 18~20s（flush 所致，工具超时管不到） |
+
+--- 根因两层 ---
+  ① `HarnessAgentFactory` 开了 `enablePendingToolRecovery(true)` 但未设 `asyncToolTimeout` ⇒ 轮末 pending 工具 drain
+     用框架默认（≈24s）
+  ② `MemoryConfig.flushTrigger(throttled(30s))`：内容达量的回合在结束前跑一次**同步记忆 flush 摘要模型调用**
+     （走 `MemoryConfig.model()`，不产生流帧、不经我们的 [model-call] 事件）⇒ 18~24s，随内容长度缩放。
+     jar 仅提供 `always/never/throttled` 三档，**无异步选项**。
+
+--- 修复 ---
+  ① `phoenix.agent.async-tool-timeout-seconds`（默认 5s）→ `.asyncToolTimeout(...)`；实测工具回合 24s→0s ✅
+  ② 方案 B（用户 2026-10-09 拍板）：前端「已有内容 + phase=IDLE + silenceMs≥8000」⇒ 视觉收尾
+     （chat-shared store `maybeSettleFromSilence/settleSession` 摘 sending + 停打字光标；admin 前台 transport、
+      mobile transport 检测静默帧；admin 运行页两处调用点置 isStreaming=false），flush 照跑、记忆不丢；
+      真 end 帧到达仍走原收尾逻辑（幂等）
+  验证: typecheck 增量 0（admin 203 / mobile 11 基线）；两端 build exit=0；nginx 三段证明；dist 含 settle 逻辑
+    （src-*.js 命中 settle/silenceMs/IDLE；run-*.js 命中 silenceMs）；线上 / 与 /m/ 200
+  **未验证（如实报）**: 方案 B 的 UI 端到端（"停止按钮消失而 SSE 仍开"）未由 agent 实测 —— 浏览器工具无法
+    稳定读取 composer 停止态与请求挂起态的组合；**待用户复测确认**
