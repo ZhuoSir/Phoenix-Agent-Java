@@ -1,7 +1,7 @@
 # CR-03 会话空间隔离：admin 运行页 与 前台 chat（含 mobile）互不可见
 
 > 档位: **major**（agent 提议、用户拍板 2026-10-09；判据：涉 SQL 新列 + 共享面 `tbl_data_chat_session` 多身份）
-> 状态: **§S 已确认（陈卓 2026-10-09）｜§P 待确认（2/3）**
+> 状态: **§S 已确认（陈卓 2026-10-09）｜§P 已确认（陈卓 2026-10-09，回填=A、拒绝=404）｜§T 待确认（3/3）**
 > 父 spec: specs/20261008_chat-attachment-understanding v1.4.0（合入后 bump v1.5.0）
 > 挂版: v2.0.0（在途，用户确认 2026-10-09）
 > 提出人: 陈卓（2026-10-09，原话大意：admin 和 chat 页面会话是同步的，应该分开；admin 运行页只是测试管理，
@@ -136,7 +136,33 @@
 
 ## §T 增/改/废任务
 
-（待 §P 确认后产出）
+> 拍板记录（确认②，陈卓 2026-10-09）：存量回填 = **A（存量→FRONT_CHAT）**；跨空间拒绝 = **404-as-不存在**。
+> 兼容决策：旧客户端不传 scope 时后端**默认 FRONT_CHAT**（保 mobile 旧包/admin 旧包可用），矩阵 #1~#3 注明。
+
+- [ ] T-10 后端：`tbl_data_chat_session` 加 `source` 列 + 列表/创建/按 id 操作加 scope 入参与校验（404-as-不存在）+ 清空仅本空间 + P-4 日志点
+    关联: R-13, R-14, R-10(改), R-11(改)　CR: CR-03　处置: 改造 ChatController 六处 + SQL V2.0.0_16（保留附件/装配器/SSE/标题不动）
+    依赖: CR-03 §S/§P/§T 确认
+    验证方式: ① SQL 三段证明（upgrade 于 drill 库执行 + 结构核对 + rollback 演练复原）；② 身份矩阵后端身份
+      **#1~#8、#12 逐条 curl 断言**（含"不传 scope 默认 FRONT_CHAT"兼容断言、清空仅本空间断言、
+      跨空间 404-as-不存在断言、存量 168 条回填后 source 全为 FRONT_CHAT 断言）；③ 日志断言：列表 INFO 含
+      agentId/scope/命中条数/userId；跨空间 WARN 含 sessionId/声明 scope/库内 source/userId；创建 INFO 含
+      sessionId/source/userId；④ 对面断言：SSE 订阅/标题生成/附件 listForSession 行为不变（矩阵 #9/#10/#11）
+    验收标准: 矩阵 #1~#8、#12 全绿 + rollback 演练通过 + 四类日志行齐 + 对面断言无破坏
+- [ ] T-11 前端三端传 scope（运行页=ADMIN_RUN；admin 前台与 mobile=FRONT_CHAT）+ 列表/创建/清空/pin/rename/delete 全调用点
+    关联: R-13, R-12　CR: CR-03　处置: 改造三端会话 API 封装（保留 UI 结构不动）
+    依赖: T-10
+    验证方式: ① typecheck 增量 0（admin 203 / mobile 11 基线，L-32）；② 构建产物断言（scope 字面量入包）；
+      ③ 浏览器三端实测：运行页列表只见 ADMIN_RUN、前台只见 FRONT_CHAT、mobile 与前台一致（R-12）；
+      ④ 对面断言：附件上传/预览（BUG-157）、SSE、历史回看在隔离后仍正常
+    验收标准: 三端互不可见实测通过 + 增量 0 + 对面断言无破坏
+- [ ] T-12 隔离端到端汇总与证据落盘（含存量回填核对、隔离后附件/理解链路回归）
+    关联: R-13, R-10, R-11　CR: CR-03　处置: 新增证据件 evidence/CR-03_session-isolation.txt
+    依赖: T-10, T-11
+    验证方式: ① e2e：同一用户分别在运行页与前台各建会话 → 两侧列表互不可见、跨空间直连 id 404；
+      ② 附件回归：两空间各自上传/理解/预览不受隔离影响；③ DB 核对 source 分布与回填行数；④ 证据落盘
+    验收标准: 隔离矩阵全绿 + 附件链路回归无破坏 + 证据入档
+
+**作废任务**: 无（不删不取消任何既有 T）
 
 ## §I 执行与合入八动作
 
