@@ -117,7 +117,8 @@ Write-Host "  Phoenix 安装成功（Windows / WSL2 路线）" -ForegroundColor 
 Write-Host "======================================================" -ForegroundColor Green
 Write-Host "  访问地址 : http://localhost:$port   （Windows 浏览器直接打开）"
 Write-Host "  管理账号 : admin / 123456（首登立即改密）"
-Write-Host "  服务管理 : wsl -d Ubuntu-22.04 -u root -- docker compose -p $Project ps"
+Write-Host "  重启语义 : 机器重启后自动复活（docker 开机自启 + compose restart:unless-stopped）；休眠/挂起只冻结进程，唤醒即继续"
+  Write-Host "  服务管理 : wsl -d Ubuntu-22.04 -u root -- docker compose -p $Project ps"
 Write-Host "  若 localhost 不通(老版 Win10): 管理员执行 netsh interface portproxy add v4tov4"
 Write-Host "    listenport=$port listenaddress=0.0.0.0 connectport=$port connectaddress=<WSL内 hostname -I>"
 Write-Host "======================================================" -ForegroundColor Green

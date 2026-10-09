@@ -87,10 +87,12 @@ phx_step 2 $TOTAL "引擎就位" && {
       phx_log WARN "get.docker.com 不可达（受限网络）——回退国内源 docker-ce@mirrors.aliyun.com"
       phx_install_docker_aliyun || phx_fail 2 $TOTAL "国内源装引擎失败（见日志 $PHX_LOG_FILE；断网请加 --offline 并备 engine/*.deb）"
     fi
-    $SUDO systemctl enable --now docker >/dev/null 2>&1 || $SUDO service docker start >/dev/null 2>&1 || true
-    $SUDO usermod -aG docker "$(id -un)" >/dev/null 2>&1 || true
-    docker info >/dev/null 2>&1 || phx_fail 2 $TOTAL "引擎装后仍不可达（重开终端使 docker 组生效，或检查 systemctl status docker）"
   fi
+  # BUG-165: 所有分支统一——设好并核实开机自启 + 讲清重启/休眠语义，再核验引擎可达。
+  # 原先只有在线分支有 enable 且被 `|| true` 吞掉；离线 dpkg 分支连 start 都没有（离线装机后引擎不起）。
+  phx_engine_autostart "$SUDO"
+  $SUDO usermod -aG docker "$(id -un)" >/dev/null 2>&1 || true
+  docker info >/dev/null 2>&1 || phx_fail 2 $TOTAL "引擎装后仍不可达（重开终端使 docker 组生效，或检查 systemctl status docker）"
   phx_step_mark 2
 }
 
@@ -186,6 +188,7 @@ phx_step 9 $TOTAL "收据卡" && {
     "管理端账号" "admin / 123456（首登立即改密）" \
     "库密码" "$PWD_LINE" \
     "数据目录" "docker 卷 ${PROJECT}_*（/var/lib/docker/volumes/）" \
+    "重启语义" "机器重启后自动复活（docker 开机自启 + compose restart:unless-stopped）；宿主休眠/挂起仅冻结进程，唤醒即继续，不重建容器" \
     "日志" "$PHX_LOG_FILE" >/dev/null
   cat "$PAYLOAD/RECEIPT"
   phx_log INFO "下一步: ①浏览器打开上方地址并改密 ②模型管理配置真实 API key ③日常运维: docker/scripts/phoenix-ctl.sh start|stop|restart|status|logs|verify"

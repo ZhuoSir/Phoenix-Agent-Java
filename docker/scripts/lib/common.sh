@@ -204,3 +204,34 @@ phx_install_docker_aliyun() {
   [ "$ok" -eq 1 ] || { phx_log ERROR "三个国内源全部失败（明细见 $PHX_LOG_FILE）"; return 1; }
   return 0
 }
+
+# ---------- 引擎开机自启：设好 + 核实 + 讲清重启语义（BUG-165） ----------
+# 背景：原先 bootstrap.sh A/4 与 install.sh 步骤2 各写一行
+#   `systemctl enable --now docker || service docker start || true`
+# ——失败被 `|| true` 吞掉、成功也不留痕，而 README 宣称"compose 已配 restart: unless-stopped，
+# 机器重启后栈通常自动复活"。那个承诺的前提（docker 是否 enabled）其实从未被核实，用户也无从判断。
+# 本函数：① 设开机自启并**核实**（systemctl is-enabled）② 把重启/休眠语义明确讲给用户
+# ③ 抽成共享函数，免得两处同构脚本再各自漂移（BL-24）。
+# 返回 0=已确认开机自启；1=未能确认（只告警、不中断安装——rootless/无 systemd 场景仍可手工起）。
+phx_engine_autostart() { # phx_engine_autostart [SUDO]
+  local s="${1:-}"
+  if command -v systemctl >/dev/null 2>&1; then
+    # shellcheck disable=SC2086
+    $s systemctl enable --now docker >>"$PHX_LOG_FILE" 2>&1 || true
+    if [ "$($s systemctl is-enabled docker 2>/dev/null)" = "enabled" ]; then
+      phx_log INFO "docker 已确认开机自启（systemctl is-enabled=enabled）"
+      phx_log INFO "  重启语义: 机器重启 → docker 自启 + compose restart:unless-stopped ⇒ 栈自动复活，无需人工干预"
+      phx_log INFO "  休眠语义: 宿主休眠/挂起只是冻结进程（不是销毁），唤醒后继续跑，不会重建容器"
+      return 0
+    fi
+    phx_log WARN "docker 未能确认开机自启（systemctl is-enabled 非 enabled）——机器重启后需手工起引擎"
+    phx_log WARN "  重启语义: 栈不会自动复活；请先手工执行 systemctl enable --now docker"
+    return 1
+  fi
+  # shellcheck disable=SC2086
+  $s service docker start >>"$PHX_LOG_FILE" 2>&1 || true
+  phx_log WARN "本机无 systemd（或无 systemctl）——引擎不会随开机自启"
+  phx_log WARN "  重启语义: 机器重启后需手工起引擎；休眠/挂起仅冻结进程，唤醒后继续，不重建容器"
+  phx_log WARN "  WSL 场景另有坑: WSL 会回收空闲发行版（dockerd 与容器随之停），需保活会话或手工唤醒"
+  return 1
+}

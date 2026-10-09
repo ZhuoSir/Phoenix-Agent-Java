@@ -128,7 +128,8 @@ Write-Host "======================================================" -ForegroundC
 Write-Host "  访问地址 : http://localhost:$showPort （Windows 浏览器直接开）"
 Write-Host "  管理账号 : admin / 123456（首登立即改密）"
 Write-Host "  离线包   : WSL 内 ~/phoenix-src/docker/dist/*.tar.gz（可拷去其它机器）"
-Write-Host "  服务管理 : wsl -d $Distro -u root -- docker compose -p $Project ps"
+Write-Host "  重启语义 : 机器重启后自动复活（docker 开机自启 + compose restart:unless-stopped）；休眠/挂起只冻结进程，唤醒即继续"
+  Write-Host "  服务管理 : wsl -d $Distro -u root -- docker compose -p $Project ps"
 Write-Host "  localhost 不通时: netsh interface portproxy add v4tov4 listenport=$showPort listenaddress=0.0.0.0 connectport=$showPort connectaddress=<WSL hostname -I>"
 Write-Host "======================================================" -ForegroundColor Green
 exit 0
