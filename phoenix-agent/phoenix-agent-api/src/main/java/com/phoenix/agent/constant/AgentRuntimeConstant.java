@@ -20,6 +20,15 @@ public final class AgentRuntimeConstant {
 
     public static final int MAX_TOOL_ITERATIONS = 100;
 
+    /**
+     * 单轮工具迭代上限**兜底默认**（BUG-162）。
+     *
+     * <p>起因：未配置时此前不注入 ⇒ 框架默认偏小，工具型任务中途被"达到最大迭代次数"中断
+     * （实测一次端到端在第 10 轮左右被打断；调到 60 后 42 秒完整跑通）。60 仍在合法区间 1~100 内，
+     * 是"上限"而非目标值，不会主动多跑；管理员可在运行配置里下调。
+     */
+    public static final int DEFAULT_TOOL_ITERATIONS = 60;
+
     public static final int MAX_KNOWLEDGE_TOP_K = 50;
 
     /** 知识库检索相似度阈值默认值（= 原 RulesRagTool 写死值） */

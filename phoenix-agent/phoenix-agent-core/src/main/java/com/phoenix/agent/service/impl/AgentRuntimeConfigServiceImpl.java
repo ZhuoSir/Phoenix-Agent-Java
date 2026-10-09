@@ -28,6 +28,9 @@ import java.util.Objects;
 @RequiredArgsConstructor
 public class AgentRuntimeConfigServiceImpl implements AgentRuntimeConfigService {
 
+    /** BUG-161：无运行配置行时，据**实际绑定**推断知识库检索是否应默认开启 */
+    private final com.phoenix.data.mapper.AgentKbaseBindMapper agentKbaseBindMapper;
+
     private final AgentRuntimeConfigMapper agentRuntimeConfigMapper;
 
     private final AgentService agentService;
@@ -48,13 +51,33 @@ public class AgentRuntimeConfigServiceImpl implements AgentRuntimeConfigService 
         defaulted.setAgentId(agentId);
         defaulted.setPlanMode(0);
         defaulted.setMemoryEnabled(1);
-        defaulted.setKnowledgeEnabled(0);
+        // BUG-161：不再无条件关（否则界面绑定成功、检索永不生效）；按实际绑定推断，显式配置行仍优先
+        defaulted.setKnowledgeEnabled(hasBoundKnowledge(agentId) ? 1 : 0);
         defaulted.setKnowledgeTopK(AgentRuntimeConstant.DEFAULT_KNOWLEDGE_TOP_K);
         defaulted.setKnowledgeSimilarityThreshold(AgentRuntimeConstant.DEFAULT_KNOWLEDGE_SIMILARITY_THRESHOLD);
+        // BUG-162：给出兜底迭代上限，避免框架默认偏小打断工具型任务（合法区间 1~100）
+        defaulted.setMaxIterations(AgentRuntimeConstant.DEFAULT_TOOL_ITERATIONS);
         defaulted.setDbQueryEnabled(0);
         defaulted.setDbDeepAnalysisEnabled(0);
         defaulted.setFilesystemPolicy(FilesystemPolicyEnm.LOCAL.getCode());
         return defaulted;
+    }
+
+    /**
+     * BUG-161：该智能体是否已绑定知识库（决定"无运行配置行"时检索工具的默认开关）。
+     */
+    private boolean hasBoundKnowledge(Long agentId) {
+        if (agentId == null) {
+            return false;
+        }
+        try {
+            java.util.List<Long> kbIds = agentKbaseBindMapper.selectKbIdsByAgent(agentId);
+            return kbIds != null && !kbIds.isEmpty();
+        }
+        catch (Exception e) {
+            log.warn("查询知识库绑定失败（按未绑定处理）: agentId={}, err={}", agentId, e.toString());
+            return false;
+        }
     }
 
     @Override
@@ -187,13 +210,15 @@ public class AgentRuntimeConfigServiceImpl implements AgentRuntimeConfigService 
         vo.setAgentId(agentId);
         vo.setPlanMode(false);
         vo.setMemoryEnabled(true);
-        vo.setKnowledgeEnabled(false);
+        // BUG-161：预览口径与运行时一致——有绑定即默认开
+        vo.setKnowledgeEnabled(hasBoundKnowledge(agentId));
         vo.setKnowledgeTopK(AgentRuntimeConstant.DEFAULT_KNOWLEDGE_TOP_K);
         vo.setKnowledgeSimilarityThreshold(AgentRuntimeConstant.DEFAULT_KNOWLEDGE_SIMILARITY_THRESHOLD);
         vo.setDbQueryEnabled(false);
         vo.setDbDeepAnalysisEnabled(false);
         vo.setFilesystemPolicy(FilesystemPolicyEnm.LOCAL.getCode());
-        vo.setMaxIterations(null); // 默认=不注入，框架值兜底（R-02）
+        // BUG-162：预览展示真实生效的兜底值（不再写 "框架默认"）
+        vo.setMaxIterations(AgentRuntimeConstant.DEFAULT_TOOL_ITERATIONS);
         return vo;
     }
 

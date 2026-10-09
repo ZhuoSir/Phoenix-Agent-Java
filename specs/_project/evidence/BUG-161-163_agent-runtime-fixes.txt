@@ -1,0 +1,41 @@
+=== BUG-161 / BUG-162 / BUG-163 修复与验证证据 ===
+日期: 2026-10-09 | 版本: v2.0.0 | 来源: 另一会话（HJP 三智能体导入）实测反馈的"真 bug"三条
+
+--- BUG-161 绑定知识库静默失效 ---
+根因: `AgentRuntimeConfigServiceImpl.resolve()` 无运行配置行时兜底 `knowledgeEnabled=0`；
+      而 `KnowledgeRetrievalToolContributor.supports()` 严格 gate `==1`；运行配置行只在保存接口被调用时才创建
+      （建智能体流程只 insert agent）⇒ 界面绑定成功、检索工具永不装配。
+修复: 无配置行时按**实际绑定**推断——`AgentKbaseBindMapper.selectKbIdsByAgent(agentId)` 非空 ⇒ knowledgeEnabled=1；
+      已有配置行仍以显式值为准（尊重管理员关闭）；预览口径同步（不再恒 false）。
+实测（`GET /api/agent/{id}/runtime-config`）:
+  | 智能体 | 绑定数 | 运行配置行 | knowledgeEnabled | 期望 |
+  |---|---|---|---|---|
+  | 20 制度汇编 | 1 | 0（无行） | **true** | true ✅（修复前为 false） |
+  | 41 测试智能体 | 0 | 0（无行） | **false** | false ✅（证明不是"无条件开"） |
+  | 42/43/44（HJP） | 3/4/2 | 1（显式行） | true（未被覆盖） | 尊重显式值 ✅ |
+
+--- BUG-162 工具迭代上限无默认 ---
+根因: `maxIterations` 未配置时不注入 ⇒ 走框架默认（偏小），工具型任务中途「达到最大迭代次数，本轮任务被中断」。
+修复: 新增 `AgentRuntimeConstant.DEFAULT_TOOL_ITERATIONS=60`，作为 `resolve()` 兜底与预览展示值（合法区间 1~100 不变）。
+实测: 上表四个智能体 `maxIterations` 均返回 **60**（agent20 无行也返回 60）✅
+
+--- BUG-163 deepseek reasoning_content 400 复发（压缩路径未覆盖，关联 BUG-77）---
+根因: BUG-77 的根治只在**轮次开始前**修 `tbl_harness_store_state`；而轮中 `CompactionMiddleware` 发起的模型调用
+      同样受「带 tool_calls 的助手消息必须回传 reasoning_content」约束 ⇒ 压缩即 400，该轮空正文/中断。
+修复: 新增 `ReasoningRepairMiddleware`（挂在 `MiddlewareBase.onReasoning`，注册在 middleware 链**最外层**）——
+      **每次模型调用前**扫描入参消息，把「含 ToolUseBlock 但无 ThinkingBlock」的助手消息补占位 thinking 块
+      （`[reasoning unavailable: turn was interrupted]`，与轮前状态表修复同文案），替换 `ReasoningInput` 后 `next.apply`。
+      正常调用 / 工具续轮 / 压缩调用**一并覆盖**（压缩也是模型调用，必然经过该钩子）。
+确定性验证（构造"有 tool_use 无 thinking"的消息直接调中间件）:
+  ① 缺陷消息已补 thinking = true（块数 2）✅
+  ② 健康消息未被改动 = true ✅
+  ③ 原列表未被就地修改 = true（无副作用）✅
+  ④ 结论 PASS
+端到端复现（"工具轮中途 cancel → 紧接继续"，BUG-77 的原失败路径）:
+  首轮 777 字后被 `POST /admin/harness/turn/cancel` 停止；紧接"继续" → 回答 767 字，
+  **无 reasoning_content/BadRequest/模型或流错误/服务器内部错误特征** ✅
+  **如实说明**: 该路径**未复现出**原始 400（也未见修复件触发日志）⇒ 本条的"压缩路径"修复为
+  **逻辑级验证 + 覆盖性论证**，端到端需待真实复发场景确认（已写入 BUG-163 备注）。
+
+--- 编译/部署 ---
+  compile/package exit=0（0 错误）；compose build backend exit=0 → up exit=0 → backend healthy
