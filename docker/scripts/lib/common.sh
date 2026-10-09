@@ -126,6 +126,41 @@ phx_disk_ok() { # phx_disk_ok <路径> <需要MB>
   [ -n "$free" ] && [ "$free" -ge "$2" ]
 }
 
+# ---------- 镜像预拉取 + 完整性校验（BUG-148 加固 / BUG-163） ----------
+# 竞速只能探 /v2/ 响应码，没有便携的带宽测法；坏源会把"截断 blob"混过 pull 校验，
+# 直到 BuildKit 计算缓存键才以 `short read: expected N bytes but got 0` 炸在离现场很远的步骤里
+# （实测：nginx 627B 层长期 0B，步骤 4/8 报错，用户现场完全不可归因）。
+# 故在动手构建前：逐个 docker pull，再用 docker save 把镜像**逐 blob 读一遍**（截断必现形）；
+# 失败即 rmi 掉重来，重试 max 次仍失败则报明确错误并指向 --mirror。
+# 可选环境变量 PHX_PREFETCH_PLATFORM（形如 linux/amd64）透传给 docker pull。
+phx_prefetch_images() { # phx_prefetch_images <镜像>... → 全绿返回 0
+  local img attempt max=2 bad=0 plat=""
+  [ -n "${PHX_PREFETCH_PLATFORM:-}" ] && plat="--platform $PHX_PREFETCH_PLATFORM"
+  for img in "$@"; do
+    [ -z "$img" ] && continue
+    attempt=1
+    while [ "$attempt" -le "$max" ]; do
+      phx_log INFO "预拉取+校验: $img（第 $attempt/$max 次）"
+      # shellcheck disable=SC2086
+      if docker pull $plat "$img" >>"$PHX_LOG_FILE" 2>&1 \
+         && docker save "$img" >/dev/null 2>>"$PHX_LOG_FILE"; then
+        phx_log INFO "  完整性校验通过: $img"
+        break
+      fi
+      phx_log WARN "  预拉取/校验失败（blob 可能被源截断）——清掉重试: $img"
+      docker rmi "$img" >>"$PHX_LOG_FILE" 2>&1 || true
+      attempt=$((attempt+1))
+    done
+    [ "$attempt" -le "$max" ] || bad=1
+  done
+  if [ "$bad" -ne 0 ]; then
+    phx_log ERROR "有镜像预拉取/完整性校验失败——镜像源传输质量差（竞速只测响应码、不测带宽）"
+    phx_log ERROR "处置: 换源重跑，如 --mirror https://docker.m.daocloud.io 或 --mirror https://docker.1panel.live"
+    return 1
+  fi
+  return 0
+}
+
 # ---------- 引擎安装：受限网络下的国内回退（BUG-145 / BUG-162） ----------
 # get.docker.com 的 **安装脚本本体在境外**（`--mirror Aliyun` 只管 deb 包源），
 # 国内受限网络下 curl 会被 reset ⇒ 脚本判定"引擎装不上"直接失败。

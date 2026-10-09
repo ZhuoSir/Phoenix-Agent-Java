@@ -83,6 +83,11 @@ phx_step 3 $TOTAL "容器内编译 jar+dist（native，产物架构无关）" &&
   if [ "$OVERSEAS" -eq 1 ]; then SETTINGS_ARG="docker/maven/settings.default.xml"; NPM_ARG="https://registry.npmjs.org"
   else SETTINGS_ARG="docker/maven/settings.aliyun.xml"; NPM_ARG="https://registry.npmmirror.com"; fi
   PLAT="" ; [ -n "$NATIVE" ] && PLAT="--platform linux/$NATIVE"
+  # 构建基础镜像预拉取 + 完整性校验（BUG-148 加固 / BUG-163）：坏 blob 不再拖到构建深处才炸
+  PHX_PREFETCH_PLATFORM=""; [ -n "$NATIVE" ] && PHX_PREFETCH_PLATFORM="linux/$NATIVE" || true
+  phx_prefetch_images "$(ref maven:3.9-eclipse-temurin-21)" "$(ref node:22-bookworm)" \
+    || phx_fail 3 $TOTAL "构建基础镜像预拉取/校验失败（镜像源传输质量差，换 --mirror 重跑）"
+  PHX_PREFETCH_PLATFORM=""
   phx_log INFO "backend 编译（MAVEN_IMAGE=$(ref maven:3.9-eclipse-temurin-21) settings=$SETTINGS_ARG）"
   # shellcheck disable=SC2086
   docker build $PLAT -f "$REPO/docker/Dockerfile.backend.multistage" --target jar \
@@ -110,6 +115,12 @@ phx_step 4 $TOTAL "组装双侧镜像 + 基础运行时三件备齐（--platform
   mkdir -p "$REPO/docker/.stage"
   cp "$WORK/artifacts/phoenix-admin.jar" "$REPO/docker/.stage/phoenix-admin.jar"
   rm -rf "$REPO/docker/.stage/dist" && cp -r "$WORK/artifacts/dist" "$REPO/docker/.stage/dist"
+  # 组装用基础镜像预拉取 + 完整性校验（BUG-163）：nginx / JRE 基座 / 三件基础运行时
+  PHX_PREFETCH_PLATFORM="linux/$ARCH"
+  # shellcheck disable=SC2046
+  phx_prefetch_images "$(ref "$NGINX_BASE")" "$JRE_BASE" $(for _pi in $BASE_IMGS; do ref_any "$_pi"; done) \
+    || phx_fail 4 $TOTAL "组装用基础镜像预拉取/校验失败（镜像源传输质量差，换 --mirror 重跑）"
+  PHX_PREFETCH_PLATFORM=""
   docker build --platform "linux/$ARCH" -f "$REPO/docker/Dockerfile.backend" \
     --build-arg "JRE_BASE_IMG=$JRE_BASE" --build-arg "JAVA_BIN=$JAVA_BIN_ARG" \
     -t "phoenix-backend:$VERSION" "$REPO" >>"$PHX_LOG_FILE" 2>&1 \
