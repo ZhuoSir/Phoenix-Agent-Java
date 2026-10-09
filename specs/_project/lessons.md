@@ -758,3 +758,16 @@
   （本次重走时已用这个形式）；破坏性命令（`branch -d`/`checkout`/`reset --hard`/`clean`）尤其必须置于
   同一条 `if` 保护下，且删除分支前先 `git log -1 | grep <标记>` 复核提交真的存在。
 - 关联: L-80（表检当提交闸）；BUG-159
+
+## L-82 审计分支**别用 `%(refname:short)`**——多命名空间同名时它会加前缀，害我误报"异常分支"
+- 场景: 清理本地分支时我用 `git for-each-ref --format='%(refname:short)' refs/heads` 列分支，
+  结果 4 个正常的本地版本分支显示成 `heads/v1.4.0`、`heads/v1.5.0`…（真实 refname 是 `refs/heads/v1.4.0`）。
+  我据此判定"这些分支名字异常、像误用全 ref 路径建的"，并向用户报告请其确认清理；用户同意后 `git branch -D heads/v1.4.0`
+  必然报 `not found` —— 才发现前提错了。原因：远端存在同名的 `refs/remotes/origin/v1.4.0`，
+  `refname:short` 为消除歧义返回了带前缀的名。
+- 根因: `%(refname:short)` 语义是"**最短无歧义名**"，不是真实名字；存在 heads/remotes/tags 同名时会加前缀。
+  我拿它当"事实"做了判断并上报。
+- 防再犯规则: ① 审计/脚本判断 ref 一律用 `%(refname)`（完整路径）或 `git rev-parse refs/heads/<name>`；
+  ② 向用户报告"某分支异常/名字怪"之前，必须用完整 refname 复核（`git for-each-ref --format='%(refname)'`
+  或 `ls .git/refs/heads/`）；③ 删除类操作先用完整 ref 验证存在性再动手（与 L-81 同源）。
+- 关联: L-81（删除类操作守卫）；本次最终按"= 远端同名 && 已并入 v2.0.0"两条断言清理，本地仅留 main 与 v2.0.0
