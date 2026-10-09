@@ -834,3 +834,29 @@
   ③ 把"空跑"当红旗：输出里出现 `:000`、空变量、空 URL、零匹配，先当成"测试没跑"而不是"通过"；
   ④ 严守铁律 5——**没有真实输出就不写"实测/验证"字样**（本次是靠自查发现，属侥幸，不可依赖）。
 - 关联: L-84（同源三层解析）；铁律 5（诚实性）；BUG-162
+
+## L-89 本机直连 github.com 不通 ⇒ `git push` 必须走代理，失败信息极易被误判成权限/凭证问题
+- 场景: 用户口令「push」后，`git push origin hotfix/install-chain-hardening` 报
+  `error: RPC failed; curl 28 Failed to connect to github.com port 443 after 21060 ms` +
+  `fatal: the remote end hung up unexpectedly`，我一度要往"凭证/SSH/权限"方向查；
+  改用 `git -c http.proxy=http://127.0.0.1:7897 -c https.proxy=http://127.0.0.1:7897 push` 后
+  **立刻成功**（`61f5ebf..25714c0 ... -> hotfix/install-chain-hardening`，退出码 0）。
+- 根因: 本机 `ProxyEnable=0`（系统代理关闭）而 github.com **直连被拦**（21s 超时）；Clash 仍在 7897 监听。
+  git 不会自动用 WSL/系统之外的代理，"连不上 443"与权限无关。
+- 防再犯规则: ① 本机 push/pull 失败且报 `Failed to connect ... port 443` 时，**第一步就换代理重试**
+  （`git -c http.proxy=http://127.0.0.1:7897 -c https.proxy=http://127.0.0.1:7897 <cmd>`），别先怀疑凭证；
+  ② 判断"代理在不在"用 `Test-NetConnection 127.0.0.1 -Port 7897`，不要看 `ProxyEnable`（二者可背离）；
+  ③ 需要长期可用可 `git config --local http.proxy ...`，但那会写进仓库配置，需用户同意。
+- 关联: L-70（网络受限族）；本轮 BUG-161~167 push
+
+## L-90 排查"打包编译失败"必须先分辨「分支源码本身坏了」vs「构建副本是脏的」
+- 场景: 步骤 3/8 报 `PrivilegeDepartmentServiceImpl.java:[313,72] invalid method reference:
+  cannot find symbol getDeptId() in PrivilegeUser`，第一直觉是"v2.0.0 分支源码编译不过"（甚至怀疑自己的改动）；
+  实为 **WSL 副本是脏的**——`bootstrap.ps1` 用 `cp -ru`（只增不删），切分支后旧文件永生（BUG-166）。
+- 根因: 构建树来自"拷贝"而非"检出"，拷贝不承担删除语义；三层事实（git 跟踪 / Windows 工作树 / 构建副本）
+  一旦不一致，报错现场会指向一个你明明找不到的文件。
+- 防再犯规则: ① 见到"编译报某文件的符号找不到"时，**先做三处一比**：`git ls-files <路径>`（分支跟不跟踪）、
+  Windows 工作树是否存在、构建副本是否存在——三者不一致即刻指向副本脏，不要先怀疑分支或自己的改动；
+  ② 反过来也成立：报错文件"在本地根本找不到"本身就是副本脏的强信号；③ 同步类脚本必须问一句
+  "它删不删？"（`cp -ru` 不删、`rsync --delete` 删、`rm+cp` 删）。
+- 关联: BUG-166；L-84/L-88（多环境传递族）
