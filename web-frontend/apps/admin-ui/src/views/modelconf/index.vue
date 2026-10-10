@@ -94,8 +94,26 @@ async function fetchOllamaModels() {
   }
   loadingModels.value = true;
   try {
-    const list = await fetchOllamaModelsApi(formData.baseUrl);
-    ollamaModels.value = list ?? [];
+    // 解包约定归一：requestClient 可能已返回 data，也可能返回 {data,...} 信封 —— 两种都兼容，
+    // 否则列表拿到非数组 ⇒ length 判定失败 ⇒ 退化为输入框（表现为"点了没反应"）
+    const res: any = await fetchOllamaModelsApi(formData.baseUrl);
+    // 多形状兼容：[] / {data:[]} / {data:{list:[]}} / {list:[]}（不同 requestClient 解包约定）
+    const pick = (v: any): string[] => {
+      if (Array.isArray(v)) return v as string[];
+      if (v && typeof v === 'object') {
+        if (Array.isArray(v.data)) return v.data as string[];
+        if (Array.isArray(v.list)) return v.list as string[];
+        if (v.data && Array.isArray(v.data.list)) return v.data.list as string[];
+        if (v.data) return pick(v.data);
+      }
+      return [];
+    };
+    const list = pick(res);
+    ollamaModels.value = list;
+    if (list.length === 0) {
+      // 便于排障：把原始返回形状留在控制台（不含敏感信息）
+      console.warn('[ollama] 模型列表为空，原始返回:', res);
+    }
     if (ollamaModels.value.length === 0) {
       ElMessage.warning('未获取到模型，请确认 Ollama 已安装模型');
     }
@@ -612,7 +630,7 @@ onMounted(loadConfigs);
         <ElFormItem label="模型名称" prop="modelName">
           <div style="display: flex; gap: 8px; width: 100%">
             <ElSelect
-              v-if="isOllama && ollamaModels.length > 0"
+              v-if="isOllama"
               v-model="formData.modelName"
               filterable
               allow-create
@@ -641,7 +659,7 @@ onMounted(loadConfigs);
         <ElFormItem
           label="API密钥"
           prop="apiKey"
-          :required="formData.provider !== 'custom'"
+          :required="formData.provider !== 'custom' && formData.provider !== 'ollama'"
         >
           <ElInput
             v-model="formData.apiKey"
@@ -650,8 +668,8 @@ onMounted(loadConfigs);
             :placeholder="
               formData.apiKey && formData.apiKey.includes('****')
                 ? '已脱敏显示；保持不变则沿用原密钥，重新输入则替换'
-                : formData.provider === 'custom'
-                  ? '可选填'
+                : formData.provider === 'custom' || formData.provider === 'ollama'
+                  ? '可选填（Ollama 本地服务无鉴权）'
                   : '请输入API密钥'
             "
           />
