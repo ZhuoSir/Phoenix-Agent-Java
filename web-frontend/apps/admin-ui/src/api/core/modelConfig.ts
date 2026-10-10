@@ -106,7 +106,11 @@ export async function checkModelConfigReadyApi() {
  * 走服务端代理（浏览器无法访问内网/宿主地址，且需统一鉴权与超时治理）。
  */
 export async function fetchOllamaModelsApi(baseUrl: string) {
+  // responseReturn: 'body' —— 本平台 ApiResponse 信封**无 code 字段**（仅 success/message/data），
+  // 默认拦截器会按 code 判定失败并把 message（"查询成功"）当错误抛出（前端弹"内部服务器错误"）。
+  // 这里直接取 body，再由调用方做多形状解包。
   return requestClient.get<string[]>(`${API_BASE_URL}/ollama/models`, {
     params: { baseUrl },
+    responseReturn: 'body',
   });
 }
