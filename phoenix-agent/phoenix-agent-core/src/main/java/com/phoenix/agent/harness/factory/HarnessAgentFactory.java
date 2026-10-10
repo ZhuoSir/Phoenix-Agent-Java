@@ -3,6 +3,7 @@ package com.phoenix.agent.harness.factory;
 import com.phoenix.agent.constant.AgentRuntimeConstant;
 import com.phoenix.agent.enums.FilesystemPolicyEnm;
 import com.phoenix.agent.harness.middleware.ReasoningRepairMiddleware;
+import com.phoenix.agent.harness.middleware.ToolLoopBreakerMiddleware;
 import com.phoenix.agent.harness.middleware.StopOnAllDeniedMiddleware;
 import com.phoenix.agent.harness.middleware.KnowledgePathGuardMiddleware;
 import com.phoenix.agent.harness.middleware.KnowledgeGuidanceMiddleware;
@@ -52,6 +53,10 @@ import java.util.List;
 @Component
 @RequiredArgsConstructor
 public class HarnessAgentFactory {
+
+    /** BUG-165：同一工具连续重复调用多少次后熔断（默认 3） */
+    @org.springframework.beans.factory.annotation.Value("${phoenix.agent.tool-repeat-breaker-threshold:3}")
+    private int toolRepeatBreakerThreshold;
 
     /** 工作区（与存量自注册智能体保持一致，避免两套目录） */
     /** BL-19/R-01：workspace 根配置化。默认与历史一致（裸机开发零感知）；
@@ -169,6 +174,8 @@ public class HarnessAgentFactory {
             .middlewares(List.of(
                   // BUG-163：必须放在最外层——每次模型调用（含框架压缩调用）前补 reasoning 块
                   new ReasoningRepairMiddleware(),
+                  // BUG-165：同一工具连续重复调用即熔断停轮（防本地小模型死循环）
+                  new ToolLoopBreakerMiddleware(toolRepeatBreakerThreshold),
                   new StopOnAllDeniedMiddleware(), new ExplicitSkillMiddleware(),
                 // T-08/R-02/R-03：知识库原件访问护栏（默认 observe 只记日志；PHOENIX_KB_PATH_GUARD=enforce 执行拒绝）
                 new KnowledgePathGuardMiddleware(workspace.toString()),
