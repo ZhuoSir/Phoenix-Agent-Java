@@ -50,6 +50,8 @@
   ⇒ **裁决：不装**，等发布。发布后安装命令：`bootstrap.ps1 -Version 2.0.0` → `install.ps1`（**单横线**；`--version` 已被 BUG-174 守卫拦下）；`install.sh` 用 `-p phoenix` ⇒ named volume 复用、`.env` 仅更新 `IMAGE_TAG`，数据与密码端口不动；步骤 6 每次必跑（BUG-183）⇒ 容器会真的换镜像。
 - **2026-10-10 发布前待核（用户未决）**：`releases/v2.0.0/MILESTONE.md` L77~78 仍记 `user-role-group-model`「待 requirements 确认①（Q1~Q6 未答复）」，而 `V2.0.0_01__org_dimension_drop_ddl` 等迁移显然已实现该需求 ⇒ **台账与实现状态不一致**，M3 冻结前须复核挂接表与三文档确认状态，避免发布时踩空。
 
+- **2026-10-10 用户：v2.0.0 发布流程暂不启动（原话「不着急，发布先不做」）** —— 在途线保持现状、安装也暂不做（见上条）；台账只登记新待办 `BL-48`（原生 OCR 识别，用户同日列入）。将来发版按 M3 走：复核 `MILESTONE.md` 挂接表与三文档确认状态 → 出四件套（`RELEASE-NOTES`/`UPGRADE`/`config/changes`/`checklist`）→ 冻结打 tag → 合 main。
+
 ## 对账记录（2026-10-02 用户口令「对账」）
 - v1.4.0 首单 detached-stream 此前按旧例直合 main（c4735a7）——既成事实保留，分支从 main tip 补建，内容完整无缺口
 - 台账/规范接入由 skill 升级触发（共享面三件套等条款同日生效）
