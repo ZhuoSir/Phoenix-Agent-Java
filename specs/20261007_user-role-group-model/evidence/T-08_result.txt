@@ -1,0 +1,42 @@
+=== T-08 验收结论（角色↔菜单授权界面修复 / R-10 / BUG-116）===
+日期: 2026-10-07 | 前端: web-frontend/apps/admin-ui（node v24.21.0 + pnpm）
+
+[1] 真因（复核实证，非推断）
+  index.vue:44 `useVbenModal({ connectedComponent: AssignMenu })` ⇒ 弹窗内容 = assign-menu.vue；
+  index.vue handleAssignMenu 只做 `assignMenuModalApi.setData(row).open()`，其后紧跟 `return;`
+  （旧 ElDialog 路径整体被注释掉，429~624 行）。
+  **断点在 assign-menu.vue**：`onOpenChange` 里 `const data = modalApi.getData()` 读取了角色，
+  却**从未写进 `currentRole`** ⇒ `handlePvalueChange` / `handleHeaderSelectAll` 里
+  `if (!role?.id || !role?.sn) return;` 永远提前返回 ⇒ 勾选看着有反应、**实际一个字节都没落库**。
+
+[2] 修复清单
+  assign-menu.vue：
+    - `onOpenChange` 中补 `currentRole.value = data;`（**核心修复**）
+    - 删除裸 `debugger;`（BUG-124，全仓仅此一处）
+    - 补 `aclLoading.value = true`（原来只有 false，loading 态永不显示）
+  index.vue：
+    - `handleAssignMenu` 清理为「只开弹窗」，删除 `return;` 之后的不可达旧逻辑
+    - 删除 429~624 行整段**旧 ElDialog 授权实现**（196 行注释块；正是它掩盖了真因）
+    - 清理因此变孤儿的声明：`getAclsByReleaseIdApi`/`getRoleAclsApi` 导入、
+      `aclLoading`/`existingAclMap` ref、`AclRecord` 类型、`assignLevels` 函数
+    - 留 5 行注释说明删除原因与 git 可追溯
+
+[3] 验证（真实输出）
+  - `pnpm typecheck`（vue-tsc --noEmit --skipLibCheck）：
+      改动前基线 **212** → 改动后 **211**（**低于基线**）
+      与基线差异仅一项：**消失了 1 个既有 TS2345**（位于被删的死代码里）；**零新增错误**
+      我改动的 2 个文件里不存在我引入的新类别（剩余均为既有 TS6133/TS7006 等）
+  - 过程自伤与纠正：用非贪婪正则删 `assignLevels` 时只吃到内层 `}`，留下残片 ⇒ TS1128，
+    类型错误数骤降至 2（**骤降即危险信号**）；已手工清残片 + 花括号平衡自检（109/109）。
+    已记入 `lessons.md` **L-32 复发**（追加：删函数按行区间删、错误数骤降先怀疑改坏文件）
+
+[4] 缺陷台账
+  - **BUG-116 → 已修复(v2.0.0)**（代码面；运行期验证待 T-16 → 已验证）
+  - **BUG-124（新登记）→ 已修复(v2.0.0)**：assign-menu.vue 残留 `debugger;`
+
+[5] **延期至 T-16（明确记载）**
+  T-08 要求的"界面点选后 tbl_privilege_acl 真实新增行 / 撤销后该角色菜单减少 / save*AclApi
+  被实际调用"必须对**已部署**的前后端执行（含浏览器点击）。
+  ⇒ **T-08 暂不勾选**，待 T-16 通过后勾选。
+
+[6] 结论：T-08 代码面完成（授权链路已通、typecheck 低于基线）；界面点击级验证挂 T-16。

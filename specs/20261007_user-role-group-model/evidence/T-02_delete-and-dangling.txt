@@ -1,0 +1,76 @@
+=== T-02 删除清单（25 个文件）===
+     1	phoenix-privilege/phoenix-privilege-api/src/main/java/com/phoenix/privilege/dto/PrivilegeCompanyDTO.java
+     2	phoenix-privilege/phoenix-privilege-api/src/main/java/com/phoenix/privilege/dto/PrivilegeDepartmentDTO.java
+     3	phoenix-privilege/phoenix-privilege-api/src/main/java/com/phoenix/privilege/dto/PrivilegeEmployeeDTO.java
+     4	phoenix-privilege/phoenix-privilege-api/src/main/java/com/phoenix/privilege/dto/query/PrivilegeCompanyQuery.java
+     5	phoenix-privilege/phoenix-privilege-api/src/main/java/com/phoenix/privilege/entity/PrivilegeCompany.java
+     6	phoenix-privilege/phoenix-privilege-api/src/main/java/com/phoenix/privilege/entity/PrivilegeDepartment.java
+     7	phoenix-privilege/phoenix-privilege-api/src/main/java/com/phoenix/privilege/entity/PrivilegeEmployee.java
+     8	phoenix-privilege/phoenix-privilege-api/src/main/java/com/phoenix/privilege/vo/DepartmentTreeVO.java
+     9	phoenix-privilege/phoenix-privilege-api/src/main/java/com/phoenix/privilege/vo/OrganizationTreeVO.java
+    10	phoenix-privilege/phoenix-privilege-api/src/main/java/com/phoenix/privilege/vo/PrivilegeCompanyVO.java
+    11	phoenix-privilege/phoenix-privilege-api/src/main/java/com/phoenix/privilege/vo/PrivilegeDepartmentVO.java
+    12	phoenix-privilege/phoenix-privilege-api/src/main/java/com/phoenix/privilege/vo/PrivilegeEmployeeVO.java
+    13	phoenix-privilege/phoenix-privilege-api/src/main/java/com/phoenix/privilege/vo/PrivilegeGroupVO.java
+    14	phoenix-privilege/phoenix-privilege-core/src/main/java/com/phoenix/privilege/mapper/PrivilegeCompanyMapper.java
+    15	phoenix-privilege/phoenix-privilege-core/src/main/java/com/phoenix/privilege/mapper/PrivilegeDepartmentMapper.java
+    16	phoenix-privilege/phoenix-privilege-core/src/main/java/com/phoenix/privilege/mapper/PrivilegeEmployeeMapper.java
+    17	phoenix-privilege/phoenix-privilege-core/src/main/java/com/phoenix/privilege/service/IPrivilegeCompanyService.java
+    18	phoenix-privilege/phoenix-privilege-core/src/main/java/com/phoenix/privilege/service/IPrivilegeDepartmentService.java
+    19	phoenix-privilege/phoenix-privilege-core/src/main/java/com/phoenix/privilege/service/IPrivilegeEmployeeService.java
+    20	phoenix-privilege/phoenix-privilege-core/src/main/java/com/phoenix/privilege/service/impl/PrivilegeCompanyServiceImpl.java
+    21	phoenix-privilege/phoenix-privilege-core/src/main/java/com/phoenix/privilege/service/impl/PrivilegeDepartmentServiceImpl.java
+    22	phoenix-privilege/phoenix-privilege-core/src/main/java/com/phoenix/privilege/service/impl/PrivilegeEmployeeServiceImpl.java
+    23	phoenix-privilege/phoenix-privilege-rest/src/main/java/com/phoenix/privilege/controller/PrivilegeCompanyController.java
+    24	phoenix-privilege/phoenix-privilege-rest/src/main/java/com/phoenix/privilege/controller/PrivilegeDepartmentController.java
+    25	phoenix-privilege/phoenix-privilege-rest/src/main/java/com/phoenix/privilege/controller/PrivilegeEmployeeController.java
+
+文件数:       25
+=== 删除后：是否仍有对已删类的引用（应只剩 3 个待改文件）===
+./phoenix-platform/phoenix-platform-core/src/main/java/com/phoenix/platform/service/front/impl/AccountInfoServiceImpl.java:38:import com.phoenix.privilege.service.IPrivilegeDepartmentService;
+./phoenix-platform/phoenix-platform-core/src/main/java/com/phoenix/platform/service/front/impl/AccountInfoServiceImpl.java:67:    private final IPrivilegeDepartmentService departmentService;
+./phoenix-common/phoenix-common-core/src/main/java/com/phoenix/common/service/sync/AbstractPlatformSyncStrategy.java:119:		String existId = queryPrivilegeCompanyId(dto.getName(), dto.getSn());
+./phoenix-common/phoenix-common-core/src/main/java/com/phoenix/common/service/sync/AbstractPlatformSyncStrategy.java:160:	private String queryPrivilegeCompanyId(String name, String thirdId) {
+./phoenix-privilege/phoenix-privilege-rest/src/main/java/com/phoenix/privilege/controller/PrivilegeUserController.java:9:import com.phoenix.privilege.entity.PrivilegeCompany;
+./phoenix-privilege/phoenix-privilege-rest/src/main/java/com/phoenix/privilege/controller/PrivilegeUserController.java:10:import com.phoenix.privilege.entity.PrivilegeDepartment;
+./phoenix-privilege/phoenix-privilege-rest/src/main/java/com/phoenix/privilege/controller/PrivilegeUserController.java:13:import com.phoenix.privilege.service.IPrivilegeCompanyService;
+./phoenix-privilege/phoenix-privilege-rest/src/main/java/com/phoenix/privilege/controller/PrivilegeUserController.java:14:import com.phoenix.privilege.service.IPrivilegeDepartmentService;
+./phoenix-privilege/phoenix-privilege-rest/src/main/java/com/phoenix/privilege/controller/PrivilegeUserController.java:27:	private final IPrivilegeCompanyService privilegeCompanyService;
+./phoenix-privilege/phoenix-privilege-rest/src/main/java/com/phoenix/privilege/controller/PrivilegeUserController.java:28:	private final IPrivilegeDepartmentService privilegeDepartmentService;
+./phoenix-privilege/phoenix-privilege-rest/src/main/java/com/phoenix/privilege/controller/PrivilegeUserController.java:60:			PrivilegeCompany company = privilegeCompanyService.getById(entity.getCompanyId());
+./phoenix-privilege/phoenix-privilege-rest/src/main/java/com/phoenix/privilege/controller/PrivilegeUserController.java:66:			PrivilegeDepartment department = privilegeDepartmentService.getById(entity.getDeptId());
+./phoenix-privilege/phoenix-privilege-core/src/main/java/com/phoenix/privilege/service/impl/PrivilegeUserServiceImpl.java:12:import com.phoenix.privilege.entity.PrivilegeCompany;
+./phoenix-privilege/phoenix-privilege-core/src/main/java/com/phoenix/privilege/service/impl/PrivilegeUserServiceImpl.java:13:import com.phoenix.privilege.entity.PrivilegeDepartment;
+./phoenix-privilege/phoenix-privilege-core/src/main/java/com/phoenix/privilege/service/impl/PrivilegeUserServiceImpl.java:137:			.leftJoin(PrivilegeCompany.class)
+./phoenix-privilege/phoenix-privilege-core/src/main/java/com/phoenix/privilege/service/impl/PrivilegeUserServiceImpl.java:138:			.on(PrivilegeUser::getCompanyId, PrivilegeCompany::getId)
+./phoenix-privilege/phoenix-privilege-core/src/main/java/com/phoenix/privilege/service/impl/PrivilegeUserServiceImpl.java:139:			.leftJoin(PrivilegeDepartment.class)
+./phoenix-privilege/phoenix-privilege-core/src/main/java/com/phoenix/privilege/service/impl/PrivilegeUserServiceImpl.java:140:			.on(PrivilegeUser::getDeptId, PrivilegeDepartment::getId)
+
+=== 引用文件去重 ===
+./phoenix-common/phoenix-common-core/src/main/java/com/phoenix/common/service/sync/AbstractPlatformSyncStrategy.java
+./phoenix-platform/phoenix-platform-core/src/main/java/com/phoenix/platform/service/front/impl/AccountInfoServiceImpl.java
+./phoenix-privilege/phoenix-privilege-core/src/main/java/com/phoenix/privilege/service/impl/PrivilegeUserServiceImpl.java
+./phoenix-privilege/phoenix-privilege-rest/src/main/java/com/phoenix/privilege/controller/PrivilegeUserController.java
+
+=== 精确口径复核（\b 单词边界；排除 queryPrivilegeCompanyId 这类方法名假阳性）===
+./phoenix-privilege/phoenix-privilege-rest/src/main/java/com/phoenix/privilege/controller/PrivilegeUserController.java:9:import com.phoenix.
+./phoenix-privilege/phoenix-privilege-rest/src/main/java/com/phoenix/privilege/controller/PrivilegeUserController.java:10:import com.phoenix
+./phoenix-privilege/phoenix-privilege-rest/src/main/java/com/phoenix/privilege/controller/PrivilegeUserController.java:60:			PrivilegeCompan
+./phoenix-privilege/phoenix-privilege-rest/src/main/java/com/phoenix/privilege/controller/PrivilegeUserController.java:66:			PrivilegeDepart
+./phoenix-privilege/phoenix-privilege-core/src/main/java/com/phoenix/privilege/service/impl/PrivilegeUserServiceImpl.java:12:import com.phoe
+./phoenix-privilege/phoenix-privilege-core/src/main/java/com/phoenix/privilege/service/impl/PrivilegeUserServiceImpl.java:13:import com.phoe
+./phoenix-privilege/phoenix-privilege-core/src/main/java/com/phoenix/privilege/service/impl/PrivilegeUserServiceImpl.java:137:			.leftJoin(P
+./phoenix-privilege/phoenix-privilege-core/src/main/java/com/phoenix/privilege/service/impl/PrivilegeUserServiceImpl.java:138:			.on(Privile
+./phoenix-privilege/phoenix-privilege-core/src/main/java/com/phoenix/privilege/service/impl/PrivilegeUserServiceImpl.java:139:			.leftJoin(P
+./phoenix-privilege/phoenix-privilege-core/src/main/java/com/phoenix/privilege/service/impl/PrivilegeUserServiceImpl.java:140:			.on(Privile
+
+=== 去重文件（预期：T-03 的 3 个文件）===
+./phoenix-privilege/phoenix-privilege-core/src/main/java/com/phoenix/privilege/service/impl/PrivilegeUserServiceImpl.java
+./phoenix-privilege/phoenix-privilege-rest/src/main/java/com/phoenix/privilege/controller/PrivilegeUserController.java
+
+=== 假阳性说明：AbstractPlatformSyncStrategy 命中的是方法名（非类型引用）===
+119:		String existId = queryPrivilegeCompanyId(dto.getName(), dto.getSn());
+137:		String existId = queryPrivilegeDeptId(dto.getSn());
+156:		return queryPrivilegeDeptId(platformDeptId);
+160:	private String queryPrivilegeCompanyId(String name, String thirdId) {
+168:	private String queryPrivilegeDeptId(String thirdId) {

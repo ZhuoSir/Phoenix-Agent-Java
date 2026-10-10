@@ -1,0 +1,50 @@
+=== T-06 演练 v3（修复后，干净基线 2026-10-07 17:13:27）===
+
+[0] 基线（应 menu=27 acl=61 tomb=14 admin_ok=24 common_ok=1 zero=2 org=4 dirty=36 bak=0）
+ERROR:  relation "tbl_privilege_acl_bak_v200" does not exist
+LINE 1: select coalesce((select count(*) from tbl_privilege_acl_bak_...
+                                              ^
+  [统计] menu=27  acl=61  tomb=14  admin_ok=24  common_ok=1  zero_role=2  org_menu=4  dirty=36  bak=
+
+[1] 正向：02 → 03 → 04
+psql:<stdin>:71: NOTICE:  [V2.0.0_02] 补角色完成：待补 2 人 / 实际写入 2 行（角色 431285032083144704 / 普通角色）
+psql:<stdin>:86: NOTICE:  [V2.0.0_02] 自检通过：存活用户无角色数 = 0
+psql:<stdin>:56: NOTICE:  [V2.0.0_03] 自检通过：组织菜单与其授权行均为 0
+psql:<stdin>:142: NOTICE:  [V2.0.0_04] 基线重建完成：存活菜单 23；目标对 30；超管 23；普通角色 7（角色 428007432736870400 / 431285032083144704）
+psql:<stdin>:159: NOTICE:  [V2.0.0_04] 终检通过：无「可用菜单为 0」的角色
+  [统计] menu=23  acl=30  tomb=14  admin_ok=23  common_ok=7  zero_role=0  org_menu=0  dirty=0  bak=57
+
+[2] 幂等复跑 #1（02/03/04）
+psql:<stdin>:71: NOTICE:  [V2.0.0_02] 补角色完成：待补 0 人 / 实际写入 0 行（角色 431285032083144704 / 普通角色）
+psql:<stdin>:86: NOTICE:  [V2.0.0_02] 自检通过：存活用户无角色数 = 0
+psql:<stdin>:56: NOTICE:  [V2.0.0_03] 自检通过：组织菜单与其授权行均为 0
+psql:<stdin>:41: NOTICE:  relation "tbl_privilege_acl_bak_v200" already exists, skipping
+psql:<stdin>:142: NOTICE:  [V2.0.0_04] 基线重建完成：存活菜单 23；目标对 30；超管 23；普通角色 7（角色 428007432736870400 / 431285032083144704）
+psql:<stdin>:159: NOTICE:  [V2.0.0_04] 终检通过：无「可用菜单为 0」的角色
+  [统计] menu=23  acl=30  tomb=14  admin_ok=23  common_ok=7  zero_role=0  org_menu=0  dirty=0  bak=57
+
+[3] 幂等复跑 #2（再跑 04 一次，验备份表不膨胀：bak 应仍为 57）
+psql:<stdin>:41: NOTICE:  relation "tbl_privilege_acl_bak_v200" already exists, skipping
+psql:<stdin>:142: NOTICE:  [V2.0.0_04] 基线重建完成：存活菜单 23；目标对 30；超管 23；普通角色 7（角色 428007432736870400 / 431285032083144704）
+psql:<stdin>:159: NOTICE:  [V2.0.0_04] 终检通过：无「可用菜单为 0」的角色
+  [统计] menu=23  acl=30  tomb=14  admin_ok=23  common_ok=7  zero_role=0  org_menu=0  dirty=0  bak=57
+
+[4] 回滚 04
+psql:<stdin>:32: NOTICE:  [V2.0.0_04-rollback] 撤销授权行 30 行；还原脏数据行 57 行
+  [统计] menu=23  acl=57  tomb=14  admin_ok=20  common_ok=1  zero_role=0  org_menu=0  dirty=36  bak=57
+    期望：menu=23 acl=57 tomb=14 admin_ok=20 common_ok=1 zero=0 org=0 dirty=36
+
+[5] 回滚 03 → 期望 menu=27 org=4 acl=61
+psql:<stdin>:50: NOTICE:  [V2.0.0_03-rollback] 自检通过：菜单 4 行 + 授权 4 行已恢复
+  [统计] menu=27  acl=61  tomb=14  admin_ok=24  common_ok=1  zero_role=0  org_menu=4  dirty=36  bak=57
+
+[6] 回滚 02 → 期望 zero_role=2（完全回到基线）
+psql:<stdin>:19: NOTICE:  [V2.0.0_02-rollback] 已撤销 2 行补角色关系
+  [统计] menu=27  acl=61  tomb=14  admin_ok=24  common_ok=1  zero_role=2  org_menu=4  dirty=36  bak=57
+
+[7] 反向幂等复跑（三件 rollback 再跑一遍）
+psql:<stdin>:32: NOTICE:  [V2.0.0_04-rollback] 撤销授权行 0 行；还原脏数据行 0 行
+psql:<stdin>:50: NOTICE:  [V2.0.0_03-rollback] 自检通过：菜单 4 行 + 授权 4 行已恢复
+psql:<stdin>:19: NOTICE:  [V2.0.0_02-rollback] 已撤销 0 行补角色关系
+  三件 rollback 复跑无错
+  [统计] menu=27  acl=61  tomb=14  admin_ok=24  common_ok=1  zero_role=2  org_menu=4  dirty=36  bak=57

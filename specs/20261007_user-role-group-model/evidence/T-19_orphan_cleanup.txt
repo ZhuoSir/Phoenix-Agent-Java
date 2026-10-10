@@ -1,0 +1,46 @@
+=== 孤儿账号域数据清理（人工数据操作，未新增迁移件）===
+时间: 2026-10-07 20:22:04
+备份: backups/orphan_cleanup_20261007_202052.sql（gitignore，仅本地留存）
+
+--- 删除明细 ---
+  tbl_privilege_user_role      12 行（user_id 不存在的孤儿绑定）
+  tbl_privilege_login_log       1 行（operation_id=tester2 不存在）
+  tbl_data_chat_message        39 行（21 行属孤儿会话 + 18 行会话已不存在）
+  tbl_data_chat_session         5 行（user_id 不存在）
+
+--- 清理后核对（孤儿全为 0）---
+ alive_accounts | orphan_role | orphan_log | orphan_sess | orphan_msg 
+----------------+-------------+------------+-------------+------------
+              2 |           0 |          0 |           0 |          0
+(1 row)
+
+--- user_role 现状（均属两个账号；del_flag=1 为角色同步留下的历史墓碑）---
+      user_id       | username |      role_id       | del_flag |       create_time       
+--------------------+----------+--------------------+----------+-------------------------
+ 461681072489615360 | admin    | 428007432736870400 |        0 | 2026-10-07 20:20:57.649
+ 461681072489615360 | admin    | 428007432736870400 |        1 | 2026-09-27 12:57:02.328
+ 461671036765859840 | chenzhuo | 431285032083144704 |        0 | 2026-09-27 12:17:11.915
+(3 rows)
+
+--- 账号与角色 ---
+ username | real_name |    role    
+----------+-----------+------------
+ admin    | 超管      | 系统管理员
+ chenzhuo | 陈卓      | 普通角色
+(2 rows)
+
+--- 登录复验（经 8090，Python 直发请求）---
+  admin     → ✅ 成功（token 长度 36）
+  chenzhuo  → ✅ 成功（token 长度 36）
+
+--- 旧账号登录（应全部失败）---
+  liufang   → ❌ 失败：用户名或密码错误
+  lwj       → ❌ 失败：用户名或密码错误
+  xtj       → ❌ 失败：用户名或密码错误
+  maliu     → ❌ 失败：用户名或密码错误
+  wangwu    → ❌ 失败：用户名或密码错误
+
+--- 说明：为何 user_role 有 3 行 ---
+  2026-10-07 20:20:57 有一次「账号保存」动作（后台日志：先 UPDATE admin 用户行、再 INSERT 角色绑定，
+  create_by=admin），即 T-13 `updateUser` 的角色同步：旧绑定被逻辑删（del_flag=1 墓碑）、新绑定插入；
+  活跃绑定仍为 admin→系统管理员、chenzhuo→普通角色 各 1 条 —— 无重复授权、无孤儿。

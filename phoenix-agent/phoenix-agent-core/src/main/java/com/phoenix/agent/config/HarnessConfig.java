@@ -28,6 +28,10 @@ import java.time.Duration;
 @Configuration
 public class HarnessConfig {
 
+	/** R-08：向量维度统一由当前 EMBEDDING 模型解析（不再写死 512） */
+	@org.springframework.beans.factory.annotation.Autowired
+	private com.phoenix.data.service.aimodelconfig.EmbeddingDimensionResolver embeddingDimensionResolver;
+
     @Bean
     @DependsOn(value = "harnessRedisStore")
     public RemoteFilesystemSpec pgRemoteFilesystemSpec(RedisStore redisStore) {
@@ -106,7 +110,7 @@ public class HarnessConfig {
                 .password(dataSourceProperties.getPassword())
                 .schema("public")
                 .tableName("tbl_harness_vector_store_knowledge")
-                .dimensions(512)
+                .dimensions(embeddingDimensionResolver.resolve())
                 .build();
     }
 
@@ -124,7 +128,7 @@ public class HarnessConfig {
         EmbeddingModel embeddings = DashScopeTextEmbedding.builder()
                 .apiKey(config.getApiKey())
                 .modelName(config.getModelName())
-                .dimensions(512)
+                .dimensions(embeddingDimensionResolver.resolve())
                 .build();
         return SimpleKnowledge.builder()
                 .embeddingModel(embeddings)

@@ -77,17 +77,22 @@ phx_step 2 $TOTAL "引擎就位" && {
   elif [ "$OFFLINE" -eq 1 ]; then
     phx_fail 2 $TOTAL "离线且无 engine/*.deb——参见 docs/OFFLINE-ENGINE.md 手工装引擎后重跑"
   else
-    phx_log INFO "在线安装 Docker Engine（get.docker.com --mirror Aliyun）"
-    if curl -fsSL -m 30 https://get.docker.com -o /tmp/phx-getdocker.sh; then
+    phx_log INFO "在线安装 Docker Engine（get.docker.com --mirror Aliyun；拉不到则回退国内源）"
+    # --mirror Aliyun 只管 deb 包源，安装脚本本体仍在 get.docker.com（境外）⇒ 需国内回退（BUG-145）
+    if curl -fsSL -m 30 https://get.docker.com -o /tmp/phx-getdocker.sh 2>/dev/null; then
+      phx_log INFO "  提示：官方脚本会静默下载引擎包（apt 输出被它丢进 /dev/null），通常 2-5 分钟无输出属正常（BUG-146）"
       # shellcheck disable=SC2086
       $SUDO sh /tmp/phx-getdocker.sh --mirror Aliyun >>"$PHX_LOG_FILE" 2>&1 || phx_fail 2 $TOTAL "引擎安装脚本失败（见日志；断网请加 --offline 并备 engine/*.deb）"
     else
-      phx_fail 2 $TOTAL "get.docker.com 不可达（网络受限？）——加 --offline 走 deb/文档路线"
+      phx_log WARN "get.docker.com 不可达（受限网络）——回退国内源 docker-ce@mirrors.aliyun.com"
+      phx_install_docker_aliyun || phx_fail 2 $TOTAL "国内源装引擎失败（见日志 $PHX_LOG_FILE；断网请加 --offline 并备 engine/*.deb）"
     fi
-    $SUDO systemctl enable --now docker >/dev/null 2>&1 || $SUDO service docker start >/dev/null 2>&1 || true
-    $SUDO usermod -aG docker "$(id -un)" >/dev/null 2>&1 || true
-    docker info >/dev/null 2>&1 || phx_fail 2 $TOTAL "引擎装后仍不可达（重开终端使 docker 组生效，或检查 systemctl status docker）"
   fi
+  # BUG-178: 所有分支统一——设好并核实开机自启 + 讲清重启/休眠语义，再核验引擎可达。
+  # 原先只有在线分支有 enable 且被 `|| true` 吞掉；离线 dpkg 分支连 start 都没有（离线装机后引擎不起）。
+  phx_engine_autostart "$SUDO"
+  $SUDO usermod -aG docker "$(id -un)" >/dev/null 2>&1 || true
+  docker info >/dev/null 2>&1 || phx_fail 2 $TOTAL "引擎装后仍不可达（重开终端使 docker 组生效，或检查 systemctl status docker）"
   phx_step_mark 2
 }
 
@@ -101,7 +106,8 @@ phx_step 4 $TOTAL "镜像 load" && {
   if docker image inspect "phoenix-backend:$VERSION" >/dev/null 2>&1 && docker image inspect "phoenix-frontend:$VERSION" >/dev/null 2>&1; then
     phx_log INFO "双镜像已在（同 tag），跳过 load"
   else
-    docker load -i "$PAYLOAD/images/phoenix-images.tar" >>"$PHX_LOG_FILE" 2>&1 || phx_fail 4 $TOTAL "docker load 失败（见日志）"
+    # 数 GB 的 load 全程静默会让人以为卡死（BUG-146）：日志照存，同时透传进度到屏幕
+    docker load -i "$PAYLOAD/images/phoenix-images.tar" 2>&1 | tee -a "$PHX_LOG_FILE" || phx_fail 4 $TOTAL "docker load 失败（见日志 $PHX_LOG_FILE）"
     docker image inspect "phoenix-backend:$VERSION" >/dev/null 2>&1 || phx_fail 4 $TOTAL "load 后仍缺 phoenix-backend:$VERSION"
   fi
   phx_step_mark 4
@@ -137,14 +143,26 @@ phx_step 5 $TOTAL ".env 生成/保留" && {
   phx_step_mark 5
 }
 
-phx_step 6 $TOTAL "compose up（项目名 $PROJECT）" && {
-  if docker compose version >/dev/null 2>&1; then DC="docker compose"
-  elif command -v docker-compose >/dev/null 2>&1; then DC="docker-compose"
-  else phx_fail 6 $TOTAL "无 docker compose 插件也无 docker-compose——装 compose 后重跑"; fi
-  ( cd "$PAYLOAD/docker" && $DC -p "$PROJECT" up -d ) >>"$PHX_LOG_FILE" 2>&1 || phx_fail 6 $TOTAL "compose up 失败（见日志）"
-  echo "$PROJECT" > "$PAYLOAD/.phoenix-project"   # phoenix-ctl.sh 项目名自动解析锚
-  phx_step_mark 6
-}
+# BUG-183：compose up **必须每次真跑** —— `up -d` 会比对镜像 ID，镜像变了就重建容器；
+# 而它一旦被状态机标成"已完成"就会跳过 ⇒ 重打包后容器仍跑旧镜像（实测：新镜像 10:19 已就绪、
+# 线上容器却是 19 小时前的旧产物，于是修好的前端"看起来没生效"）。故本步不入状态机。
+phx_log INFO "====> 步骤 6/$TOTAL: compose up（项目名 $PROJECT，每次必跑：镜像变了要重建容器）"
+if docker compose version >/dev/null 2>&1; then DC="docker compose"
+elif command -v docker-compose >/dev/null 2>&1; then DC="docker-compose"
+else phx_fail 6 $TOTAL "无 docker compose 插件也无 docker-compose——装 compose 后重跑"; fi
+( cd "$PAYLOAD/docker" && $DC -p "$PROJECT" up -d ) >>"$PHX_LOG_FILE" 2>&1 || phx_fail 6 $TOTAL "compose up 失败（见日志）"
+echo "$PROJECT" > "$PAYLOAD/.phoenix-project"   # phoenix-ctl.sh 项目名自动解析锚
+# BUG-183 核验：容器实际用的镜像必须等于包内镜像——不等即说明没换镜像（旧行为会静默跳过）
+for PAIR in nginx:phoenix-frontend backend:phoenix-backend; do
+  SVC="${PAIR%%:*}"; IMG="${PAIR##*:}"
+  RUN_ID=$(docker inspect --format '{{.Image}}' "${PROJECT}-${SVC}-1" 2>/dev/null || true)
+  WANT_ID=$(docker image inspect --format '{{.Id}}' "${IMG}:${VERSION}" 2>/dev/null || true)
+  if [ -n "$RUN_ID" ] && [ -n "$WANT_ID" ] && [ "$RUN_ID" != "$WANT_ID" ]; then
+    phx_log WARN "容器 ${PROJECT}-${SVC}-1 仍在用旧镜像（run=${RUN_ID:0:12} / want=${WANT_ID:0:12}）——请查日志确认 compose up 是否真跑了"
+  else
+    phx_log INFO "镜像一致性 OK: ${PROJECT}-${SVC}-1 ← ${IMG}:${VERSION}"
+  fi
+done
 
 phx_step 7 $TOTAL "等待 migrator 完成 + backend healthy（${TIMEOUT}s 上限，5s 轮询——L-08 确定性等待）" && {
   # 竞态修复（演练四实证）：backend 不依赖 migrator 完成，Spring 起动可能快过迁移脚本——
@@ -156,6 +174,8 @@ phx_step 7 $TOTAL "等待 migrator 完成 + backend healthy（${TIMEOUT}s 上限
     M2=$(docker inspect --format '{{.State.ExitCode}}' "${PROJECT}-migrator-post-1" 2>/dev/null || echo running)
     if [ "$ST" = "healthy" ] && [ "$M1" = "0" ] && [ "$M2" = "0" ]; then break; fi
     i=$((i+5)); sleep 5
+    # 静默等待最长 300s 会让人以为卡死（BUG-146）：每轮把实况透出（写屏幕 + 进日志）
+    phx_log INFO "  等待中 ${i}s/${TIMEOUT}s：backend=$ST migrator=$M1 migrator-post=$M2"
   done
   [ "$ST" = "healthy" ] || phx_fail 7 $TOTAL "backend 未在 ${TIMEOUT}s 内 healthy（当前=$ST；docker logs ${PROJECT}-backend-1 看详情）"
   { [ "$M1" = "0" ] && [ "$M2" = "0" ]; } || phx_fail 7 $TOTAL "migrator 未正常完成（migrator=$M1 migrator-post=$M2；docker logs ${PROJECT}-migrator-1 看详情）"
@@ -180,6 +200,7 @@ phx_step 9 $TOTAL "收据卡" && {
     "管理端账号" "admin / 123456（首登立即改密）" \
     "库密码" "$PWD_LINE" \
     "数据目录" "docker 卷 ${PROJECT}_*（/var/lib/docker/volumes/）" \
+    "重启语义" "机器重启后自动复活（docker 开机自启 + compose restart:unless-stopped）；宿主休眠/挂起仅冻结进程，唤醒即继续，不重建容器" \
     "日志" "$PHX_LOG_FILE" >/dev/null
   cat "$PAYLOAD/RECEIPT"
   phx_log INFO "下一步: ①浏览器打开上方地址并改密 ②模型管理配置真实 API key ③日常运维: docker/scripts/phoenix-ctl.sh start|stop|restart|status|logs|verify"

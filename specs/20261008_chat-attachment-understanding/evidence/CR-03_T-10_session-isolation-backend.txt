@@ -1,0 +1,36 @@
+=== CR-03 / T-10 验证结论：会话空间隔离（后端）===
+日期: 2026-10-09 | 分支: feature/chat-attachment-understanding | 档: major | 拍板: 回填=A、拒绝=404-as-不存在
+
+--- SQL 三段证明 ---
+  upgrade: migrator 落账 `/releases/v2.0.0/sql/V2.0.0_16__chat_session_source_ddl.sql`（仅 ddl 一条）
+  结构: source varchar(16) NOT NULL DEFAULT 'FRONT_CHAT'；索引 idx_chat_session_agent_source ✅
+  回填: 存量 173 条 → FRONT_CHAT=173（口径 A）✅
+  rollback 演练: 事务内执行 rollback SQL（DROP INDEX + DROP COLUMN）→ 列消失=0 → ROLLBACK 后语法验证通过；
+    **事故与止血（如实记）**: 首版我把 rollback 文件误放 releases/v2.0.0/sql/（migrator 扫描目录）⇒
+    开机时 ddl 与 rollback **都被执行**，线上 source 列被 drop（ledger 两条）。止血：rollback 移入
+    releases/v2.0.0/sql/rollback/（该子目录为既有约定）+ 清 16 的两条账 + 重启让 migrator 干净重跑 ⇒
+    现 ledger 仅 ddl、列/索引/回填齐全。记 L-78。附件表未受影响（15 的 rollback 从未进扫描目录）✅
+
+--- 身份矩阵断言（#1~#8、#12，真实 curl + DB 核对）---
+  #4 创建 scope=ADMIN_RUN → 库内 source=ADMIN_RUN ✅；不传 scope → FRONT_CHAT ✅（兼容默认）
+  #1 列表 scope=ADMIN_RUN：含 run 会话 ✅ 不含 front 会话 ✅
+  #2 列表 scope=FRONT_CHAT：含 front 会话 ✅ 不含 run 会话 ✅
+  #compat 不传 scope 的列表 == FRONT_CHAT 列表 ✅
+  #5 同空间读消息 条数=1 ✅；跨空间读消息 → **空列表（as-不存在）** ✅
+  #6 同空间 saveMessage success=true ✅；跨空间 saveMessage → success=false「会话不存在」且**未落库**（探针 0 行）✅
+      （首跑断言误取 message 字段；实际信封字段为 msg，行为正确 —— 断言修正后绿）
+  #7 跨空间 pin/rename/delete → success=false ✅×3；同空间 rename → success=true ✅
+  #8 清空 scope=ADMIN_RUN → run 空间剩 0 且 **front 会话仍在（1）** ✅（防误删聊天历史）
+  #12 存量分布 FRONT_CHAT=174（含新建探针）/ ADMIN_RUN 仅探针 ✅
+
+--- P-4 日志断言（四类齐）---
+  INFO 会话列表: agentId/scope/命中/userId ✅；INFO 会话创建: sessionId/source/userId ✅；
+  INFO 会话清空: agentId/scope/userId ✅；WARN 跨空间访问被拒: sessionId/声明scope/库内source/userId ✅（5 条实测）
+
+--- 对面断言（矩阵 #9/#10 不改面）---
+  SSE 订阅端点 curl -m6 → HTTP 200（流式存活，非 500）✅
+  附件 listForSession → HTTP 200 success=true ✅
+  标题生成/updateSessionTime：内部副作用，未加空间校验（P-2 #6/#11 设计如此）✅
+
+--- 编译/部署 ---
+  mvn package exit=0（0 错误）；compose build backend exit=0 → up exit=0 → healthy

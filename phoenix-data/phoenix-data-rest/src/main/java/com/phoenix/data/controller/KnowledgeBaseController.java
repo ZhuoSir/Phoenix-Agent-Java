@@ -37,10 +37,39 @@ public class KnowledgeBaseController {
 
 	private final KnowledgeBaseService knowledgeBaseService;
 
+	/** R-18（CR-01/T-25）：超管判定复用 R-08/R-17 守卫（单一口径） */
+	private final com.phoenix.data.component.AdminRoleGuard adminRoleGuard;
+
+	/** 当前登录用户 id */
+	private String me() {
+		return StpUtil.getLoginIdAsString();
+	}
+
+	private boolean isSuperAdmin() {
+		return adminRoleGuard.isAdmin(me());
+	}
+
+	/** R-18：列表 owner 过滤值 —— 超管 null（不过滤），普通用户=本人 id */
+	private String ownerFilter() {
+		return isSuperAdmin() ? null : me();
+	}
+
+	/** R-18：单对象归属校验 —— 非本人且非超管 → 403 */
+	private void assertOwner(Long id) {
+		if (isSuperAdmin()) {
+			return;
+		}
+		String creator = knowledgeBaseService.getCreatorById(id);
+		if (creator == null || !creator.equals(me())) {
+			throw new org.springframework.web.server.ResponseStatusException(
+					org.springframework.http.HttpStatus.FORBIDDEN, "无权访问他人创建的知识库");
+		}
+	}
+
 	@PostMapping("/query/page")
 	public PageResponse<List<KnowledgeBaseVO>> queryByPage(@Valid @RequestBody KnowledgeBaseQueryDTO queryDTO) {
 		try {
-			PageResult<KnowledgeBaseVO> pr = knowledgeBaseService.queryByConditionsWithPage(queryDTO);
+			PageResult<KnowledgeBaseVO> pr = knowledgeBaseService.queryByConditionsWithPage(queryDTO, ownerFilter());
 			return PageResponse.success(pr.getData(), pr.getTotal(), pr.getPageNum(), pr.getPageSize(),
 					pr.getTotalPages());
 		}
@@ -53,13 +82,18 @@ public class KnowledgeBaseController {
 	/** BUG-18(T-04)：按库重刷 QA/FAQ 联合向量（幂等） */
 	@PostMapping("/{id}/re-embed")
 	public ApiResponse<java.util.Map<String, Object>> reEmbed(@PathVariable Long id) {
+		assertOwner(id);
 		return ApiResponse.success("重刷完成", knowledgeBaseService.reEmbedKnowledgeBase(id));
 	}
 
 	@GetMapping("/{id}")
 	public ApiResponse<KnowledgeBaseVO> detail(@PathVariable("id") Long id) {
 		try {
+			assertOwner(id);
 			return ApiResponse.success("查询成功", knowledgeBaseService.detail(id));
+		}
+		catch (org.springframework.web.server.ResponseStatusException e) {
+			throw e;
 		}
 		catch (Exception e) {
 			return ApiResponse.error(e.getMessage());
@@ -80,7 +114,11 @@ public class KnowledgeBaseController {
 	@PutMapping
 	public ApiResponse<KnowledgeBaseVO> update(@Valid @RequestBody KnowledgeBaseUpdateDTO dto) {
 		try {
+			assertOwner(dto.getId());
 			return ApiResponse.success("更新成功", knowledgeBaseService.update(dto, StpUtil.getLoginIdAsString()));
+		}
+		catch (org.springframework.web.server.ResponseStatusException e) {
+			throw e;
 		}
 		catch (Exception e) {
 			return ApiResponse.error(e.getMessage());
@@ -90,8 +128,12 @@ public class KnowledgeBaseController {
 	@DeleteMapping("/{id}")
 	public ApiResponse<Boolean> delete(@PathVariable("id") Long id) {
 		try {
+			assertOwner(id);
 			knowledgeBaseService.delete(id, StpUtil.getLoginIdAsString());
 			return ApiResponse.success("删除成功", Boolean.TRUE);
+		}
+		catch (org.springframework.web.server.ResponseStatusException e) {
+			throw e;
 		}
 		catch (Exception e) {
 			// R-04：仍被绑定异常 message 即绑定清单，前端直接展示

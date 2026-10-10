@@ -3,5 +3,7 @@
 ARG NGINX_BASE_IMG=nginx:latest
 FROM ${NGINX_BASE_IMG}
 COPY docker/.stage/dist /usr/share/nginx/html
+# T-08（chat-attachment-understanding）：mobile-ui 挂 /m/（以 --base=/m/ 构建，host pnpm exec vite build）
+COPY docker/.stage/dist-mobile /usr/share/nginx/html-mobile
 COPY docker/nginx/phoenix.conf /etc/nginx/conf.d/default.conf
 EXPOSE 80

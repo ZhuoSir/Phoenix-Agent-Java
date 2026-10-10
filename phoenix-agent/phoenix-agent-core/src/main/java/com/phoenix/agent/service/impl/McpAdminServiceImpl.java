@@ -63,10 +63,14 @@ public class McpAdminServiceImpl implements McpAdminService {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
-    public ReturnVo<Page<McpListVO>> page(String keyword, int pageNum, int pageSize) {
+    public ReturnVo<Page<McpListVO>> page(String keyword, int pageNum, int pageSize, String ownerId) {
         int pn = Math.max(pageNum, 1);
         int ps = Math.min(Math.max(pageSize, 1), MAX_PAGE_SIZE);
         QueryWrapper q = QueryWrapper.create().where("del_flag = 0");
+        // R-18（CR-01/T-25）：普通用户仅见本人创建；ownerId=null（超管）不过滤
+        if (StringUtils.hasText(ownerId)) {
+            q.and("creator = ?", ownerId);
+        }
         if (StringUtils.hasText(keyword)) {
             q.and("name like ?", "%" + keyword.trim() + "%");
         }
@@ -380,17 +384,31 @@ public class McpAdminServiceImpl implements McpAdminService {
     }
 
     @Override
-    public ReturnVo<List<com.phoenix.agent.model.McpOptionVO>> options(Long agentId) {
+    public ReturnVo<List<com.phoenix.agent.model.McpOptionVO>> options(Long agentId, String viewerId, boolean superAdmin) {
         Set<String> bound = new HashSet<>(boundIdSet(agentId));
         List<com.phoenix.agent.model.McpOptionVO> result = new ArrayList<>();
         Set<String> seen = new HashSet<>();
+        // R-18（CR-01/T-26）：可见集合 = 超管全部启用；否则 自己的 ∪ 我所在组关联的 ∪ 公共（无组授权行）
+        QueryWrapper pool = QueryWrapper.create().where("status = ?", "enabled").and("del_flag = 0");
+        if (!superAdmin) {
+            List<String> myGroups = myGroupIds(viewerId);
+            StringBuilder cond = new StringBuilder("(creator = ?");
+            List<Object> params = new ArrayList<>();
+            params.add(viewerId);
+            if (!myGroups.isEmpty()) {
+                cond.append(" or id in (select mcp_id from tbl_platform_group_mcp_info where del_flag = 0 and group_id in (")
+                    .append(placeholders(myGroups.size())).append("))");
+                params.addAll(myGroups);
+            }
+            cond.append(" or id not in (select mcp_id from tbl_platform_group_mcp_info where del_flag = 0))");
+            pool.and(cond.toString(), params.toArray());
+        }
         // 启用池
-        for (McpServerInfo e : mcpServerInfoMapper
-            .selectListByQuery(QueryWrapper.create().where("status = ?", "enabled").and("del_flag = 0"))) {
+        for (McpServerInfo e : mcpServerInfoMapper.selectListByQuery(pool)) {
             result.add(toOption(e, bound.contains(e.getId())));
             seen.add(e.getId());
         }
-        // 已绑定但停用/下线的保留展示（镜像技能：可手动解绑）
+        // 已绑定但停用/下线/不可见的保留展示（镜像技能：可手动解绑，R-04 场景2）
         for (String id : bound) {
             if (seen.contains(id)) {
                 continue;
@@ -401,6 +419,37 @@ public class McpAdminServiceImpl implements McpAdminService {
             }
         }
         return ReturnVo.ok(result);
+    }
+
+    /** 当前用户所在组 id 集（R-18 可见集合用） */
+    private List<String> myGroupIds(String userId) {
+        if (!StringUtils.hasText(userId)) {
+            return List.of();
+        }
+        return com.mybatisflex.core.row.Db
+            .selectListBySql("select group_id from tbl_platform_account_group_info where account_id = ? and del_flag = 0", userId)
+            .stream()
+            .map(r -> r.getString("group_id"))
+            .filter(java.util.Objects::nonNull)
+            .distinct()
+            .toList();
+    }
+
+    private String placeholders(int n) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < n; i++) {
+            if (i > 0) {
+                sb.append(',');
+            }
+            sb.append('?');
+        }
+        return sb.toString();
+    }
+
+    @Override
+    public String getCreatorById(String id) {
+        McpServerInfo e = load(id);
+        return e == null ? null : e.getCreator();
     }
 
     @Override

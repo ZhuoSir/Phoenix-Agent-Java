@@ -25,6 +25,8 @@ public class AiModelConfigChangeListener {
     public void onModelConfigChanged(AiModelConfigChangedEvent event) {
         harnessModelRegistry.refreshChat();
         harnessModelRegistry.refreshEmbedding();
+        // T-03：多模态模型同样需要热切换（否则管理页改了 MULTIMODAL 行不生效）
+        harnessModelRegistry.refreshMultimodal();
         aiModelConfigEpoch.bump(event.getModelType(), event.getConfigId());
     }
 }

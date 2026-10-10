@@ -17,6 +17,10 @@ import static org.springframework.ai.vectorstore.pgvector.PgVectorStore.PgIndexT
 @Configuration
 @RequiredArgsConstructor
 public class VectorConfig {
+
+	/** R-08：向量维度统一由当前 EMBEDDING 模型解析（不再写死 512） */
+	@org.springframework.beans.factory.annotation.Autowired
+	private com.phoenix.data.service.aimodelconfig.EmbeddingDimensionResolver embeddingDimensionResolver;
     private final JdbcTemplate jdbcTemplate;
     private final AiModelRegistry aiModelRegistry;
 
@@ -29,7 +33,7 @@ public class VectorConfig {
     @Qualifier("userMemoryVectorStore")
     public PgVectorStore userMemoryVectorStore() {
         return PgVectorStore.builder(jdbcTemplate, aiModelRegistry.getEmbeddingModel())
-                .dimensions(512)                    // 向量维度（需与 Embedding 模型匹配）
+                .dimensions(embeddingDimensionResolver.resolve())                    // 向量维度（需与 Embedding 模型匹配）
                 .distanceType(COSINE_DISTANCE)       // 距离度量策略（余弦相似度）
                 .indexType(HNSW)                     // 索引类型（HNSW 或 IVFFlat）
                 .initializeSchema(true)              // 启动时自动创建表和索引
@@ -46,7 +50,7 @@ public class VectorConfig {
     @Qualifier("ragVectorStore")
     public PgVectorStore ragVectorStore() {
         return PgVectorStore.builder(jdbcTemplate, aiModelRegistry.getEmbeddingModel())
-                .dimensions(512)                    // 向量维度（需与 Embedding 模型匹配）
+                .dimensions(embeddingDimensionResolver.resolve())                    // 向量维度（需与 Embedding 模型匹配）
                 .distanceType(COSINE_DISTANCE)       // 距离度量策略（余弦相似度）
                 .indexType(HNSW)                     // 索引类型（HNSW 或 IVFFlat）
                 .initializeSchema(true)              // 启动时自动创建表和索引

@@ -1,4 +1,7 @@
-const BASE_URL = import.meta.env.VITE_GLOB_API_URL || '/api';
+// BUG-154 修复：用 `??` 而非 `||` —— **空串是合法配置**（生产 nginx 不剥层，基址须为空），
+// 而 `||` 会把空串当 falsy 兜回 '/api'，导致 /auth/login→/api/auth/login(404)、
+// stream→/api/api/...(撞 nginx 410 止血块)。dev 仍配 '/api'（vite proxy 会剥一层），语义不变。
+const BASE_URL = import.meta.env.VITE_GLOB_API_URL ?? '';
 
 const TOKEN_KEY = 'mobile-ui:auth:token';
 const USER_KEY = 'mobile-ui:auth:user';

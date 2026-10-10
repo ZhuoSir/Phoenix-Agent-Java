@@ -15,12 +15,15 @@ interface BackendChatSession {
   [key: string]: unknown;
 }
 
+// CR-03（R-13）：mobile 属前台聊天空间 = FRONT_CHAT（与 admin 运行页 ADMIN_RUN 隔离）
+const SESSION_SCOPE = 'FRONT_CHAT';
+
 export async function getAgentSessionsApi(
   agentId: string,
 ): Promise<ChatSession[]> {
   try {
     const data = await http.get<BackendChatSession[]>(
-      `/api/agent/${agentId}/sessions`,
+      `/api/agent/${agentId}/sessions?scope=${SESSION_SCOPE}`,
     );
     return (data ?? []).map((s) => ({
       id: String(s.id),
@@ -43,7 +46,7 @@ export async function createSessionApi(
 ): Promise<ChatSession | null> {
   try {
     const data = await http.post<BackendChatSession>(
-      `/api/agent/${agentId}/sessions`,
+      `/api/agent/${agentId}/sessions?scope=${SESSION_SCOPE}`,
       { title: title ?? '新会话' },
     );
     return data
@@ -63,7 +66,7 @@ export async function createSessionApi(
 }
 
 export async function deleteSessionApi(sessionId: string): Promise<void> {
-  await http.delete(`/api/sessions/${sessionId}`);
+  await http.delete(`/api/sessions/${sessionId}?scope=${SESSION_SCOPE}`);
 }
 
 export async function pinSessionApi(
@@ -71,7 +74,7 @@ export async function pinSessionApi(
   isPinned: boolean,
 ): Promise<void> {
   await http.put(
-    `/api/sessions/${sessionId}/pin?isPinned=${isPinned}`,
+    `/api/sessions/${sessionId}/pin?isPinned=${isPinned}&scope=${SESSION_SCOPE}`,
   );
 }
 
@@ -80,7 +83,7 @@ export async function renameSessionApi(
   title: string,
 ): Promise<void> {
   await http.put(
-    `/api/sessions/${sessionId}/rename?title=${encodeURIComponent(title.trim())}`,
+    `/api/sessions/${sessionId}/rename?title=${encodeURIComponent(title.trim())}&scope=${SESSION_SCOPE}`,
   );
 }
 
@@ -102,16 +105,27 @@ export async function getSessionMessagesApi(
 ): Promise<ChatMessage[]> {
   try {
     const data = await http.get<BackendChatMessage[]>(
-      `/api/sessions/${sessionId}/messages`,
+      `/api/sessions/${sessionId}/messages?scope=${SESSION_SCOPE}`,
     );
-    return (data ?? []).map((m) => ({
-      id: String(m.id ?? `${Date.now()}-${Math.random()}`),
-      role: (m.role === 'user' ? 'user' : 'assistant') as 'user' | 'assistant',
-      content: m.content ?? '',
-      createdAt: m.createTime ? new Date(m.createTime).getTime() : Date.now(),
-      messageType: m.messageType ?? 'text',
-      metadata: m.metadata,
-    }));
+    return (data ?? []).map((m) => {
+      // T-08（R-10）：从 metadata 还原附件；旧消息无该键 ⇒ undefined（S6 兼容）
+      let attachments;
+      try {
+        const md = typeof m.metadata === 'string' ? JSON.parse(m.metadata) : m.metadata;
+        if (md && Array.isArray(md.attachments)) attachments = md.attachments;
+      } catch {
+        /* metadata 非 JSON：静默 */
+      }
+      return {
+        id: String(m.id ?? `${Date.now()}-${Math.random()}`),
+        role: (m.role === 'user' ? 'user' : 'assistant') as 'user' | 'assistant',
+        content: m.content ?? '',
+        createdAt: m.createTime ? new Date(m.createTime).getTime() : Date.now(),
+        messageType: m.messageType ?? 'text',
+        metadata: m.metadata,
+        attachments,
+      };
+    });
   } catch {
     return [];
   }
@@ -121,7 +135,7 @@ export async function saveMessageApi(
   sessionId: string,
   message: Record<string, unknown>,
 ): Promise<void> {
-  await http.post(`/api/sessions/${sessionId}/messages`, {
+  await http.post(`/api/sessions/${sessionId}/messages?scope=${SESSION_SCOPE}`, {
     ...message,
     sessionId,
   });

@@ -10,7 +10,8 @@ export function useSearchFormSchema(): VbenFormSchema[] {
       label: '搜索',
       labelWidth: 40,
       componentProps: {
-        placeholder: '请输入用户名/姓名',
+        // R-15（v2.4.0）：关键字检索覆盖 用户名 / 姓名 / 手机号（后端 pageByQuery 已支持三者）
+        placeholder: '用户名 / 姓名 / 手机号',
         allowClear: true,
       },
     },
@@ -19,18 +20,11 @@ export function useSearchFormSchema(): VbenFormSchema[] {
 
 export function useColumns(): VxeTableGridColumns {
   return [
+    // R-15（v2.4.0）：勾选列，用于批量启用/禁用
+    { type: 'checkbox', width: 44, fixed: 'left' },
     { field: 'username', title: '用户名', minWidth: 120 },
     { field: 'realName', title: '真实姓名', width: 120 },
     { field: 'mobile', title: '手机号', width: 100 },
-    { field: 'code', title: '工号', width: 100 },
-    { field: 'companyName', title: '公司名称', width: 140 },
-    { field: 'deptName', title: '部门名称', width: 120 },
-    {
-      field: 'userType',
-      title: '用户类型',
-      width: 110,
-      slots: { default: 'userTypeSlot' },
-    },
     {
       field: 'status',
       title: '状态',
@@ -67,36 +61,16 @@ export function useSchema(): VbenFormSchema[] {
       },
     },
     {
-      component: 'Input',
-      fieldName: 'employeeId',
-      label: 'employeeId',
-      dependencies: {
-        triggerFields: [''],
-        show: false,
-      },
-    },
-    {
-      component: 'Input',
-      fieldName: 'companyId',
-      label: 'companyId',
-      dependencies: {
-        triggerFields: [''],
-        show: false,
-      },
-    },
-    {
-      fieldName: 'employeeSelector',
-      label: '选择人员',
+      // R-03 三维度化：角色多选（插槽渲染 ElSelect multiple；不选=后端补默认角色）
+      fieldName: 'roleIds',
+      label: '角色',
       component: 'Input',
       formItemClass: 'col-span-2',
-      dependencies: {
-        triggerFields: ['id'],
-        show: (values: any) => !values.id,
-      },
     },
     {
-      fieldName: 'deptId',
-      label: '选择部门',
+      // R-03 三维度化：组多选（插槽渲染 ElSelect multiple）
+      fieldName: 'groupIds',
+      label: '组',
       component: 'Input',
       formItemClass: 'col-span-2',
     },
@@ -118,23 +92,5 @@ export function useSchema(): VbenFormSchema[] {
       label: '手机号',
       rules: z.string().min(1, '请输入手机号'),
     },
-    {
-      component: 'Input',
-      fieldName: 'code',
-      label: '工号',
-      rules: z.string().min(1, '请输入工号'),
-    },
-    {
-      component: 'Select',
-      fieldName: 'userType',
-      label: '用户类型',
-      componentProps: {
-        options: [
-          { label: '自建用户', value: 0 },
-          { label: 'idm用户', value: 1 },
-        ],
-      },
-      rules: 'selectRequired',
-    }
   ];
 }

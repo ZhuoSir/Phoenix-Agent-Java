@@ -23,6 +23,7 @@ public class AccountGroupInfoServiceImpl extends ServiceImpl<AccountGroupInfoMap
 	@Override
 	public Page<AccountGroupInfo> page(Page<AccountGroupInfo> page, AccountGroupInfo query) {
 		return QueryChain.of(getMapper())
+			.eq(AccountGroupInfo::getDelFlag, 0)
 			.eq(AccountGroupInfo::getGroupId, query.getGroupId(), StrUtil.isNotBlank(query.getGroupId()))
 			.eq(AccountGroupInfo::getAccountId, query.getAccountId(), StrUtil.isNotBlank(query.getAccountId()))
 			.orderBy(AccountGroupInfo::getCreateTime, false)
@@ -32,6 +33,7 @@ public class AccountGroupInfoServiceImpl extends ServiceImpl<AccountGroupInfoMap
 	@Override
 	public List<AccountGroupInfo> getByGroupId(String groupId) {
 		return QueryChain.of(getMapper())
+			.eq(AccountGroupInfo::getDelFlag, 0)
 			.eq(AccountGroupInfo::getGroupId, groupId)
 			.orderBy(AccountGroupInfo::getCreateTime, false)
 			.list();
@@ -40,6 +42,7 @@ public class AccountGroupInfoServiceImpl extends ServiceImpl<AccountGroupInfoMap
 	@Override
 	public List<AccountGroupInfo> getByAccountId(String accountId) {
 		return QueryChain.of(getMapper())
+			.eq(AccountGroupInfo::getDelFlag, 0)
 			.eq(AccountGroupInfo::getAccountId, accountId)
 			.orderBy(AccountGroupInfo::getCreateTime, false)
 			.list();
@@ -53,7 +56,8 @@ public class AccountGroupInfoServiceImpl extends ServiceImpl<AccountGroupInfoMap
 			.select(GroupInfo::getDescription)
 			.from(AccountGroupInfo.class)
 			.leftJoin(GroupInfo.class).on(AccountGroupInfo::getGroupId, GroupInfo::getId)
-			.where(AccountGroupInfo::getAccountId).eq(accountId);
+			.where(AccountGroupInfo::getAccountId).eq(accountId)
+			.and(AccountGroupInfo::getDelFlag).eq(0);
 		return getMapper().selectListByQueryAs(qw, UserGroupVO.class);
 	}
 

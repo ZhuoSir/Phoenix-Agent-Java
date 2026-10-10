@@ -1,0 +1,19 @@
+=== T-08（R-09 维度一致性显式拒绝）验证证据（部分）===
+日期: 2026-10-10 | 部署: mvn package exit=0 → compose build/up exit=0 → backend healthy
+
+实现:
+- EmbeddingDimensionResolver.assertAllTablesCompatible()：查询**所有** `embedding vector(N)` 表，
+  与当前 EMBEDDING 模型维度逐一比对；不一致 → 抛 DimensionMismatchException（含表名、两个维度、处置建议，指向 BL-34）
+  选"全表校验"而非"猜表名"：写入入口注入的是具体 VectorStore bean，代码层拿不到表名（避免认错表导致假通过/假拒绝）
+- AgentVectorStoreServiceImpl.addDocuments() 首行接入该校验（覆盖知识库/业务术语/Schema 等全部写入方）
+
+已验证（512 口径回归，非破坏性）:
+- 启动期：EmbeddingDimensionResolver 在 main 线程完成维度解析（日志「向量维度解析: …」）
+- 真实知识入库（kbId=12，DOCUMENT/recursive）：创建成功 id=53，**未被 R-09 拒绝**（无「维度不一致」日志）
+  ⇒ 512 表 + dashscope(512) 既有口径**未受影响**（T-08 不得误伤存量）
+- 探针文档已清理（tbl_data_agent_knowledge + 向量表对应行）
+
+未验证（如实）:
+- **拒绝路径未做实机验证**：需临时把 EMBEDDING 默认切到 ollama/768 行（id=20）并重启，再触发写入以观察拒绝；
+  该操作会让运行中的知识库链路进入"表 512 / 模型 768"的不一致态，需成对重启并回退，本轮未执行
+- 768 维"写入成功"仍受 Non-goal（不自动重建存量）限制，见 T-05 说明

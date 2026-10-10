@@ -1,0 +1,286 @@
+[INFO] Scanning for projects...
+[WARNING] 
+[WARNING] Some problems were encountered while building the effective model for com.phoenix:phoenix-parent:pom:2.0.0-SNAPSHOT
+[WARNING] 'dependencyManagement.dependencies.dependency.(groupId:artifactId:type:classifier)' must be unique: com.esotericsoftware.kryo:kryo5:jar -> duplicate declaration of version ${kryo5.version} @ com.phoenix:phoenix-parent:${revision}, /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-parent/pom.xml, line 152, column 25
+[WARNING] 
+[WARNING] Some problems were encountered while building the effective model for com.phoenix:phoenix-data:pom:2.0.0-SNAPSHOT
+[WARNING] 'dependencyManagement.dependencies.dependency.(groupId:artifactId:type:classifier)' must be unique: com.esotericsoftware.kryo:kryo5:jar -> duplicate declaration of version ${kryo5.version} @ com.phoenix:phoenix-parent:${revision}, /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-parent/pom.xml, line 152, column 25
+[WARNING] 
+[WARNING] It is highly recommended to fix these problems because they threaten the stability of your build.
+[WARNING] 
+[WARNING] For this reason, future Maven versions might no longer support building such malformed projects.
+[WARNING] 
+[INFO] ------------------------------------------------------------------------
+[INFO] Reactor Build Order:
+[INFO] 
+[INFO] phoenix-parent                                                     [pom]
+[INFO] phoenix-tool                                                       [jar]
+[INFO] phoenix-common-api                                                 [jar]
+[INFO] phoenix-data-api                                                   [jar]
+[INFO] phoenix-common-core                                                [jar]
+[INFO] phoenix-privilege-api                                              [jar]
+[INFO] phoenix-privilege-core                                             [jar]
+[INFO] phoenix-data-core                                                  [jar]
+[INFO] phoenix-data-rest                                                  [jar]
+[INFO] phoenix-data                                                       [pom]
+[INFO] phoenix-agent-api                                                  [jar]
+[INFO] phoenix-agent-core                                                 [jar]
+[INFO] phoenix-agent-rest                                                 [jar]
+[INFO] phoenix-agent                                                      [pom]
+[INFO] phoenix-admin-api                                                  [jar]
+[INFO] phoenix-admin-core                                                 [jar]
+[INFO] phoenix-privilege-rest                                             [jar]
+[INFO] phoenix-platform-api                                               [jar]
+[INFO] phoenix-platform-core                                              [jar]
+[INFO] phoenix-platform-rest                                              [jar]
+[INFO] phoenix-common-rest                                                [jar]
+[INFO] phoenix-admin-rest                                                 [jar]
+[INFO] phoenix-admin-manager                                              [jar]
+[INFO] phoenix-admin                                                      [pom]
+[INFO] phoenix-privilege                                                  [pom]
+[INFO] phoenix-common                                                     [pom]
+[INFO] phoenix-platform                                                   [pom]
+[INFO] phoenix-codegen                                                    [jar]
+[INFO] phoenix-flink-api                                                  [jar]
+[INFO] phoenix-flink-core                                                 [jar]
+[INFO] phoenix-flink-server                                               [jar]
+[INFO] phoenix-flink                                                      [pom]
+[INFO] phoenix-rag-api                                                    [jar]
+[INFO] phoenix-rag-core                                                   [jar]
+[INFO] phoenix-rag-rest                                                   [jar]
+[INFO] phoenix-rag                                                        [pom]
+[INFO] phoenix-kg-api                                                     [jar]
+[INFO] phoenix-kg-core                                                    [jar]
+[INFO] phoenix-kg-rest                                                    [jar]
+[INFO] phoenix-kg                                                         [pom]
+[INFO] phoenix                                                            [pom]
+[INFO] 
+[INFO] ---------------------< com.phoenix:phoenix-parent >---------------------
+[INFO] Building phoenix-parent 2.0.0-SNAPSHOT                            [1/41]
+[INFO] --------------------------------[ pom ]---------------------------------
+[INFO] 
+[INFO] --- maven-clean-plugin:2.5:clean (default-clean) @ phoenix-parent ---
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:clean (flatten.clean) @ phoenix-parent ---
+[INFO] Deleting /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-parent/.flattened-pom.xml
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:flatten (flatten) @ phoenix-parent ---
+[INFO] Generating flattened POM of project com.phoenix:phoenix-parent:pom:2.0.0-SNAPSHOT...
+[INFO] 
+[INFO] ----------------------< com.phoenix:phoenix-tool >----------------------
+[INFO] Building phoenix-tool 2.0.0-SNAPSHOT                              [2/41]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- maven-clean-plugin:2.5:clean (default-clean) @ phoenix-tool ---
+[INFO] Deleting /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-tool/target
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:clean (flatten.clean) @ phoenix-tool ---
+[INFO] Deleting /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-tool/.flattened-pom.xml
+[INFO] 
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ phoenix-tool ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-tool/src/main/resources
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:flatten (flatten) @ phoenix-tool ---
+[INFO] Generating flattened POM of project com.phoenix:phoenix-tool:jar:2.0.0-SNAPSHOT...
+[INFO] 
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ phoenix-tool ---
+[INFO] Changes detected - recompiling the module! :source
+[INFO] Compiling 3 source files with javac [debug release 21] to target/classes
+[INFO] 
+[INFO] -------------------< com.phoenix:phoenix-common-api >-------------------
+[INFO] Building phoenix-common-api 2.0.0-SNAPSHOT                        [3/41]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- maven-clean-plugin:2.5:clean (default-clean) @ phoenix-common-api ---
+[INFO] Deleting /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-common/phoenix-common-api/target
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:clean (flatten.clean) @ phoenix-common-api ---
+[INFO] Deleting /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-common/phoenix-common-api/.flattened-pom.xml
+[INFO] 
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ phoenix-common-api ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-common/phoenix-common-api/src/main/resources
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:flatten (flatten) @ phoenix-common-api ---
+[INFO] Generating flattened POM of project com.phoenix:phoenix-common-api:jar:2.0.0-SNAPSHOT...
+[INFO] 
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ phoenix-common-api ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 18 source files with javac [debug release 21] to target/classes
+[WARNING] /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-common/phoenix-common-api/src/main/java/com/phoenix/common/vectorstore/request/SearchVectorRequest.java:[14,17] @Builder will ignore the initializing expression entirely. If you want the initializing expression to serve as default, add @Builder.Default. If it is not supposed to be settable during building, make the field final.
+[WARNING] /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-common/phoenix-common-api/src/main/java/com/phoenix/common/vectorstore/request/SearchVectorRequest.java:[18,20] @Builder will ignore the initializing expression entirely. If you want the initializing expression to serve as default, add @Builder.Default. If it is not supposed to be settable during building, make the field final.
+[WARNING] /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-common/phoenix-common-api/src/main/java/com/phoenix/common/model/platform/PlatformInfo.java:[13,1] Generating equals/hashCode implementation but without a call to superclass, even though this class does not extend java.lang.Object. If this is intentional, add '@EqualsAndHashCode(callSuper=false)' to your type.
+[INFO] 
+[INFO] --------------------< com.phoenix:phoenix-data-api >--------------------
+[INFO] Building phoenix-data-api 2.0.0-SNAPSHOT                          [4/41]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- maven-clean-plugin:2.5:clean (default-clean) @ phoenix-data-api ---
+[INFO] Deleting /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-data/phoenix-data-api/target
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:clean (flatten.clean) @ phoenix-data-api ---
+[INFO] Deleting /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-data/phoenix-data-api/.flattened-pom.xml
+[INFO] 
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ phoenix-data-api ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-data/phoenix-data-api/src/main/resources
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:flatten (flatten) @ phoenix-data-api ---
+[INFO] Generating flattened POM of project com.phoenix:phoenix-data-api:jar:2.0.0-SNAPSHOT...
+[INFO] 
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ phoenix-data-api ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 120 source files with javac [debug release 21] to target/classes
+[WARNING] /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-data/phoenix-data-api/src/main/java/com/phoenix/data/entity/Agent.java:[30,24] @Builder will ignore the initializing expression entirely. If you want the initializing expression to serve as default, add @Builder.Default. If it is not supposed to be settable during building, make the field final.
+[WARNING] /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-data/phoenix-data-api/src/main/java/com/phoenix/data/dto/ModelConfigDTO.java:[43,24] @Builder will ignore the initializing expression entirely. If you want the initializing expression to serve as default, add @Builder.Default. If it is not supposed to be settable during building, make the field final.
+[WARNING] /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-data/phoenix-data-api/src/main/java/com/phoenix/data/dto/ModelConfigDTO.java:[45,25] @Builder will ignore the initializing expression entirely. If you want the initializing expression to serve as default, add @Builder.Default. If it is not supposed to be settable during building, make the field final.
+[WARNING] /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-data/phoenix-data-api/src/main/java/com/phoenix/data/dto/ModelConfigDTO.java:[49,25] @Builder will ignore the initializing expression entirely. If you want the initializing expression to serve as default, add @Builder.Default. If it is not supposed to be settable during building, make the field final.
+[WARNING] /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-data/phoenix-data-api/src/main/java/com/phoenix/data/dto/ModelConfigDTO.java:[54,25] @Builder will ignore the initializing expression entirely. If you want the initializing expression to serve as default, add @Builder.Default. If it is not supposed to be settable during building, make the field final.
+[WARNING] /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-data/phoenix-data-api/src/main/java/com/phoenix/data/dto/ModelConfigDTO.java:[57,25] @Builder will ignore the initializing expression entirely. If you want the initializing expression to serve as default, add @Builder.Default. If it is not supposed to be settable during building, make the field final.
+[WARNING] /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-data/phoenix-data-api/src/main/java/com/phoenix/data/dto/search/HybridSearchRequest.java:[27,24] @Builder will ignore the initializing expression entirely. If you want the initializing expression to serve as default, add @Builder.Default. If it is not supposed to be settable during building, make the field final.
+[WARNING] /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-data/phoenix-data-api/src/main/java/com/phoenix/data/entity/AgentCategory.java:[16,1] Generating equals/hashCode implementation but without a call to superclass, even though this class does not extend java.lang.Object. If this is intentional, add '@EqualsAndHashCode(callSuper=false)' to your type.
+[INFO] /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-data/phoenix-data-api/src/main/java/com/phoenix/data/prompt/PromptHelper.java: /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-data/phoenix-data-api/src/main/java/com/phoenix/data/prompt/PromptHelper.java使用或覆盖了已过时的 API。
+[INFO] /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-data/phoenix-data-api/src/main/java/com/phoenix/data/prompt/PromptHelper.java: 有关详细信息, 请使用 -Xlint:deprecation 重新编译。
+[INFO] 
+[INFO] ------------------< com.phoenix:phoenix-common-core >-------------------
+[INFO] Building phoenix-common-core 2.0.0-SNAPSHOT                       [5/41]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- maven-clean-plugin:2.5:clean (default-clean) @ phoenix-common-core ---
+[INFO] Deleting /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-common/phoenix-common-core/target
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:clean (flatten.clean) @ phoenix-common-core ---
+[INFO] Deleting /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-common/phoenix-common-core/.flattened-pom.xml
+[INFO] 
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ phoenix-common-core ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-common/phoenix-common-core/src/main/resources
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:flatten (flatten) @ phoenix-common-core ---
+[INFO] Generating flattened POM of project com.phoenix:phoenix-common-core:jar:2.0.0-SNAPSHOT...
+[INFO] 
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ phoenix-common-core ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 23 source files with javac [debug release 21] to target/classes
+[INFO] 
+[INFO] -----------------< com.phoenix:phoenix-privilege-api >------------------
+[INFO] Building phoenix-privilege-api 2.0.0-SNAPSHOT                     [6/41]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- maven-clean-plugin:2.5:clean (default-clean) @ phoenix-privilege-api ---
+[INFO] Deleting /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-privilege/phoenix-privilege-api/target
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:clean (flatten.clean) @ phoenix-privilege-api ---
+[INFO] Deleting /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-privilege/phoenix-privilege-api/.flattened-pom.xml
+[INFO] 
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ phoenix-privilege-api ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-privilege/phoenix-privilege-api/src/main/resources
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:flatten (flatten) @ phoenix-privilege-api ---
+[INFO] Generating flattened POM of project com.phoenix:phoenix-privilege-api:jar:2.0.0-SNAPSHOT...
+[INFO] 
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ phoenix-privilege-api ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 44 source files with javac [debug release 21] to target/classes
+[WARNING] /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-privilege/phoenix-privilege-api/src/main/java/com/phoenix/privilege/entity/PrivilegeAcl.java:[55,21] @Builder will ignore the initializing expression entirely. If you want the initializing expression to serve as default, add @Builder.Default. If it is not supposed to be settable during building, make the field final.
+[INFO] 
+[INFO] -----------------< com.phoenix:phoenix-privilege-core >-----------------
+[INFO] Building phoenix-privilege-core 2.0.0-SNAPSHOT                    [7/41]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- maven-clean-plugin:2.5:clean (default-clean) @ phoenix-privilege-core ---
+[INFO] Deleting /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-privilege/phoenix-privilege-core/target
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:clean (flatten.clean) @ phoenix-privilege-core ---
+[INFO] Deleting /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-privilege/phoenix-privilege-core/.flattened-pom.xml
+[INFO] 
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ phoenix-privilege-core ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] Copying 4 resources
+[INFO] 
+[INFO] --- flatten-maven-plugin:1.7.3:flatten (flatten) @ phoenix-privilege-core ---
+[INFO] Generating flattened POM of project com.phoenix:phoenix-privilege-core:jar:2.0.0-SNAPSHOT...
+[INFO] 
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ phoenix-privilege-core ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 31 source files with javac [debug release 21] to target/classes
+[INFO] -------------------------------------------------------------
+[ERROR] COMPILATION ERROR : 
+[INFO] -------------------------------------------------------------
+[ERROR] /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-privilege/phoenix-privilege-core/src/main/java/com/phoenix/privilege/service/impl/PrivilegeUserServiceImpl.java:[12,36] 找不到符号
+  符号:   类 PrivilegeCompany
+  位置: 程序包 com.phoenix.privilege.entity
+[ERROR] /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-privilege/phoenix-privilege-core/src/main/java/com/phoenix/privilege/service/impl/PrivilegeUserServiceImpl.java:[13,36] 找不到符号
+  符号:   类 PrivilegeDepartment
+  位置: 程序包 com.phoenix.privilege.entity
+[INFO] 2 errors 
+[INFO] -------------------------------------------------------------
+[INFO] ------------------------------------------------------------------------
+[INFO] Reactor Summary for phoenix 2.0.0-SNAPSHOT:
+[INFO] 
+[INFO] phoenix-parent ..................................... SUCCESS [  0.143 s]
+[INFO] phoenix-tool ....................................... SUCCESS [  0.833 s]
+[INFO] phoenix-common-api ................................. SUCCESS [  0.926 s]
+[INFO] phoenix-data-api ................................... SUCCESS [  1.990 s]
+[INFO] phoenix-common-core ................................ SUCCESS [  0.631 s]
+[INFO] phoenix-privilege-api .............................. SUCCESS [  0.908 s]
+[INFO] phoenix-privilege-core ............................. FAILURE [  0.355 s]
+[INFO] phoenix-data-core .................................. SKIPPED
+[INFO] phoenix-data-rest .................................. SKIPPED
+[INFO] phoenix-data ....................................... SKIPPED
+[INFO] phoenix-agent-api .................................. SKIPPED
+[INFO] phoenix-agent-core ................................. SKIPPED
+[INFO] phoenix-agent-rest ................................. SKIPPED
+[INFO] phoenix-agent ...................................... SKIPPED
+[INFO] phoenix-admin-api .................................. SKIPPED
+[INFO] phoenix-admin-core ................................. SKIPPED
+[INFO] phoenix-privilege-rest ............................. SKIPPED
+[INFO] phoenix-platform-api ............................... SKIPPED
+[INFO] phoenix-platform-core .............................. SKIPPED
+[INFO] phoenix-platform-rest .............................. SKIPPED
+[INFO] phoenix-common-rest ................................ SKIPPED
+[INFO] phoenix-admin-rest ................................. SKIPPED
+[INFO] phoenix-admin-manager .............................. SKIPPED
+[INFO] phoenix-admin ...................................... SKIPPED
+[INFO] phoenix-privilege .................................. SKIPPED
+[INFO] phoenix-common ..................................... SKIPPED
+[INFO] phoenix-platform ................................... SKIPPED
+[INFO] phoenix-codegen .................................... SKIPPED
+[INFO] phoenix-flink-api .................................. SKIPPED
+[INFO] phoenix-flink-core ................................. SKIPPED
+[INFO] phoenix-flink-server ............................... SKIPPED
+[INFO] phoenix-flink ...................................... SKIPPED
+[INFO] phoenix-rag-api .................................... SKIPPED
+[INFO] phoenix-rag-core ................................... SKIPPED
+[INFO] phoenix-rag-rest ................................... SKIPPED
+[INFO] phoenix-rag ........................................ SKIPPED
+[INFO] phoenix-kg-api ..................................... SKIPPED
+[INFO] phoenix-kg-core .................................... SKIPPED
+[INFO] phoenix-kg-rest .................................... SKIPPED
+[INFO] phoenix-kg ......................................... SKIPPED
+[INFO] phoenix ............................................ SKIPPED
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD FAILURE
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  6.038 s
+[INFO] Finished at: 2026-10-07T17:00:06+08:00
+[INFO] ------------------------------------------------------------------------
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:3.11.0:compile (default-compile) on project phoenix-privilege-core: Compilation failure: Compilation failure: 
+[ERROR] /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-privilege/phoenix-privilege-core/src/main/java/com/phoenix/privilege/service/impl/PrivilegeUserServiceImpl.java:[12,36] 找不到符号
+[ERROR]   符号:   类 PrivilegeCompany
+[ERROR]   位置: 程序包 com.phoenix.privilege.entity
+[ERROR] /Users/bryanchen/Documents/work/ai_workspace/Phoenix-Agent-Java/phoenix-privilege/phoenix-privilege-core/src/main/java/com/phoenix/privilege/service/impl/PrivilegeUserServiceImpl.java:[13,36] 找不到符号
+[ERROR]   符号:   类 PrivilegeDepartment
+[ERROR]   位置: 程序包 com.phoenix.privilege.entity
+[ERROR] -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException
+[ERROR] 
+[ERROR] After correcting the problems, you can resume the build with the command
+[ERROR]   mvn <args> -rf :phoenix-privilege-core

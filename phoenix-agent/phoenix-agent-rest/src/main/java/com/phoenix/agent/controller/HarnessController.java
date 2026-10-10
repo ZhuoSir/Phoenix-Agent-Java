@@ -131,7 +131,9 @@ public class HarnessController {
                 .agentId(harnessRequest.getAgentId())
                 .enabledSkillIds(harnessRequest.getEnabledSkillIds())
                 .channel("admin")
-                .build();
+                
+                // T-06：转抄附件 id —— 不转抄则该入口静默丢附件（L-06 多入口枚举）
+                .attachmentIds(harnessRequest.getAttachmentIds()).build();
         return SseSupport.withHeartbeat(turnManager.openOrReject(harnessRequest.getSessionId(),
                 () -> harnessChatService.stream(request).map(HarnessEventMapper::toEventMap)));
     }
@@ -142,7 +144,10 @@ public class HarnessController {
         if (value instanceof PrivilegeUser pUser) {
             return pUser;
         }
-        ObjectMapper mapper = new ObjectMapper();
+        // R-14（v2.3.0）：会话里缓存的可能是**旧版** PrivilegeUser（含已下线的 code/user_type 等字段），
+        // 故必须显式忽略未知属性 —— 否则新代码读到旧会话会抛 UnrecognizedPropertyException
+        ObjectMapper mapper = new ObjectMapper()
+                .configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
         if (value instanceof Map<?, ?> map) {
             return mapper.convertValue(map, PrivilegeUser.class);
         }

@@ -1,0 +1,51 @@
+=== T-22 部署验证（R-16：内置超管账号 admin 绝对不可禁用/不可删除）===
+时间: 2026-10-07 | 入口: http://localhost:8090 | 迁移台账: 仍 8 件（R-16 无迁移件）
+
+--- 变更前基线 ---
+ username | real_name | status 
+----------+-----------+--------
+ admin    | 超管      |      0
+ chenzhuo | 陈卓      |      0
+ test01   | 测试用户  |      0
+(3 rows)
+
+--- ① 禁止禁用 admin（单个，含 admin 自己与其他账号发起）---
+  admin 本人       → success=False msg=内置超管账号不可禁用 ✅
+  chenzhuo 发起    → success=False msg=内置超管账号不可禁用 ✅
+  库内 admin.status = 0（应仍为 0）
+
+--- ② 禁止批量禁用含 admin（整体拒绝，不部分执行）---
+  batch[admin,test01] status=1 → success=False msg=所选账号包含内置超管账号（admin），不可禁用 ✅
+  test01.status 应仍为 0（证明未部分执行）= 0
+
+--- ③ 禁止删除 admin（admin 本人 / chenzhuo 发起）---
+  admin 本人       → success=False msg=内置超管账号不可删除 ✅
+  chenzhuo 发起    → success=False msg=内置超管账号不可删除 ✅
+  admin 是否仍存在 = 1
+
+--- ④ 禁止改名绕过（编辑 admin 改用户名）---
+  改名 admin→admin2 → success=False msg=内置超管账号的用户名不可修改 ✅
+  库内 username = admin（应仍为 admin）
+
+--- ⑤ admin 其他字段仍可编辑（改名以外的能力不回退）---
+  提交 realName=超管（原名）→ success=True ✅
+
+--- ⑥ 删除端点补齐保护（BUG-132）---
+  chenzhuo 删除自己 → success=False msg=不能删除当前登录账号 ✅
+  说明：同一端点的「不可删除最后一个启用超管」分支与 R-15 已实测的同一守卫共用（canDisable），在 admin 为唯一超管时该分支总被「内置超管」规则先行命中，故未单独构造环境验证（已在代码路径中）。
+
+--- ⑦ 终态：三账号齐全、admin 可登录、状态全为启用 ---
+ username | real_name | status 
+----------+-----------+--------
+ admin    | 超管      |      0
+ chenzhuo | 陈卓      |      0
+ test01   | 测试用户  |      0
+(3 rows)
+  admin 登录 → success=True token=True ✅
+  admin 菜单数 = 19（超管口径应为 19）
+
+--- ⑧ 前端产物（已部署）---
+  含「内置超管账号」提示的 chunk: account-D6TuJj7G.js
+
+--- ⑨ 部署后后端 ERROR 行数 ---
+  ERROR 行数: 0

@@ -26,9 +26,15 @@ public class AgentKbaseController {
 
     private final AgentKbaseService agentKbaseService;
 
+    /** R-18（CR-01/T-26）：超管判定复用 R-08/R-17 守卫 */
+    private final com.phoenix.data.component.AdminRoleGuard adminRoleGuard;
+
     @GetMapping("/agent/{agentId}/bindable")
     public ReturnVo<List<BindableKbaseVO>> bindable(@PathVariable Long agentId) {
-        return ReturnVo.ok(agentKbaseService.bindable(agentId));
+        // R-18（CR-01/T-26）：可见集合按当前登录用户；超管看全部
+        String me = cn.dev33.satoken.stp.StpUtil.getLoginIdAsString();
+        boolean superAdmin = adminRoleGuard.isAdmin(me);
+        return ReturnVo.ok(agentKbaseService.bindable(agentId, me, superAdmin));
     }
 
     @PutMapping("/agent/{agentId}/bind")

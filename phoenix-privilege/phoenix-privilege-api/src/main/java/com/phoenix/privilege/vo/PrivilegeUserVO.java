@@ -19,11 +19,6 @@ public class PrivilegeUserVO {
 
 	private String id;
 
-	/** 人员ID */
-	private String employeeId;
-
-	private String code;
-
 	private String realName;
 
 	private String username;
@@ -39,20 +34,6 @@ public class PrivilegeUserVO {
 	private String email;
 
 	private byte[] image;
-
-	private String companyId;
-
-	private String companyName;
-
-	private String deptId;
-
-	private String deptName;
-
-	private Long itUserId;
-
-	private String itUserName;
-
-	private Integer isLeader;
 
 	private Integer sex;
 
@@ -83,8 +64,6 @@ public class PrivilegeUserVO {
 	private String updator;
 
 	private Integer delFlag;
-
-	private Integer userType;
 
 	/** 人员禁用状态 1是0否 */
 	private Integer status;

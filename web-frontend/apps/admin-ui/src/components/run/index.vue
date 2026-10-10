@@ -1,5 +1,8 @@
 <script setup lang="ts">
-import { watch } from 'vue';
+// CR-03（R-13）：运行页会话空间 = ADMIN_RUN（与前台 chat/mobile 的 FRONT_CHAT 隔离）
+const SESSION_SCOPE = 'ADMIN_RUN';
+
+import { watch, onBeforeUnmount } from 'vue';
 import ChatFilesPanel from '#/views/front/components/ChatFilesPanel.vue';
 import ThinkingBlock from '#/views/front/components/ThinkingBlock.vue';
 
@@ -62,6 +65,7 @@ import { FolderOpened,
   Download,
   FullScreen,
   Loading,
+  Paperclip,
   Promotion,
   WarningFilled,
 } from '@element-plus/icons-vue';
@@ -80,6 +84,20 @@ import {
 } from '#/api';
 
 import { downloadHtmlReportApi } from '#/api/core/chat';
+
+// T-07：对话附件（chat-attachment-understanding）—— API 封装 + 两端规则单一来源
+import {
+  fetchAttachmentThumbUrlApi,
+  formatAttachmentSize,
+  previewAttachmentApi,
+  uploadChatAttachmentsApi,
+} from '#/api/core/chatAttachment';
+import type { ChatAttachmentMeta } from '@phoenix/chat-shared';
+import {
+  ATTACHMENT_MAX_FILES_PER_SEND,
+  attachmentCountMessage,
+  validateAttachmentsLocally,
+} from '@phoenix/chat-shared';
 
 import hljs from 'highlight.js';
 import 'highlight.js/styles/github.css';
@@ -347,7 +365,12 @@ const resultSetDisplayConfig = reactive<ResultSetDisplayConfig>({
   pageSize: 20,
 });
 
-const agentId = computed(() => Number(route.params.id));
+/** BUG-182：路由无 :id 时 Number(undefined)=NaN 会被拼进 URL（实测 /api/agent/NaN）。
+ *  统一归一到 0；0 为 falsy，配套守卫后不会发出请求。 */
+const agentId = computed(() => {
+  const n = Number(route.params.id);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+});
 
 window.copyTextToClipboard = (btn: HTMLElement) => {
   const text = btn.previousElementSibling?.textContent || '';
@@ -402,6 +425,9 @@ window.handleResultSetPagination = (
 };
 
 async function loadAgent() {
+  if (!agentId.value) {
+    return; // BUG-182：无有效 agentId 时不发请求（原会拼出 /api/agent/NaN）
+  }
   try {
     const result = await getAgentApi(agentId.value);
     if (!result) {
@@ -438,7 +464,7 @@ async function selectSession(session: ChatSession | null) {
     syncStateToView(session.id, { isStreaming, remoteRunning, nodeBlocks });
     syncConfirmFromState(session.id);
     // T-04：join 续渲需要"原始 markdown 基线"（applyServerRowRender 会把 content 转成 HTML），故转换前先取
-    const rows = (await getSessionMessagesApi(session.id)) as any[];
+    const rows = (await getSessionMessagesApi(session.id, SESSION_SCOPE)) as any[];
     let joinBase = '';
     let joinBaseThinking = '';
     for (let i = rows.length - 1; i >= 0; i--) {
@@ -515,7 +541,7 @@ async function selectSession(session: ChatSession | null) {
           st.remoteRunning = false;
           try {
             // 末次拉取：以服务端定稿行为准（join 只负责"看得见"，落库不归它管）
-            currentMessages.value = applyServerRowRender(await getSessionMessagesApi(session.id) as any[]) as any;
+            currentMessages.value = applyServerRowRender(await getSessionMessagesApi(session.id, SESSION_SCOPE) as any[]) as any;
           } catch { /* ignore */ }
         };
 
@@ -540,6 +566,15 @@ async function selectSession(session: ChatSession | null) {
             async (response) => {
               if (currentSession.value?.id !== session.id) return; // BUG-74 会话守卫
               applySilenceFrame(session.id, response);
+              // BUG-158（方案 B）：轮末框架尾巴（记忆 flush 等同步收尾，实测 18~24s）期间只有静默帧；
+              // 静默≥8s 且本轮已有内容 ⇒ 视觉收尾（停"正在执行"、放开输入）；真 end 帧到达仍照常收尾
+              if ((response as any).phase === 'IDLE' && Number((response as any).silenceMs || 0) >= 8000) {
+                const st = getSessionState(session.id);
+                if (st && (st.snapText || '').length > 0) {
+                  st.isStreaming = false;
+                  isStreaming.value = false;
+                }
+              }
               if ((response as any).agentFiles) notifyFilesChanged();
               const piece = String((response as any).text || '');
               const th = String((response as any).thinking || '');
@@ -610,6 +645,102 @@ function interruptedAtText(message: any): string {
   return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
 }
 
+// ===== T-07：对话附件（chat-attachment-understanding）=====
+/** 待发送附件草稿：**按会话分片**（L-20：切会话不串附件，不用单例 ref） */
+const pendingAttachments = ref<Map<string, ChatAttachmentMeta[]>>(new Map());
+const attachmentInputRef = ref<HTMLInputElement | null>(null);
+const uploadingAttachments = ref(false);
+/** 缩略图 object URL 缓存（卸载时统一 revoke，防泄漏） */
+const thumbUrlCache = new Map<number, string>();
+
+function currentPendingAttachments(): ChatAttachmentMeta[] {
+  const sid = currentSession.value?.id;
+  return (sid && pendingAttachments.value.get(sid)) || [];
+}
+
+function pickAttachmentFiles() {
+  attachmentInputRef.value?.click();
+}
+
+async function onAttachmentPicked(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const files = [...(input.files || [])];
+  input.value = ''; // 允许再次选同一文件
+  if (!files.length) return;
+  const sid = currentSession.value?.id;
+  if (!sid) {
+    ElMessage.warning('请先创建或选择会话');
+    return;
+  }
+  const existed = pendingAttachments.value.get(sid) || [];
+  if (existed.length + files.length > ATTACHMENT_MAX_FILES_PER_SEND) {
+    ElMessage.error(attachmentCountMessage(existed.length + files.length));
+    return;
+  }
+  // 前端即时反馈（后端仍做「扩展名 + 真实内容类型」双判定，R-01）
+  const checked = validateAttachmentsLocally(files);
+  for (const c of checked.filter((x) => x.reason)) {
+    ElMessage.error(`${c.file.name}：${c.reason}`);
+  }
+  const okFiles = checked.filter((x) => !x.reason).map((x) => x.file);
+  if (!okFiles.length) return;
+  uploadingAttachments.value = true;
+  try {
+    const res = await uploadChatAttachmentsApi(okFiles, sid);
+    // R-03：非法者逐个指明，不整批静默失败
+    for (const r of res.rejected) ElMessage.error(`${r.fileName}：${r.reason}`);
+    if (res.accepted.length) {
+      const next = new Map(pendingAttachments.value);
+      next.set(sid, [...existed, ...res.accepted]);
+      pendingAttachments.value = next;
+      await loadThumbs(res.accepted);
+    }
+  } catch (error: any) {
+    ElMessage.error(error?.message || '附件上传失败');
+  } finally {
+    uploadingAttachments.value = false;
+  }
+}
+
+function removePendingAttachment(id: number) {
+  const sid = currentSession.value?.id;
+  if (!sid) return;
+  const next = new Map(pendingAttachments.value);
+  next.set(sid, (next.get(sid) || []).filter((a) => a.id !== id));
+  pendingAttachments.value = next;
+}
+
+/** 缩略图必须 fetch+blob（<img src> 带不了鉴权头 —— T-05 交接注记） */
+async function loadThumbs(list: ChatAttachmentMeta[]) {
+  for (const a of list) {
+    if (a.kind === 'IMAGE' && !thumbUrlCache.has(a.id)) {
+      const url = await fetchAttachmentThumbUrlApi(a.id);
+      if (url) thumbUrlCache.set(a.id, url);
+    }
+  }
+}
+
+function cachedThumb(id: number): string | undefined {
+  return thumbUrlCache.get(id);
+}
+
+/** BUG-157：点击附件 = **展示优先**（可预览格式新标签页打开；office 类回退下载并提示） */
+async function onDownloadAttachment(att: ChatAttachmentMeta) {
+  try {
+    const result = await previewAttachmentApi(att);
+    if (result === 'downloaded') {
+      ElMessage.info('该格式浏览器无法在线预览，已改为下载');
+    }
+  } catch (error: any) {
+    ElMessage.error(error?.message || '打开附件失败');
+  }
+}
+
+onBeforeUnmount(() => {
+  for (const u of thumbUrlCache.values()) URL.revokeObjectURL(u);
+  thumbUrlCache.clear();
+});
+
 async function sendMessage() {
   if (!userInput.value.trim()) {
     ElMessage.warning('请输入请求消息！');
@@ -625,16 +756,25 @@ async function sendMessage() {
   const sessionId = currentSession.value.id;
   thinkingMap.set(sessionId, { text: '', ms: 0, start: 0 }); // 新一轮思考轨迹重置
 
+  // T-07：本会话待发送附件（草稿按会话分片）
+  const sentAttachments = currentPendingAttachments();
+  const attachmentIds = sentAttachments.map((a) => a.id);
   const userMessage: ChatMessage = {
     sessionId,
     role: 'user',
     content: userInput.value,
     messageType: 'text',
     titleNeeded: needsTitle,
+    // 附件与告知写入 metadata：历史回看仍可见（R-10/R-07）；
+    // 后端 saveMessage 据 metadata.attachmentIds 回填附件 message_id（S9）
+    ...(attachmentIds.length
+      ? { metadata: JSON.stringify({ attachmentIds, attachments: sentAttachments }) }
+      : {}),
   };
+  (userMessage as any).attachments = sentAttachments.length ? sentAttachments : undefined;
 
   try {
-    await saveMessageApi(sessionId, userMessage);
+    await saveMessageApi(sessionId, userMessage, SESSION_SCOPE);
     currentMessages.value.push(userMessage);
 
     const sessionState = getSessionState(sessionId);
@@ -646,9 +786,16 @@ async function sendMessage() {
       rejectedPlan: false,
       humanFeedbackContent: undefined,
       threadId: sessionState.lastRequest?.threadId || undefined,
+      attachmentIds: attachmentIds.length ? attachmentIds : undefined,
     };
 
     userInput.value = '';
+    // 清空本会话附件草稿（其它会话草稿不受影响 —— L-20 分片）
+    if (attachmentIds.length) {
+      const next = new Map(pendingAttachments.value);
+      next.set(sessionId, []);
+      pendingAttachments.value = next;
+    }
     await sendGraphRequest(request, true);
   } catch {
     ElMessage.error('发送消息失败');
@@ -695,7 +842,7 @@ async function sendGraphRequest(request: GraphRequest, rejectedPlan: boolean) {
               content: first.text,
               messageType: 'result-set',
             };
-            await saveMessageApi(sessionId, aiMessage);
+            await saveMessageApi(sessionId, aiMessage, SESSION_SCOPE);
             return;
           }
         } catch {
@@ -710,7 +857,7 @@ async function sendGraphRequest(request: GraphRequest, rejectedPlan: boolean) {
         content: nodeHtml,
         messageType: 'html',
       };
-      await saveMessageApi(sessionId, aiMessage);
+      await saveMessageApi(sessionId, aiMessage, SESSION_SCOPE);
     };
 
     let closeStreamFn: (() => void) | null = null;
@@ -740,6 +887,7 @@ async function sendGraphRequest(request: GraphRequest, rejectedPlan: boolean) {
         content: request.query,
         agentSn: String(agent.value.sn),
         type: 'agent',
+        attachmentIds: request.attachmentIds,
       };
 
       return streamChat(
@@ -766,7 +914,7 @@ async function sendGraphRequest(request: GraphRequest, rejectedPlan: boolean) {
               messageType: 'html-report',
             };
             try {
-              await saveMessageApi(sessionId, htmlReportMessage);
+              await saveMessageApi(sessionId, htmlReportMessage, SESSION_SCOPE);
               if (currentSession.value?.id === sessionId) {
                 currentMessages.value.push(htmlReportMessage);
               }
@@ -786,7 +934,7 @@ async function sendGraphRequest(request: GraphRequest, rejectedPlan: boolean) {
               messageType: 'markdown-report',
             };
             try {
-              await saveMessageApi(sessionId, markdownMessage);
+              await saveMessageApi(sessionId, markdownMessage, SESSION_SCOPE);
               if (currentSession.value?.id === sessionId) {
                 currentMessages.value.push(markdownMessage);
               }
@@ -813,7 +961,7 @@ async function sendGraphRequest(request: GraphRequest, rejectedPlan: boolean) {
                 messageType: 'markdown-report',
               };
               try {
-                await saveMessageApi(sessionId, reportMessage);
+                await saveMessageApi(sessionId, reportMessage, SESSION_SCOPE);
                 if (currentSession.value?.id === sessionId) {
                   currentMessages.value.push(reportMessage);
                 }
@@ -856,12 +1004,20 @@ async function sendGraphRequest(request: GraphRequest, rejectedPlan: boolean) {
         sessionId,
         message: request.query,
         agentId: Number(agent.value.id),
+        attachmentIds: request.attachmentIds,
       };
 
       return streamHarnessChat(
         harnessRequest,
         async (response: GraphNodeResponse) => {
           applySilenceFrame(sessionId, response);
+          // BUG-158（方案 B）：轮末框架尾巴（记忆 flush 等同步收尾）期间只有静默帧；
+          // 静默≥8s 且本轮已有内容 ⇒ 视觉收尾；真 end 帧到达仍照常走收尾逻辑（幂等）
+          if ((response as any).phase === 'IDLE' && Number((response as any).silenceMs || 0) >= 8000
+              && (sessionState.snapText || '').length > 0) {
+            sessionState.isStreaming = false;
+            isStreaming.value = false;
+          }
           // BL-19：本轮产物登记事件 → 刷新文件面板（admin 运行页）
           if ((response as any).agentFiles) notifyFilesChanged();
           if ((response as any).text) {
@@ -1089,7 +1245,7 @@ async function sendGraphRequest(request: GraphRequest, rejectedPlan: boolean) {
           metadata: thinkingMetaOf(sessionId), // thinking-display R-05
         } as any;
         try {
-          await saveMessageApi(sessionId, htmlReportMessage);
+          await saveMessageApi(sessionId, htmlReportMessage, SESSION_SCOPE);
           if (currentSession.value?.id === sessionId) {
             currentMessages.value.push(htmlReportMessage);
           }
@@ -1105,7 +1261,7 @@ async function sendGraphRequest(request: GraphRequest, rejectedPlan: boolean) {
           metadata: thinkingMetaOf(sessionId), // thinking-display R-05
         } as any;
         try {
-          await saveMessageApi(sessionId, markdownMessage);
+          await saveMessageApi(sessionId, markdownMessage, SESSION_SCOPE);
           if (currentSession.value?.id === sessionId) {
             currentMessages.value.push(markdownMessage);
           }
@@ -1169,6 +1325,12 @@ function applyServerRowRender(list: any[]) {
       if (md && typeof md.thinking === 'string') {
         (m as any).thinking = md.thinking;
         (m as any).thinkingMs = typeof md.thinkingMs === 'number' ? md.thinkingMs : undefined;
+      }
+      // T-07（R-10）：历史回看附件——从 metadata 还原并异步加载缩略图；
+      // 旧消息无该键 ⇒ 不进此分支（S6 兼容）
+      if (md && Array.isArray(md.attachments)) {
+        (m as any).attachments = md.attachments;
+        loadThumbs(md.attachments);
       }
     } catch { /* metadata 非 JSON：静默（旧行无键） */ }
     // 服务端进行中轮次（status=generating）刷新后须保持流式态，
@@ -1407,7 +1569,7 @@ async function handlePresetQuestionClick(question: string) {
 
   if (!currentSession.value) {
     try {
-      const newSession = await createSessionApi(agentId.value, '新会话');
+      const newSession = await createSessionApi(agentId.value, '新会话', undefined, SESSION_SCOPE);
       if (!newSession) {
         ElMessage.error('创建会话失败');
         return;
@@ -1448,7 +1610,7 @@ async function stopStreaming() {
       sessionState.closeJoin = null;
       remoteRunning.value = false;
       sessionState.remoteRunning = false;
-      currentMessages.value = applyServerRowRender(await getSessionMessagesApi(sessionId) as any[]) as any;
+      currentMessages.value = applyServerRowRender(await getSessionMessagesApi(sessionId, SESSION_SCOPE) as any[]) as any;
       ElMessage.success('已停止对话');
     } catch {
       ElMessage.error('停止对话失败');
@@ -1476,7 +1638,7 @@ async function stopStreaming() {
           messageType: 'html',
         };
         try {
-          await saveMessageApi(sessionId, aiMessage);
+          await saveMessageApi(sessionId, aiMessage, SESSION_SCOPE);
         } catch {
           /* ignore */
         }
@@ -1783,6 +1945,32 @@ document.addEventListener('visibilitychange', () => {
                   </el-avatar>
                 </div>
                 <div class="message-content">
+                  <!-- T-07（R-10）：消息附件（历史回看从 metadata 还原；点击经鉴权端点下载） -->
+                  <div
+                    v-if="(message as any).attachments?.length"
+                    style="display:flex;flex-direction:column;gap:4px;margin-bottom:6px"
+                  >
+                    <div
+                      v-for="att in (message as any).attachments"
+                      :key="att.id"
+                      style="display:flex;align-items:center;gap:6px;padding:4px 8px;border:1px solid #e4e7ed;border-radius:6px;background:#fafafa;font-size:12px;cursor:pointer;max-width:420px"
+                      @click="onDownloadAttachment(att)"
+                    >
+                      <img
+                        v-if="att.kind === 'IMAGE' && cachedThumb(att.id)"
+                        :src="cachedThumb(att.id)"
+                        style="width:28px;height:28px;object-fit:cover;border-radius:4px"
+                      />
+                      <el-icon v-else><Document /></el-icon>
+                      <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ att.fileName }}</span>
+                      <span style="color:#909399">{{ formatAttachmentSize(att.sizeBytes) }}</span>
+                      <span
+                        v-if="att.notice"
+                        style="color:#e6a23c"
+                        :title="att.notice"
+                      >⚠</span>
+                    </div>
+                  </div>
                   <ThinkingBlock
                     v-if="message.role === 'assistant' && (message as any).thinking"
                     :content="(message as any).thinking"
@@ -1995,7 +2183,49 @@ document.addEventListener('visibilitychange', () => {
               </div>
             </div>
           </div>
+          <!-- T-07：待发送附件草稿（按会话分片，L-20） -->
+          <div
+            v-if="currentPendingAttachments().length"
+            style="display:flex;flex-wrap:wrap;gap:6px;padding:6px 8px 0"
+          >
+            <div
+              v-for="att in currentPendingAttachments()"
+              :key="att.id"
+              style="display:flex;align-items:center;gap:6px;padding:3px 8px;border:1px solid #dcdfe6;border-radius:14px;background:#f7f8fa;font-size:12px"
+            >
+              <img
+                v-if="att.kind === 'IMAGE' && cachedThumb(att.id)"
+                :src="cachedThumb(att.id)"
+                style="width:20px;height:20px;object-fit:cover;border-radius:4px"
+              />
+              <span style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ att.fileName }}</span>
+              <span style="color:#909399">{{ formatAttachmentSize(att.sizeBytes) }}</span>
+              <el-icon
+                style="cursor:pointer;color:#909399"
+                @click="removePendingAttachment(att.id)"
+              ><Close /></el-icon>
+            </div>
+          </div>
           <div class="input-container">
+            <!-- T-07：附件选择（白名单与上限的即时反馈在前端，最终裁决在后端 R-01~R-04） -->
+            <input
+              ref="attachmentInputRef"
+              type="file"
+              multiple
+              style="display:none"
+              accept=".doc,.docx,.pdf,.xls,.xlsx,.txt,.md,.png,.jpg,.jpeg,.gif,.webp,.bmp"
+              @change="onAttachmentPicked"
+            />
+            <el-button
+              circle
+              title="上传附件（文档 word/pdf/excel/txt/md，图片 png/jpg/gif/webp/bmp；单个≤20MB，单次≤5个）"
+              :loading="uploadingAttachments"
+              :disabled="isStreaming || remoteRunning || showHarnessConfirm"
+              style="margin-right:6px"
+              @click="pickAttachmentFiles"
+            >
+              <el-icon><Paperclip /></el-icon>
+            </el-button>
             <el-input
               v-model="userInput"
               type="textarea"

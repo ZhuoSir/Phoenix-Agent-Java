@@ -16,6 +16,29 @@ export interface ChatMessage {
   thinking?: string;
   /** 思考耗时毫秒 */
   thinkingMs?: number;
+  /**
+   * 消息附件（chat-attachment-understanding R-10）。
+   * **可选字段** ⇒ 旧消息（无该键）与两端既有渲染均不受影响（共享面 S5/S6）。
+   */
+  attachments?: ChatAttachmentMeta[];
+}
+
+/** 对话附件元信息（后端 ChatAttachmentVO 的前端映射） */
+export interface ChatAttachmentMeta {
+  id: number;
+  fileName: string;
+  /** DOCUMENT = 文字类文档；IMAGE = 图片 */
+  kind: 'DOCUMENT' | 'IMAGE';
+  ext: string;
+  sizeBytes: number;
+  /** 受鉴权的取件端点（后端刻意不暴露存储直链，R-11） */
+  url?: string;
+  /** 缩略图端点（仅 IMAGE 非空）；必须 fetch+blob 加载（<img src> 带不了鉴权头） */
+  thumbUrl?: null | string;
+  /** ACTIVE | EXTRACT_FAILED（R-09：解析失败的文档不可用于生成） */
+  extractStatus?: string;
+  /** 用户可见提示：解析失败原因类别，或"内容已截断"告知（R-08/R-09） */
+  notice?: null | string;
 }
 
 export interface ChatSession {

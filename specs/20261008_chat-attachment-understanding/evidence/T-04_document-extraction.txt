@@ -1,0 +1,48 @@
+=== T-04 验证结论：文档文本抽取 + 超长顺序截断 + 三类解析失败明确提示 ===
+日期: 2026-10-08 | 分支: feature/chat-attachment-understanding | 关联: R-05 / R-08 / R-09
+账号: chenzhuo（非超管）| 断言口径: 响应业务字段（extractStatus/notice）+ DB（extracted_chars/status），非 HTTP 状态（L-26）
+
+--- 实现要点 ---
+- ChatDocumentExtractor：**刻意不用 Tika.parseToString**（它吞 TikaException 返回空串，会把"加密"误判成"无文本层"）；
+  改用 AutoDetectParser + BodyContentHandler(writeLimit=24001)，使三类失败可区分：
+  EncryptedDocumentException → 受保护/加密；WriteLimitReachedException → 截断；TikaException/SAXException/IOException → 损坏；
+  抽取结果空白 → 无文本层（扫描件）。MAX_EXTRACT_CHARS = 24000（R-08 顺序截断，保留开头）
+- Tika 3.x 差异（编译期实测）：WriteLimitReachedException 在 org.apache.tika.**exception**（非 ..sax）；
+  Metadata.RESOURCE_NAME_KEY 已移至 **TikaCoreProperties**.RESOURCE_NAME_KEY
+- 上传即抽取：extracted_chars / status(ACTIVE|EXTRACT_FAILED) 落库，notice 随响应回给前端（最早暴露问题）
+
+--- ① 五类合法文档抽取成功（R-05）---
+  sample.docx → ACTIVE, chars=35 ✅
+  fact.pdf    → ACTIVE, chars=**32** ✅ ← 与写入 PDF 的文本 "Unique fact PDF-4821 amount 5533"（**恰 32 字符**）逐字符吻合
+  sample.xlsx → ACTIVE, chars=15 ✅
+  sample.txt  → ACTIVE, chars=**13** ✅ ← 与文件内容 "独特事实：TXT-4821"（**恰 13 字符**）吻合（精确断言，抽对了内容而非垃圾）
+  sample.md   → ACTIVE, chars=17 ✅
+
+--- ② 超长顺序截断 + 显式告知（R-08）---
+  long.txt（29028 字符）→ extractStatus=ACTIVE，**extracted_chars=24000（恰为上限）** ✅
+  notice（用户可见）= "文档内容较长，已按顺序截断至前 24000 字符（超出部分不参与理解）" ✅
+  ⇒ 非静默截断；保留开头（顺序截断），符合 Q6 裁定
+
+--- ③ 三类解析失败原因类别明确（R-09）---
+  scanned.pdf（Pillow 生成的图片型 PDF，无文本层）→ EXTRACT_FAILED
+     notice="文档无可提取的文本层（疑似扫描件/图片型 PDF）；**本期不自动转图片理解**" ✅（Q6 裁定：不自动转视觉）
+  corrupt.pdf（%PDF 头 + 随机字节）→ EXTRACT_FAILED
+     notice="文档无法解析（文件可能已损坏或格式不完整）" ✅
+  encrypted.pdf（手工构造带 /Encrypt + /Filter /Standard 的 PDF）→ EXTRACT_FAILED
+     notice="文档受保护或已加密，无法解析（请去除密码后重新上传）" ✅ ← 加密类**确实被单独识别**，未与"损坏/无文本层"混淆
+  三者均未产生"空内容继续作答"的数据（status=EXTRACT_FAILED 供 T-06 拒绝生成）
+
+--- ④ 图片不做抽取（对照组）---
+  sample.png → extractStatus=ACTIVE、notice=None、extracted_chars=**NULL** ✅（抽取只作用于 DOCUMENT）
+
+--- ⑤ DB 汇总与复原 ---
+  status 分布: ACTIVE×7 / EXTRACT_FAILED×3；有 extracted_chars 的行 6 / 总行 10（图片与失败件为 NULL）✅
+  复原基线（L-60）: 删除全部验证行 + 清理落盘文件 ⇒ 行数 **0**、chat-attachments 残留 **0** ✅
+
+--- ⑥ 质量门与自纠 ---
+  编译 exit=0 后才部署（L-65⑤）；两次编译错误（parseToString 签名、Tika 3.x 类位置）均在**构建前**发现，未部署半成品
+  未部署项: 前端 dist 未重建（本任务纯后端）
+
+--- ⑦ 遗留到 T-06 的断言（无调用方，不虚报）---
+  "上传后**追问文档中的独特事实** ⇒ 回答命中" 属端到端断言，需 T-06 把抽取文本注入提示词后才可验证；
+  本任务已证到"抽取内容精确正确（字符数逐一吻合）+ 截断/失败可判定"，即注入所需的前置事实成立。

@@ -79,6 +79,9 @@ services:
     volumes:
       - applogs:/app/logs
       - uploads:/app/uploads   # FileStorageProperties path=./uploads 相对 WORKDIR（头像/产物图片持久化）
+      # 2026-10-09：智能体运行期 pip 安装的第三方依赖（PYTHONUSERBASE=/app/.local）跨容器重建保留；
+      # named volume 首次创建会从镜像目录预置内容 ⇒ 预装的 python-docx/openpyxl/python-pptx/Pillow 一并带过来
+      - pylibs:/app/.local
     depends_on:
       postgres:
         condition: service_healthy
@@ -133,3 +136,4 @@ volumes:
   redisdata:
   applogs:
   uploads:
+  pylibs:

@@ -11,6 +11,8 @@ import { getGroupInfoPageApi, toggleStatusGroupInfoApi } from '#/api';
 
 import AssignAgentForm from './assign-agent-form.vue';
 import AssignKbaseForm from './assign-kbase-form.vue';
+import AssignMcpForm from './assign-mcp-form.vue';
+import AssignSkillForm from './assign-skill-form.vue';
 import AssignPeopleForm from './assign-people-form.vue';
 import Form from './form.vue';
 import { useColumns, useSearchFormSchema } from './data';
@@ -29,6 +31,15 @@ const [AssignAgentModal, assignAgentModalApi] = useVbenModal({
 });
 const [AssignKbaseModal, assignKbaseModalApi] = useVbenModal({
   connectedComponent: AssignKbaseForm,
+});
+// R-04（T-09）：补齐技能与 MCP 的组侧授权入口 —— 此前组管理页只能管人员/智能体/知识库
+const [AssignSkillModal, assignSkillModalApi] = useVbenModal({
+  connectedComponent: AssignSkillForm,
+  destroyOnClose: true,
+});
+const [AssignMcpModal, assignMcpModalApi] = useVbenModal({
+  connectedComponent: AssignMcpForm,
+  destroyOnClose: true,
 });
 
 const formOptions: VbenFormProps = {
@@ -126,6 +137,16 @@ function getActions(row: any) {
       onClick: () => assignKbaseModalApi.setData({ ...row }).open(),
     },
     {
+      text: '分配技能',
+      icon: 'lucide:wrench',
+      onClick: () => assignSkillModalApi.setData({ ...row }).open(),
+    },
+    {
+      text: '分配 MCP',
+      icon: 'lucide:plug',
+      onClick: () => assignMcpModalApi.setData({ ...row }).open(),
+    },
+    {
       text: '编辑',
       icon: 'lucide:edit',
       onClick: () => onEdit(row),
@@ -151,6 +172,8 @@ function getActions(row: any) {
     <AssignPeopleModal @success="refreshGrid" />
     <AssignAgentModal @success="refreshGrid" />
     <AssignKbaseModal @success="refreshGrid" />
+    <AssignSkillModal @success="refreshGrid" />
+    <AssignMcpModal @success="refreshGrid" />
     <Grid table-title="组管理">
       <template #toolbar-tools>
         <ElButton type="primary" @click="onCreate">新增</ElButton>

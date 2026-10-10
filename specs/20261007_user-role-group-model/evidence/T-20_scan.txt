@@ -1,0 +1,45 @@
+=== T-20 使用面实测（R-14 下线依据，2026-10-07 全栈扫描）===
+
+[1] 数据库列（tbl_privilege_user）
+    code          varchar NOT NULL  comment「工号」
+    user_type     int4              comment「用户类型 0：自建用户 1：idm用户」
+    it_user_id    varchar           comment「it用户ID」
+    it_user_name  varchar           comment「it用户姓名」
+    （tbl_privilege_user_role.user_no varchar comment「用户工号」——工号冗余列）
+    活库取值：admin code=1001 / chenzhuo code=1002 / test01 code=10001；user_type 全为 0（**无 1=IDM 的记录**）
+
+[2] 后端引用（Java，排除枚举 .getCode() 噪音）
+    user_type        2 处：LoginServiceImpl:93（登录透传）、PrivilegeUserServiceImpl:216（列表按值过滤）
+                     —— 无任何逻辑分支；前端从未提交该筛选项
+    UserTypeEnum     仅自身定义 + PrivilegeUser 的 javadoc @see ⇒ 无调用方（死代码）
+    it_user_id/name  1 处：仅实体字段声明 ⇒ 无读写
+    code（工号）      6 处真实承重：
+                     · PrivilegeUserServiceImpl:54 按工号查询（+ 接口 + REST GET /code/{code}）
+                     · saveUserRole(id, userNo, roleId) ×3 → 写入 tbl_privilege_user_role.user_no
+                     · addUserGroups(id, code, groupIds) ×2 → 写入 tbl_platform_account_group_info.account_name
+                     · pageByQuery:218 关键字搜索含工号
+                     · PrivilegePvalueController:69 setCreateBy(user.getCode())（审计写工号）
+                     · ReactAgentController:51 UserProfile.userCode(privilegeUser.getCode())
+    IDM 死规则         ExceptionEnum.USER_DELETE_ERROR(「该用户为IDM用户，不可删除」)、
+                     DEPORTMENT_DELETE_ERROR(「IDM同步的部门不允许删除」)、
+                     USERCODE_DUPLICATE_EXCEPTION(「工号重复」) —— 三者**定义但从未抛出**；
+                     IDM 同步包已随 R-06 整包删除（find 无 service/sync 目录）
+
+[3] IDM 何时才会用到（回答用户提问）
+    仅当接入外部 IT/HR 系统（IDM）做用户同步时才需要：user_type=1 标记来源、it_user_id/it_user_name 存 IDM 侧标识、
+    并以「IDM 用户不可删除」保护同步数据。而 R-02/Q5 已确认「外部 IDM/HR 对接 = 没有」、同步代码已删
+    ⇒ 当前**永远不会用到**；仅剩界面上一处标签与一个可手选的「idm用户」下拉（选了无任何效果）。
+
+[4] 前端引用（admin-ui + mobile-ui）
+    工号 5 处：system-management/account/data.ts（列表列 + 表单必填项）、
+              account/group-info/assign-people-form.vue（工号搜索框 + 工号列 + assignPeopleCode 状态机）
+    userType 14 处：账号列表 userTypeSlot 标签、表单「用户类型」下拉（可选 idm用户）、
+              api/core/{privilege-user,auth}.ts 类型、store/auth.ts 解构与落地页注释、
+              api/core/privilege-user.ts 的无调用方 getUserByCodeApi、mobile-ui authTransport 类型声明
+    router/guard.ts：`if (userType !== 1)` 门 —— 实测所有用户 user_type 均为 0 ⇒ 该门会把**所有**用户
+              重定向走，与 R-12「/front/chat 恢复为独立 chat 页」自相矛盾（死门）
+
+[5] 保留项（非本条款范围）
+    tbl_platform_account_info.code（前台账号表）：属**前台账号自身标识**，仍被
+    前台登录响应 userCode、getByCode 查询、列表筛选与关键字搜索使用 ⇒ 本次不删；
+    其值不再由后台工号派生（登录载体 carrier.setCode 改取用户名）。

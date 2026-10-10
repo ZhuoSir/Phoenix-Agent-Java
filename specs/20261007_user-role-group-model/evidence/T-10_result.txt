@@ -1,0 +1,38 @@
+=== T-10 验收结论（预设问题接口角色校验 / R-08 / BUG-122）===
+日期: 2026-10-07 | 工具链: JDK 23 + Maven 3.8.6 + .mvn-home
+
+[1] 改动
+  新增 phoenix-data-core/.../component/AdminRoleGuard.java：
+    - `isAdmin(userId)`：裸 SQL 查 `tbl_privilege_user_role ⋈ tbl_privilege_role`，
+      判定「硬编码超管 role_id（沿用 AgentKnowledgeMapper 既有口径）**或** `upper(sn)='ROLE_ADMIN'`」
+      —— 与 LoginServiceImpl.isSuperAdmin **同口径**（含忽略大小写，规避 BUG-123 类坑）
+    - **fail-closed**：SQL 异常时记 error 日志并返回 false（拒绝而非放行），无 userId 直接 false
+  改 phoenix-data-rest/.../AgentPresetQuestionController.java：
+    - 注入 AdminRoleGuard；新增私有 `requireAdmin()`
+    - `POST /{agentId}/preset-questions`（batchSave）与 `DELETE /{agentId}/preset-questions/{questionId}`
+      在方法体起始处调用 `requireAdmin()`
+    - **校验刻意置于 `try` 之外**：该方法的 `catch (Exception)` 会把异常包成 500
+      （"保存预设问题失败: …"），若放在 try 内则 403 语义失真
+    - 非管理员 → 抛 `ResponseStatusException(HttpStatus.FORBIDDEN, "权限不足：仅管理员可管理预设问题")`
+      → 由既有 `GlobalExceptionHandler.handleResponseStatusException` 统一渲染为
+      HTTP 403 + `ApiResponse.error(reason)`（统一错误响应；未登录则由 NotLoginException → 401）
+
+[2] 验证（真实输出）
+  - mvn clean compile → **BUILD SUCCESS，ERROR=0**（T-10_compile.raw.txt）
+  - 守卫 SQL 口径复刻（drill 库，T-10_guard-replica.txt）：
+      admin(461681072489615360)   → admin_hits=1 → **ADMIN(放行)**
+      liufang(428011841386577920) → admin_hits=1 → **ADMIN(放行)**
+      chenzhuo/lwj/xtj            → admin_hits=0 → **非管理员(403)**
+      不存在的 user_id             → admin_hits=0 → 403（边界正确）
+  - 正负对照齐备（管理员放行 + 普通角色拒绝），符合 R-08 两条验收场景的口径要求
+
+[3] **延期至 T-16（明确记载）**
+  R-08 的 HTTP 级断言（普通角色 POST/DELETE 得 403 且数据未变更；管理员同接口成功）
+  需对**已部署**实例执行 ⇒ **T-10 暂不勾选**，待 T-16 通过后勾选。
+
+[4] 台账
+  - **BUG-122 → 已修复(v2.0.0)**（仅写接口；R-08 范围）
+  - **BUG-126（新登记）**：两个 GET 接口仍可枚举他人私有预设 —— **R-08 范围外，本 spec 未修**
+    （不擅自扩范围；已留账可追溯）
+
+[5] 结论：T-10 代码面完成（编译绿 + 判定口径正负对照实证）；HTTP 级断言挂 T-16。

@@ -1,0 +1,46 @@
+=== T-19 验收结论（R-13 账号收敛为 admin + chenzhuo；含初始化数据）===
+日期: 2026-10-07 | 确认人: 陈卓（口令「确认执行（确认人：陈卓）」+ 追问裁定「聊天数据一并删除」）
+
+[1] 变更内容
+  升级件 `V2.0.0_07__account_prune_dml.sql`（+ rollback，配对 7/7）：
+    删除 5 个账号（liufang/lwj/xtj 存活 + maliu/wangwu 已软删）及其账号域数据：
+    `tbl_privilege_user` / `tbl_privilege_user_role` / `tbl_privilege_login_log` /
+    `tbl_agent_user_agent_info` / `tbl_data_chat_session` / `tbl_data_chat_message` /
+    `tbl_vector_store_user_memory`（后者按 metadata->>'userId' 关联，含 lwj 的前台账号 id）
+    自检（L-51 环境无关）：存活账号 = 2 且恰为 admin/chenzhuo；残留账号域行 = 0；chenzhuo 角色绑定仍在
+  初始化数据（基线 `sql/all_data.sql` / `sql/all_schema.sql`）：
+    删除 **88 条**种子语句（5 演示账号 + 19 角色绑定 + 前台账号/组归属/智能体绑定 + 7 会话 + 49 消息 + 3 向量记忆），
+    注入 **chenzhuo 一套 5 条**（用户/角色绑定/前台账号/组归属/智能体绑定，均由生产库逐行导出）；
+    `admin` 仍由 `docker/init/10_seed_admin.sql` 提供 ⇒ 全新库初始化后账号集合恰为 `{admin, chenzhuo}`
+
+[2] 验证（真实输出，见 T-19_drill.txt / T-19_deploy-verify.txt）
+  ① **drill（升级路径）**：迁移前 5 账号 → 01~07 两轮**全 exit=0**；07 自检 NOTICE
+     「存活账号 2（admin+chenzhuo）/ 残留 0 行 / chenzhuo 角色绑定 1 条」；
+     反向 07 → 复原 5 账号 + 会话 170 + 消息 549；再正向 → 2 账号（可重放）
+  ② **洁净库（migrate.sh 首启顺序 00 → all_data → 10_seed_admin → 20_seed_runtime_agents → 01~07 两轮）**：
+     全部 exit=0；初始化后账号即 `admin,chenzhuo`；终态 u_all=2 / u_alive=2 / role_rows=2 / front_rows=1 / menus=14 / org_tables=0
+  ③ **活库部署**：migrator 应用 V2.0.0_07（台账 7 行齐备），自检 NOTICE 同上
+  ④ **部署后实测（经 8090）**：
+     · `tbl_privilege_user` 恰 2 行：admin(超管) / chenzhuo(陈卓)，均 del_flag=0
+     · 登录：admin ✅ / chenzhuo ✅；liufang、lwj、xtj、maliu、wangwu **全部失败**（用户名或密码错误）
+     · 菜单：超管 19 / 普通 7（与各自角色一致）
+     · 残留：role=0 / sess=0 / mem=0 / loginlog=0（指向已删账号的行全部归零）
+
+[3] 过程发现并修掉的两个自身缺陷（记 L-52 / L-53）
+  ① **按行编辑 dump 会切断多行语句**：`tbl_data_chat_message` 的 INSERT 是**多行**（内容含 HTML 与换行），
+     首版按行只删掉 `INSERT INTO ...` 首行，把续行留成悬空 SQL ⇒ 基线载入
+     `ERROR: syntax error at or near "<"`。已改为**语句边界（引号感知）解析**后重做（88 条按语句删除成功）。
+  ② **迁移后库导出的种子缺迁移前 NOT NULL 列**：chenzhuo 行取自活库（`company_id`/`dept_id` 已被 V2.0.0_01 删除），
+     灌入全新库（迁移前 schema 两列 NOT NULL）即
+     `ERROR: null value in column "company_id"`。已按迁移前 schema 补齐这两列（沿用原演示账号的占位组织 id）。
+  两次修正后，两份基线均 `exit=0 / 0 错误`，且账号集合恰为 chenzhuo（+ init 脚本的 admin）。
+
+[4] 遗留（如实记载，不在本次确认范围）
+  活库 `tbl_privilege_user_role` 仍有 **12 行"孤儿绑定"**：`00a2eaad…`×7、`432058661221859328` 等×5，
+  其 `user_id` **在 `tbl_privilege_user` 中根本不存在**（既有脏数据，BUG-118 家族；**不指向本次删除的 5 个账号**）。
+  - 影响：无（无账号可展示、不参与登录与菜单判定）
+  - 基线已不含此类行（全新库更干净）⇒ 升级库与全新库存在该不对称
+  - 处置建议：另立一件 `V2.0.0_08__orphan_role_cleanup_dml.sql` 清理（**本 spec 未做，待用户裁定**）
+
+[5] 结论：R-13 达成 —— 活库与全新库**均只有 admin / chenzhuo 两个账号**，两账号可登录且菜单 19 / 7，
+    5 个旧账号登录失败，指向已删账号的账号域行全部归零；升级件与回滚件配对（7/7）。

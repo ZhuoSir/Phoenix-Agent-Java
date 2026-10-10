@@ -1,0 +1,52 @@
+########## T-18 演练（重跑，含子菜单 URL）##########
+① drill 重建自迁移前备份: 迁移前菜单 27
+  轮1 V2.0.0_01                                            exit=0 err=0
+  轮1 V2.0.0_02                                            exit=0 err=0
+  轮1 V2.0.0_03                                            exit=0 err=0
+  轮1 V2.0.0_04                                            exit=0 err=0
+  轮1 V2.0.0_05                                            exit=0 err=0
+  轮1 V2.0.0_06                                            exit=0 err=0
+  轮2 V2.0.0_01                                            exit=0 err=0
+  轮2 V2.0.0_02                                            exit=0 err=0
+  轮2 V2.0.0_03                                            exit=0 err=0
+  轮2 V2.0.0_04                                            exit=0 err=0
+  轮2 V2.0.0_05                                            exit=0 err=0
+  轮2 V2.0.0_06                                            exit=0 err=0
+② 系统管理子树（URL 应全为 /system-management/*）
+    name    |                 url                 | order_no 
+------------+-------------------------------------+----------
+ 角色管理   | /system-management/role             |        1
+ 系统管理   | /system-management                  |        1
+ 账号管理   | /system-management/account          |        2
+ 组管理     | /system-management/group            |        3
+ 菜单管理   | /system-management/menu             |        4
+ 权限值管理 | /system-management/permission-value |        5
+ 日志管理   | /system-management/log              |        6
+(7 rows)
+
+menus=19 admin_acl=19 common_acl=7
+③ 反向 06 → 复位核对
+menus=21 权限管理=1 前台管理=1 角色URL=/permission-management/role
+   再正向后 menus=19
+
+########## 洁净库重放（更新后基线 + 01~06）##########
+  all_schema exit=0 ERROR行=0
+  all_data   exit=0 ERROR行=0
+  基线（清洗后）: menus=14
+  轮1 V2.0.0_01                                            exit=0 err=0
+  轮1 V2.0.0_02                                            exit=0 err=0
+  轮1 V2.0.0_03                                            exit=0 err=0
+  轮1 V2.0.0_04                                            exit=0 err=0
+  轮1 V2.0.0_05                                            exit=0 err=0
+  轮1 V2.0.0_06                                            exit=3 err=1
+  轮2 V2.0.0_01                                            exit=0 err=0
+  轮2 V2.0.0_02                                            exit=0 err=0
+  轮2 V2.0.0_03                                            exit=0 err=0
+  轮2 V2.0.0_04                                            exit=0 err=0
+  轮2 V2.0.0_05                                            exit=0 err=0
+  轮2 V2.0.0_06                                            exit=3 err=1
+ menus | legacy | sys_children | org_tables 
+-------+--------+--------------+------------
+    14 |      0 |            6 |          0
+(1 row)
+

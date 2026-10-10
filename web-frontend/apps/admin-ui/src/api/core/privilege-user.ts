@@ -8,12 +8,6 @@ export interface PrivilegeUser {
   username?: string;
   realName?: string;
   mobile?: string;
-  code?: string;
-  companyId?: string;
-  companyName?: string;
-  deptId?: string;
-  deptName?: string;
-  userType?: number;
   status?: number;
   secret?: string;
   password?: string;
@@ -49,12 +43,6 @@ export async function getUserByUsernameApi(username: string) {
   );
 }
 
-export async function getUserByCodeApi(code: string) {
-  return requestClient.get<PrivilegeUser>(`/api/privilege/user/code/${code}`, {
-    responseReturn: 'body',
-  });
-}
-
 export async function createUserApi(data: Record<string, any>) {
   return requestClient.post('/api/privilege/user', data, {
     responseReturn: 'body',
@@ -71,6 +59,27 @@ export async function deleteUserApi(id: string) {
   return requestClient.delete(`/api/privilege/user/${id}`, {
     responseReturn: 'body',
   });
+}
+
+/** R-15（v2.4.0）：启用/禁用单个账号。status：0 启用 / 1 禁用 */
+export async function updateUserStatusApi(id: string, status: number) {
+  return requestClient.put(
+    '/api/privilege/user/status',
+    { id, status },
+    { responseReturn: 'body' },
+  );
+}
+
+/** R-15（v2.4.0）：批量启用/禁用。返回实际更新行数 */
+export async function batchUpdateUserStatusApi(
+  ids: string[],
+  status: number,
+) {
+  return requestClient.put(
+    '/api/privilege/user/status/batch',
+    { ids, status },
+    { responseReturn: 'body' },
+  );
 }
 
 export async function updatePasswordApi(

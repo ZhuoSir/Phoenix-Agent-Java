@@ -78,6 +78,10 @@ import static org.springframework.ai.vectorstore.pgvector.PgVectorStore.PgIndexT
 @EnableConfigurationProperties({ CodeExecutorProperties.class, DataAgentProperties.class, FileStorageProperties.class })
 public class DataAgentConfiguration implements DisposableBean {
 
+	/** R-08：向量维度统一由当前 EMBEDDING 模型解析（不再写死 512） */
+	@org.springframework.beans.factory.annotation.Autowired
+	private com.phoenix.data.service.aimodelconfig.EmbeddingDimensionResolver embeddingDimensionResolver;
+
 	/**
 	 * 专用线程池，用于数据库操作的并行处理
 	 */
@@ -310,7 +314,7 @@ public class DataAgentConfiguration implements DisposableBean {
 	@Qualifier("simpleVectorStore")
 	public PgVectorStore simpleVectorStore(JdbcTemplate jdbcTemplate, EmbeddingModel embeddingModel) {
 		return PgVectorStore.builder(jdbcTemplate, embeddingModel)
-				.dimensions(512)                    // 向量维度（需与 Embedding 模型匹配）
+				.dimensions(embeddingDimensionResolver.resolve())                    // 向量维度（需与 Embedding 模型匹配）
 				.distanceType(COSINE_DISTANCE)       // 距离度量策略（余弦相似度）
 				.indexType(HNSW)                     // 索引类型（HNSW 或 IVFFlat）
 				.initializeSchema(true)

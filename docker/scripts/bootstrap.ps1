@@ -1,6 +1,6 @@
-<#
+﻿<#
 Phoenix 一键 bootstrap · Windows 版（R-10/T-11）
-用法: 管理员 PowerShell，在源码目录执行  .\docker\scripts\bootstrap.ps1 [-Version v] [-Project phoenix] [-Port 0] [-Distro Ubuntu-22.04] [-Offline]
+用法: 管理员 PowerShell，在源码目录执行  .\docker\scripts\bootstrap.ps1 [-Version v] [-Project phoenix] [-Port 0] [-Distro Ubuntu-22.04] [-Mirror <源前缀>] [-Offline]
 流程: 管理员检查 → Windows 原生引擎拒绝(L-12) → WSL2 就绪(功能启用/重启续接/-Distro 兼容 --import 自定义名)
       → 源码拷入 WSL → bootstrap.sh(引擎/打包/安装/收据) → Windows 侧收据
 退出码: 0=成功  1=失败  2=需重启后重跑
@@ -12,6 +12,7 @@ param(
   [int]$Port = 0,
   [int]$Timeout = 300,
   [string]$Distro = "Ubuntu-22.04",
+  [string]$Mirror = "",
   [switch]$Offline
 )
 $ErrorActionPreference = "Stop"
@@ -28,20 +29,52 @@ function Write-Fail($msg) {
 function Mark-Done($k) { Add-Content -Path $StateFile -Value $k }
 function Test-Done($k) { return (Test-Path $StateFile) -and (@(Get-Content $StateFile) -contains $k) }
 
+# ── 0. 参数守卫（BUG-174）──
+# PowerShell 只把【单横线】当参数名（-Version）。若按 WSL bash 的习惯写成 `--version`，
+# 它不会被认成参数名，而是按【位置】绑到第一个参数上：$Version="--version"、后一个值顺位
+# 顶给 $Project —— 一路静默带到 docker tag 才炸（`invalid tag "phx-tmp-jar:--version"`），
+# 报错完全指不到根因（实测两次白跑）。这里在动手前把这类误用拦下并打印正确用法。
+$argErrs = @()
+if ($Version -like '-*') { $argErrs += "-Version 收到以 '-' 开头的值：'$Version'（是不是把 -Version 写成了 --version？）" }
+if ($Project -like '-*') { $argErrs += "-Project 收到以 '-' 开头的值：'$Project'（是不是把 -Project 写成了 --project？）" }
+if ($Distro  -like '-*') { $argErrs += "-Distro 收到以 '-' 开头的值：'$Distro'" }
+if ($Mirror  -like '-*') { $argErrs += "-Mirror 收到以 '-' 开头的值：'$Mirror'" }
+if ($Version -and ($Version -notmatch '^v?\d+\.\d+(\.\d+)?([-.+][0-9A-Za-z.+-]+)?$')) { $argErrs += "-Version 值 '$Version' 不像版本号（应形如 1.7.0）" }
+if ($Project -match '^\d+\.\d+') { $argErrs += "-Project 值 '$Project' 像版本号 ⇒ 参数整体错位了（典型：-Version 写成了 --version）" }
+if ($args.Count -gt 0) { $argErrs += "有多余的位置参数：$($args -join ' ')" }
+if ($argErrs.Count -gt 0) {
+  Write-Host "[bootstrap.ps1] 参数有误，已在动手前拦下：" -ForegroundColor Red
+  foreach ($e in $argErrs) { Write-Host "  × $e" -ForegroundColor Red }
+  Write-Host "  正确用法: .\docker\scripts\bootstrap.ps1 -Version 1.7.0 [-Project phoenix] [-Port 9080] [-Distro Ubuntu-22.04] [-Mirror <源前缀>] [-Offline]" -ForegroundColor Yellow
+  Write-Host "  提示: PowerShell 参数一律【单横线】；双横线写法（--version）是给 WSL 内 bash 脚本用的。" -ForegroundColor Yellow
+  exit 1
+}
+
 # ── 1. 管理员 ──
 $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 if (-not $isAdmin) { Write-Fail "请以管理员身份运行 PowerShell" }
 
 # ── 2. Windows 原生引擎 = 拒绝（跑不了 Linux 镜像） ──
 if (Get-Command docker -ErrorAction SilentlyContinue) {
-  $ost = & docker info --format '{{.OSType}}' 2>$null
+  # 走 cmd /c 取输出：PS 5.1 在 $ErrorActionPreference=Stop 下会把原生命令的 stderr 升级成
+  # 终止错误，`2>$null` 拦不住（BUG-141）——引擎没起时那样会让脚本红堆栈死在这一行。
+  $ost = & cmd /c 'docker info --format {{.OSType}} 2>nul'
   if ($ost -eq "windows") { Write-Fail "检测到 Windows 原生容器引擎(OSType=windows)——本脚本走 WSL2 路线，请先停用 Windows 容器模式或忽略本机既有引擎（不影响 WSL 内独立引擎）" }
 }
 
 # ── 3. WSL2 + 发行版（与 install.ps1 同构；-Distro 兼容 wsl --import 自定义名） ──
 if (-not (Get-Command wsl -ErrorAction SilentlyContinue)) { Write-Fail "无 wsl 命令——系统版本过老或功能未启用（先跑 dism 两功能+重启）" }
-$distros = (& wsl -l -q 2>$null) -join "`n"
-if ($distros -notmatch [regex]::Escape($Distro)) {
+# 发行版就绪判定 = **直接探测**，不解析 `wsl -l -q`：其输出在 PowerShell 5.1 里字间夹 NUL
+# （实测 "U\0b\0u\0n\0t\0u\0"），-match 恒不命中 ⇒ 已装好被误判为未装 ⇒ 重装报
+# ERROR_ALREADY_EXISTS ⇒ **第二次重跑必失败**（BUG-144）。探测全程走 cmd /c，避免
+# native stderr 在 EAP=Stop 下抛错（BUG-141）。
+function Test-Distro($name) {
+  & cmd /c "wsl -d $name -u root -- true 1>nul 2>nul"
+  return ($LASTEXITCODE -eq 0)
+}
+if (Test-Distro $Distro) {
+  Write-Step "$Distro 已就绪，跳过发行版安装"
+} else {
   if (-not (Test-Done "features")) {
     Write-Step "启用 WSL 与虚拟机平台功能（dism）..."
     & dism.exe /online /enable-feature /featurename:Microsoft-Windows-Subsystem-Linux /all /norestart | Out-Null
@@ -51,25 +84,39 @@ if ($distros -notmatch [regex]::Escape($Distro)) {
     exit 2
   }
   Write-Step "安装 $Distro（若 Server 无商店报「无效的分发名称」，请按 README 的 rootfs 导入法建同名发行版后重跑）..."
-  & wsl --install -d $Distro --no-launch
-  if ($LASTEXITCODE -ne 0) { Write-Fail "wsl --install 失败(码 $LASTEXITCODE)——Server 环境请改用导入法：aka.ms/wslubuntu2204 下载后 wsl --import $Distro C:\WSL\Ubuntu <rootfs.tar.gz>" }
+  $installOut = & cmd /c "wsl --install -d $Distro --no-launch 2>&1"
+  $installOut | ForEach-Object { Write-Host "  $_" }
+  if (-not (Test-Distro $Distro)) {
+    Write-Fail "$Distro 不可用——Server 无商店请改用导入法：aka.ms/wslubuntu2204 下载后 wsl --import $Distro C:\WSL\Ubuntu <rootfs.tar.gz> 后重跑；刚装完也可能需重启；仍失败查虚拟化/嵌套虚拟化"
+  }
   Mark-Done "distro"
 }
-& wsl -d $Distro -u root -- true 2>$null
-if ($LASTEXITCODE -ne 0) { Write-Fail "$Distro 无法以 root 启动——刚装完可能需重启；仍失败查虚拟化/嵌套虚拟化" }
 
 # ── 4. 源码拷入 WSL ext4（/mnt 下构建慢 10 倍） ──
 $WinPath = ($SrcRoot -replace '\\','/')
 $Drv = $WinPath.Substring(0,1).ToLower(); $Rest = $WinPath.Substring(2)
 $WslSrc = "/mnt/$Drv$Rest"
-Write-Step "拷贝源码进 WSL: $WslSrc → ~/phoenix-src"
-& wsl -d $Distro -u root -- bash -c "mkdir -p ~/phoenix-src && cp -ru '$WslSrc/.' ~/phoenix-src/"
-if ($LASTEXITCODE -ne 0) { Write-Fail "源码拷贝失败（路径换算: $WslSrc）" }
+Write-Step "镜像源码进 WSL: $WslSrc → ~/phoenix-src（先清空，避免陈旧文件残留）"
+# BUG-179: 原用 cp -ru（只增不删）⇒ 切分支/删文件后 WSL 里是「陈旧并集」，会拿已删除的源码去编译
+# （实测：v2.0.0 下线组织维度删掉的 PrivilegeDepartmentServiceImpl.java 残留 ⇒ 编译报 getDeptId 找不到）。
+# 改真镜像：docker/dist（断点状态+已产出工件，约 1.5G）先暂存、整棵重拷（源码+.git 约 110MB、秒级）、再把 dist 放回。
+& wsl -d $Distro -u root -- bash -c "rm -rf /tmp/phx-dist-keep; { mv ~/phoenix-src/docker/dist /tmp/phx-dist-keep 2>/dev/null || true; }; rm -rf ~/phoenix-src; mkdir -p ~/phoenix-src; cp -r '$WslSrc/.' ~/phoenix-src/; { mv /tmp/phx-dist-keep ~/phoenix-src/docker/dist 2>/dev/null || true; }"
+if ($LASTEXITCODE -ne 0) { Write-Fail "源码镜像失败（路径换算: $WslSrc）" }
+
+# ── 4.5 行尾规整 CRLF→LF（BUG-143）──
+# Windows 工作树在 core.autocrlf=true（Git for Windows 默认）下检出为 CRLF，而仓库对象
+# 里存的是 LF。直接把这棵树交给 bash，bash 会崩在 \r 上——bootstrap.sh 自己第 13 行
+# `case "$1" in` 就报 syntax error，跑不到任何自愈代码，所以必须在**外部**先规整。
+# 只规整被 bash/Docker/Compose 消费的文本资产；Java/TS/SQL 的 CRLF 无害，不动。
+Write-Step "规整行尾 CRLF→LF（bash/Docker/Compose 资产）..."
+& wsl -d $Distro -u root -- bash -c "cd ~/phoenix-src && find . -type f \( -name '*.sh' -o -name 'Dockerfile*' -o -name '.env*' -o -name '*.conf' -o -name '*.yaml' -o -name '*.yml' -o -name '*.list' \) -exec sed -i 's/\r//g' {} +"
+if ($LASTEXITCODE -ne 0) { Write-Fail "行尾规整失败（WSL 内 find/sed 不可用？）" }
 
 # ── 5. WSL 内 bootstrap.sh 全链 ──
 $bsArgs = "--project $Project --timeout $Timeout"
 if ($Version) { $bsArgs += " --version $Version" }
 if ($Port -gt 0) { $bsArgs += " --port $Port" }
+if ($Mirror) { $bsArgs += " --mirror $Mirror" }
 if ($Offline) { $bsArgs += " --offline" }
 Write-Step "WSL 内启动 bootstrap 全链（引擎→打包→安装，首次约 40-70 分钟）..."
 & wsl -d $Distro -u root -- bash -c "cd ~/phoenix-src && bash docker/scripts/bootstrap.sh $bsArgs"
@@ -84,7 +131,8 @@ Write-Host "======================================================" -ForegroundC
 Write-Host "  访问地址 : http://localhost:$showPort （Windows 浏览器直接开）"
 Write-Host "  管理账号 : admin / 123456（首登立即改密）"
 Write-Host "  离线包   : WSL 内 ~/phoenix-src/docker/dist/*.tar.gz（可拷去其它机器）"
-Write-Host "  服务管理 : wsl -d $Distro -u root -- docker compose -p $Project ps"
+Write-Host "  重启语义 : 机器重启后自动复活（docker 开机自启 + compose restart:unless-stopped）；休眠/挂起只冻结进程，唤醒即继续"
+  Write-Host "  服务管理 : wsl -d $Distro -u root -- docker compose -p $Project ps"
 Write-Host "  localhost 不通时: netsh interface portproxy add v4tov4 listenport=$showPort listenaddress=0.0.0.0 connectport=$showPort connectaddress=<WSL hostname -I>"
 Write-Host "======================================================" -ForegroundColor Green
 exit 0

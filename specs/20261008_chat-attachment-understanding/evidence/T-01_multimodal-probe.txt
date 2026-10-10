@@ -1,0 +1,51 @@
+=== T-01 多模态可用性探针 —— 结论：**未通过（阻塞）** ===
+日期: 2026-10-08 | 分支: feature/chat-attachment-understanding | 执行依据: plan v1.0.0 决策2 + tasks T-01
+纪律: 探针不过即停、不改模型名硬试（L-11）；不信 /models 能力清单（L-36）；密钥仅脚本内读取，**未落盘未打印**
+
+--- ① 探针本体（真实带 image_url 的调用，非清单接口）---
+端点:   https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions
+模型:   qwen-vl-max（用户 Q4-1 裁定）
+测试图: 640x200 PNG，8448 字节，图内独特编码 PROBE-4821-KQ（Pillow 生成）
+提示词: 「请只回答图片中那串大写编码，原样输出，不要解释。」
+结果:   **HTTP 400 ❌**
+        error.code = "Arrearage"
+        error.message = "Access denied, please make sure your account is in good standing.
+                         For details, see: https://help.aliyun.com/zh/model-studio/error-code#overdue-payment"
+        request_id = 3a1b91b3-7496-9497-9181-b0bafa4eb2a8
+判定:   失败原因 = **阿里云百炼账号欠费/状态异常**，**不是**模型名不存在、不是 provider 不支持 image_url、
+        不是本需求代码问题（本任务尚未写任何生产代码）
+
+--- ② 影响面诊断（既有链路，纯文本，与本需求代码无关）---
+  qwen CHAT (qwen3.8-flash, id=7)        → HTTP 400 ❌ code=Arrearage（同上，账号欠费）
+  deepseek CHAT (deepseek-v4-flash, id=5, **is_default=true**) → HTTP 402 ❌ code=invalid_request_error
+                                           msg="Insufficient Balance"（余额不足）
+  qwen EMBEDDING（默认行 id=11）:
+    第一次探测（**方法错误，已纠正**）: 用 /v1/chat/completions 打 embedding 模型
+        → HTTP 404 code=model_not_supported —— 这是**我探错端点**导致的假信号，不是配置缺陷
+    正确端点复测 /v1/embeddings（按 embeddings_path 或默认）:
+        → **HTTP 200 ✅ 向量维度=1024**（embedding 链路正常）
+  ⇒ 结论：**所有 CHAT/多模态链路因账单问题不可用**；embedding 正常。
+  ⇒ 我几乎据错误方法登记一条假 BUG，经 L-45（全称否定结论必须自己复核）/L-37（核对响应内容身份）复核后撤销。
+
+--- ③ 库内生效配置（is_active 且未删）---
+  deepseek / deepseek-v4-flash / CHAT      / default=true   ← 线上默认对话模型，402 余额不足
+  qwen     / qwen3.8-flash     / CHAT      / default=false  ← 400 Arrearage
+  qwen     / qwen3.7-text-embedding-flash  / EMBEDDING / default=true  ← 200 正常
+  custom   / qwen3.7-text-embedding-flash  / EMBEDDING / default=false
+
+--- ④ 阻塞判定与任务影响（按 tasks v1.0.0 依赖图）---
+  T-01 探针            **阻塞**（本件）——不勾选，验收标准明确要求"失败即停并回报"
+  T-03 MULTIMODAL 支路 **阻塞**（依赖 T-01；且"含图请求选 MULTIMODAL"无法验证）
+  T-04 文档理解        **验证阻塞**（验收标准要求"追问文档中独特事实 ⇒ 回答命中"，CHAT 全死无法取证；
+                        代码可写但**不得声称验证通过**——铁律 5）
+  T-06 stream 集成     **阻塞**（依赖 T-03/T-04/T-05，且降级/多模态断言都需真实模型）
+  T-02 上传+存储+迁移件 **不阻塞**（不依赖模型）
+  T-05 附件鉴权         **不阻塞**（不依赖模型）
+  T-07/T-08 两端前端    **不阻塞**（但"基于文档内容作答"的端到端断言需模型，属 T-09）
+  T-09 端到端           **阻塞**（12 条 R 中 R-05/R-06/R-07/R-08 的断言需真实模型）
+
+--- ⑤ 解除条件（需用户处置，agent 无权代办）---
+  A. 阿里云百炼账号充值/恢复（解 Arrearage）⇒ qwen-vl-max 与 qwen3.8-flash 复活
+  B. deepseek 账户充值（解 402 Insufficient Balance）⇒ 默认 CHAT 复活
+  C. 或提供另一把可用 key / 另一个支持 image_url 的 provider（则回改 plan 决策2 并重走确认②）
+  探针可在处置后**原样重跑**（脚本化、幂等、不改模型名）

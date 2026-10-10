@@ -1,0 +1,39 @@
+=== T-04 验收结论（三方集成三层后端删除）===
+日期: 2026-10-07 | 工具链: JDK 23 + Maven 3.8.6 + -Dmaven.repo.local=$PWD/.mvn-home
+
+[1] 删除 30 个文件
+  ① 同步层 9: service/sync/{PlatformSyncStrategy,AbstractPlatformSyncStrategy,PlatformSyncFactory}
+     + sync/{dingtalk,feishu,weixin}/{*SyncStrategy,*SyncConstants}
+  ② 免登层 5: service/thirdparty/{ThirdPartyLoginStrategy,ThirdPartyLoginFactory}
+     + thirdparty/strategy/{DingTalk,Feishu,WeCom}ThirdPartyLoginStrategy
+  ③ 平台配置层 12: PlatformInfo 实体/Mapper/Service(+Impl)/Controller + 3 个 SdkService(+Impl)
+  ④ 传输/DTO 4: dto/front/ThirdPartyLoginDTO + model/dto/{SyncUserDTO,SyncDeptDTO} + controller/sync/PlatformSyncController
+     （+ common/enm/PlatformTypeEnm 已计入 ③ 合计）
+  【注】按 plan §C「三层同批整删、不留保留项」执行 —— 原 R-06 边界 4「保留 3 个 *SyncConstants」
+        的约束随 R-11 自动解除，*SyncConstants 已整包删除。
+
+[2] 改造 5 处（保留文件内摘引用）
+  - AccountInfoService：删 getByThirdPartyId / thirdPartyLogin 两个接口方法 + import
+  - AccountInfoServiceImpl：删 platformInfoService / thirdPartyLoginFactory 字段与 import、
+    删 getByThirdPartyId 与 thirdPartyLogin 两个实现（含 /auth/thirdLogin 的业务体）
+  - AccountLoginController：删 POST /thirdLogin 端点 + import
+  - AccountInfoController：删 GET /third-party/{thirdPartyId} 端点
+  - AccountInfo（model）：删 thirdPartyId 字段（列 third_party_id 由 T-14 DDL 删除）
+
+[3] 静态复核（真实输出）
+  - grep "ThirdPartyLogin|thirdPartyLogin|platformInfoService|PlatformSyncFactory|SyncUserDTO|PlatformTypeEnm"
+    --include=*.java → **0 命中**
+  - grep 同名关键词 --include=*.xml/.yml/.yaml/.properties → **0 命中**（无指向已删 Mapper 的 namespace）
+
+[4] 编译验证
+  - mvn clean compile -Dspring-javaformat.skip=true -Dmaven.repo.local=$PWD/.mvn-home → **BUILD SUCCESS**（ERROR=0）
+  - 原始输出: T-04_compile.raw.txt
+
+[5] **运行期断言延期至 T-16（明确记载，不静默）**
+  T-04 任务书要求 ① POST /platform/sync/* → 404 ② POST /auth/thirdLogin → 404
+  ③ /platform/platform-info/** → 404 ④ POST /auth/login（后台+前台）成功。
+  这四条**必须对"含本次改动的运行实例"断言**；当前在跑的 phoenix-release-backend-1 镜像是
+  v1.6.0-dev（旧代码），不具备断言条件 ⇒ 统一在 T-16「部署与端到端回归」执行并在该任务证据留档。
+  （用户 2026-10-07 裁定：不改已确认文档，偏差记入任务证据与 completion.md）
+
+[6] 结论：T-04 代码面完成（30 删 + 5 改 + 编译绿 + 零残留）；运行期四条断言挂 T-16。

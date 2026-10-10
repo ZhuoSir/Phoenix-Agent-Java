@@ -1,9 +1,4 @@
-import type {
-  ChatMessage,
-  ChatSession,
-  ChatTransport,
-  SendPayload,
-} from '@phoenix/chat-shared';
+import type { ChatMessage, ChatSession, ChatTransport, SendPayload, ChatAttachmentMeta } from '@phoenix/chat-shared';
 import { useAgentStore, useChatStore } from '@phoenix/chat-shared';
 
 import { renderMarkdown, escapeHtml } from '../utils/markdown';
@@ -25,6 +20,16 @@ import {
 import type { StreamNodeResponse } from './stream';
 
 let msgCounter = 0;
+
+/**
+ * T-08（chat-attachment-understanding）：本轮待发送附件。
+ * 与 admin 前台同范式 —— **读取一次即清空**，仅对下一条消息生效，不持久。
+ */
+let pendingAttachments: ChatAttachmentMeta[] = [];
+
+export function setPendingAttachments(list: ChatAttachmentMeta[]) {
+  pendingAttachments = Array.isArray(list) ? [...list] : [];
+}
 
 function uid(): string {
   msgCounter++;
@@ -221,8 +226,24 @@ export const realChatTransport: ChatTransport = {
       return !session?.title || session.title === '新会话';
     })();
 
+    // T-08：本轮附件（读取一次即清空，仅对本条消息生效）
+    const attachmentsForThisTurn =
+      pendingAttachments.length > 0 ? [...pendingAttachments] : undefined;
+    const attachmentIdsForThisTurn = attachmentsForThisTurn?.map((a) => a.id);
+    pendingAttachments = [];
+
     const userMessage = toApiMessage(sessionId, 'user', content, {
       titleNeeded: needsTitle,
+      // R-10/S9：附件写入 metadata ⇒ 后端回填 message_id；历史回看可还原
+      ...(attachmentIdsForThisTurn?.length
+        ? {
+            metadata: JSON.stringify({
+              attachmentIds: attachmentIdsForThisTurn,
+              attachments: attachmentsForThisTurn,
+            }),
+            attachments: attachmentsForThisTurn,
+          }
+        : {}),
     });
     await saveMessageApi(sessionId, userMessage);
 
@@ -244,9 +265,15 @@ export const realChatTransport: ChatTransport = {
             sessionId,
             message: content,
             harnessSn: currentAgent?.sn || '',
+            // T-08：附件 id（不传即后端短路，行为不变 —— S1'）
+            attachmentIds: attachmentIdsForThisTurn,
           },
           (response) => {
             if (abortRequested) return;
+            // BUG-158（方案 B）：轮末框架尾巴期间只有静默帧；达阈值且已有内容 ⇒ 视觉收尾
+            if ((response as any).phase) {
+              useChatStore().maybeSettleFromSilence(sessionId, response as any, fullText.length > 0);
+            }
             if (response.error) return;
             if (response.needConfirm && response.buttons) {
               onNodeMessage?.({
@@ -505,6 +532,8 @@ export const realChatTransport: ChatTransport = {
             content,
             agentSn: currentAgent?.sn || '',
             type: currentAgent?.type || '',
+            // T-08：附件 id（SQL/nl2sql 走 streamFrontChatSql，不接附件）
+            attachmentIds: attachmentIdsForThisTurn,
           },
           (response) => {
             if (abortRequested) return;

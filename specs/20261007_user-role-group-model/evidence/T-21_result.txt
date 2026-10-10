@@ -1,0 +1,62 @@
+=== T-21 验收结论（R-15：手机号搜索 / 启用禁用与批量 / 权限分配入口收敛）===
+日期: 2026-10-07 | 确认人: 陈卓（口令「确认执行 R-15（确认人：陈卓）」+ 批量仅启用/禁用 + 两条保护都加 +
+操作列 = 启用禁用/设置密码/编辑/删除）
+
+[1] 变更内容（**无需新增迁移件** —— status 列已存在，本需求为纯代码改动；台账仍 8 件）
+  后端:
+    · `PrivilegeUserServiceImpl.pageByQuery` 关键字检索**补 `mobile`（手机号）**，保留 `phone`/`tel`
+    · 新增 `PUT /api/privilege/user/status`（单个启停，body {id,status}）
+    · 新增 `PUT /api/privilege/user/status/batch`（批量启停，body {ids[],status}，返回更新行数）
+    · 新增 DTO：`PrivilegeUserStatusDTO`、`PrivilegeUserBatchStatusDTO`
+    · 服务层新增 `isSuperAdmin`（**统一口径**，LoginServiceImpl 已委托到此，消除两套判定）、
+      `updateStatus`、`updateStatusBatch`、`canDisable`
+    · 控制器安全保护：① 禁止操作当前登录账号本人（单/批）；② 禁用后必须仍存在≥1 个启用的超管
+  前端（账号管理）:
+    · 搜索框提示 →「用户名 / 姓名 / 手机号」
+    · 列表新增**勾选列**；工具栏新增**批量启用 / 批量禁用**（未勾选时禁用，按钮上显示已选数）
+    · 操作列：新增**启用/禁用**（按当前状态显示对应动作，二次确认）→ 保留 设置密码 / 编辑 / 删除
+    · **移除「分配权限」按钮与独立 `role-form.vue` 弹窗**（角色/组分配统一走编辑，R-03 设计）
+
+[2] 过程发现并修复的真实缺陷（记 BUG-130）
+  起草 R-15 时我据代码判断「后端已覆盖手机号、只需改文案」——**该判断错误**：
+  账号手机号存于 **`mobile`** 列，而原检索子句只含 `phone`（**座机**，库内 3 行全为空）
+  ⇒ **手机号搜索一直失效**（用户提出的正是这个）。实测（修复前）：
+    keyword=18515422024 → 命中 [] ❌ ；keyword=chenzhuo → 命中 [chenzhuo] ✅（只有用户名能搜到）
+  修复后实测（**全量与片段均命中**）：
+    keyword=18515422024 → [chenzhuo] ✅ ；18900002345 → [test01] ✅ ；1850000000 → [admin] ✅
+    keyword=1542202    → [chenzhuo] ✅ ；189000 → [test01] ✅ ；18500 → [admin] ✅
+    keyword=陈卓（中文，经 URL 编码）→ [chenzhuo] ✅ ；keyword=chenzhuo → [chenzhuo] ✅
+  生成 SQL 核对（后端日志）：
+    SELECT COUNT(*) ... FROM "tbl_privilege_user"
+     WHERE ("username" LIKE ? OR "real_name" LIKE ? OR "mobile" LIKE ? OR "phone" LIKE ?) AND "del_flag" = ?
+
+[3] 启用/禁用与批量（实测，用 test01 验证，全程未动 admin/chenzhuo）
+  PUT /status{test01,1}  → success=True ；随后 test01 登录探测 = 「用户已被禁用」✅（禁用闸门先于口令校验）
+  PUT /status{test01,0}  → success=True ；随后探测 = 「密码错误」✅（回到口令校验）
+  PUT /status/batch{ids:[test01],1} → success=True 更新 1 行 ；status=0 → 更新 1 行 ✅
+  PUT /status/batch{ids:[]} → success=False msg=「请先勾选账号」✅
+  终态：admin/chenzhuo/test01 三者 status 均为 0（启用）✅
+
+[4] 安全保护（实测）
+  ① 自锁：admin 禁用自己 → success=False msg=「不能对当前登录账号执行启用/禁用操作」✅（库内 admin.status 仍 0）
+      admin 批量含自己 → success=False msg=「所选账号包含当前登录账号，请取消后再操作」✅
+  ② 失管：chenzhuo 试图禁用 admin（当前唯一启用超管）→ success=False
+      msg=「系统必须保留至少一个启用的超管账号」✅
+
+[5] 前端产物（已部署 dist）
+  含「批量禁用」的 chunk：`account-B8Hmd-1M.js`（账号页）等
+  含「用户名 / 姓名 / 手机号」提示的 chunk：`form-BeF54sil.js`（旧文案「请输入用户名/姓名」已 0 命中）
+  仍含「分配权限」的 chunk：`role-*.js` / `menu-management-*.js` —— 属**角色/菜单**页的合法用法，
+    账号页 `account-*.js` 中「分配权限」计数为 **0** ✅
+  质量门：`typecheck` 203 条（较改动前 204 **零新增**，少 1 条）；`pnpm build` ✓ 4.81s；后端编译 0 错误；
+    部署后后端 ERROR 行数 **0**
+
+[6] 遗留（如实记载，未在本需求范围）
+  · **BUG-131（新登记）**：`/api/privilege/user/**` 用户管理端点**无管理员角色守卫**（只要求登录）
+    ⇒ 任意登录用户可调用 删除/改密/启停；实测 chenzhuo（普通角色）可成功调用 `PUT /status`（被保护规则拦下而已）。
+    既有 `AdminRoleGuard` 仅用于预设问题端点（T-10/R-08）。**本 spec 未修**（改守卫会波及既有全部用户管理端点，
+    属独立安全改造，建议另立）。
+  · `test01` 账号按用户裁定**暂时保留**（当前 3 个账号、均为启用状态）。
+
+[7] 结论：R-15 达成 —— 手机号（含片段）可搜；行级与批量启用/禁用可用且真实拦截登录；
+    自锁与失管两条保护生效；角色/组分配入口已收敛到编辑；无新增迁移件（台账 8 件不变）。

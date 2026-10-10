@@ -74,7 +74,10 @@ compose 已配 `restart: unless-stopped`，docker 引擎起来后栈通常**自�
 
 ## 国内源说明（默认全国内，无需配置）
 - 基础镜像：`mirrors.list` 三候选竞速（1ms.run/daocloud/dockerproxy），失稳时编辑该文件或 `--mirror` 指定
-- Maven=阿里云（`docker/maven/settings.aliyun.xml`，含 30s 超时加固）；npm=npmmirror；引擎安装=get.docker `--mirror Aliyun`
+- Maven=阿里云（`docker/maven/settings.aliyun.xml`，含 30s 超时加固）；npm=npmmirror
+- **引擎安装**：`get.docker.com` 的**安装脚本本体在境外**（`--mirror Aliyun` 只管 deb 包源）——受限网络拉不到时，
+  脚本会**自动回退**到 `docker-ce@mirrors.aliyun.com`（apt 全国内源，`lib/common.sh:phx_install_docker_aliyun`），
+  无需手工干预；真断网（离线机）请用 `install.sh --offline` + 包内 `engine/*.deb`
 - 海外环境：`package.sh --overseas` 一键切官方源
 
 ## 装完自检 / 日常体检
@@ -88,6 +91,7 @@ PHOENIX_COMPOSE_PROJECT=phx2 PHOENIX_HTTP_PORT=9180 sh verify.sh   # 指定项�
 | 症状 | 处置 |
 |---|---|
 | 拉镜像超时 | `mirrors.list` 换序或 `--mirror`；`docker info \| grep -A3 Mirrors` 核对 daemon 配置 |
+| 装引擎时卡 `get.docker.com`（SSL reset / 超时） | 已内置国内回退：日志会出现「get.docker.com 不可达（受限网络）——回退国内源 docker-ce@mirrors.aliyun.com」，等它装完即可；若回退也失败，看 `~/.phoenix/*.log` 里 apt 段报错 |
 | mvn/pnpm 阶段失败 | 看日志是否走 aliyun/npmmirror；内网仓传 `--build-arg MAVEN_SETTINGS=<路径>` |
 | `OSType: windows` | Windows 原生引擎跑不了 Linux 镜像——走 bootstrap.ps1 的 WSL2 路线 |
 | WSL 嵌套虚拟化不可用 | Server 是虚拟机的话，宿主机开嵌套虚拟化（此项无法脚本代劳） |

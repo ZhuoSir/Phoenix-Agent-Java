@@ -47,6 +47,9 @@ public class AgentChatController {
     private final GraphService graphService;
     private final HarnessChatService harnessChatService;
 
+    /** T-06：对话附件装配（两阶段方案 B）；attachmentIds 为空即短路，既有行为不变（共享面 S1'） */
+    private final com.phoenix.agent.harness.attachment.ChatAttachmentAssembler attachmentAssembler;
+
     /**
      * SSE 心跳保活间隔，防止长报告生成期间连接被空闲超时断开
      */
@@ -69,7 +72,12 @@ public class AgentChatController {
                 });
             }
             var userProfile = UserProfile.builder().sessionId(sessionId).userId(userId).groups(userGroups).email(loginVO.getEmail()).userCode(loginVO.getUserCode()).name(loginVO.getRealName()).build();
-            AgentInfoDto agentInfoDto = AgentInfoDto.builder().sn(request.getAgentSn()).userProfile(userProfile).message(request.getContent()).build();
+            // T-06（react 族接入）：附件装配异步（阶段1 调多模态模型），包一层 flatMapMany；
+            // attachmentIds 为空 ⇒ prepare 立即返回空上下文、enrich 原样返回 content ⇒ 行为逐字节不变（S1'）
+            return attachmentAssembler.prepare(request.getAttachmentIds(), userId).flatMapMany(ctx -> {
+            // streamCall 声明 checked Exception；lambda 内无法向外层 try 传播 ⇒ 就地转 Flux.error
+            try {
+            AgentInfoDto agentInfoDto = AgentInfoDto.builder().sn(request.getAgentSn()).userProfile(userProfile).message(attachmentAssembler.enrich(request.getContent(), ctx)).build();
             return agentManager.streamCall(agentInfoDto).map(output -> {
                         Map<String, Object> event = new LinkedHashMap<>();
                         event.put("content", "");
@@ -82,6 +90,10 @@ public class AgentChatController {
                         }
                         return event;
                     });
+            } catch (Exception e) {
+                return Flux.error(e);
+            }
+            });
         } catch (Exception e) {
             return Flux.error(e);
         }

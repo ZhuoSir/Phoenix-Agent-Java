@@ -1,0 +1,51 @@
+=== T-15 验收结论（菜单行删除件：两份基线 + 升级件）===
+日期: 2026-10-07 | 环境: Docker 内 pgvector/pg16（drill=phoenix_drill、洁净库=phoenix_fresh）
+
+[1] 两份基线文件各删 10 行（`sql/all_schema.sql`、`sql/all_data.sql`）
+  - `tbl_privilege_module` 4 行组织菜单：组织管理(2bafd881…) / 公司管理(90511f37…) /
+    部门管理(5db72850…) / 人员管理(8ec79aa5…)
+  - `tbl_privilege_acl` 4 行（release_id=428007432736870400、release_sn='role'，指向上述 4 菜单）
+  - `tbl_privilege_module` 2 行：「三方平台」(37def686…, /basic/platform-info) 与其父目录
+    「基础管理」(71b572d5…, /basic)
+  - 自查：6 个目标 id 在两文件中**残留 0**；`OrganizationManagement`/`CompanyManagement`/
+    `DepartmentManagement`/`EmployeeManagement`/`PlatformInfo`/`BasicManagement` 等 sn 字样亦为 0
+
+[2] **连带删除父目录「基础管理」的依据（实测，非推断）**
+  `select * from tbl_privilege_module where pid='71b572d5…'` 仅返回「三方平台」1 行（无软删子节点）
+  ⇒ 只删子菜单会在导航留下**空目录**；R-11 意图是平台配置整体下线，故一并删除（回滚件保真重建 2 行）。
+  「三方平台」「基础管理」**均无 ACL 行**（实测 0 行）；正向件仍带一句防御性 ACL 清理。
+
+[3] 新增升级件 + 回滚件（件数配对：正向 5 / 反向 5）
+  `sql/V2.0.0_05__three_party_menu_cleanup_dml.sql`
+  `sql/rollback/V2.0.0_05__three_party_menu_cleanup_dml_rollback.sql`（两行 INSERT ... ON CONFLICT DO NOTHING，
+    数据逐字取自 `sql/all_data.sql` 删除前的原始 INSERT 行）
+
+[4] 验证（真实输出，严格错误检测）
+  - drill 正反向（T-15_drill.txt 前半）：正向 ×2 幂等（第 2 次影响 0 行）→ 目标行 0；
+    反向 ×2 幂等 → 两行**保真恢复**（name/url/order_no/del_flag 逐列核对）
+  - **洁净库重放**（T-15_drill.txt 后半，phoenix_fresh 从零）：
+      `all_schema` exit=0 / ERROR 行 0 ；`all_data` exit=0 / ERROR 行 0
+      基线状态：active_menus=16、targets_left=**0**、active_acls=47
+      01→05 连跑 **两轮**：10 次执行全部 `exit=0` 且 `ERROR 行=0`
+      终态：active_menus=16、targets_left=**0**、org_tables_left=**0**、active_acls=21、
+            **零角色用户 0**
+      菜单表按名称复查（组织管理/公司管理/部门管理/人员管理/三方平台/基础管理）：**none**
+
+[5] **本轮抓到并修掉的既有缺陷：BUG-127（P2，已修复 v2.0.0）**
+  `sql/all_data.sql` 的 `DROP TABLE` 会连带删除被 `OWNED BY` 的序列，导致随后
+  `CREATE TABLE ... DEFAULT nextval(...)` 报 `relation "tbl_data_categories_id_seq" does not exist`；
+  `ON_ERROR_STOP=1` 下整份导入在 line 1597 中止，**其后的菜单/授权/用户 INSERT 全部未载入**。
+  受影响 5 张表。已用**纯 git 原版文件 + 干净库**隔离对照确认**既有**（非本 spec 引入）。
+  修复：在 5 处 `DROP TABLE` 与 `CREATE TABLE` 之间插入 `CREATE SEQUENCE IF NOT EXISTS`。
+  修复后坏表也拿到数据（categories=5 / tmp_orders=10）。
+
+[6] **勘误（自我纠正，不静默）**
+  T-14 首轮「全新库重放 all_data 0 error」系**假绿**：当时用 `grep -icE "^error|fatal"`，
+  而 psql 输出行首为 `psql:<stdin>:NNN: `，模式永远匹配不到；真实情况是 BUG-127 导致中止。
+  已在 `evidence/T-14_result.txt` 追加勘误段，并记 **L-50**（错误断言必须匹配真实输出格式 + 同时看退出码）。
+
+[7] **延期至 T-16**
+  「导航中不再出现组织管理/三方平台」（浏览器侧）需对已部署实例断言 ⇒ 随 T-16。
+
+[8] 结论：T-15 完成件与基线面（两文件各清 10 行、新增 05 件与其回滚、洁净库重放全绿）；
+    浏览器侧导航断言挂 T-16 ⇒ **T-15 暂不勾选**。

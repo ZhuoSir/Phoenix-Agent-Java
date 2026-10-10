@@ -1,0 +1,48 @@
+=== T-09 验收结论（组侧技能/MCP 关联补齐 + 组授权读侧 del_flag 统一 / R-04 / BUG-121）===
+日期: 2026-10-07 | 后端 JDK 23 + Maven 3.8.6 + .mvn-home；前端 node v24.21.0
+
+[1] 组侧技能/MCP 关联补齐（此前只有资源侧单向入口）
+  新增后端 8 文件：
+    - dto：SkillIdsDTO（List<Long>）· McpIdsDTO（List<String>）—— 镜像 KbaseIdsDTO
+    - service：GroupSkillInfoService · GroupMcpInfoService
+      impl：GroupSkillInfoServiceImpl · GroupMcpInfoServiceImpl（差集幂等：撤=逻辑删、增=新插入）
+    - controller：GroupSkillController(/platform/group-skill) · GroupMcpController(/platform/group-mcp)
+      各 3 端点：PUT /{groupId}/assign（全量替换）· GET /{groupId}/skills|mcps（回显）·
+      GET /skill/{id}/groups 与 /mcp/{id}/groups（反向回显）
+  新增前端 4 文件 + 接线：
+    - api/core/group-skill.ts · group-mcp.ts（并在 api/core/index.ts 导出）
+    - views/account/group-info/assign-skill-form.vue · assign-mcp-form.vue（同构 assign-kbase-form）
+    - group-info/index.vue：新增「分配技能」「分配 MCP」两个动作 + 两个 modal 挂载
+  ⇒ 组管理页现在四类资源（智能体/知识库/技能/MCP）均可增删。
+
+[2] 组授权读侧 del_flag 统一（BUG-121；**定向方案**，不全局改 BaseModel）
+  - `GroupMcpInfo.delFlag` 补 `@Column(isLogicDelete = true)`（与 GroupSkillInfo 对齐）
+  - 显式补 `del_flag = 0`：GroupAgentInfoServiceImpl 4 处、AccountGroupInfoServiceImpl 3 处 + join 查询、
+    GroupInfoServiceImpl 3 处
+  - **未做**：给 `BaseModel` 全局补 isLogicDelete（影响 10 个实体、语义未逐表核验）⇒ 已登记 **BUG-125** 建议另立 spec
+
+[3] 实测影响面（T-09_delflag-impact.txt，活库）
+  表                                 active  tombstone   本次变化
+  tbl_platform_group_agent_info           4        0      无
+  tbl_platform_account_group_info         1        0      无
+  tbl_platform_group_info                 1        0      无
+  tbl_platform_group_kbase_info           3        2      **排除 2 行**（已撤销授权，原是"仍可见"真因）
+  tbl_platform_group_skill_info           5        6      本就过滤（实体已声明）
+  tbl_platform_group_mcp_info             1        5      **排除 5 行**
+  ⇒ 行为变化精确落在有墓碑的表上，无墓碑表零变化（回归风险可控）。
+
+[4] 验证（真实输出）
+  - 后端：mvn clean compile → **BUILD SUCCESS，ERROR=0**（T-09_compile.raw.txt）
+  - 前端：pnpm typecheck → **211**（与 T-08 后基线**完全一致，零新增**；
+    唯一命中 `api/core/index.ts(31,1)` 的 TS2308 为**既有**歧义导出，非本次引入）
+
+[5] **延期至 T-16（明确记载）**
+  R-04 的运行期断言（组管理页对四类资源增删 → 前台该组用户即时可见/不可见；撤销后即时不可见）
+  需对**已部署**实例执行 ⇒ **T-09 暂不勾选**，待 T-16 通过后勾选。
+
+[6] 附：API 载荷与既有资源侧入口的关系
+  资源侧 `PUT /api/skill/{id}/groups`（SkillPublishDTO.groupIds）与 `PUT /api/mcp/{id}/groups`
+  仍保留；组侧与资源侧操作同一张表、互为反向视图，最终集合一致（组侧为差集逻辑删，
+  资源侧 MCP 为物理删后重建 —— 语义等价，均有幂等保证）。
+
+[7] 结论：T-09 代码面完成（后端编译绿 + 前端零新增类型错误 + 影响面已量化）；运行期断言挂 T-16。

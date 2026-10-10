@@ -1,0 +1,51 @@
+=== T-02 验证结论：附件上传端点 + 存储落盘 + V2.0.0_15 ===
+日期: 2026-10-08 | 分支: feature/chat-attachment-understanding | 关联: R-01/R-02/R-03/R-04
+账号: **chenzhuo（非超管）**——按 L-65 要求用非超管账号实测；登录态经 phoenix-token 反查（不在弹性线程取 Sa-Token）
+
+--- ① SQL V2.0.0_15（只 DDL，CR-01 裁定：不插模型行）---
+  drill: 正向×2 exit=0 / 反向 exit=0（表消失）/ 再正向 exit=0；自检「表已建 / 索引 2 个 / uploader_id NOT NULL」
+  活库: migrator 应用成功，台账 **15 件**；pg_indexes 对该表 = 3（2 索引 + 主键）
+  结构: 无 del_flag（plan 决策4，避 L-21）、无外键（沿用项目风格）
+
+--- ② 白名单双判定（R-01/R-02）---
+  合法文档: sample.docx ✅ / sample.pdf ✅ / sample.xlsx ✅ / sample.txt ✅ / sample.md ✅（修复后）
+  合法图片（一次 5 个 = 数量上限）: png/jpg/webp/bmp/gif **全部 accepted=5** ✅
+  mime 留痕（DB 实读）: md → text/x-web-markdown；docx → application/vnd.openxmlformats-...wordprocessingml.document；txt → text/plain
+  非法（R-03 单独指明、不整批静默失败）:
+    sample.zip → rejected「不支持的文件类型：仅支持文档（word/pdf/excel/txt/md）与常见图片格式…」✅
+    sample.svg → rejected 同上（.svg 刻意排除）✅
+    **fake.txt（PE 头伪装 .txt）→ rejected「文件内容与扩展名不符（检测类型：application/x-msdownload）」** ✅ 双判定生效
+    empty.txt → rejected「文件内容为空」✅
+
+--- ③ 限制（R-04）---
+  big.txt (21MB) → rejected「文件超过大小上限 20MB」✅（DataBufferUtils.join 限流，未打爆内存）
+  一次 6 个 → HTTP 200 **success=false** message「单次最多上传 5 个附件（当前 6 个）」✅ 提示含上限值
+  断言口径按 L-26：全部**断业务字段**（success / accepted / rejected），不以 HTTP 200 判通过
+
+--- ④ 脏行与落盘 ---
+  拒绝类上传前后附件行数 9 → 9 ✅ **无脏行**（R-03：不落库不落盘）
+  落库正确性: 行数 9；**uploader 全为 chenzhuo**=true；kind 分布 DOCUMENT,IMAGE；ext=bmp,docx,gif,jpg,pdf,png,txt,webp,xlsx
+  伪装 exe 是否入库: 0 行 ✅；storage_path 全部在 chat-attachments 下=true ✅
+  落盘实测（容器内）: `uploads/data-agent/chat-attachments/*`（存储根带 data-agent 前缀）——12 个文件实在 ✅
+
+--- ⑤ 对面断言（共享面 S4 / S7，防"修 A 死 B"）---
+  S4 `POST /api/upload/avatar`（既有 image-only 上传）→ HTTP 200 `{'success': True, 'message': '上传成功',
+     'url': '/uploads/data-agent/avatars/<uuid>.png'}` ✅ 未被新子目录影响；avatars 目录 10 个文件独立存在 ✅
+  S7 `POST /api/skill/upload`（既有上传路由）→ HTTP 200 success=True id=25 ✅ 无路由冲突；随后 DELETE 清理 → 200 ✅
+
+--- ⑥ 过程中的两个自我纠错（如实留痕）---
+  1) **.md 首轮被误拒**：Tika 3.x 实测给 `text/x-web-markdown`，我的白名单只写了 text/plain|text/markdown|text/x-webview
+     ⇒ 补 `text/x-web-markdown` 后复验 accepted ✅（属我自己的实现缺陷，验证阶段发现并修，按 skill §5 不登记 BUG）
+  2) **首轮"落盘文件数 0"是我查错目录**：真实存储根为 `uploads/data-agent/`（avatar 的 url 已暴露该前缀），
+     我按 `uploads/chat-attachments` 查 ⇒ 假信号。改用 `find uploads -path "*chat-attachments*"` 后实测 12 个文件 ✅
+  3) **一次"改了但没改"的险情**：用 python heredoc 改白名单时脚本 SyntaxError（跨行单引号），
+     修改**未落盘**，但 `mvn package` 仍 exit=0（源码未变）⇒ 差点把旧行为当新版本部署验证。
+     处置：构建前 **grep 断言修改已落盘**（命中 2 处）再打包。已记教训 **L-75**。
+
+--- ⑦ 复原基线（L-60）---
+  删除验证产生的附件行 + `find … -delete` 清理落盘文件 ⇒ 附件行数 **0**（= 基线）、chat-attachments 残留 **0** ✅
+  （首轮清理曾用错路径 rm -rf uploads/chat-attachments，故残留 9 文件；复验轮已按正确路径清空）
+
+--- ⑧ 未覆盖项（如实报，不虚报）---
+  真实 `.doc` / `.xls`（OLE2 旧格式）**未取到样本**，白名单已含 `application/msword`、`application/vnd.ms-excel`、
+  `application/x-tika-msoffice`，待现场样本验证；本结论不声称已验证。

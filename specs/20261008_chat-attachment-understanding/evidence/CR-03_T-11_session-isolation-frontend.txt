@@ -1,0 +1,26 @@
+=== CR-03 / T-11 验证结论：三端传 scope（前端）===
+日期: 2026-10-09 | 档: major | 关联: R-13/R-12
+
+--- 改动面 ---
+  admin api/core/chat.ts：8 个会话函数加**可选** scope（不传=不发参数，后端默认 FRONT_CHAT ⇒ 旧调用零破坏）
+  admin 运行页 index.vue + ChatSessionSidebar.vue：全部会话调用点传 SESSION_SCOPE='ADMIN_RUN'
+    （列表/创建/消息读/消息写×9/pin/rename/delete/清空）
+  admin 前台 api/front/chat.ts：模块内固定 SESSION_SCOPE='FRONT_CHAT'（5 处）；transport createSession 显式传
+  mobile services/chat.ts：7 处 URL 拼 scope=FRONT_CHAT（http 助手无 params 通道）
+
+--- 验证 ---
+  typecheck 增量 0：admin **203=基线** / mobile **11=基线** ✅
+  构建：admin build exit=0、mobile vite build exit=0；nginx 三段证明 build/up/healthy；/ 与 /m/ 200
+  **浏览器网络抓包（真实 UI，非 curl）**：
+    运行页 → GET /api/agent/41/sessions?scope=ADMIN_RUN 200（解码 309B）
+             GET /api/sessions/{id}/messages?scope=ADMIN_RUN 200
+    前台   → GET /api/agent/41/sessions?scope=FRONT_CHAT 200（解码 2360B，**与运行页集合不同**）
+             GET /api/sessions/{id}/messages?scope=FRONT_CHAT 200
+    运行页加载时自动新建的会话落 ADMIN_RUN；用户真实会话 e5003de2 落 FRONT_CHAT ✅
+  线上/产物 bundle 断言（**纠正 2026-10-09 首版错误断言**：minify 后 "scope=FRONT_CHAT" 不连续、
+    admin 入口 html 不直接引用懒加载 chunk，首版两条 grep 写法错误返回 0，已改用正确字面量重查）：
+    mobile 线上 /m/assets/index-*.js：FRONT_CHAT=1、"?scope="=1 ✅
+    admin 产物 chunk：ChatSessionSidebar-*.js 与 run-*.js 含 ADMIN_RUN=1；chat-*.js（前台）含 FRONT_CHAT=1 ✅
+
+--- 对面断言 ---
+  不传 scope 的旧客户端 ⇒ 后端默认 FRONT_CHAT（T-10 兼容断言已绿）；SSE/附件/标题不受影响（T-10 已验）

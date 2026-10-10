@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 import org.springframework.beans.BeanUtils;
 
 import java.util.Date;
+import java.util.List;
 
 @Data
 @NoArgsConstructor
@@ -22,11 +23,6 @@ public class PrivilegeUserDTO {
 	}
 
 	private String id;
-
-	/** 人员ID */
-	private String employeeId;
-
-	private String code;
 
 	private String realName;
 
@@ -44,16 +40,6 @@ public class PrivilegeUserDTO {
 
 	private byte[] image;
 
-	private String companyId;
-
-	private String deptId;
-
-	private String itUserId;
-
-	private String itUserName;
-
-	private Integer isLeader;
-
 	private Integer sex;
 
 	private String address;
@@ -70,7 +56,14 @@ public class PrivilegeUserDTO {
 
 	private Integer pwdInit;
 
-	private Integer userType;
+	/**
+	 * R-03（v2.0.0）：创建/更新时一并授予的角色 id 集合。
+	 * null = 不改动（更新场景）；空列表 = 清空；创建时为空则走默认角色兜底。
+	 */
+	private List<String> roleIds;
+
+	/** R-03（v2.0.0）：创建/更新时一并加入的组 id 集合。null = 不改动；空列表 = 清空。 */
+	private List<String> groupIds;
 
 	private String keyword;
 

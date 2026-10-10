@@ -1,0 +1,30 @@
+=== T-25 验证（BUG-135 收尾：补齐 system_id/category_id + 一次误报的排查）===
+日期: 2026-10-07 | 升级件 V2.0.0_11（+rollback，配对 11/11）
+
+[1] 变更：把「存活但 system_id/category_id 为空」的 5 个菜单补成全站统一值 110/111
+    （MCP / 技能管理 / 插件管理 / 智能体中心 / 知识库；不写死 id、幂等、软删不动）
+
+[2] 惰性证明（补值前实测，兑现"不改鉴权语义"）
+    · 登录菜单树 LoginServiceImpl:133 用 privilegeModuleService.list()，不按 system_id 过滤
+    · 角色授权树 / 菜单管理页 getModuleTreeApi() 不带 systemId → tree(null) 不过滤
+    · getBySystemId / /module/system/{id} 硬过滤端点：前端零调用方
+    · category_id：后端零引用
+    ⇒ 两列对可见性/鉴权均无作用路径
+
+[3] drill：正向补齐(空值 5→0) → 幂等再跑 → 反向复原 5 → 再正向，全 exit=0
+    活库：migrator 应用 V2.0.0_11，台账 11 件，自检「system_id/category_id 空 0 个」
+    活库终态：5 菜单均 system_id=110 / category_id=111 / state=31
+
+[4] 一次误报与排查（重要，记 L-60）
+    补值后回归发现 chenzhuo 菜单 7→8，一度以为 V2.0.0_11 动了鉴权。
+    实测根因：**不是** system_id —— 是我 T-23/T-24 的"勾选→还原"闭环测试，
+    "还原"只把 acl_state 置 0、**没删授权行**；而登录可见性判据是"存在 ACL 行即可见"，
+    于是 技能管理/请求管理 两条 state=0 的残留行使 chenzhuo 多看 1 个菜单。
+    处置：按行 id 删除这 2 条我造的残留（create_by=admin、非 V2.0.0_04 来源），
+    普通角色 ACL 回到 7 条（全 31、全 V2.0.0_04）。备份 /tmp/acl_residue_backup.json。
+
+[5] 最终回归（清理后）
+    · chenzhuo 可见菜单 = 7 ✅（智能体管理/列表/编辑/对话、个人中心、智能体中心、知识库）
+    · admin 可见菜单 = 19 ✅
+    · 授权树 技能管理/插件管理/MCP/知识库 各 pvalues=5 ✅（BUG-135 主修复仍生效）
+    · 8090 首页 200；后端 0 ERROR

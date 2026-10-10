@@ -6,6 +6,8 @@ export interface GraphRequest {
   humanFeedbackContent?: string;
   rejectedPlan: boolean;
   nl2sqlOnly: boolean;
+  /** 对话附件 id（chat-attachment-understanding T-07；可选，不传即后端短路） */
+  attachmentIds?: number[];
 }
 
 export interface ConfirmButton {
@@ -58,6 +60,8 @@ export interface HarnessChatRequest {
   harnessSn?: string;
   /** 显式执行的技能 id（由前台/运行页技能区传入） */
   enabledSkillIds?: number[];
+  /** 对话附件 id（chat-attachment-understanding T-07；可选，不传即后端短路） */
+  attachmentIds?: number[];
 }
 
 const API_BASE_URL = ''; // BL-18: 拼接串已含 /api 真实前缀
@@ -67,6 +71,8 @@ export interface ChatApiRequest {
   content: string;
   agentSn: string;
   type: string;
+  /** 对话附件 id（chat-attachment-understanding T-07；可选，不传即后端短路） */
+  attachmentIds?: number[];
 }
 
 export function streamChat(

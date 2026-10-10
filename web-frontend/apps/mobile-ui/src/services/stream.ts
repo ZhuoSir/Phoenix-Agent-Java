@@ -1,4 +1,7 @@
-const API_BASE_URL = import.meta.env.VITE_GLOB_API_URL || '/api';
+// BUG-154 修复：用 `??` 而非 `||` —— **空串是合法配置**（生产 nginx 不剥层，基址须为空），
+// 而 `||` 会把空串当 falsy 兜回 '/api'，导致 /auth/login→/api/auth/login(404)、
+// stream→/api/api/...(撞 nginx 410 止血块)。dev 仍配 '/api'（vite proxy 会剥一层），语义不变。
+const API_BASE_URL = import.meta.env.VITE_GLOB_API_URL ?? '';
 const TOKEN_KEY = 'mobile-ui:auth:token';
 const USER_KEY = 'mobile-ui:auth:user';
 
@@ -22,6 +25,9 @@ export interface FrontChatStreamRequest {
   content: string;
   agentSn: string;
   type: string;
+
+  /** 对话附件 id（chat-attachment-understanding T-08；可选，不传即后端短路） */
+  attachmentIds?: number[];
 }
 
 export interface ConfirmButton {
@@ -132,6 +138,9 @@ export interface FrontHarnessChatRequest {
   sessionId: string;
   message: string;
   harnessSn: string;
+
+  /** 对话附件 id（chat-attachment-understanding T-08；可选，不传即后端短路） */
+  attachmentIds?: number[];
 }
 
 export interface FrontHarnessConfirmRequest {

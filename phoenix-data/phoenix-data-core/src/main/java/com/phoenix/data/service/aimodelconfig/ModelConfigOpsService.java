@@ -2,6 +2,7 @@ package com.phoenix.data.service.aimodelconfig;
 
 import com.phoenix.data.dto.ModelConfigDTO;
 import com.phoenix.data.entity.ModelConfig;
+import com.phoenix.data.enums.ModelProvider;
 import com.phoenix.data.enums.ModelType;
 import com.phoenix.data.event.AiModelConfigChangedEvent;
 import com.phoenix.data.exception.InvalidInputException;
@@ -25,6 +26,13 @@ import tools.jackson.databind.ObjectMapper;
 @Transactional(rollbackFor = Exception.class)
 @AllArgsConstructor
 public class ModelConfigOpsService {
+
+	/** R-09：模型配置变更时让向量维度缓存失效 */
+	@org.springframework.beans.factory.annotation.Autowired
+	private EmbeddingDimensionResolver embeddingDimensionResolver;
+
+	@org.springframework.beans.factory.annotation.Autowired
+	private OllamaApiClient ollamaApiClient;
 
 	private final org.springframework.context.ApplicationEventPublisher eventPublisher;
 
@@ -87,8 +95,8 @@ public class ModelConfigOpsService {
 			throw new InvalidInputException("配置不存在");
 		}
 		if (modelConfigDataService.isDefaultConfig(id)) {
-			throw new InvalidInputException("该模型是「" + entity.getModelType().getCode()
-					+ "」类型的默认模型，请先将其他模型设为默认后再停用");
+			throw new InvalidInputException("该模型是「" + entity.getModelType().getLabel()
+					+ "」类型当前的默认模型，需先启用另一条同类型模型并设为默认，或直接删除本行，之后才能停用");
 		}
 		modelConfigDataService.deactivateConfig(id);
 		// 先落库后刷新：否则重建时仍会读到旧状态
@@ -132,6 +140,8 @@ public class ModelConfigOpsService {
 	 * 刷新内存中的模型实例（清空注册中心的缓存）
 	 */
 	private void refreshMemoryModel(ModelType type) {
+		// R-09：任何模型配置变更后，维度缓存必须失效（含 EMBEDDING 默认/启停/更新）
+		embeddingDimensionResolver.invalidate();
 		if (ModelType.CHAT.equals(type)) {
 			aiModelRegistry.refreshChat();
 		}
@@ -140,6 +150,12 @@ public class ModelConfigOpsService {
 		}
 		else if (ModelType.AUDIO.equals(type)) {
 			aiModelRegistry.refreshTranscription();
+		}
+		else if (ModelType.MULTIMODAL.equals(type)) {
+			// T-03：data 域注册中心（AiModelRegistry）只构建 Chat/Embedding/Transcription，
+			// **不构建多模态实例** ⇒ 此处无缓存可清；agent 域由 publishChanged 事件触发
+			// AiModelConfigChangeListener → HarnessModelRegistry.refreshMultimodal()。
+			log.debug("MULTIMODAL 配置变更：data 域无内存实例需刷新（agent 域由事件刷新）");
 		}
 		else {
 			throw new RuntimeException("未知的模型类型: " + type);
@@ -193,11 +209,22 @@ public class ModelConfigOpsService {
 		String modelType = config.getModelType();
 
 		try {
+			// R-04：provider=ollama 走**原生** /api/tags 探针（既有分支走 OpenAI 兼容协议，路径不同）
+			if (ModelProvider.OLLAMA.getCode().equalsIgnoreCase(config.getProvider())) {
+				testOllamaConnection(config);
+				return;
+			}
 			if (ModelType.CHAT.getCode().equalsIgnoreCase(modelType)) {
 				testChatModel(config);
 			}
 			else if (ModelType.EMBEDDING.getCode().equalsIgnoreCase(modelType)) {
 				testEmbeddingModel(config);
+			}
+			else if (ModelType.MULTIMODAL.getCode().equalsIgnoreCase(modelType)) {
+				// BUG-159：多模态模型与 CHAT 同为 OpenAI 兼容 chat 端点（差异在能否吃图），
+				// 连接测试复用最轻量 chat 探针验证 base_url / key / model 可达；视觉能力不在本探针范围
+				log.info("Testing Multimodal Model connection (reuse chat probe), modelName: {}", config.getModelName());
+				testChatModel(config);
 			}
 			else {
 				throw new IllegalArgumentException("未知的模型类型: " + modelType);
@@ -214,6 +241,33 @@ public class ModelConfigOpsService {
 			// 如果是 OpenAiHttpException，通常包含具体的 API 错误信息
 			throw new RuntimeException(parseErrorMessage(e));
 		}
+	}
+
+	/**
+	 * R-04：Ollama 连接测试 —— 走原生 {@code /api/tags} 探活，并**校验所配模型确实已安装**。
+	 *
+	 * <p>失败信息必须可据以定位（地址不通 / 服务异常 / 模型未安装并列出本机已装模型）。
+	 */
+	private void testOllamaConnection(ModelConfigDTO config) {
+		java.util.List<String> models = ollamaApiClient.listModels(config.getBaseUrl());
+		String name = config.getModelName() == null ? "" : config.getModelName().trim();
+		boolean installed = models.stream().anyMatch(m -> m.equals(name) || m.startsWith(name + ":"));
+		if (!installed) {
+			throw new InvalidInputException("Ollama 服务可达，但未安装模型「" + name + "」（本机已装: "
+					+ String.join(", ", models) + "）");
+		}
+		log.info("Ollama 连接测试通过: modelType={}, endpoint={}, model={}", config.getModelType(),
+				config.getBaseUrl(), name);
+	}
+
+	/**
+	 * R-05：列出 Ollama 本机模型（服务端代理，前端不直连内网/宿主地址）。
+	 */
+	public java.util.List<String> listOllamaModels(String baseUrl) {
+		if (!org.springframework.util.StringUtils.hasText(baseUrl)) {
+			throw new InvalidInputException("baseUrl 不能为空");
+		}
+		return ollamaApiClient.listModels(baseUrl);
 	}
 
 	/**

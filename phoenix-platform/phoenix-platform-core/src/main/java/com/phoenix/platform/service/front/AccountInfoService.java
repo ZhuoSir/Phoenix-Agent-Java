@@ -4,7 +4,6 @@ import com.mybatisflex.core.paginate.Page;
 import com.mybatisflex.core.service.IService;
 import com.phoenix.data.entity.Agent;
 import com.phoenix.platform.dto.front.AccountLoginDTO;
-import com.phoenix.platform.dto.front.ThirdPartyLoginDTO;
 import com.phoenix.platform.dto.front.UpdatePwdDTO;
 import com.phoenix.platform.model.front.AccountInfo;
 import com.phoenix.tools.vo.ReturnVo;
@@ -23,13 +22,9 @@ public interface AccountInfoService extends IService<AccountInfo> {
 
 	AccountInfo getByCode(String code);
 
-	AccountInfo getByThirdPartyId(String thirdPartyId);
-
 	List<AccountInfo> getByStatus(String status);
 
 	ReturnVo<LoginVO> login(AccountLoginDTO loginDTO);
-
-	ReturnVo<LoginVO> thirdPartyLogin(ThirdPartyLoginDTO loginDTO);
 
 	/**
 	 * 登录后 - 修改密码

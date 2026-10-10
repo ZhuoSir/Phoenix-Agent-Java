@@ -21,7 +21,10 @@ public interface SkillAdminService {
     /**
      * 技能分页列表（管理视角全量，keyword 匹配名称/描述）。
      */
-    ReturnVo<Page<SkillListVO>> page(String keyword, String status, int pageNum, int pageSize);
+    ReturnVo<Page<SkillListVO>> page(String keyword, String status, int pageNum, int pageSize, String ownerId);
+
+    /** R-18（CR-01/T-25）：取技能创建人 id（controller 归属校验用）；不存在返回 null。 */
+    String getCreatorById(Long id);
 
     /**
      * 技能详情：SKILL.md 正文 + 资源清单。
@@ -33,7 +36,7 @@ public interface SkillAdminService {
      * 同名且未指定 overwrite → 冲突错误；overwrite=true 覆盖更新并回到草稿态。
      * @return 技能 id
      */
-    ReturnVo<Long> upload(MultipartFile file, boolean overwrite);
+    ReturnVo<Long> upload(MultipartFile file, boolean overwrite, String operator);
 
     /**
      * 发布：置 published 并覆盖式设置授权组（groupIds 可为空=仅后台可见）。
@@ -53,7 +56,7 @@ public interface SkillAdminService {
     /**
      * 智能体编辑页技能可选池：已发布技能 + 该智能体已绑定但已下线的技能（bound=true、status=draft 供灰显）。
      */
-    ReturnVo<List<AgentSkillOptionVO>> options(Long agentId);
+    ReturnVo<List<AgentSkillOptionVO>> options(Long agentId, String viewerId, boolean superAdmin);
 
     /**
      * 智能体已绑定技能 id 列表（编辑页回显）。

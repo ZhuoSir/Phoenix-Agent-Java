@@ -1,0 +1,48 @@
+=== T-21 部署验证（R-15：手机号搜索 / 启用禁用 / 批量 / 分配权限收敛到编辑）===
+时间: 2026-10-07 | 入口: http://localhost:8090 | 迁移台账: 仍 8 件（R-15 无新迁移件）
+
+--- ⓪ 登录取 token ---
+  admin token: True / chenzhuo token: True
+
+--- ① 手机号搜索（keyword = 手机号）---
+  keyword=18515422024  → HTTP 200 命中=[] ❌
+  keyword=18900002345  → HTTP 200 命中=[] ❌
+  keyword=1850000000   → HTTP 200 命中=[] ❌
+  keyword=chenzhuo     → 命中=['chenzhuo'] ✅
+  keyword=陈卓           → 命中=[] ❌
+
+--- ② 行级禁用/启用（用 test01 实测，admin 不动）---
+  PUT /status {test01, status=1} → HTTP 200 success=True data=True
+  禁用后：test01 登录探测 = 「用户已被禁用」✅（禁用闸门生效，先于口令校验）
+  PUT /status {test01, status=0} → HTTP 200 success=True
+  启用后：test01 登录探测 = 「密码错误」✅（回到口令校验）
+
+--- ③ 批量启用/禁用 ---
+  batch disable → HTTP 200 success=True 更新行数=1
+  batch enable  → HTTP 200 success=True 更新行数=1
+  空 ids → success=False msg=请先勾选账号 ✅
+
+--- ④ 保护①：禁止操作当前登录账号本人 ---
+  admin 禁用自己 → success=False msg=不能对当前登录账号执行启用/禁用操作 ✅
+  admin 批量含自己 → success=False msg=所选账号包含当前登录账号，请取消后再操作 ✅
+  库内 admin.status = 0（应仍为 0）
+
+--- ⑤ 保护②：禁止禁用最后一个启用的超管 ---
+  chenzhuo 试图禁用 admin（唯一超管）→ success=False msg=系统必须保留至少一个启用的超管账号 ✅
+  （注：该调用同时暴露「用户管理端点未做 admin 角色守卫」——见结论遗留项）
+
+--- ⑥ 终态：三个账号均为启用 ---
+ username | status 
+----------+--------
+ admin    |      0
+ chenzhuo |      0
+ test01   |      0
+(3 rows)
+
+--- ⑦ 前端产物（已部署 dist）---
+  含「批量禁用」的 chunk: agent-create-drawer-4GzkTApf.js, PromptConfig-lvOz-ap3.js, account-B8Hmd-1M.js
+  含「用户名 / 姓名 / 手机号」提示的 chunk: form-BeF54sil.js
+  仍含「分配权限」的 chunk（应为角色/菜单页）: menu-management-B8Aw2fcf.js, role-k8BAkewn.js
+
+--- ⑧ 部署后后端 ERROR 行数 ---
+  ERROR 行数: 0

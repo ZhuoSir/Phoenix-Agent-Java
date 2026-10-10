@@ -11,9 +11,4 @@ import java.util.List;
 @Mapper
 public interface PrivilegeRoleMapper extends BaseMapper<PrivilegeRole> {
 
-	List<PrivilegeRole> selectPageByQuery(@Param("dto") PrivilegeRoleDTO dto, @Param("limit") long limit,
-			@Param("offset") long offset);
-
-	long countPageByQuery(@Param("dto") PrivilegeRoleDTO dto);
-
 }

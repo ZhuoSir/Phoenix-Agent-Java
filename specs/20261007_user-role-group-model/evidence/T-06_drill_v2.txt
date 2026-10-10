@@ -1,0 +1,74 @@
+=== T-06 演练 v2（干净基线：由全量备份重建 phoenix_drill，2026-10-07 17:12:27）===
+
+[0] 基线
+  [统计] menu_active=27  acl_active=61  acl_tomb=14  admin_ok=24  common_ok=1  zero_role=2  org_menu=4  dirty_mod=30  dirty_role=36  dup=0
+
+[1] V2.0.0_02 补角色
+psql:<stdin>:71: NOTICE:  [V2.0.0_02] 补角色完成：待补 2 人 / 实际写入 2 行（角色 431285032083144704 / 普通角色）
+psql:<stdin>:86: NOTICE:  [V2.0.0_02] 自检通过：存活用户无角色数 = 0
+  [统计] menu_active=27  acl_active=61  acl_tomb=14  admin_ok=24  common_ok=1  zero_role=0  org_menu=4  dirty_mod=30  dirty_role=36  dup=0
+
+[2] V2.0.0_03 组织菜单清理
+psql:<stdin>:56: NOTICE:  [V2.0.0_03] 自检通过：组织菜单与其授权行均为 0
+DELETE 4
+DELETE 4
+DELETE 0
+DELETE 0
+  [统计] menu_active=23  acl_active=57  acl_tomb=14  admin_ok=20  common_ok=1  zero_role=0  org_menu=0  dirty_mod=30  dirty_role=36  dup=0
+
+[3] V2.0.0_04 ACL 基线重建
+psql:<stdin>:138: NOTICE:  [V2.0.0_04] 基线重建完成：存活菜单 23；目标对 30；超管 23；普通角色 7（角色 428007432736870400 / 431285032083144704）
+psql:<stdin>:155: NOTICE:  [V2.0.0_04] 终检通过：无「可用菜单为 0」的角色
+INSERT 0 36
+DELETE 36
+  [统计] menu_active=23  acl_active=30  acl_tomb=14  admin_ok=23  common_ok=7  zero_role=0  org_menu=0  dirty_mod=0  dirty_role=0  dup=0
+
+[3b] 普通角色最终可见菜单
+psql: warning: extra command-line argument "" ignored
+ERROR:  syntax error at or near "-"
+LINE 1: -c
+        ^
+    name    |       url       
+------------+-----------------
+ 智能体中心 | #/front/chat
+ 智能体管理 | /agent-manager
+ 智能体列表 | /agent/list
+ 智能体编辑 | /agent/:id
+ 智能体对话 | /agent/:id/run
+ 知识库     | /knowledge-base
+ 个人中心   | /profile
+(7 rows)
+
+
+[4] 幂等复跑 02/03/04
+psql:<stdin>:71: NOTICE:  [V2.0.0_02] 补角色完成：待补 0 人 / 实际写入 0 行（角色 431285032083144704 / 普通角色）
+psql:<stdin>:86: NOTICE:  [V2.0.0_02] 自检通过：存活用户无角色数 = 0
+psql:<stdin>:56: NOTICE:  [V2.0.0_03] 自检通过：组织菜单与其授权行均为 0
+psql:<stdin>:41: NOTICE:  relation "tbl_privilege_acl_bak_v200" already exists, skipping
+psql:<stdin>:138: NOTICE:  [V2.0.0_04] 基线重建完成：存活菜单 23；目标对 30；超管 23；普通角色 7（角色 428007432736870400 / 431285032083144704）
+psql:<stdin>:155: NOTICE:  [V2.0.0_04] 终检通过：无「可用菜单为 0」的角色
+  三件复跑无错
+  [统计] menu_active=23  acl_active=30  acl_tomb=14  admin_ok=23  common_ok=7  zero_role=0  org_menu=0  dirty_mod=0  dirty_role=0  dup=0
+
+[5] 回滚 04（预期：admin_ok=20 common_ok=1 acl_active=57 脏数据 30/36 还原）
+psql:<stdin>:31: ERROR:  duplicate key value violates unique constraint "idx_tbl_privilege_acl_release_module"
+DETAIL:  Key (release_id, module_id)=(428007432736870400, 02b733aa08774219a23c2f21f1b3f6b5) already exists.
+CONTEXT:  SQL statement "INSERT INTO tbl_privilege_acl
+    SELECT (jsonb_populate_record(NULL::tbl_privilege_acl, b.row_json)).*
+      FROM tbl_privilege_acl_bak_v200 b
+    ON CONFLICT (id) DO NOTHING"
+PL/pgSQL function inline_code_block line 10 at SQL statement
+  [统计] menu_active=23  acl_active=30  acl_tomb=14  admin_ok=23  common_ok=7  zero_role=0  org_menu=0  dirty_mod=0  dirty_role=0
+
+[6] 回滚 03 → 预期 menu=27 org_menu=4 acl_active=61
+psql:<stdin>:50: NOTICE:  [V2.0.0_03-rollback] 自检通过：菜单 4 行 + 授权 4 行已恢复
+  [统计] menu_active=27  acl_active=34  acl_tomb=14  admin_ok=27  common_ok=7  zero_role=0  org_menu=4  dirty_mod=0  dirty_role=0
+
+[7] 回滚 02 → 预期 zero_role=2（回到原始基线）
+psql:<stdin>:19: NOTICE:  [V2.0.0_02-rollback] 已撤销 2 行补角色关系
+  [统计] menu_active=27  acl_active=34  acl_tomb=14  admin_ok=27  common_ok=7  zero_role=2  org_menu=4  dirty_mod=0  dirty_role=0
+
+[8] 反向幂等复跑（三件 rollback 再跑一遍）
+  [统计] menu_active=27  acl_active=34  acl_tomb=14  admin_ok=27  common_ok=7  zero_role=2  org_menu=4  dirty_mod=0  dirty_role=0
+
+[9] 备份表: rows=87
