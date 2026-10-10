@@ -1,6 +1,6 @@
 # v2.0.0 发版说明（RELEASE-NOTES）
 
-> 冻结日期：**2026-10-10**（拟定）| 状态：**M3 汇总完成，M4 发布待口令**
+> 冻结日期：**2026-10-10** | 状态：**已发布(v2.0.0)**（M2 已冻结；M4 落账完成）| **部署基线 = tag `v2.0.0`**
 > 聚合来源：`specs/20261007_user-role-group-model`、`specs/20261008_chat-attachment-understanding`、`specs/20261009_ollama-model-support` + 两批随版修复包（`hotfix/ps1-utf8-bom`、`hotfix/install-chain-hardening`）
 > **升级基线：从 v1.7.0 升至 v2.0.0（MAJOR · 破坏性变更，升级前必读 `UPGRADE.md`）**
 
