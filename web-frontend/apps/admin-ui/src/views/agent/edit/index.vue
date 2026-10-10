@@ -44,9 +44,19 @@ const isDraftOrPending = computed(() =>
   ['draft', 'draft-pending'].includes(agent.value.status ?? ''),
 );
 
+/** BUG-169：新建态路由无 :id ⇒ Number(undefined)=NaN 会被直接拼进 URL（实测 /api/agent/NaN 与 /api/agent/NaN/datasources）。
+ *  统一归一：非有限值或非正数一律返回 0；0 为 falsy，模板 v-if 与服务端调用都不会发出。 */
+function currentAgentId(): number {
+  const n = Number(route.params.id);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
 async function loadAgent() {
   try {
-    const id = Number(route.params.id);
+    const id = currentAgentId();
+    if (!id) {
+      return;
+    }
     const result = await getAgentApi(id);
     if (!result) {
       ElMessage.error('智能体不存在');
@@ -115,7 +125,7 @@ async function saveAgent() {
   }
   try {
     loading.value = true;
-    await updateAgentApi(Number(route.params.id), {
+    await updateAgentApi(currentAgentId(), {
       name: agent.value.name?.trim(),
       description: agent.value.description?.trim(),
       avatar: agent.value.avatar,
@@ -143,7 +153,7 @@ async function handleDelete() {
         confirmButtonType: 'danger',
       },
     );
-    await deleteAgentApi(Number(route.params.id));
+    await deleteAgentApi(currentAgentId());
     ElMessage.success('智能体已删除');
     router.push('/agent/list');
   } catch {
@@ -276,28 +286,28 @@ onMounted(loadAgent);
         </div>
       </div>
 
-      <div class="rounded-lg bg-white p-6 shadow-sm">
-        <AgentDataSourceConfig :agent-id="Number(route.params.id)" />
+      <div v-if="currentAgentId()" class="rounded-lg bg-white p-6 shadow-sm">
+        <AgentDataSourceConfig :agent-id="currentAgentId()" />
       </div>
 
-      <div v-if="Number(route.params.id)" class="rounded-lg bg-white p-6 shadow-sm">
-        <AgentRuntimeConfig :agent-id="Number(route.params.id)" />
+      <div v-if="currentAgentId()" class="rounded-lg bg-white p-6 shadow-sm">
+        <AgentRuntimeConfig :agent-id="currentAgentId()" />
       </div>
 
-      <div v-if="Number(route.params.id)" class="rounded-lg bg-white p-6 shadow-sm">
+      <div v-if="currentAgentId()" class="rounded-lg bg-white p-6 shadow-sm">
         <AgentSkillConfig
-          :agent-id="Number(route.params.id)"
+          :agent-id="currentAgentId()"
           :agent-type="agent.type"
         />
       </div>
 
-      <div v-if="Number(route.params.id)" class="rounded-lg bg-white p-6 shadow-sm">
-        <AgentPluginConfig :agent-id="Number(route.params.id)" />
+      <div v-if="currentAgentId()" class="rounded-lg bg-white p-6 shadow-sm">
+        <AgentPluginConfig :agent-id="currentAgentId()" />
       </div>
 
-      <div v-if="Number(route.params.id)" class="rounded-lg bg-white p-6 shadow-sm">
+      <div v-if="currentAgentId()" class="rounded-lg bg-white p-6 shadow-sm">
         <AgentGroupGrant
-          :agent-id="Number(route.params.id)"
+          :agent-id="currentAgentId()"
           :status="agent.status"
         />
       </div>
