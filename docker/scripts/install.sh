@@ -143,14 +143,26 @@ phx_step 5 $TOTAL ".env 生成/保留" && {
   phx_step_mark 5
 }
 
-phx_step 6 $TOTAL "compose up（项目名 $PROJECT）" && {
-  if docker compose version >/dev/null 2>&1; then DC="docker compose"
-  elif command -v docker-compose >/dev/null 2>&1; then DC="docker-compose"
-  else phx_fail 6 $TOTAL "无 docker compose 插件也无 docker-compose——装 compose 后重跑"; fi
-  ( cd "$PAYLOAD/docker" && $DC -p "$PROJECT" up -d ) >>"$PHX_LOG_FILE" 2>&1 || phx_fail 6 $TOTAL "compose up 失败（见日志）"
-  echo "$PROJECT" > "$PAYLOAD/.phoenix-project"   # phoenix-ctl.sh 项目名自动解析锚
-  phx_step_mark 6
-}
+# BUG-170：compose up **必须每次真跑** —— `up -d` 会比对镜像 ID，镜像变了就重建容器；
+# 而它一旦被状态机标成"已完成"就会跳过 ⇒ 重打包后容器仍跑旧镜像（实测：新镜像 10:19 已就绪、
+# 线上容器却是 19 小时前的旧产物，于是修好的前端"看起来没生效"）。故本步不入状态机。
+phx_log INFO "====> 步骤 6/$TOTAL: compose up（项目名 $PROJECT，每次必跑：镜像变了要重建容器）"
+if docker compose version >/dev/null 2>&1; then DC="docker compose"
+elif command -v docker-compose >/dev/null 2>&1; then DC="docker-compose"
+else phx_fail 6 $TOTAL "无 docker compose 插件也无 docker-compose——装 compose 后重跑"; fi
+( cd "$PAYLOAD/docker" && $DC -p "$PROJECT" up -d ) >>"$PHX_LOG_FILE" 2>&1 || phx_fail 6 $TOTAL "compose up 失败（见日志）"
+echo "$PROJECT" > "$PAYLOAD/.phoenix-project"   # phoenix-ctl.sh 项目名自动解析锚
+# BUG-170 核验：容器实际用的镜像必须等于包内镜像——不等即说明没换镜像（旧行为会静默跳过）
+for PAIR in nginx:phoenix-frontend backend:phoenix-backend; do
+  SVC="${PAIR%%:*}"; IMG="${PAIR##*:}"
+  RUN_ID=$(docker inspect --format '{{.Image}}' "${PROJECT}-${SVC}-1" 2>/dev/null || true)
+  WANT_ID=$(docker image inspect --format '{{.Id}}' "${IMG}:${VERSION}" 2>/dev/null || true)
+  if [ -n "$RUN_ID" ] && [ -n "$WANT_ID" ] && [ "$RUN_ID" != "$WANT_ID" ]; then
+    phx_log WARN "容器 ${PROJECT}-${SVC}-1 仍在用旧镜像（run=${RUN_ID:0:12} / want=${WANT_ID:0:12}）——请查日志确认 compose up 是否真跑了"
+  else
+    phx_log INFO "镜像一致性 OK: ${PROJECT}-${SVC}-1 ← ${IMG}:${VERSION}"
+  fi
+done
 
 phx_step 7 $TOTAL "等待 migrator 完成 + backend healthy（${TIMEOUT}s 上限，5s 轮询——L-08 确定性等待）" && {
   # 竞态修复（演练四实证）：backend 不依赖 migrator 完成，Spring 起动可能快过迁移脚本——
