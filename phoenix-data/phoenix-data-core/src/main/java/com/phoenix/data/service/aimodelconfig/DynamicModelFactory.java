@@ -89,7 +89,11 @@ public class DynamicModelFactory {
         // R-02：Ollama 空 key 在 Spring AI OpenAiApi 下不合法（apiKey must not be empty）⇒ 用占位值
         boolean ollama = ModelProvider.OLLAMA.getCode().equalsIgnoreCase(config.getProvider());
 
-        String apiKey = StringUtils.hasText(config.getApiKey()) ? config.getApiKey() : "";
+        // R-02：Ollama 无鉴权 ⇒ 平台存空串；但 Spring AI OpenAiApi 强制要求非空 apiKey
+        // （实测 "apiKey must not be empty" ⇒ AiModelRegistry 初始化失败 ⇒ 生成 prompt 报 42012）
+        // 故 provider=ollama 时用占位值（Ollama 忽略该请求头）。此处自包含判断，避免方法间作用域问题。
+        String apiKey = StringUtils.hasText(config.getApiKey()) ? config.getApiKey()
+                : (ModelProvider.OLLAMA.getCode().equalsIgnoreCase(config.getProvider()) ? "ollama" : "");
         OpenAiApi.Builder apiBuilder = OpenAiApi.builder()
                 .apiKey(apiKey)
                 .baseUrl(config.getBaseUrl())
@@ -118,7 +122,11 @@ public class DynamicModelFactory {
         log.info("Creating NEW TranscriptionModel instance. Provider: {}, Model: {}, BaseUrl: {}", config.getProvider(),
                 config.getModelName(), config.getBaseUrl());
         checkBasic(config);
-        String apiKey = StringUtils.hasText(config.getApiKey()) ? config.getApiKey() : "";
+        // R-02：Ollama 无鉴权 ⇒ 平台存空串；但 Spring AI OpenAiApi 强制要求非空 apiKey
+        // （实测 "apiKey must not be empty" ⇒ AiModelRegistry 初始化失败 ⇒ 生成 prompt 报 42012）
+        // 故 provider=ollama 时用占位值（Ollama 忽略该请求头）。此处自包含判断，避免方法间作用域问题。
+        String apiKey = StringUtils.hasText(config.getApiKey()) ? config.getApiKey()
+                : (ModelProvider.OLLAMA.getCode().equalsIgnoreCase(config.getProvider()) ? "ollama" : "");
         OpenAiAudioApi aiAudioApi = OpenAiAudioApi.builder()
                 .baseUrl(config.getBaseUrl())
                 .apiKey(apiKey)
@@ -139,7 +147,11 @@ public class DynamicModelFactory {
      */
     private static void checkBasic(ModelConfigDTO config) {
         Assert.hasText(config.getBaseUrl(), "baseUrl must not be empty");
-        if (!"custom".equalsIgnoreCase(config.getProvider())) {
+        // R-02：Ollama 本地服务无鉴权 ⇒ apiKey 允许为空（与前端 :required 的放行口径一致；
+        // 此前只放行 custom，导致 provider=ollama 时任何 Spring AI 路径（生成 prompt 等）都直接失败）
+        boolean keyOptional = "custom".equalsIgnoreCase(config.getProvider())
+                || ModelProvider.OLLAMA.getCode().equalsIgnoreCase(config.getProvider());
+        if (!keyOptional) {
             Assert.hasText(config.getApiKey(), "apiKey must not be empty");
         }
         Assert.hasText(config.getModelName(), "modelName must not be empty");

@@ -792,3 +792,16 @@
   ② 前端构建的 PATH 必须**同时**含 ①pnpm shim 目录 ②**node 的 bin 目录**（只加 shim 会报 `exec: node: not found` —— 本轮连踩两次）；
   ③ 部署后**在运行容器内**再断言一次（线上容器路径 /usr/share/nginx/html/assets），不只看本地 dist。
 - 关联: L-77（工具链不在 PATH ⇒ 假信号）、L-83（截断输出漏判）；T-09/T-10
+
+## L-85 「只放行 custom」这类口径散落多处：前端 :required / formRules.validator / 后端 checkBasic，改一处等于没改
+- 场景: 本轮要让 provider=ollama 免 API Key（R-02）。我先后改了 formRules.validator、后端 DynamicModelFactory 的 apiKey 赋值，
+  但用户仍报「提示必填」与「生成 prompt 42012」。**三处**独立口径分别在：
+  ① 模板 `ElFormItem :required="provider !== 'custom'"`
+  ② 后端 `DynamicModelFactory.checkBasic()` 的 `if (!"custom".equalsIgnoreCase(provider)) Assert.hasText(apiKey)`
+  ③（最早的）`apiKey` 取值处的 `? : ""`
+  只有三处都改，功能才通。
+- 根因: 把"某个 provider 的例外口径"当成单点实现；同一条业务规则（谁能免 key）在多处重复表达，且没有单一事实源。
+- 防再犯规则: ① 新增/修改 provider 例外口径时，先全仓 grep 该口径的判据串（如 `"custom"`、`required`、`must not be empty`），
+  列出全部出现点再逐处改；② 例外口径应集中到一个枚举/工具方法（如 `ModelProvider.requiresApiKey()`），禁止各处手写 equals 判断；
+  ③ 端到端验证必须覆盖"该 provider 的完整用户动作"（本例：填表→保存→调用业务功能），只验其中一段会漏。
+- 关联: L-63（判别列服务端写死）、L-84（同类"改一处不够"的构建 PATH 版）；BUG 号：本轮用户实测 42012
