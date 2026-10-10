@@ -43,6 +43,13 @@
   〔下次开版本时的动作〕本包 5 条缺陷（BUG-141~145）在 bugs.md 里仍是「已修复/已验证(hotfix/ps1-utf8-bom)」，
   开新版时应把它们的版本列改为该版号，并把 `hotfix/ps1-utf8-bom` 合入该版本分支或 main。
 
+- **2026-10-10 用户裁决：暂不从在途线打包安装，等 v2.0.0 正式发布后再装**。背景：用户问「现在是否可装 2.0.0（现网是 1.7）」，核查结论——
+  ① 工程版本已是 `2.0.0-SNAPSHOT`（`pom.xml`），但打包链版本**默认取 `git describe --tags`**（最新 tag 仍是 v1.7.0）⇒ **不显式传 `-Version 2.0.0` 时包名/镜像 tag/`.env` 的 `IMAGE_TAG` 仍会被标成 1.7.0**（与现状「内容新、标签旧」同因）；
+  ② v2.0.0 仍**在途未冻结**（无 tag、未合 main；`releases/v2.0.0/` 只有 `MILESTONE.md` + `sql/V2.0.0_01~16(+rollback)`，缺 RELEASE-NOTES/UPGRADE/checklist/config）⇒ 现在装属「在途版本自测安装」而非「发布版安装」；
+  ③ 现网栈是 hotfix 线打包的（2026-10-10 10:31），**缺 v2.0.0 线 4 条**（知识库绑定静默失效 / 工具迭代上限 60 / reasoning 压缩 400 / Python 依赖预装+可写+跨重建保留）；但现网**库已是 v2.0.0 schema**（payload 带整个 `releases/`，migrator 已增量跑到 `V2.0.0_16`，MIG_OK）⇒ 将来安装是「幂等重跑 + 换镜像」，非破坏性升级。
+  ⇒ **裁决：不装**，等发布。发布后安装命令：`bootstrap.ps1 -Version 2.0.0` → `install.ps1`（**单横线**；`--version` 已被 BUG-174 守卫拦下）；`install.sh` 用 `-p phoenix` ⇒ named volume 复用、`.env` 仅更新 `IMAGE_TAG`，数据与密码端口不动；步骤 6 每次必跑（BUG-183）⇒ 容器会真的换镜像。
+- **2026-10-10 发布前待核（用户未决）**：`releases/v2.0.0/MILESTONE.md` L77~78 仍记 `user-role-group-model`「待 requirements 确认①（Q1~Q6 未答复）」，而 `V2.0.0_01__org_dimension_drop_ddl` 等迁移显然已实现该需求 ⇒ **台账与实现状态不一致**，M3 冻结前须复核挂接表与三文档确认状态，避免发布时踩空。
+
 ## 对账记录（2026-10-02 用户口令「对账」）
 - v1.4.0 首单 detached-stream 此前按旧例直合 main（c4735a7）——既成事实保留，分支从 main tip 补建，内容完整无缺口
 - 台账/规范接入由 skill 升级触发（共享面三件套等条款同日生效）
