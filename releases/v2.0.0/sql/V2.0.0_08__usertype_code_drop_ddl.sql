@@ -41,14 +41,15 @@ BEGIN
 
   SELECT count(*) INTO alive FROM tbl_privilege_user WHERE coalesce(del_flag, 0) = 0;
   IF alive < 1 THEN RAISE EXCEPTION '[V2.0.0_08] 存活账号为 0（异常）'; END IF;
-  IF NOT EXISTS (SELECT 1 FROM tbl_privilege_user WHERE username = 'chenzhuo' AND coalesce(del_flag, 0) = 0) THEN
-    RAISE EXCEPTION '[V2.0.0_08] chenzhuo 账号不存在（异常）';
-  END IF;
+    -- BUG-184（BUG-151 同族再犯）：原断言要求 chenzhuo 必存在——那是**开发数据集**口径，全新安装库只有 admin
+  -- ⇒ 断言触发、整迁移回滚、migrator exit 3。改为：chenzhuo 存在才校验其角色绑定，不存在属正常（见下方条件化）。
 
   SELECT count(*) INTO chen_role FROM tbl_privilege_user_role
    WHERE user_id = (SELECT id FROM tbl_privilege_user WHERE username = 'chenzhuo')
      AND coalesce(del_flag, 0) = 0;
-  IF chen_role < 1 THEN RAISE EXCEPTION '[V2.0.0_08] chenzhuo 角色绑定丢失'; END IF;
+  IF chen_role < 1 AND EXISTS (SELECT 1 FROM tbl_privilege_user WHERE username = 'chenzhuo' AND coalesce(del_flag, 0) = 0) THEN
+    RAISE EXCEPTION '[V2.0.0_08] chenzhuo 角色绑定丢失';
+  END IF;
 
   SELECT count(*) INTO bad_names FROM tbl_platform_account_group_info a
     JOIN tbl_privilege_user u ON u.id = a.account_id

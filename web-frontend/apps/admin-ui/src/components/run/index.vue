@@ -365,7 +365,12 @@ const resultSetDisplayConfig = reactive<ResultSetDisplayConfig>({
   pageSize: 20,
 });
 
-const agentId = computed(() => Number(route.params.id));
+/** BUG-182：路由无 :id 时 Number(undefined)=NaN 会被拼进 URL（实测 /api/agent/NaN）。
+ *  统一归一到 0；0 为 falsy，配套守卫后不会发出请求。 */
+const agentId = computed(() => {
+  const n = Number(route.params.id);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+});
 
 window.copyTextToClipboard = (btn: HTMLElement) => {
   const text = btn.previousElementSibling?.textContent || '';
@@ -420,6 +425,9 @@ window.handleResultSetPagination = (
 };
 
 async function loadAgent() {
+  if (!agentId.value) {
+    return; // BUG-182：无有效 agentId 时不发请求（原会拼出 /api/agent/NaN）
+  }
   try {
     const result = await getAgentApi(agentId.value);
     if (!result) {

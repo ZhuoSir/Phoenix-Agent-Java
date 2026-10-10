@@ -20,6 +20,8 @@
 | BL-10 | **语音（AUDIO）能力接入或下线** | 本次模型「启用/默认」改造暴露 | 待确认 | 现状：AUDIO 是三种模型类型之一、可设默认，`AiModelRegistry.getTranscriptionModel()` 与 `DynamicModelFactory.createTranscriptionModel()` 均已实现，但**全仓无业务调用方** → 要么接 ASR 场景（如语音问数），要么在模型管理隐藏 AUDIO |
 | BL-11 | 清理**死配置** `phoenix.agent.skillPath`（`PhoenixAgentProperties:12` 定义、全仓无引用） | `BUG-06` 遗留 | 已立项(v1.7.0) | 技能资源路径实际由 `PostgresSkillRepository` + `SkillZipSanitizer` 决定；该属性留着会误导配置者 〔2026-10-05：随 `specs/20261005_visibility-filetree-hygiene` 立项（R-03 清账组）〕|
 
+| BL-47 | **打包/安装断点状态机加「逻辑指纹」**：`docker/dist/.package-<ver>-<arch>.state` 只记步骤号、不含该步逻辑或输入的指纹 ⇒ 改了某步代码后重跑仍判「已完成」而跳过，新逻辑**静默不生效** | 2026-10-09 现场实测（BUG-181：给步骤 3 加 `dist-mobile` 提取后重跑，仍从 `步骤 2/8` 直跳 `步骤 4/8`、整轮仅 34 秒）；2026-10-10 用户裁决「转 BL」 | 待办（原 BUG-181，旧号 BUG-168） | 修法：状态文件记「步骤号 + 该步脚本 sha 或版本常量（如 `PHX_PIPELINE_VERSION`）」，指纹不符即视为未完成；或提供 `--force-step N`，并在文档写明「改了打包脚本要清状态」。⚠️ **同类风险也在 `install.sh` 的九步状态机**（`$PAYLOAD/.phoenix-install.state`）——本轮 BUG-178/183 都踩过它，建议一并做 |
+
 ## 二、工程卫生（非功能，随手可做）
 | # | 待办 | 来源 | 状态 | 备注 |
 |---|---|---|---|---|
@@ -33,6 +35,8 @@
 |---|---|---|---|---|
 | BL-16 | **里程碑挂接（M0+M1）**：建 `releases/vX.Y.Z/`、把三个 spec 与已修复缺陷挂入、回填版本号 | skill 里程碑流程；项目原先无 `releases/` | **已交付(v1.2.0)** | 2026-09-27 完成：`releases/v1.2.0/MILESTONE.md`（3 spec + 18 缺陷）；版本号取 MINOR=v1.2.0（历史分支线已到 1.1.x，用户确认）。**M2 冻结前置未满足**：① `agent-config-ai-generate` 未合并；② P1（BUG-01/20）未达「已验证」 |
 | BL-17 | **汇总升级件（M3）**：把 spec-1/2/3 的 `01~05` 升级件重排为 Flyway 风格 `V<版本>_<序号>__<描述>.sql` + rollback 配对，产出 `UPGRADE.md` / `RELEASE-NOTES.md` / `config/changes.md` | 同上 | **已交付(v1.2.0)** | 2026-10-04 账面同步：M3 汇总自 v1.2.0 起成惯例，v1.3.0/v1.4.0/v1.5.0 三轮均执行（Flyway 重排/rollback 配对/四件套） 〔2026-10-05：v1.6.0 汇总件已执行——`V1.6.0_01~03`+rollback 配对+RELEASE-NOTES/UPGRADE/config/checklist 四件套，全新库重放绿、回滚零残留〕|
+
+| BL-46 | **BUG 编号撞号收口**：两条并行工作流同时从 161 起取号，致 BUG-161~164 双重占用（v2.0.0 线=知识库绑定/迭代上限/reasoning 400/智能体依赖预装；hotfix/install-chain-hardening 线=.ps1 参数守卫/引擎多源回退/镜像预拉取+完整性校验/systemd 探测） | 2026-10-09 对话中发现（`fetch origin/v2.0.0` 后核对远端 ref） | **已交付(v2.0.0)**（2026-10-10 用户裁决「v2.0.0 的不动，hotfix 分支的版本号修改」） | **收口方式（已执行，2026-10-10）**：照 2026-09-27「B-01~B-20 → BUG-01~20」迁移先例，把 hotfix 线**全部 13 条整批 +13 改号** —— BUG-161~173 → **BUG-174~186**（按当时 `bugs.md` 实际最大号 173 +1 起算；当初拟的「169~176」作废）；同步改号 16 个文件共 38 处引用（14 个脚本/配置/前端文件 25 处 + `lessons.md` 7 处 + `version.md` 6 处），`bugs.md` 13 行行号与批次注记按合并冲突解析处理；台账加「编号迁移（2026-10-10）」注记、各条尾部留 `〔编号迁移：旧 BUG-1xx〕`，**commit message 不动**（历史提交仍用旧号可对照）。v2.0.0 侧 161~164 原样保留 ⇒ 合并后台账 161~186 **号唯一无重复**。**过程坑见 L-91**（改号脚本整数键求值静默为空，靠正向断言兜住并已从 index 复原） |
 
 ## 四、在手未完成（指向 spec，不占 BL 编号）
 - `specs/20260927_agent-config-ai-generate`：**〔已随 v1.2.0 发布，历史快照〕** 13 个任务 **13/13 全勾**（2026-10-05 复核；旧注记"已勾 8 个"为误记） —— 只差**界面人工走查**（浏览器扩展未连接，无法自动走查）；代码层证据已齐（`vue-tsc` 189、8 个改动文件 Vite 转译 200）。

@@ -6,7 +6,7 @@ Phoenix 一键安装（Windows / WSL2 路线，docker-auto-pipeline T-05）
 退出码: 0=成功  1=失败  2=需重启后重跑(功能刚启用)
 #>
 param(
-  [int]$Timeout = 300,
+  [string]$Timeout = "300",
   [string]$Project = "phoenix",
   [switch]$Offline
 )
@@ -22,6 +22,24 @@ function Write-Fail($msg) {
 }
 function Mark-Done($k) { Add-Content -Path $StateFile -Value $k }
 function Test-Done($k) { return (Test-Path $StateFile) -and (@(Get-Content $StateFile) -contains $k) }
+
+# ── 0. 参数守卫（BUG-174）──
+# PowerShell 只把【单横线】当参数名（-Project/-Timeout）。写成 `--project` 时它不会被认成
+# 参数名，而是按【位置】绑定——$Timeout 是第一个位置参数（原为 [int]，会先抛难懂的转换错误；
+# 现改 [string] 以便在这里给出可读提示）。与 bootstrap.ps1 同构（BL-24 记：共享段需人工同步）。
+$argErrs = @()
+if ($Timeout -like '-*') { $argErrs += "-Timeout 收到以 '-' 开头的值：'$Timeout'（双横线参数名不被识别，会按位置绑到这里；请改用单横线 -Timeout/-Project）" }
+if ($Project -like '-*') { $argErrs += "-Project 收到以 '-' 开头的值：'$Project'（是不是写成了 --project？）" }
+if ($Timeout -and ($Timeout -notmatch '^\d+$')) { $argErrs += "-Timeout 值 '$Timeout' 不是整数秒" }
+if ($Project -match '^\d+\.\d+') { $argErrs += "-Project 值 '$Project' 像版本号 ⇒ 参数整体错位了" }
+if ($args.Count -gt 0) { $argErrs += "有多余的位置参数：$($args -join ' ')" }
+if ($argErrs.Count -gt 0) {
+  Write-Host "[install.ps1] 参数有误，已在动手前拦下：" -ForegroundColor Red
+  foreach ($e in $argErrs) { Write-Host "  × $e" -ForegroundColor Red }
+  Write-Host "  正确用法: .\install.ps1 [-Timeout 300] [-Project phoenix] [-Offline]" -ForegroundColor Yellow
+  Write-Host "  提示: PowerShell 参数一律【单横线】；双横线写法（--timeout）是给 WSL 内 bash 脚本用的。" -ForegroundColor Yellow
+  exit 1
+}
 
 # ── 1. 管理员 ──
 $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
@@ -99,7 +117,8 @@ Write-Host "  Phoenix 安装成功（Windows / WSL2 路线）" -ForegroundColor 
 Write-Host "======================================================" -ForegroundColor Green
 Write-Host "  访问地址 : http://localhost:$port   （Windows 浏览器直接打开）"
 Write-Host "  管理账号 : admin / 123456（首登立即改密）"
-Write-Host "  服务管理 : wsl -d Ubuntu-22.04 -u root -- docker compose -p $Project ps"
+Write-Host "  重启语义 : 机器重启后自动复活（docker 开机自启 + compose restart:unless-stopped）；休眠/挂起只冻结进程，唤醒即继续"
+  Write-Host "  服务管理 : wsl -d Ubuntu-22.04 -u root -- docker compose -p $Project ps"
 Write-Host "  若 localhost 不通(老版 Win10): 管理员执行 netsh interface portproxy add v4tov4"
 Write-Host "    listenport=$port listenaddress=0.0.0.0 connectport=$port connectaddress=<WSL内 hostname -I>"
 Write-Host "======================================================" -ForegroundColor Green

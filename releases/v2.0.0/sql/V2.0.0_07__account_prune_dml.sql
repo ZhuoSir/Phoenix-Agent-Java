@@ -28,14 +28,22 @@ DELETE FROM tbl_privilege_user WHERE id IN ('428011841386577920', '4316784134940
 
 -- ② 自检（L-51：只校验结构不变量，不硬编码环境相关绝对数）
 DO $chk$
-DECLARE alive int; bad int; chen_role int;
+DECLARE alive int; bad int; chen_role int; has_admin boolean; has_chen boolean;
 BEGIN
   SELECT count(*) INTO alive FROM tbl_privilege_user WHERE coalesce(del_flag, 0) = 0;
-  IF alive <> 2 THEN RAISE EXCEPTION '[V2.0.0_07] 存活账号 % <> 2', alive; END IF;
-  IF NOT EXISTS (SELECT 1 FROM tbl_privilege_user WHERE username = 'admin' AND coalesce(del_flag,0)=0)
-     OR NOT EXISTS (SELECT 1 FROM tbl_privilege_user WHERE username = 'chenzhuo' AND coalesce(del_flag,0)=0) THEN
-    RAISE EXCEPTION '[V2.0.0_07] 存活账号不是 admin + chenzhuo';
+  -- BUG-184（BUG-151 同族再犯）：原断言写死 alive=2 且要求 admin+chenzhuo 同时在——那是**开发数据集**口径；
+  -- 全新安装库只种一个 admin（alive=1）⇒ 断言触发、整迁移事务回滚、migrator exit 3、整栈起不来。
+  -- 按本文件自身声明的原则（L-51：只校验结构不变量、不硬编码环境相关绝对数）改为分档：
+  --   0 = 空库（跳过）/ 1 = 仅 admin 的全新库（通过）/ 2 = 开发库 admin+chenzhuo（通过）/ >2 才异常
+  IF alive = 0 THEN
+    RAISE NOTICE '[V2.0.0_07] 跳过：库中无存活账号（全新未初始化库）';
+    RETURN;
   END IF;
+  IF alive > 2 THEN RAISE EXCEPTION '[V2.0.0_07] 存活账号 % > 2，疑似清理未生效', alive; END IF;
+  SELECT EXISTS (SELECT 1 FROM tbl_privilege_user WHERE username = 'admin' AND coalesce(del_flag,0)=0) INTO has_admin;
+  SELECT EXISTS (SELECT 1 FROM tbl_privilege_user WHERE username = 'chenzhuo' AND coalesce(del_flag,0)=0) INTO has_chen;
+  IF NOT has_admin THEN RAISE EXCEPTION '[V2.0.0_07] 存活账号中缺 admin'; END IF;
+  IF alive = 2 AND NOT has_chen THEN RAISE EXCEPTION '[V2.0.0_07] 存活账号为 2 但不是 admin + chenzhuo'; END IF;
 
   SELECT count(*) INTO bad FROM (
     SELECT 1 FROM tbl_privilege_user WHERE id IN ('428011841386577920', '431678413494018048', '428011841386577921', '432101006843711488', '432061200055025664', '433383317100486656')
@@ -46,12 +54,17 @@ BEGIN
   ) x;
   IF bad <> 0 THEN RAISE EXCEPTION '[V2.0.0_07] 仍残留待删账号的账号域数据 % 行', bad; END IF;
 
-  SELECT count(*) INTO chen_role FROM tbl_privilege_user_role
-   WHERE user_id = '461671036765859840' AND coalesce(del_flag, 0) = 0;
-  IF chen_role < 1 THEN RAISE EXCEPTION '[V2.0.0_07] chenzhuo 的角色绑定丢失'; END IF;
+  -- chenzhuo 的角色绑定：仅当 chenzhuo 存活时校验（全新库无此账号属正常，不再硬失败）
+  IF has_chen THEN
+    SELECT count(*) INTO chen_role FROM tbl_privilege_user_role
+     WHERE user_id = '461671036765859840' AND coalesce(del_flag, 0) = 0;
+    IF chen_role < 1 THEN RAISE EXCEPTION '[V2.0.0_07] chenzhuo 的角色绑定丢失'; END IF;
+  ELSE
+    chen_role := 0;
+  END IF;
 
-  RAISE NOTICE '[V2.0.0_07] 自检通过：存活账号 %（admin+chenzhuo）/ 残留 % 行 / chenzhuo 角色绑定 % 条',
-    alive, bad, chen_role;
+  RAISE NOTICE '[V2.0.0_07] 自检通过：存活账号 %（admin=% / chenzhuo=%）/ 残留 % 行 / chenzhuo 角色绑定 % 条',
+    alive, has_admin, has_chen, bad, chen_role;
 END $chk$;
 
 COMMIT;

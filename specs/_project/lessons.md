@@ -771,3 +771,111 @@
   ② 向用户报告"某分支异常/名字怪"之前，必须用完整 refname 复核（`git for-each-ref --format='%(refname)'`
   或 `ls .git/refs/heads/`）；③ 删除类操作先用完整 ref 验证存在性再动手（与 L-81 同源）。
 - 关联: L-81（删除类操作守卫）；本次最终按"= 远端同名 && 已并入 v2.0.0"两条断言清理，本地仅留 main 与 v2.0.0
+
+## L-83 同一条消息里并存两种横线写法（bash `--version` / PowerShell `-Version`）⇒ 用户混用，白跑两轮
+- 场景: 我一条消息里既给了 WSL bash 用的 `bash docker/scripts/bootstrap.sh --version 1.7.0`，又给了 Windows 用的
+  `.\docker\scripts\bootstrap.ps1 -Version 1.7.0`。用户两次都按 `--version` 跑 ps1 ⇒ PowerShell 把 `--version`
+  当**位置参数**绑进 `$Version`、`1.7.0` 顺位顶给 `$Project` ⇒ 版本号成 `--version` ⇒ docker tag 非法，
+  两次各白跑一轮（BUG-174）。
+- 根因: 两个入口参数风格相反（bash 双横线 / PowerShell 单横线），我却把它们并列摆出，没做视觉区分、没标"给哪个脚本用"。
+- 防再犯规则: ① 同轮给多入口命令时，每条必须显式标注适用环境（`# WSL bash` / `# Windows PowerShell`），
+  横线写法加粗或单独成块；② 优先只给一种入口，另一种折叠为备选；③ 用户复述命令失败后，
+  第一件事是核对他实际敲的那一条（本轮本可第一轮就发现）。
+- 关联: BUG-174；L-67（ps1 入口族）
+
+## L-84 `bash -c '...'` 里内嵌双引号经 PowerShell→wsl 会被吃掉 ⇒ bash 把 `A|B` 当命令执行
+- 场景: 我发 `wsl -d Ubuntu-22.04 -u root -- bash -c 'ls -t ... | xargs grep -E "====|ERROR|WARN" | tail -12'`，
+  返回 `/bin/bash: line 1: ERROR: command not found`、`WARN | tail -12: command not found`——双引号丢失后
+  `|` 变成真管道，`ERROR`/`WARN` 成了命令名。同轮另一条更长的命令则整条零输出（stderr 被 `2>$null` 吞掉，见 L-85）。
+- 根因: pwsh → wsl.exe → bash 三层各自解析一遍，内嵌双引号在传参过程中被剥离；不是 bash 的问题。
+- 防再犯规则: ① 经 PowerShell 调 wsl bash 时，**payload 内一律不用双引号**；需要多模式匹配就用
+  `grep -e A -e B -e C`；② 复杂逻辑一律落成脚本文件（`/mnt/d/...`）再 `bash <file>`，用 write 工具写（LF），
+  绕开三层引号；③ 报错里出现"某个词被当成命令"立刻想到本坑。
+- 关联: L-85；本轮诊断命令两次自伤
+
+## L-85 诊断命令外层加 `2>$null` 会把 wsl 的错误一起吞掉 ⇒ 制造"无输出、exit 1"假象
+- 场景: 为压掉 pwsh 的 localhost 代理告警，我在 `wsl ... 2>$null` 上套了重定向；某次命令整条零输出 + exit 1，
+  我据此怀疑"命令被 PowerShell 解析坏了"，实为 wsl/bash 的报错被 `2>$null` 吞掉，多跑一轮才定位到 L-84。
+- 根因: `2>$null` 屏蔽的是**整条 wsl 调用**的 stderr，不只是那条代理告警；而诊断类命令最需要 stderr。
+- 防再犯规则: ① 诊断/取证类命令**不吞 stderr**（代理告警只是噪音，可容忍）；② 只在"确定只看 stdout 且
+  已知告警存在"的批量命令上才压 stderr；③ 遇到"无输出"先重跑一次**不带任何重定向**的版本再下结论。
+- 关联: L-84
+
+## L-86 中文 Windows 下读台账/跑表检的编码双坑：`PYTHONIOENCODING=utf-8` + 别裸用 `Get-Content` 读 UTF-8 无 BOM 的 .md
+- 场景: ① 跑 skill 的 `mdtable_check.py` 直接崩 `UnicodeEncodeError: 'gbk' codec can't encode character '\u2713'`
+  ——崩在**最后打印** `✓` 那一行，检查本身其实已完成，极易误判成"脚本坏了/表有问题"；
+  ② `Get-Content specs/_project/version.md` 出来整片乱码（`鐗堟湰鍙拌处`），我一度以为台账被写坏。
+- 根因: 本机 Python 与 Windows PowerShell 5.1 的 stdout/默认读文件编码都是 ACP=936(GBK)，而仓库里这些
+  文本文件是 **UTF-8 无 BOM**（PS 5.1 对无 BOM 文件按 ANSI 解码）。
+- 防再犯规则: ① 跑表检固定 `$env:PYTHONIOENCODING="utf-8"; python <skill>/scripts/mdtable_check.py <file>`；
+  ② 读 `.md`/台账一律用 read 工具（或 `Get-Content -Encoding UTF8`），**不要裸 Get-Content**；
+  ③ 看到中文乱码先怀疑编码，不要先怀疑文件被改坏（与 BUG-142/L-68 同族：PS 5.1 + 无 BOM + 中文 = 坑）。
+- 关联: BUG-142；L-68；铁律 8（表检）
+
+## L-87 判断"在途版本"必须读**版本分支线**上的 version.md —— 我读了施工分支上的旧台账，误判"无在途版本"
+- 场景: 我在 `hotfix/ps1-utf8-bom` 上读 `specs/_project/version.md`，该副本停在 2026-10-08、写着"当前仍无在途版本"，
+  我据此向用户报告并据此出方案；用户一句"换个分支，2.0.0，有这个分支，试试"才揭穿——**v2.0.0 正是在途版本分支**
+  （领先 main 143 条、已并入安装链修复包、BUG-141~151 的修复版本列都写着 v2.0.0）。
+- 根因: "全局账永远活在版本分支线"是规范要求，但现实里施工分支上的账本是**旧快照**；
+  我把分支上的文件当成了全局事实，且没做多分支交叉核对。
+- 防再犯规则: ① 报"在途版本/台账现状"前先 `git branch -r` 列全远端分支，再对**每个候选版本分支**核对
+  `version.md` 与 `git merge-base`；② 判断"最新代码"以实测 ref 为准（本次 `origin/v2.0.0` 领先 main 143 条），
+  不以分支名或某一份台账叙述为准；③ 给用户的方案里主动标注"依据来自哪个分支的台账"。
+- 关联: 本轮 install-chain-hardening 立项；L-82（ref/事实核对同族）
+
+## L-88 经 pwsh→wsl 传含 `$var` 的 bash 片段：变量被吞成空 ⇒ 测试"空跑"却像通过，我据此写下未经验证的结论
+- 场景: 为验证 BUG-175 三源可用性，我发 `bash -c 'for u in A B C; do printf %s: "$u"; curl … $u/…; done'`，
+  实际输出 `:000`/`:000`/`:000`——`$u` 已被吞成空串，curl 请求的是无效 URL，**这次"实测"什么都没测到**；
+  而我直接在 commit message 里写了"三源 jammy Release 实测可达"。随后补测（展开写法、全程无 `$`）才拿到真码 200/200/200，并 amend 修正。
+- 根因: ① pwsh→wsl.exe→bash 三层解析，`$var` 在内层被吞（与 L-84 同源，但**失败模式更隐蔽**：
+  不是报错，而是"跑完、有输出、看着像成功"）；② 我对"测试是否真的执行到了被测对象"没有做任何断言。
+- 防再犯规则: ① 经 pwsh 调 wsl bash 时**不写 `$var`**——循环/变量逻辑落成脚本文件（write 工具，LF）再 `bash <file>`，或直接展开手写；
+  ② 任何"实测"结论落笔前，先确认输出里**被测对象真的出现过**（本例 URL 为空、码为 000 就是铁证）；
+  ③ 把"空跑"当红旗：输出里出现 `:000`、空变量、空 URL、零匹配，先当成"测试没跑"而不是"通过"；
+  ④ 严守铁律 5——**没有真实输出就不写"实测/验证"字样**（本次是靠自查发现，属侥幸，不可依赖）。
+- 关联: L-84（同源三层解析）；铁律 5（诚实性）；BUG-175
+
+## L-89 本机直连 github.com 不通 ⇒ `git push` 必须走代理，失败信息极易被误判成权限/凭证问题
+- 场景: 用户口令「push」后，`git push origin hotfix/install-chain-hardening` 报
+  `error: RPC failed; curl 28 Failed to connect to github.com port 443 after 21060 ms` +
+  `fatal: the remote end hung up unexpectedly`，我一度要往"凭证/SSH/权限"方向查；
+  改用 `git -c http.proxy=http://127.0.0.1:7897 -c https.proxy=http://127.0.0.1:7897 push` 后
+  **立刻成功**（`61f5ebf..25714c0 ... -> hotfix/install-chain-hardening`，退出码 0）。
+- 根因: 本机 `ProxyEnable=0`（系统代理关闭）而 github.com **直连被拦**（21s 超时）；Clash 仍在 7897 监听。
+  git 不会自动用 WSL/系统之外的代理，"连不上 443"与权限无关。
+- 防再犯规则: ① 本机 push/pull 失败且报 `Failed to connect ... port 443` 时，**第一步就换代理重试**
+  （`git -c http.proxy=http://127.0.0.1:7897 -c https.proxy=http://127.0.0.1:7897 <cmd>`），别先怀疑凭证；
+  ② 判断"代理在不在"用 `Test-NetConnection 127.0.0.1 -Port 7897`，不要看 `ProxyEnable`（二者可背离）；
+  ③ 需要长期可用可 `git config --local http.proxy ...`，但那会写进仓库配置，需用户同意。
+- 关联: L-70（网络受限族）；本轮 BUG-174~180 push
+
+## L-90 排查"打包编译失败"必须先分辨「分支源码本身坏了」vs「构建副本是脏的」
+- 场景: 步骤 3/8 报 `PrivilegeDepartmentServiceImpl.java:[313,72] invalid method reference:
+  cannot find symbol getDeptId() in PrivilegeUser`，第一直觉是"v2.0.0 分支源码编译不过"（甚至怀疑自己的改动）；
+  实为 **WSL 副本是脏的**——`bootstrap.ps1` 用 `cp -ru`（只增不删），切分支后旧文件永生（BUG-179）。
+- 根因: 构建树来自"拷贝"而非"检出"，拷贝不承担删除语义；三层事实（git 跟踪 / Windows 工作树 / 构建副本）
+  一旦不一致，报错现场会指向一个你明明找不到的文件。
+- 防再犯规则: ① 见到"编译报某文件的符号找不到"时，**先做三处一比**：`git ls-files <路径>`（分支跟不跟踪）、
+  Windows 工作树是否存在、构建副本是否存在——三者不一致即刻指向副本脏，不要先怀疑分支或自己的改动；
+  ② 反过来也成立：报错文件"在本地根本找不到"本身就是副本脏的强信号；③ 同步类脚本必须问一句
+  "它删不删？"（`cp -ru` 不删、`rsync --delete` 删、`rm+cp` 删）。
+- 关联: BUG-179；L-84/L-88（多环境传递族）
+
+## L-91 PowerShell 整数键字典在 `[ordered]` 下按「位置」求值 ⇒ 改号脚本静默产出空号
+- 场景: 合并 v2.0.0 时执行 BUG 编号迁移（BL-46），脚本用 `[ordered]@{161=174;162=175;…}` 建映射，
+  循环里 `$new = $pairs[$old]` 恒得 `$null` ⇒ `BUG-161` 被替换成 **`BUG-`**（号丢了），
+  **15 个文件一次写坏且零报错**（BUG-174~186 收口过程）。
+- 根因: `OrderedDictionary` 实现 `IList`，PowerShell 对**整数**索引优先按「第 N 个元素」解释——
+  `$pairs[161]` 取的是第 161 个元素（越界 ⇒ `$null`），不是键 161 的值；`$pairs['161']`（字符串键）
+  与普通 `@{161=174}`（Hashtable）都正常，**所以探针必须覆盖真实调用形态**。
+- 为什么没被拦住: 原脚本的校验是「旧号是否还有残留」——把号删掉恰恰让旧号消失 ⇒ **缺席式断言恒真**。
+- 防再犯规则: ① 这类映射一律用**字符串键**（`'161'='174'`），脚本开头放取值探针（取不到即 throw）；
+  ② 改写类脚本必须**正向断言**：既查「旧号 0 残留」，也查「新号确实出现且数量符合预期」；
+  ③ 逐条打印 `旧 -> 新` 让映射可肉眼核对；④ 旧号要在**转换前**取（本次标记曾误取转换后的号，
+  写成「旧 BUG-174」，正是标记值断言抓出来的）；⑤ 区间写法要防续段——`BUG-161~167、169~171、173`
+  的后两段**没有 `BUG-` 前缀**，只替换带前缀的会留半成品。
+- 恢复手段: 合并进行中，自动合并结果都在 **index** 里 ⇒ `git checkout -- <受影响文件>` 一键还原到合并态，
+  再跑修正后的脚本即可（未 push，零外部影响）。
+- 附带: `git checkout -m -- <file>` 重建的冲突标记标签是 `<<<<<<< ours`/`>>>>>>> theirs`（不是 `HEAD`/分支名），
+  解析冲突的正则须写成标签无关；这批台账也别用 `Get-Content` 读（GBK 乱码，见 L-86）。
+- 关联: BL-46（编号撞号收口）、BUG-174~186、L-88（pwsh 变量被吞导致空心测试）

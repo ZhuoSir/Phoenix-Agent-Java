@@ -14,12 +14,17 @@ ARG NPM_REGISTRY=https://registry.npmmirror.com
 # 慢/不稳镜像健壮性（BUG-150）：① pnpm store 缓存挂载 → 已下载包跨构建复用、多跑收敛（对称 backend .m2 缓存）；
 # ② fetch-timeout/retries 拉高 → 大 native 二进制包（esbuild/turbo/oxlint/element-plus 等）在 0-40KiB/s 慢网下不被 abort。
 # 单行 RUN：规避 CRLF + `\` 续行坑（L-69/L-72）；store-dir 置于 /repo/.pnpm-store（不随 dist 外泄，dist 仅拷 apps/admin-ui/dist）
-RUN --mount=type=cache,id=phoenix-pnpm,target=/repo/.pnpm-store pnpm config set registry ${NPM_REGISTRY} && pnpm config set fetch-timeout 600000 && pnpm config set fetch-retries 10 && pnpm config set fetch-retry-mintimeout 20000 && pnpm config set fetch-retry-maxtimeout 120000 && pnpm install --frozen-lockfile --store-dir /repo/.pnpm-store && pnpm -F @vben/web-ele build
-# package.sh 工件提取阶段（T-02）：只带 dist 不带 node_modules；默认目标仍为末阶段（身份①不变）
+RUN --mount=type=cache,id=phoenix-pnpm,target=/repo/.pnpm-store pnpm config set registry ${NPM_REGISTRY} && pnpm config set fetch-timeout 600000 && pnpm config set fetch-retries 10 && pnpm config set fetch-retry-mintimeout 20000 && pnpm config set fetch-retry-maxtimeout 120000 && pnpm install --frozen-lockfile --store-dir /repo/.pnpm-store && pnpm -F @vben/web-ele build && pnpm -F @vben/mobile-ui exec vite build --mode production --base=/m/
+# BUG-180: mobile-ui 产物必须一并构建——`Dockerfile.frontend:7` 要 docker/.stage/dist-mobile（nginx 挂 /m/），
+# 而此前只有 T-08 演练时在宿主机手工 `pnpm exec vite build --base=/m/` 产出过，打包链里从未构建 ⇒ 干净环境必失败。
+# 注意：此处**直接调 vite、不走 mobile 包的 `build` 脚本**——那个脚本内含 `vue-tsc --noEmit`，
+# 即已裁决「不修复」的 BUG-153（移动端生产构建常红），故刻意绕开。
+# package.sh 工件提取阶段（T-02）：只带 dist/dist-mobile 不带 node_modules；默认目标仍为末阶段（身份①不变）
 FROM build AS dist
-RUN mkdir -p /out && cp -r apps/admin-ui/dist /out/dist
+RUN mkdir -p /out && cp -r apps/admin-ui/dist /out/dist && cp -r apps/mobile-ui/dist /out/dist-mobile
 
 FROM ${NGINX_IMAGE}
 COPY --from=build /repo/apps/admin-ui/dist /usr/share/nginx/html
+COPY --from=build /repo/apps/mobile-ui/dist /usr/share/nginx/html-mobile
 COPY docker/nginx/phoenix.conf /etc/nginx/conf.d/default.conf
 EXPOSE 80

@@ -29,6 +29,27 @@ function Write-Fail($msg) {
 function Mark-Done($k) { Add-Content -Path $StateFile -Value $k }
 function Test-Done($k) { return (Test-Path $StateFile) -and (@(Get-Content $StateFile) -contains $k) }
 
+# ── 0. 参数守卫（BUG-174）──
+# PowerShell 只把【单横线】当参数名（-Version）。若按 WSL bash 的习惯写成 `--version`，
+# 它不会被认成参数名，而是按【位置】绑到第一个参数上：$Version="--version"、后一个值顺位
+# 顶给 $Project —— 一路静默带到 docker tag 才炸（`invalid tag "phx-tmp-jar:--version"`），
+# 报错完全指不到根因（实测两次白跑）。这里在动手前把这类误用拦下并打印正确用法。
+$argErrs = @()
+if ($Version -like '-*') { $argErrs += "-Version 收到以 '-' 开头的值：'$Version'（是不是把 -Version 写成了 --version？）" }
+if ($Project -like '-*') { $argErrs += "-Project 收到以 '-' 开头的值：'$Project'（是不是把 -Project 写成了 --project？）" }
+if ($Distro  -like '-*') { $argErrs += "-Distro 收到以 '-' 开头的值：'$Distro'" }
+if ($Mirror  -like '-*') { $argErrs += "-Mirror 收到以 '-' 开头的值：'$Mirror'" }
+if ($Version -and ($Version -notmatch '^v?\d+\.\d+(\.\d+)?([-.+][0-9A-Za-z.+-]+)?$')) { $argErrs += "-Version 值 '$Version' 不像版本号（应形如 1.7.0）" }
+if ($Project -match '^\d+\.\d+') { $argErrs += "-Project 值 '$Project' 像版本号 ⇒ 参数整体错位了（典型：-Version 写成了 --version）" }
+if ($args.Count -gt 0) { $argErrs += "有多余的位置参数：$($args -join ' ')" }
+if ($argErrs.Count -gt 0) {
+  Write-Host "[bootstrap.ps1] 参数有误，已在动手前拦下：" -ForegroundColor Red
+  foreach ($e in $argErrs) { Write-Host "  × $e" -ForegroundColor Red }
+  Write-Host "  正确用法: .\docker\scripts\bootstrap.ps1 -Version 1.7.0 [-Project phoenix] [-Port 9080] [-Distro Ubuntu-22.04] [-Mirror <源前缀>] [-Offline]" -ForegroundColor Yellow
+  Write-Host "  提示: PowerShell 参数一律【单横线】；双横线写法（--version）是给 WSL 内 bash 脚本用的。" -ForegroundColor Yellow
+  exit 1
+}
+
 # ── 1. 管理员 ──
 $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 if (-not $isAdmin) { Write-Fail "请以管理员身份运行 PowerShell" }
@@ -75,9 +96,12 @@ if (Test-Distro $Distro) {
 $WinPath = ($SrcRoot -replace '\\','/')
 $Drv = $WinPath.Substring(0,1).ToLower(); $Rest = $WinPath.Substring(2)
 $WslSrc = "/mnt/$Drv$Rest"
-Write-Step "拷贝源码进 WSL: $WslSrc → ~/phoenix-src"
-& wsl -d $Distro -u root -- bash -c "mkdir -p ~/phoenix-src && cp -ru '$WslSrc/.' ~/phoenix-src/"
-if ($LASTEXITCODE -ne 0) { Write-Fail "源码拷贝失败（路径换算: $WslSrc）" }
+Write-Step "镜像源码进 WSL: $WslSrc → ~/phoenix-src（先清空，避免陈旧文件残留）"
+# BUG-179: 原用 cp -ru（只增不删）⇒ 切分支/删文件后 WSL 里是「陈旧并集」，会拿已删除的源码去编译
+# （实测：v2.0.0 下线组织维度删掉的 PrivilegeDepartmentServiceImpl.java 残留 ⇒ 编译报 getDeptId 找不到）。
+# 改真镜像：docker/dist（断点状态+已产出工件，约 1.5G）先暂存、整棵重拷（源码+.git 约 110MB、秒级）、再把 dist 放回。
+& wsl -d $Distro -u root -- bash -c "rm -rf /tmp/phx-dist-keep; { mv ~/phoenix-src/docker/dist /tmp/phx-dist-keep 2>/dev/null || true; }; rm -rf ~/phoenix-src; mkdir -p ~/phoenix-src; cp -r '$WslSrc/.' ~/phoenix-src/; { mv /tmp/phx-dist-keep ~/phoenix-src/docker/dist 2>/dev/null || true; }"
+if ($LASTEXITCODE -ne 0) { Write-Fail "源码镜像失败（路径换算: $WslSrc）" }
 
 # ── 4.5 行尾规整 CRLF→LF（BUG-143）──
 # Windows 工作树在 core.autocrlf=true（Git for Windows 默认）下检出为 CRLF，而仓库对象
@@ -107,7 +131,8 @@ Write-Host "======================================================" -ForegroundC
 Write-Host "  访问地址 : http://localhost:$showPort （Windows 浏览器直接开）"
 Write-Host "  管理账号 : admin / 123456（首登立即改密）"
 Write-Host "  离线包   : WSL 内 ~/phoenix-src/docker/dist/*.tar.gz（可拷去其它机器）"
-Write-Host "  服务管理 : wsl -d $Distro -u root -- docker compose -p $Project ps"
+Write-Host "  重启语义 : 机器重启后自动复活（docker 开机自启 + compose restart:unless-stopped）；休眠/挂起只冻结进程，唤醒即继续"
+  Write-Host "  服务管理 : wsl -d $Distro -u root -- docker compose -p $Project ps"
 Write-Host "  localhost 不通时: netsh interface portproxy add v4tov4 listenport=$showPort listenaddress=0.0.0.0 connectport=$showPort connectaddress=<WSL hostname -I>"
 Write-Host "======================================================" -ForegroundColor Green
 exit 0

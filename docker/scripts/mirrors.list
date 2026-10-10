@@ -5,9 +5,12 @@
 #   docker.1ms.run→401 / docker.m.daocloud.io→401 / dockerproxy.net→200
 #   docker.1panel.live→200 / docker.nju.edu.cn→403 / hub.rat.dev→302
 #   注意：401/403 也算"活"（registry 正常应答），判活只看响应码 != 000
-https://docker.1ms.run
+# 〔2026-10-09 排序调整（BUG-176）〕判活只测响应码、测不到带宽：docker.1ms.run 响应最快却实测
+#   仅 ~11KB/s（maven 基础镜像拉 1327s、nginx 627B 层被截断 ⇒ 步骤 4/8 失败）。故把实测较稳的
+#   源前置；判活按此顺序取第一个活口，用户也可用 --mirror 直接指定。
 https://docker.m.daocloud.io
-https://dockerproxy.net
 https://docker.1panel.live
+https://docker.1ms.run
+https://dockerproxy.net
 https://docker.nju.edu.cn
 https://hub.rat.dev
