@@ -1,0 +1,28 @@
+=== T-01 / T-02 部署后行为验证证据 ===
+日期: 2026-10-09 | 分支: feature/ollama-model-support | 部署: mvn package exit=0 → compose build/up exit=0 → backend healthy
+
+--- T-01（依赖 + 类型上移）---
+  【改好了】mvn -o -q compile exit=0（0 错误）；残留 OpenAIChatModel 仅 3 个装配 builder 点（已由 T-03 收敛为分派）
+  【没改坏】既有默认模型（deepseek）真实对话回归：
+    时长 2s | 帧数 14 | 回答长度 83 | 含结束帧 end:true ✅
+    回答片段：「1+1 等于 2。……（说明：这是纯数学问题，无需检索知识库；如需…… 我会调用 getRagInfo 检索后作答。）」
+    ⇒ 类型上移未影响既有 provider 的装配与流式链路
+
+--- T-02（provider 归一 + apiKey 空串）---
+  断言① 新增 provider=ollama 且 apiKey 留空：
+    {"success":true,"message":"配置已保存"}
+  断言② 非法 provider=foo：
+    {"success":false,"message":"保存失败: 不支持的模型提供商: foo（可选: openai / deepseek / qwen / siliconflow / ollama / custom）"}
+    ⇒ 服务端拒绝且列出可选值（L-63：不信任前端 DTO、不静默落默认分支）
+  断言③ DB 语义（tbl_data_model_config id=17）：
+    17 | ollama | qwen2.5:7b | len(api_key)=0 | active=false
+    ⇒ apiKey 落**空串**（非 null，列 NOT NULL 约束满足）
+  补充：经 POST /api/model-config/activate/17 启用成功（"模型切换成功！"），复核 active=true
+    ⚠ 观察（非本任务范围，待查）：add 接口 payload 传 isActive=true 但落库为 false，
+      疑为 addConfig→toEntity 未映射该字段（既有行为），已记入待办观察，不阻塞本需求
+
+--- 尚未验证（下一批）---
+  · provider=ollama CHAT 真实流式对话（需绑定 id=17 到智能体运行配置）
+  · 工具调用正例（qwen2.5:7b）/ 反例提示（gemma3:latest 不支持工具调用）
+  · 多模态图片理解（gemma3:latest）
+  · embedding 768 维入库与检索（T-05/T-08 前置）

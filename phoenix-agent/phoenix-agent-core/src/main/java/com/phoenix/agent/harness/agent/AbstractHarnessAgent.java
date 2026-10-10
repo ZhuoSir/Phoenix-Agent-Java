@@ -9,7 +9,7 @@ import com.phoenix.data.enums.AgentStatusEnm;
 import com.phoenix.data.service.agent.AgentService;
 import io.agentscope.core.skill.repository.AgentSkillRepository;
 import io.agentscope.core.skill.repository.postgresql.PostgresSkillRepository;
-import io.agentscope.extensions.model.openai.OpenAIChatModel;
+import io.agentscope.core.model.ChatModelBase;
 import io.agentscope.extensions.postgresql.state.PostgresAgentStateStore;
 import io.agentscope.extensions.redis.RedisDistributedStore;
 import io.agentscope.extensions.redis.store.RedisStore;
@@ -70,7 +70,7 @@ public abstract class AbstractHarnessAgent implements SmartInitializingSingleton
      *
      * @return ChatModel
      */
-    public OpenAIChatModel createChatModel() {
+    public ChatModelBase createChatModel() {
         return harnessModelRegistry.getOpenAIChatModel();
     }
 

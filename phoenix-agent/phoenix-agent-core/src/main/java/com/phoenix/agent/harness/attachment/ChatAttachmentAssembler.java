@@ -12,7 +12,7 @@ import io.agentscope.core.message.Base64Source;
 import io.agentscope.core.message.TextBlock;
 import io.agentscope.core.message.UserMessage;
 import io.agentscope.core.model.GenerateOptions;
-import io.agentscope.extensions.model.openai.OpenAIChatModel;
+import io.agentscope.core.model.ChatModelBase;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.Resource;
@@ -156,7 +156,7 @@ public class ChatAttachmentAssembler {
 		if (images.isEmpty()) {
 			return Mono.just(build(loaded, List.of(), false));
 		}
-		OpenAIChatModel model = harnessModelRegistry.getOpenAIMultimodalModel();
+		ChatModelBase model = harnessModelRegistry.getOpenAIMultimodalModel();
 		if (model == null) {
 			// R-07：降级但显式告知；绝不暗示"看过图"
 			List<String> notices = new ArrayList<>();
@@ -190,7 +190,7 @@ public class ChatAttachmentAssembler {
 			});
 	}
 
-	private Mono<String> describe(OpenAIChatModel model, Loaded l) {
+	private Mono<String> describe(ChatModelBase model, Loaded l) {
 		List<ContentBlock> blocks = List.of(TextBlock.builder().text(DESCRIBE_PROMPT).build(),
 				ImageBlock.builder()
 					.source(Base64Source.builder()
