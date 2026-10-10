@@ -33,21 +33,21 @@ export interface ChatSessionUserStatVO {
 
 export async function getAgentRequestPageApi(params: Record<string, any>) {
   return requestClient.get<{ records: ChatSessionRequestVO[]; totalRow?: number }>(
-    '/platform/monitoring/agent-request/page',
+    '/monitoring/agent-request/page',
     { params },
   );
 }
 
 export async function getAgentRequestAgentStatsApi(params: Record<string, any>) {
   return requestClient.get<ChatSessionAgentStatVO[]>(
-    '/platform/monitoring/agent-request/agent-stats',
+    '/monitoring/agent-request/agent-stats',
     { params },
   );
 }
 
 export async function getAgentRequestUserStatsApi(params: Record<string, any>) {
   return requestClient.get<ChatSessionUserStatVO[]>(
-    '/platform/monitoring/agent-request/user-stats',
+    '/monitoring/agent-request/user-stats',
     { params },
   );
 }
