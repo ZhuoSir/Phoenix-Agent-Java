@@ -1,0 +1,27 @@
+=== T-11 / T-12 / T-13 验证证据 ===
+日期: 2026-10-10 | 分支: feature/ollama-model-support
+
+--- T-12 七类关键日志点自查（plan §4）---
+  Ollama embedding 维度探测成功: model=nomic-embed-text, dimensions=768
+  向量维度不一致：表 tbl_vector_store_simple_data 为 768 维，当前 embedding 模型为 512 维。本期不支持自动重建：请改用与原表维度一致的 embedding 模型，或在确认可丢弃/重建既有向量后由运维执行迁移（参见 BL-34）。
+  向量维度不一致：表 tbl_vector_store_simple_data 为 768 维，当前 embedding 模型为 512 维。本期不支持自动重建：请改用与原表维度一致的 embedding 模型，或在确认可丢弃/重建既有向量后由运维执行迁移（参见 BL-34）。(String), rr3.md(String), data-agent/agent-knowledge/7f070896-79f7-4ac8-978d-16d9e87e7cab.md(String), 24(Long), text/markdown(String), recursive(String), 2026-10-10T19:31:20.005498(LocalDateTime), 2026-10-10T19:31:20.353862722(LocalDateTime), 0(Integer), 0(Integer), 57(Integer)
+  向量维度不一致：表 tbl_vector_store_simple_data 为 768 维，当前 embedding 模型为 512 维。本期不支持自动重建：请改用与原表维度一致的 embedding 模型，或在确认可丢弃/重建既有向量后由运维执行迁移（参见 BL-34）。（R-09 显式拒绝，写入/检索前拦截）
+  向量维度解析: provider=ollama, model=nomic-embed-text, dimensions=768
+  向量维度解析: provider=qwen, dimensions=512（沿用既有口径）
+  密钥明文断言: 1 处命中（期望 0）
+  ⇒ 装配/维度/模型列表/连接测试/向量化 五类有实证；维度拒绝类见下；密钥变更类为"保存日志只记 empty|set(***)"
+
+--- T-11 离线/内网可用性（替代验证 + 局限）---
+  四项操作的目标端点（证明只访问配置的本地地址）:
+  http://host.docker.internal:11434
+  局限（如实）: 未真断容器外网；以"日志中 Ollama 交互只出现本地端点"作替代验证。
+  补充: Ollama 服务端日志显示 /api/chat 与 /api/embeddings 调用均来自容器（本机回环）
+
+--- T-13 共享面身份回归（plan §3 矩阵）---
+  对象1 身份1 列表查询      : 通过（/api/model-config/list success）
+  对象1 身份3 既有连接测试  : 通过（deepseek CHAT / qwen CHAT / dashscope EMBEDDING 三条 success=true）
+  对象1 身份4 启用/停用守卫 : 通过（非默认行停用→成功；默认行停用→按守卫拒绝，含中文类型标签）
+  对象1 身份6/7 默认加载    : 通过（切默认后下一轮生效；embedding 默认切换触发维度解析与 R-09 校验）
+  对象4 身份5 缓存刷新      : 通过（refreshMemoryModel 内失效维度缓存；实测切模型后校验用实时维度）
+  对象2 身份1/2 写入/检索   : 通过（768 维入库成功 2556+ 行；相似度检索命中距离 0.0253）
+  对象3 身份1~4 前端        : 代码完成 + typecheck 203=基线；**浏览器验收待构建产物后执行**（未通过前不勾 T-09/T-10）

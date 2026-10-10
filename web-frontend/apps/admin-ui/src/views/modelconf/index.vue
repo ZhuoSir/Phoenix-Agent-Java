@@ -2,6 +2,7 @@
 import type { FormInstance, FormRules } from 'element-plus';
 
 import type { ModelConfig } from '#/api/core/modelConfig';
+import { fetchOllamaModelsApi } from '#/api/core/modelConfig';
 
 import { computed, onMounted, reactive, ref } from 'vue';
 
@@ -81,6 +82,31 @@ const [FilterForm] = useVbenForm({
 });
 
 const loading = ref(true);
+/** R-05：Ollama 本机模型列表（拉取成功后模型名称改为可搜索下拉；失败退化手工输入） */
+const ollamaModels = ref<string[]>([]);
+const loadingModels = ref(false);
+const isOllama = computed(() => formData.provider === 'ollama');
+
+async function fetchOllamaModels() {
+  if (!formData.baseUrl) {
+    ElMessage.warning('请先填写 API 地址');
+    return;
+  }
+  loadingModels.value = true;
+  try {
+    const list = await fetchOllamaModelsApi(formData.baseUrl);
+    ollamaModels.value = list ?? [];
+    if (ollamaModels.value.length === 0) {
+      ElMessage.warning('未获取到模型，请确认 Ollama 已安装模型');
+    }
+  } catch (error: any) {
+    // 失败不阻断保存：给出原因并退化为手工输入
+    ollamaModels.value = [];
+    ElMessage.error(`获取模型列表失败：${error?.message ?? error}`);
+  } finally {
+    loadingModels.value = false;
+  }
+}
 const dialogVisible = ref(false);
 const isEditMode = ref(false);
 const submitting = ref(false);
@@ -131,7 +157,7 @@ const formRules: FormRules = {
   apiKey: [
     {
       validator: (_rule: any, value: string, callback: any) => {
-        if (formData.provider === 'custom') {
+        if (formData.provider === 'custom' || formData.provider === 'ollama') {
           callback();
         } else if (!value || value.trim() === '') {
           callback(new Error('请输入API密钥'));
@@ -568,6 +594,7 @@ onMounted(loadConfigs);
             <ElOption label="Qwen" value="qwen" />
             <ElOption label="OpenAI" value="openai" />
             <ElOption label="Siliconflow" value="siliconflow" />
+            <ElOption label="Ollama（本地/内网）" value="ollama" />
             <ElOption label="Custom" value="custom" />
           </ElSelect>
         </ElFormItem>
@@ -581,10 +608,32 @@ onMounted(loadConfigs);
         </ElFormItem>
 
         <ElFormItem label="模型名称" prop="modelName">
-          <ElInput
-            v-model="formData.modelName"
-            placeholder="例如: gpt-4, deepseek-chat, qwen-plus, text-embedding-v4"
-          />
+          <div style="display: flex; gap: 8px; width: 100%">
+            <ElSelect
+              v-if="isOllama && ollamaModels.length > 0"
+              v-model="formData.modelName"
+              filterable
+              allow-create
+              default-first-option
+              placeholder="选择本机已安装模型（可搜索）"
+              style="flex: 1"
+            >
+              <ElOption v-for="m in ollamaModels" :key="m" :label="m" :value="m" />
+            </ElSelect>
+            <ElInput
+              v-else
+              v-model="formData.modelName"
+              placeholder="请输入模型名称"
+              style="flex: 1"
+            />
+            <ElButton
+              v-if="isOllama"
+              :loading="loadingModels"
+              @click="fetchOllamaModels"
+            >
+              获取模型列表
+            </ElButton>
+          </div>
         </ElFormItem>
 
         <ElFormItem
