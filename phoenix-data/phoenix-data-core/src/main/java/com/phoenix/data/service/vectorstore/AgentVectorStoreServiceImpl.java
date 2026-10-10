@@ -33,6 +33,10 @@ import static com.phoenix.data.service.vectorstore.DynamicFilterService.buildFil
 @Transactional(rollbackFor = Exception.class)
 public class AgentVectorStoreServiceImpl implements AgentVectorStoreService {
 
+	/** R-09：写入/检索前校验向量表维度和当前 embedding 模型一致（不一致则显式拒绝） */
+	@org.springframework.beans.factory.annotation.Autowired
+	private com.phoenix.data.service.aimodelconfig.EmbeddingDimensionResolver embeddingDimensionResolver;
+
     private static final String DEFAULT = "default";
     @Autowired
     @Qualifier("simpleVectorStore")
@@ -111,6 +115,8 @@ public class AgentVectorStoreServiceImpl implements AgentVectorStoreService {
      */
     @Override
     public void addDocuments(String agentId, List<Document> documents) {
+        // R-09：维度不一致必须显式拒绝（防脏数据/静默失败），先于任何写入
+        embeddingDimensionResolver.assertAllTablesCompatible();
         Assert.notNull(agentId, "AgentId cannot be null.");
         Assert.notEmpty(documents, "Documents cannot be empty.");
 
