@@ -43,6 +43,15 @@ public class EmbeddingDimensionResolver {
 	private volatile Integer cachedDimensions;
 
 	/**
+	 * 使缓存失效（模型配置变更时调用）。
+	 *
+	 * <p>否则运行中切换 embedding 模型后，校验/装配仍用旧维度 ⇒ 出现"校验放行但 INSERT 维度不符"的裸 SQL 错误。
+	 */
+	public void invalidate() {
+		cachedDimensions = null;
+	}
+
+	/**
 	 * 解析当前生效的向量维度。
 	 */
 	public int resolve() {
@@ -108,6 +117,8 @@ public class EmbeddingDimensionResolver {
 	 * 任一表维度不一致即拒绝（含表名与处置建议），避免"静默写坏/检索空结果"。
 	 */
 	public void assertAllTablesCompatible() {
+		// R-09：必须用**实时**维度（缓存可能在模型切换后滞后，导致校验放行而 INSERT 失败）
+		invalidate();
 		int modelDims = resolve();
 		java.util.List<String> tables = jdbcTemplate.queryForList(
 				"select c.table_name from information_schema.columns c "

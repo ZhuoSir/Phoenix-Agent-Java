@@ -27,6 +27,10 @@ import tools.jackson.databind.ObjectMapper;
 @AllArgsConstructor
 public class ModelConfigOpsService {
 
+	/** R-09：模型配置变更时让向量维度缓存失效 */
+	@org.springframework.beans.factory.annotation.Autowired
+	private EmbeddingDimensionResolver embeddingDimensionResolver;
+
 	@org.springframework.beans.factory.annotation.Autowired
 	private OllamaApiClient ollamaApiClient;
 
@@ -136,6 +140,8 @@ public class ModelConfigOpsService {
 	 * 刷新内存中的模型实例（清空注册中心的缓存）
 	 */
 	private void refreshMemoryModel(ModelType type) {
+		// R-09：任何模型配置变更后，维度缓存必须失效（含 EMBEDDING 默认/启停/更新）
+		embeddingDimensionResolver.invalidate();
 		if (ModelType.CHAT.equals(type)) {
 			aiModelRegistry.refreshChat();
 		}
