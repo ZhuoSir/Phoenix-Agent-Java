@@ -781,3 +781,14 @@
   ② 类型改名/签名变更类改动，落锤前必须编译一遍（编译是唯一权威），不得用 grep 代替编译；
   ③ 汇报"残留仅剩 N 处"时，必须附上完整命中的文件:行清单。
 - 关联: L-32④（错误数崩塌=文件写坏）；T-01
+
+## L-84 构建脚本内部再调 pnpm ⇒ 需 shim 在 PATH；且**构建失败后仍复制 stale dist 并部署 = 双重陷阱**
+- 场景: 本轮构建 admin-ui 时 `pnpm run build` 内部执行 `pnpm vite build`，而我只把 pnpm.mjs 的 **node 路径** 放进了 PATH，
+  没有 pnpm 可执行名 ⇒ 子进程报 `sh: pnpm: command not found`、构建 exit=1；而我**未校验 exit 就复制 dist 并部署了 nginx**
+  ⇒ 部署的是上一版旧产物（产物断言 "获取模型列表 = 0 个文件" 才暴露）。补 `/tmp/pnbin/pnpm` shim 后重建，断言 1/1/1 通过再部署。
+- 根因: ① 与 L-77 同源——工具链要"可执行名"在 PATH，而不只是能被 node 执行；
+  ② 更严重的是"构建失败仍继续部署"：**没有把"产物含新内容"作为部署前置断言**。
+- 防再犯规则: ① 部署前必须 `[ build exit == 0 ]` **且** 断言产物含本次新增字符串（>0 命中）——两者缺一即拒绝部署；
+  ② 前端构建一律带 shim：`printf '#!/bin/sh\nexec <node> <pnpm.mjs> "$@"\n' > /tmp/pnbin/pnpm && chmod +x`，PATH 前置；
+  ③ 部署后**在运行容器内**再断言一次（线上容器路径 /usr/share/nginx/html/assets），不只看本地 dist。
+- 关联: L-77（工具链不在 PATH ⇒ 假信号）、L-83（截断输出漏判）；T-09/T-10
