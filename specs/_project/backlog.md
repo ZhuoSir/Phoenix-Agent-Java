@@ -20,6 +20,8 @@
 | BL-10 | **语音（AUDIO）能力接入或下线** | 本次模型「启用/默认」改造暴露 | 待确认 | 现状：AUDIO 是三种模型类型之一、可设默认，`AiModelRegistry.getTranscriptionModel()` 与 `DynamicModelFactory.createTranscriptionModel()` 均已实现，但**全仓无业务调用方** → 要么接 ASR 场景（如语音问数），要么在模型管理隐藏 AUDIO |
 | BL-11 | 清理**死配置** `phoenix.agent.skillPath`（`PhoenixAgentProperties:12` 定义、全仓无引用） | `BUG-06` 遗留 | 已立项(v1.7.0) | 技能资源路径实际由 `PostgresSkillRepository` + `SkillZipSanitizer` 决定；该属性留着会误导配置者 〔2026-10-05：随 `specs/20261005_visibility-filetree-hygiene` 立项（R-03 清账组）〕|
 
+| BL-47 | **打包/安装断点状态机加「逻辑指纹」**：`docker/dist/.package-<ver>-<arch>.state` 只记步骤号、不含该步逻辑或输入的指纹 ⇒ 改了某步代码后重跑仍判「已完成」而跳过，新逻辑**静默不生效** | 2026-10-09 现场实测（BUG-168：给步骤 3 加 `dist-mobile` 提取后重跑，仍从 `步骤 2/8` 直跳 `步骤 4/8`、整轮仅 34 秒）；2026-10-10 用户裁决「转 BL」 | 待办（原 BUG-168） | 修法：状态文件记「步骤号 + 该步脚本 sha 或版本常量（如 `PHX_PIPELINE_VERSION`）」，指纹不符即视为未完成；或提供 `--force-step N`，并在文档写明「改了打包脚本要清状态」。⚠️ **同类风险也在 `install.sh` 的九步状态机**（`$PAYLOAD/.phoenix-install.state`）——本轮 BUG-165/170 都踩过它，建议一并做 |
+
 ## 二、工程卫生（非功能，随手可做）
 | # | 待办 | 来源 | 状态 | 备注 |
 |---|---|---|---|---|
