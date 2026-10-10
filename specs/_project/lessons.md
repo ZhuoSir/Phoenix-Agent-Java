@@ -789,6 +789,6 @@
 - 根因: ① 与 L-77 同源——工具链要"可执行名"在 PATH，而不只是能被 node 执行；
   ② 更严重的是"构建失败仍继续部署"：**没有把"产物含新内容"作为部署前置断言**。
 - 防再犯规则: ① 部署前必须 `[ build exit == 0 ]` **且** 断言产物含本次新增字符串（>0 命中）——两者缺一即拒绝部署；
-  ② 前端构建一律带 shim：`printf '#!/bin/sh\nexec <node> <pnpm.mjs> "$@"\n' > /tmp/pnbin/pnpm && chmod +x`，PATH 前置；
+  ② 前端构建的 PATH 必须**同时**含 ①pnpm shim 目录 ②**node 的 bin 目录**（只加 shim 会报 `exec: node: not found` —— 本轮连踩两次）；
   ③ 部署后**在运行容器内**再断言一次（线上容器路径 /usr/share/nginx/html/assets），不只看本地 dist。
 - 关联: L-77（工具链不在 PATH ⇒ 假信号）、L-83（截断输出漏判）；T-09/T-10

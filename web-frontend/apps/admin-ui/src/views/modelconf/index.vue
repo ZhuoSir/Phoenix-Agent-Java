@@ -141,6 +141,8 @@ const providerBaseUrlMap: Record<string, string> = {
   qwen: 'https://dashscope.aliyuncs.com/compatible-mode',
   openai: 'https://api.openai.com',
   siliconflow: 'https://api.siliconflow.cn',
+  // R-01：Ollama 本地/内网默认地址（容器访问宿主；内网部署可改为内网 IP）
+  ollama: 'http://host.docker.internal:11434',
   custom: 'https://modelservice.jdcloud.com/',
 };
 
