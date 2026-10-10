@@ -879,3 +879,18 @@
 - 附带: `git checkout -m -- <file>` 重建的冲突标记标签是 `<<<<<<< ours`/`>>>>>>> theirs`（不是 `HEAD`/分支名），
   解析冲突的正则须写成标签无关；这批台账也别用 `Get-Content` 读（GBK 乱码，见 L-86）。
 - 关联: BL-46（编号撞号收口）、BUG-174~186、L-88（pwsh 变量被吞导致空心测试）
+
+## L-92 带 `ValueFromRemainingArguments` 的位置参数会被隐式排到**最后**；"空输出就算失败"的守卫挡不住把错误写进 stdout 的命令
+- 场景: `.\phoenix-ctl.ps1 stop` 报 `WSL_E_DISTRO_NOT_FOUND`（BUG-187）——脚本把**命令名**当成了发行版名。
+- 根因: ① `param([Parameter(ValueFromRemainingArguments = $true)][string[]]$Args, [string]$Distro = "Ubuntu-22.04")`
+  中 `$Args` 未显式声明 Position ⇒ PowerShell 隐式排序把它排到**最后一位**，第一个位置参数被 `$Distro` 吃掉
+  （探针实测：`… status` → `Args=[] Distro=[status]`；`… start nginx` → `Args=[nginx] Distro=[start]`）；
+  ② `wsl` 的「不存在该发行版」打到 **stdout** ⇒ `if (-not $probe)` 这类"没输出就算失败"的守卫**恒不触发**，
+  错误文本被当成数据继续往下传（表现=没有报错、行为诡异、退出码 -1）。
+- 防再犯规则: ① 收集剩余参数的位置参数一律写 `[Parameter(Position = 0, ValueFromRemainingArguments = $true)]`，
+  并**用探针实测四种调用**（无参 / 单个位置 / 多个位置 / 显式命名参数），别照文档猜——本次另一候选
+  「只声明 `-Distro`、命令用自动变量 `$args`」就是被探针否定的想当然修法；
+  ② 调外部命令时**校验返回物的形状**（路径要 `-match '/docker$'`、JSON 要能 parse），别只判空：
+  "有输出" ≠ "成功了"；③ 关键入口加「预检 + 可行动的报错」（列出可用发行版、给出 `-Distro` 示例），
+  把不可归因的底层报错变成一句话能照做的提示；④ 对错误流不规范的 CLI（`wsl` 把错误写 stdout）尤其要这样。
+- 关联: BUG-187；L-85（`2>$null` 吞 stderr 的另一面：错误根本没走 stderr）、L-88（pwsh 变量被吞导致空心测试）
