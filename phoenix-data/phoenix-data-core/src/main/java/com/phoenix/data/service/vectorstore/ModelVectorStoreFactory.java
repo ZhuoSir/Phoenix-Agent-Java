@@ -100,6 +100,25 @@ public class ModelVectorStoreFactory {
 		return ensureModelTable(baseTable, modelId);
 	}
 
+	/**
+	 * 幂等确保专属表存在（**不依赖内存缓存**）：即使 store 已缓存、或表被外部删除，也能自愈（运维工具箱/断点续跑）。
+	 */
+	public void ensureTableExists(String baseTable, Integer modelId) {
+		if (modelId == null) {
+			return;
+		}
+		Integer defId = defaultEmbeddingModelId();
+		if (defId != null && defId.equals(modelId)) {
+			return; // 默认模型用基表
+		}
+		ModelConfig cfg = modelConfigDataService.getById(modelId);
+		if (cfg == null) {
+			throw new IllegalArgumentException("指定的向量模型不存在：" + modelId);
+		}
+		String modelKey = modelKey(cfg);
+		ensureTableDdl(baseTable + "__" + shortHash(modelKey), resolveDimensions(cfg), spaceKeyFor(modelId));
+	}
+
 	/** 确保某模型的表存在（首绑即建；幂等，可重复调用）。 */
 	public PgVectorStore ensureModelTable(String baseTable, Integer modelId) {
 		ModelConfig cfg = modelId == null ? null : modelConfigDataService.getById(modelId);

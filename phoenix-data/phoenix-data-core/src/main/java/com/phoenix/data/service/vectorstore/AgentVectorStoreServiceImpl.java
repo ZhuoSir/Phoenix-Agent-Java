@@ -236,7 +236,8 @@ public class AgentVectorStoreServiceImpl implements AgentVectorStoreService {
             m.put("retrievalSourceKbIds", kbIds);
             m.put("retrievalSourceTable", "keyword:tbl_data_agent_knowledge");
             String text = it.getContent() == null ? String.valueOf(it.getTitle()) : it.getContent();
-            docs.add(new Document(String.valueOf(it.getId()), text, m));
+            // Spring AI 的 Document id 必须为 UUID（条目 id 保留在 metadata.agentKnowledgeId）
+            docs.add(new Document(java.util.UUID.randomUUID().toString(), text, m));
         }
         log.warn("检索降级（模型不可达 ⇒ 关键词兜底）: kbIds={}, reason={}, 影响条数={}", kbIds, reason, docs.size());
         return docs;

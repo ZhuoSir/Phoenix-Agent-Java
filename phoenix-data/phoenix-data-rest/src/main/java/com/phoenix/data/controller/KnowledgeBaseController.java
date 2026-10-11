@@ -40,6 +40,9 @@ public class KnowledgeBaseController {
 	/** R-03/T-06：检索路由探针（无 LLM 依赖，供运维与验证） */
 	private final com.phoenix.data.service.vectorstore.AgentVectorStoreService agentVectorStoreService;
 
+	/** R-04/T-10：重建任务（后台执行/进度/重试/续跑） */
+	private final com.phoenix.data.service.knowledge.KnowledgeRebuildService knowledgeRebuildService;
+
 	/** R-18（CR-01/T-25）：超管判定复用 R-08/R-17 守卫（单一口径） */
 	private final com.phoenix.data.component.AdminRoleGuard adminRoleGuard;
 
@@ -141,6 +144,74 @@ public class KnowledgeBaseController {
 			}
 			out.put("hitCount", hitCount);
 			return ApiResponse.success("查询成功", out);
+		}
+		catch (Exception e) {
+			return ApiResponse.error(e.getMessage());
+		}
+	}
+
+	/** R-04/T-10 启动重建任务（管理员）：把该库向量重建到目标模型，完成后原子切换绑定。 */
+	@PostMapping("/{id}/rebuild")
+	public ApiResponse<java.util.Map<String, Object>> startRebuild(@PathVariable("id") Long id,
+			@org.springframework.web.bind.annotation.RequestBody java.util.Map<String, Object> body) {
+		try {
+			if (!isSuperAdmin()) {
+				return ApiResponse.error("仅管理员可发起重建");
+			}
+			Object tm = body.get("toModelId");
+			if (tm == null) {
+				return ApiResponse.error("缺少 toModelId");
+			}
+			Long jobId = knowledgeRebuildService.start(id, Integer.valueOf(String.valueOf(tm)), me());
+			java.util.Map<String, Object> out = new java.util.LinkedHashMap<>();
+			out.put("jobId", jobId);
+			out.put("kbId", id);
+			out.put("toModelId", Integer.valueOf(String.valueOf(tm)));
+			return ApiResponse.success("重建任务已创建", out);
+		}
+		catch (Exception e) {
+			return ApiResponse.error("创建重建任务失败: " + e.getMessage());
+		}
+	}
+
+	/** R-04/T-10 进度查询：最新任务的数值进度与失败清单。 */
+	@GetMapping("/{id}/rebuild/latest")
+	public ApiResponse<Object> rebuildLatest(@PathVariable("id") Long id) {
+		try {
+			if (!isSuperAdmin()) {
+				return ApiResponse.error("仅管理员可查看重建进度");
+			}
+			return ApiResponse.success("查询成功", knowledgeRebuildService.latest(id));
+		}
+		catch (Exception e) {
+			return ApiResponse.error(e.getMessage());
+		}
+	}
+
+	/** R-04/T-10 续跑（断点续跑，亦可由启动钩子自动触发）。 */
+	@PostMapping("/rebuild/{jobId}/resume")
+	public ApiResponse<String> rebuildResume(@PathVariable("jobId") Long jobId) {
+		try {
+			if (!isSuperAdmin()) {
+				return ApiResponse.error("仅管理员可续跑重建");
+			}
+			knowledgeRebuildService.resume(jobId);
+			return ApiResponse.success("已提交续跑");
+		}
+		catch (Exception e) {
+			return ApiResponse.error(e.getMessage());
+		}
+	}
+
+	/** R-04/T-10 重试失败条目。 */
+	@PostMapping("/rebuild/{jobId}/retry")
+	public ApiResponse<String> rebuildRetry(@PathVariable("jobId") Long jobId) {
+		try {
+			if (!isSuperAdmin()) {
+				return ApiResponse.error("仅管理员可重试重建");
+			}
+			knowledgeRebuildService.retryFailed(jobId);
+			return ApiResponse.success("已提交重试");
 		}
 		catch (Exception e) {
 			return ApiResponse.error(e.getMessage());
