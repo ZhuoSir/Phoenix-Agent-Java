@@ -68,8 +68,10 @@ function modelNameOf(id?: null | number) {
 /** 拉取可用向量模型（EMBEDDING）并识别默认项（R-01：下拉默认值=默认向量模型） */
 async function loadEmbeddingModels() {
   try {
-    const all = await getModelConfigListApi();
-    const embs = (all || []).filter((m) => String(m.modelType).toUpperCase() === 'EMBEDDING' && m.id != null);
+    const body: any = await getModelConfigListApi();
+    // 该接口经 responseReturn:'body' 返回的是 ApiResponse 信封（{data:[...]}），需兼容裸数组与信封两种形态
+    const all: any[] = Array.isArray(body) ? body : (body?.data ?? []);
+    const embs = all.filter((m) => String(m?.modelType).toUpperCase() === 'EMBEDDING' && m?.id != null);
     embeddingModels.value = embs.map((m) => ({ id: m.id as number, label: `${m.modelName}（${m.provider}）` }));
     defaultModelId.value = embs.find((m) => m.isDefault)?.id ?? embs[0]?.id ?? null;
   } catch {
