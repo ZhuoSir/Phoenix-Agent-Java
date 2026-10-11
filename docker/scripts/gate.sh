@@ -60,6 +60,13 @@ fresh_install() {
   local envflag=""
   # 装前预清：同名项目的残留容器会让 compose recreate 撞上竞态（实测 No such container）
   ( cd "$PAYLOAD/docker" 2>/dev/null && IMAGE_TAG="$VERSION" docker compose -p "$PROJECT" down -v >/dev/null 2>&1 ) || true
+  # 装前预清**载荷残留**（BUG-197）：出现即 WARN 并记录（全新安装语义要求无旧 .env/状态/收据）
+  local leftovers
+  leftovers="$(cd "$PAYLOAD" && ls -A 2>/dev/null | grep -E '^\.env$|^\.phoenix-|^RECEIPT$' | tr '\n' ' ')"
+  if [ -n "${leftovers:-}" ]; then
+    phx_log WARN "载荷内含上次安装残留（BUG-197）: ${leftovers}⇒ 本次按全新安装处理（已移除）"
+    ( cd "$PAYLOAD" && rm -f .env .phoenix-install.state .phoenix-project .phoenix-pgpassword RECEIPT )
+  fi
   [ "$ALLOW_MISMATCH" -eq 1 ] && envflag="PHOENIX_ALLOW_ARCH_MISMATCH=1"
   ( cd "$PAYLOAD" && rm -f .phoenix-install.state && \
     env $envflag PHX_LOG_FILE="$OUT/install-${PROJECT}.log" bash install.sh --project "$PROJECT" --port "$PORT" --timeout "$TIMEOUT" ) \
