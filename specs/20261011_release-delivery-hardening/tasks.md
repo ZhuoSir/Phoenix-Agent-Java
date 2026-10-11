@@ -43,7 +43,7 @@
 
 ## 4. 维度迁移独立脚本（R-04）
 
-- [ ] T-06 新增 `docker/scripts/vector-dim-migrate.sh`（`--dims N [--dry-run] [--pg-container NAME] [--table T]`）：删索引时排除约束承载索引；迁移后自检维度与 id 唯一约束，不通过即给修复语句
+- [x] T-06 新增 `docker/scripts/vector-dim-migrate.sh`（`--dims N [--dry-run] [--pg-container NAME] [--table T]`）：删索引时排除约束承载索引；迁移后自检维度与 id 唯一约束，不通过即给修复语句
   关联: R-04
   依赖: T-01
   验证方式: ① 在独立 pgvector 库跑 `--dry-run`（事务回滚）→ 断言数据未变（维度/行数/约束数与执行前一致）；② 真跑一次 → 断言 4 表维度=目标值、hnsw 索引已重建、**约束数不减**；③ **反例**：造"缺 PK"表 → 断言自检报出并打印 `ADD CONSTRAINT ... PRIMARY KEY (id)`；④ **反例**：造重复 id → 断言报重复组数并给查重/去重语句；⑤ **身份对照（向量表 3 身份）**：平台写入路径（入库一篇文档）+ 检索路径（检索命中）+ 运维脚本，三者仍正常；⑥ 日志断言：逐表 INFO（表名/原维度/目标维度/索引动作/行数）+ 自检结果

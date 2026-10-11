@@ -1007,3 +1007,14 @@
      优先排查**未定义函数/未设前提被 `||` 吞掉**；
   ④ 被复用的函数在调用前 self-check 存在性（脚本层 `command -v` 守卫）。
 - 状态: active
+
+## L-103 `mktemp` 模板必须以 `XXXXXX` 结尾——macOS 不接受后缀，返回空路径后被重定向变成"空文件名"
+- 分类: 工具 / 跨平台
+- 触发场景: `vector-dim-migrate.sh` 生成临时 SQL 文件（T-06）
+- 坑: `mktemp "${TMPDIR:-/tmp}/phx-vdm.XXXXXX.sql"` 在 macOS 直接失败并返回**空串** ⇒ 后续
+  `{ ... } > "$SQLF"` 报 `line 91: : No such file or directory`（**空命令名**），极易误判为脚本语法问题
+- 防再犯规则:
+  ① `mktemp` 模板一律以 `XXXXXX` 结尾；需要后缀就在创建后 `mv` 重命名；
+  ② 临时路径变量创建后立即 `[ -n "$VAR" ]` 守卫，报"临时文件创建失败"真因；
+  ③ 见到空命令名报错（`` : No such file or directory ``）先查**未赋值/空变量**，再怀疑语法。
+- 状态: active
