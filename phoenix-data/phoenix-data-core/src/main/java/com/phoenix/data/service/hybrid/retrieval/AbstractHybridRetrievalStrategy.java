@@ -55,10 +55,16 @@ public abstract class AbstractHybridRetrievalStrategy implements HybridRetrieval
 	public List<Document> retrieve(HybridSearchRequest request) {
 
 		SearchRequest vectorSearchRequest = request.toVectorSearchRequest();
+		// R-03/T-06：优先使用调用方按"命中库绑定模型"路由后的存储；为空则沿用本策略默认存储（行为不变）
+		final VectorStore effectiveStore = request.getRoutingVectorStore() == null ? vectorStore
+				: request.getRoutingVectorStore();
+		if (request.getRoutingVectorStore() != null) {
+			log.info("混合检索向量腿使用路由后的存储（按库绑定模型）");
+		}
 
 		// 异步执行向量搜索
 		CompletableFuture<List<Document>> vectorSearchFuture = CompletableFuture.supplyAsync(() -> {
-			List<Document> vectorResults = vectorStore.similaritySearch(vectorSearchRequest);
+			List<Document> vectorResults = effectiveStore.similaritySearch(vectorSearchRequest);
 			log.debug("Vector Search completed. Found {} documents for SearchRequest: {}", vectorResults.size(),
 					vectorSearchRequest);
 			return vectorResults;

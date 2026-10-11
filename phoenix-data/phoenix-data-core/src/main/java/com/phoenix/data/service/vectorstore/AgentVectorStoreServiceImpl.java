@@ -90,12 +90,17 @@ public class AgentVectorStoreServiceImpl implements AgentVectorStoreService {
                 .filterExpression(filter)
                 .build();
 
+        // R-03/T-06：单库 ⇒ 按该库绑定模型选表选模型；多库 ⇒ 暂用默认存储（分组扇出见 T-07）
+        // 注意：路由必须在混合检索分支**之前**解析，并把结果注入请求，否则混合路径会用策略自带存储（实测绕过）
+        Route route = resolveRoute(searchRequest.getAgentId(), searchRequest.getDocVectorType());
+        hybridRequest.setRoutingVectorStore(route.store);
         if (dataAgentProperties.getVectorStore().isEnableHybridSearch() && hybridRetrievalStrategy.isPresent()) {
+            log.info("混合检索（按库绑定模型路由）: agentId={}, docVectorType={}, kbId={}, modelId={}, table={}",
+                    searchRequest.getAgentId(), searchRequest.getDocVectorType(), route.kbId, route.modelId,
+                    route.table);
             return hybridRetrievalStrategy.get().retrieve(hybridRequest);
         }
         log.debug("Hybrid search is not enabled. use vector-search only");
-        // R-03/T-06：单库 ⇒ 按该库绑定模型选表选模型；多库 ⇒ 暂用默认存储（分组扇出见 T-07）
-        Route route = resolveRoute(searchRequest.getAgentId(), searchRequest.getDocVectorType());
         List<Document> results = route.store.similaritySearch(hybridRequest.toVectorSearchRequest());
         log.info("检索完成（按库绑定模型路由）: agentId={}, docVectorType={}, kbId={}, modelId={}, table={}, hits={}",
                 searchRequest.getAgentId(), searchRequest.getDocVectorType(), route.kbId, route.modelId, route.table,
