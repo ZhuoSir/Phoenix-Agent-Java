@@ -14,5 +14,5 @@ public class KnowledgeBaseCreateDTO {
     private String description;
 
     /** 向量模型 id；为空则绑定当前默认 embedding 模型（R-01） */
-    private Long embeddingModelId;
+    private Integer embeddingModelId;
 }

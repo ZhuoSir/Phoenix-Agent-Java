@@ -26,7 +26,7 @@ public class KnowledgeBaseVO {
     private List<String> boundAgentNames;
 
     /** 绑定的向量模型 id（R-01） */
-    private Long embeddingModelId;
+    private Integer embeddingModelId;
 
     /** 向量空间键（R-06） */
     private String modelSpaceKey;

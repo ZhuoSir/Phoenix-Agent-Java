@@ -16,7 +16,7 @@ public class KnowledgeBaseUpdateDTO {
     private Integer status;
 
     /** 请求更换的向量模型 id（为空=不变更绑定）；变更需走重建流程（R-01 附加） */
-    private Long embeddingModelId;
+    private Integer embeddingModelId;
 
     /** 是否已确认"更换模型将重建该知识库"；未确认时仅返回提示、绑定不变（R-01 附加） */
     private Boolean confirmRebuild;

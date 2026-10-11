@@ -14,6 +14,7 @@ import com.phoenix.data.enums.ModelType;
 import com.phoenix.data.dto.ModelConfigDTO;
 import com.phoenix.data.entity.ModelConfig;
 import com.phoenix.data.service.aimodelconfig.ModelConfigDataService;
+import com.phoenix.data.service.vectorstore.ModelVectorStoreFactory;
 import com.mybatisflex.core.query.QueryWrapper;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -44,6 +45,8 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
 
     private final ModelConfigDataService modelConfigDataService;
 
+    private final ModelVectorStoreFactory modelVectorStoreFactory;
+
     @Override
     public KnowledgeBaseVO create(KnowledgeBaseCreateDTO dto, String operator) {
         String name = StrUtil.trim(dto.getName());
@@ -61,6 +64,11 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
           // R-01：创建时绑定向量模型——显式指定优先，否则取默认 embedding 模型
           kb.setEmbeddingModelId(resolveBindingModelId(dto.getEmbeddingModelId()));
         knowledgeBaseMapper.insert(kb);
+        // R-02：首绑某模型即确保其专属向量表存在（幂等；默认模型复用既有表，不新建）
+        if (kb.getEmbeddingModelId() != null) {
+            java.util.Map<String, String> tables = modelVectorStoreFactory.ensureKnowledgeTables(kb.getEmbeddingModelId());
+            log.info("知识库绑定模型专属表就绪: kbId={}, modelId={}, tables={}", kb.getId(), kb.getEmbeddingModelId(), tables);
+        }
           log.info("知识库创建: id={}, name={}, by={}, embeddingModelId={}", kb.getId(), name, operator,
                   kb.getEmbeddingModelId());
         return toVO(kb, false);
@@ -188,7 +196,7 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
     }
 
     /** 解析创建时的向量模型绑定：显式指定优先（须存在），否则取默认 embedding 模型、再退任一启用行（R-01） */
-    private Long resolveBindingModelId(Long explicitModelId) {
+    private Integer resolveBindingModelId(Integer explicitModelId) {
         if (explicitModelId != null) {
             ModelConfig cfg = modelConfigDataService.getById(explicitModelId);
             if (cfg == null) {
@@ -200,7 +208,7 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
         if (def == null) {
             def = modelConfigDataService.getActiveConfigByType(ModelType.EMBEDDING);
         }
-        return (def == null || def.getId() == null) ? null : def.getId().longValue();
+        return (def == null) ? null : def.getId();
     }
 
     private KnowledgeBaseVO toVO(KnowledgeBase kb, boolean withBoundAgents) {
