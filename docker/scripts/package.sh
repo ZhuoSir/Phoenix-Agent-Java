@@ -3,11 +3,12 @@
 # 用法: package.sh [--arch amd64|arm64] [--version X.Y.Z] [--overseas] [--mirror <前缀>] [--out <目录>]
 #        [--engine-tgz <本地路径|URL>]  # R-02：通用静态二进制离线引擎件（含字节对账/tar 完整性校验）
 #        [--engine-bytes <N>]           # 可选：期望字节数（L-73 对账）
+#        [--skip-gate]                  # 仅调试：跳过出货门禁（R-05；禁止用于出货）
 # 产物: <out>/phoenix-<ver>-<arch>.tar.gz（自包含：镜像+compose资产+安装脚本+manifest+sha256）
 # 兼容契约: bash 3.2（L-05）；失败出口唯一 phx_fail（L-02/L-03）
 # shellcheck disable=SC1091  # 动态 source 路径，shellcheck 无法跟随
 set -uo pipefail
-HERE=$(cd "$(dirname "$0")" && pwd)
+HERE=$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)   # 兼容 source（$0 在被 source 时不是本脚本）
 REPO=$(cd "$HERE/../.." && pwd)
 # shellcheck source=lib/common.sh
 . "$HERE/lib/common.sh"
@@ -26,7 +27,8 @@ while [ $# -gt 0 ]; do
     --mirror) MIRROR="$2"; shift 2;;
     --out) OUTDIR="$2"; shift 2;;
     --with-engine-debs) WITH_DEBS=1; shift;;
-    --base-image) JRE_BASE_IMG="$2"; JRE_BASE="$2"; shift 2;;   # R-01：覆盖 JRE 底座（JRE_BASE 已在其前定值，须同步覆盖）
+    --base-image) JRE_BASE_IMG="$2"; JRE_BASE="$2"; shift 2;;
+    --skip-gate) SKIP_GATE=1; shift;;               # 仅调试：跳过出货门禁（禁止用于出货）   # R-01：覆盖 JRE 底座（JRE_BASE 已在其前定值，须同步覆盖）
     --engine-tgz) ENGINE_TGZ="$2"; shift 2;;        # R-02：通用静态二进制（本地路径或 URL）
     --engine-bytes) ENGINE_BYTES="$2"; shift 2;;    # 可选：期望字节数（L-73 对账）
     -h|--help) grep '^#' "$0" | head -6; exit 0;;
@@ -34,6 +36,7 @@ while [ $# -gt 0 ]; do
   esac
 done
 WITH_DEBS="${WITH_DEBS:-0}"
+SKIP_GATE="${SKIP_GATE:-0}"
 ENGINE_TGZ="${ENGINE_TGZ:-}"
 ENGINE_BYTES="${ENGINE_BYTES:-}"
 
@@ -50,6 +53,48 @@ phx_log_init
 export PHX_STATE_FILE="$OUTDIR/.package-${VERSION}-${ARCH}.state"
 mkdir -p "$OUTDIR"
 WORK="$OUTDIR/.work-$PKGNAME"
+pkg_manifest_write() { # pkg_manifest_write <out> <ver> <arch> <gitdesc> <githash> <imgjson>
+  # R-01（v2.1.0）：manifest 记录逐架构底座与差异说明，供两架构一致性核对
+  local out="$1" ver="$2" arch="$3" gd="$4" gh="$5" imgs="$6" sub note
+  if [ "$JRE_BASE" = "$JRE_BASE_REF" ]; then sub=false; else sub=true; fi
+  note="架构=${arch} JRE底座=${JRE_BASE} 参考底座=${JRE_BASE_REF} JAVA_BIN=${JAVA_BIN_ARG:-java} 是否替代=${sub}"
+  if [ "$sub" = "true" ]; then
+    note="${note}；影响=未使用参考底座，两架构镜像层不一致，出货前必须各自 install.sh 端到端验证（到收据）"
+  else
+    note="${note}；影响=无（与参考底座一致）"
+  fi
+  printf '{\n  "product": "Phoenix-Agent-Java",\n  "version": "%s",\n  "arch": "%s",\n  "git": "%s (%s)",\n  "built_at": "%s",\n  "engine_min": "20.10",\n  "base_images": {\n    "jre": "%s",\n    "jre_reference": "%s",\n    "jre_substituted": %s,\n    "nginx": "%s"\n  },\n  "equivalence_note": "%s",\n  "images": [%s]\n}\n' \
+    "$ver" "$arch" "$gd" "$gh" "$(date '+%F %T')" "$JRE_BASE" "$JRE_BASE_REF" "$sub" "$NGINX_BASE" "$note" "$imgs" > "$out"
+}
+
+pkg_ship_gate() { # pkg_ship_gate <解包payload> <tarball> <证据目录> → 0=门禁通过且哈希复核一致
+  local pay="$1" tar="$2" gout="$3" before after gcmd
+  gcmd="${PHX_GATE_CMD:-$HERE/gate.sh}"
+  before="$(phx_sha256 "$tar")"
+  local flag=""
+  [ "${PHX_ALLOW_ARCH_MISMATCH:-0}" = "1" ] && flag="--allow-arch-mismatch"
+  phx_log INFO "出货门禁开始 payload=${pay} 证据=${gout}"
+  bash "$gcmd" --payload "$pay" --out "$gout" --project "phxgate-pkg-$$" \
+       --port "${PHX_GATE_PORT:-8190}" --timeout "${PHX_GATE_TIMEOUT:-900}" $flag \
+    || { phx_log ERROR "出货门禁未通过 证据=${gout}（修复后重跑；--skip-gate 仅调试，禁止出货）"; return 1; }
+  after="$(phx_sha256 "$tar")"
+  if [ "$before" != "$after" ]; then
+    phx_log ERROR "门禁后包哈希变化 before=${before} after=${after}（门禁期间产物被改动，拒绝出货）"; return 1
+  fi
+  phx_log INFO "门禁通过且包哈希复核一致 sha256=${after} 证据=${gout}"
+  return 0
+}
+
+pkg_ship_or_skip() { # pkg_ship_or_skip <解包payload> <tarball> <证据目录> —— 步骤7 用；尊重 SKIP_GATE
+  if [ "${SKIP_GATE:-0}" -eq 1 ]; then
+    phx_log WARN "--skip-gate：已跳过出货门禁（仅调试用途，禁止用于出货）"
+    return 0
+  fi
+  pkg_ship_gate "$1" "$2" "$3"
+}
+
+if [ "${PHX_PKG_LIB_ONLY:-0}" = "1" ]; then return 0; fi   # 仅测试：source 后加载函数即返回（T-05 验证用）
+
 phx_log INFO "打包开始: $PKGNAME (native=$NATIVE overseas=$OVERSEAS) 日志=$PHX_LOG_FILE"
 
 # ref()/ref_any(): 镜像加 mirror 前缀（--overseas/手工 mirror 时直通）
@@ -86,21 +131,6 @@ if true; then
   fi
 fi
 
-pkg_manifest_write() { # pkg_manifest_write <out> <ver> <arch> <gitdesc> <githash> <imgjson>
-  # R-01（v2.1.0）：manifest 记录逐架构底座与差异说明，供两架构一致性核对
-  local out="$1" ver="$2" arch="$3" gd="$4" gh="$5" imgs="$6" sub note
-  if [ "$JRE_BASE" = "$JRE_BASE_REF" ]; then sub=false; else sub=true; fi
-  note="架构=${arch} JRE底座=${JRE_BASE} 参考底座=${JRE_BASE_REF} JAVA_BIN=${JAVA_BIN_ARG:-java} 是否替代=${sub}"
-  if [ "$sub" = "true" ]; then
-    note="${note}；影响=未使用参考底座，两架构镜像层不一致，出货前必须各自 install.sh 端到端验证（到收据）"
-  else
-    note="${note}；影响=无（与参考底座一致）"
-  fi
-  printf '{\n  "product": "Phoenix-Agent-Java",\n  "version": "%s",\n  "arch": "%s",\n  "git": "%s (%s)",\n  "built_at": "%s",\n  "engine_min": "20.10",\n  "base_images": {\n    "jre": "%s",\n    "jre_reference": "%s",\n    "jre_substituted": %s,\n    "nginx": "%s"\n  },\n  "equivalence_note": "%s",\n  "images": [%s]\n}\n' \
-    "$ver" "$arch" "$gd" "$gh" "$(date '+%F %T')" "$JRE_BASE" "$JRE_BASE_REF" "$sub" "$NGINX_BASE" "$note" "$imgs" > "$out"
-}
-
-if [ "${PHX_PKG_LIB_ONLY:-0}" = "1" ]; then return 0; fi   # 仅测试：source 后加载函数即返回（T-05 验证用）
 
 phx_step 3 $TOTAL "容器内编译 jar+dist（native，产物架构无关）" && {
   rm -rf "$WORK/artifacts" && mkdir -p "$WORK/artifacts"
@@ -257,6 +287,8 @@ phx_step 7 $TOTAL "自校验（解包+sha 全量+manifest 复算）" && {
   [ $RC -eq 0 ] || phx_fail 7 $TOTAL "sha 校验失败: $BADS"
   grep -q "\"version\": \"$VERSION\"" "$VT/$PKGNAME/manifest.json" || phx_fail 7 $TOTAL "manifest 版本不符"
   grep -q "\"arch\": \"$ARCH\"" "$VT/$PKGNAME/manifest.json" || phx_fail 7 $TOTAL "manifest 架构不符"
+  pkg_ship_or_skip "$VT/$PKGNAME" "$OUTDIR/$PKGNAME.tar.gz" "$OUTDIR/gate-${VERSION}-${ARCH}-$(date +%Y%m%d-%H%M%S)" \
+    || phx_fail 7 $TOTAL "出货门禁未通过（证据见 $OUTDIR/gate-*；修复后重跑）"
   rm -rf "$VT"
   phx_step_mark 7
 }

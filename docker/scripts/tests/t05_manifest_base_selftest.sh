@@ -9,7 +9,7 @@ P=0; F=0; ok(){ P=$((P+1)); printf '  ✅ %s\n' "$1"; }; no(){ F=$((F+1)); print
 jget(){ python3 -c "import json,sys;d=json.load(open('$1'));print(eval('d'+sys.argv[1]))" "$2" 2>/dev/null; }
 
 # 用例A：参考底座（未替代）
-( export PHX_PKG_LIB_ONLY=1 PHX_LOG_FILE="$W/a.log"; . docker/scripts/package.sh >/dev/null 2>&1
+( export PHX_PKG_LIB_ONLY=1 PHX_LOG_FILE="$W/a.log"; . docker/scripts/package.sh --version 2.1.0 --arch arm64 --out /tmp/phx-t05 >/dev/null 2>&1
   pkg_manifest_write "$W/a.json" 2.1.0 arm64 "v2.0.0-3-gabc" abc123 '"phoenix-backend:2.1.0","phoenix-frontend:2.1.0"' )
 [ "$(jget "$W/a.json" "['base_images']['jre_substituted']")" = "False" ] && ok "A 未替代 ⇒ jre_substituted=false" || no "A substituted" "$(jget "$W/a.json" "['base_images']['jre_substituted']")"
 jget "$W/a.json" "['equivalence_note']" | grep -q "与参考底座一致" && ok "A note 说明无影响" || no "A note" "$(jget "$W/a.json" "['equivalence_note']" | cut -c1-60)"
@@ -18,7 +18,7 @@ python3 -c "import json;d=json.load(open('$W/a.json'));assert all(k in d for k i
 
 # 用例B：替代底座（差异四要素 + 影响）
 ( export PHX_PKG_LIB_ONLY=1 PHX_LOG_FILE="$W/b.log" JRE_BASE_IMG=eclipse-temurin:21-jre-jammy JAVA_BIN_ARG=java
-  . docker/scripts/package.sh >/dev/null 2>&1
+  . docker/scripts/package.sh --version 2.1.0 --arch arm64 --out /tmp/phx-t05 >/dev/null 2>&1
   pkg_manifest_write "$W/b.json" 2.1.0 amd64 "v2.0.0-3-gabc" abc123 '"phoenix-backend:2.1.0"' )
 [ "$(jget "$W/b.json" "['base_images']['jre_substituted']")" = "True" ] && ok "B 替代 ⇒ jre_substituted=true" || no "B substituted" "$(jget "$W/b.json" "['base_images']['jre_substituted']")"
 [ "$(jget "$W/b.json" "['base_images']['jre']")" = "eclipse-temurin:21-jre-jammy" ] && ok "B 记录实际底座" || no "B jre 记录" "$(jget "$W/b.json" "['base_images']['jre']")"
@@ -28,7 +28,7 @@ echo "$N" | grep -q "架构=amd64" && echo "$N" | grep -q "JRE底座=eclipse-tem
 
 # 用例C：--base-image 参数生效
 ( export PHX_PKG_LIB_ONLY=1 PHX_LOG_FILE="$W/c.log"
-  . docker/scripts/package.sh --base-image eclipse-temurin:21-jre-jammy >/dev/null 2>&1
+  . docker/scripts/package.sh --version 2.1.0 --arch arm64 --out /tmp/phx-t05 --base-image eclipse-temurin:21-jre-jammy >/dev/null 2>&1
   printf '%s' "$JRE_BASE" > "$W/c.val" )
 [ "$(cat "$W/c.val")" = "eclipse-temurin:21-jre-jammy" ] && ok "C --base-image 生效（JRE_BASE 被覆盖）" || no "C 参数" "$(cat "$W/c.val")"
 
