@@ -366,6 +366,13 @@ public class ModelVectorStoreFactory {
 			ModelConfig cfg = modelConfigDataService.getById(modelId);
 			if (cfg != null && Boolean.TRUE.equals(cfg.getIsActive())
 					&& (cfg.getIsDeleted() == null || cfg.getIsDeleted() == 0)) {
+				// ollama 走原生探测（`POST /v1/embeddings` 在部分版本不存在，用 HTTP 探测会**误判不可达**，T-16 抓出）
+				if (ModelProvider.OLLAMA.getCode().equalsIgnoreCase(cfg.getProvider())) {
+					int d = ollamaApiClient.probeEmbeddingDimension(cfg.getBaseUrl(), cfg.getModelName());
+					reachabilityCache.put(modelId, new long[] { now, d > 0 ? 1L : 0L });
+					log.info("模型可达性预检（ollama 原生探测）: modelId={}, dims={}", modelId, d);
+					return d > 0;
+				}
 				String path = (cfg.getEmbeddingsPath() == null || cfg.getEmbeddingsPath().isBlank())
 						? "/v1/embeddings"
 						: cfg.getEmbeddingsPath();

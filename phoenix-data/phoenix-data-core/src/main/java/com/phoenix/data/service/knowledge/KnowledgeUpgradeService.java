@@ -100,9 +100,12 @@ public class KnowledgeUpgradeService {
 		else {
 			String only = nonEmpty.get(0);
 			Integer mapped = tableToModel.get(only);
+			// 注意：不能用 path 的初值("B")当条件——曾因此把 A/B 判定整段短路，永远判 B（T-16 端到端抓出）
+			boolean determined = false;
 			if (base.equals(only)) {
 				// 基表：生成模型即默认模型（可判定）
 				candidateModelId = defaultModelId;
+				determined = true;
 			}
 			else if (mapped == null) {
 				path = "B";
@@ -110,8 +113,9 @@ public class KnowledgeUpgradeService {
 			}
 			else {
 				candidateModelId = mapped;
+				determined = true;
 			}
-			if (!"B".equals(path)) {
+			if (determined) {
 				var cfg = modelConfigDataService.findById(candidateModelId);
 				boolean exists = cfg != null;
 				boolean active = exists && Boolean.TRUE.equals(cfg.getIsActive())
@@ -170,8 +174,10 @@ public class KnowledgeUpgradeService {
 		}
 		Map<String, Object> out = new LinkedHashMap<>(plan);
 		if ("A".equals(decided)) {
-			Map<String, Object> ledger = knowledgeMigrationService.migrate(kbId,
-					(Integer) plan.get("candidateModelId"), true);
+			// 路径(a) 的**目标**优先取调用方指定（典型：模型重注册 ⇒ 指向同权重的新配置行）；
+			// 未指定时才用"判定出的生成模型"（此时通常是 REBIND_ONLY）
+			Integer targetModel = toModelId != null ? toModelId : (Integer) plan.get("candidateModelId");
+			Map<String, Object> ledger = knowledgeMigrationService.migrate(kbId, targetModel, true);
 			out.put("executed", "A");
 			out.put("ledger", ledger);
 			log.info("升级完成（路径 a 搬迁不重嵌）: kbId={}, 台账={}", kbId, ledger);

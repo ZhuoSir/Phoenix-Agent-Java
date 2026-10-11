@@ -44,7 +44,7 @@ while [ $# -gt 0 ]; do
     *) die "未知参数：$1（--help 查看用法）";;
   esac
 done
-[ -n "$MODE" ] || die "必须指定 --mode audit|report|migrate"
+[ -n "$MODE" ] || die "必须指定 --mode audit|report|migrate|rollback"
 
 # ---------- psql 通道 ----------
 q() { # q <sql> → stdout（-tA 纯值）
@@ -172,6 +172,29 @@ do_migrate() {
   printf '  对账通过（行数一致），**未发生嵌入调用**（纯搬运）\n'
 }
 
+# ---------- rollback：回滚到旧表/旧绑定（回滚窗口，T-16） ----------
+# 语义：迁移/重建**从不删除旧表旧行** ⇒ 回滚 = 把绑定改回旧模型并核对旧表数据仍在；
+#       目标表数据默认保留（--prune-target 才清理），便于二次核对与再迁移。
+do_rollback() {
+  [ -n "$KB" ] || die "--mode rollback 需要 --kb"
+  [ -n "$TO_MODEL" ] || die "--mode rollback 需要 --to-model（回滚目标＝旧模型）"
+  base="tbl_vector_store_simple_data"
+  [ -n "$(q "select 1 from tbl_data_knowledge_base where id=$KB and del_flag=0")" ] || die "知识库不存在：$KB"
+  [ -n "$(q "select 1 from tbl_data_model_config where id=$TO_MODEL")" ] || die "回滚目标模型不存在：$TO_MODEL"
+  cur="$(q "select coalesce(embedding_model_id::text,'-') from tbl_data_knowledge_base where id=$KB")"
+  old_table="$(table_of "$base" "$TO_MODEL")"
+  ids="$(q "select string_agg(id::text,',' order by id) from tbl_data_agent_knowledge where knowledge_base_id=$KB and is_deleted=0")"
+  rows=0; [ -n "$ids" ] && rows="$(q "select count(*) from \"$old_table\" where metadata->>'agentKnowledgeId' in ($(echo "$ids" | sed "s/[^,]*/'&'/g"))" 2>/dev/null || echo 0)"
+  space_key="$(q "select provider||'-'||model_name||'-'||coalesce((select a.atttypmod::text from pg_class c join pg_attribute a on a.attrelid=c.oid where c.relname='$old_table' and a.attname='embedding'),'?') from tbl_data_model_config where id=$TO_MODEL")"
+  printf '\n== 回滚计划 ==\n  当前绑定=%s → 回滚到模型 %s（表 %s）\n  旧表本库行数=%s（迁移/重建不删旧行 ⇒ 回滚窗口有效）\n' "$cur" "$TO_MODEL" "$old_table" "$rows"
+  if [ "$rows" = "0" ]; then printf '  警告：旧表无该库向量 ⇒ 回滚后检索可能命中 0（请确认是否应改走重建）\n'; fi
+  if [ "$DRY_RUN" = "1" ]; then printf '\n  [--dry-run] 仅打印。将执行：UPDATE tbl_data_knowledge_base SET embedding_model_id=%s, model_space_key=%s WHERE id=%s;\n' "$TO_MODEL" "'$space_key'" "$KB"; return 0; fi
+  q "update tbl_data_knowledge_base set embedding_model_id=$TO_MODEL, model_space_key='$space_key', update_time=now() where id=$KB" >/dev/null
+  now="$(q "select coalesce(embedding_model_id::text,'-')||'|'||coalesce(model_space_key,'-') from tbl_data_knowledge_base where id=$KB")"
+  printf '\n== 回滚完成 ==\n  绑定=%s 旧表行数=%s\n' "$now" "$rows"
+  printf '  目标表数据默认保留（如需清理：手工 DROP/清行；本脚本不做破坏性操作）\n'
+}
+
 # ---------- report：验收报告（R-09 五项） ----------
 do_report() {
   need "1"
@@ -257,6 +280,7 @@ do_report() {
 case "$MODE" in
   audit)   do_audit;;
   migrate) do_migrate;;
+  rollback) do_rollback;;
   report)  do_report || exit 2;;
   *) die "未知模式：$MODE";;
 esac
