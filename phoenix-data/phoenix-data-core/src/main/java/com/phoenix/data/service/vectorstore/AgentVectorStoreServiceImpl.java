@@ -5,6 +5,9 @@ import com.phoenix.data.constant.Constant;
 import com.phoenix.data.constant.DocumentMetadataConstant;
 import com.phoenix.data.dto.search.AgentSearchRequest;
 import com.phoenix.data.dto.search.HybridSearchRequest;
+import com.phoenix.data.entity.KnowledgeBase;
+import com.phoenix.data.mapper.AgentKbaseBindMapper;
+import com.phoenix.data.mapper.KnowledgeBaseMapper;
 import com.phoenix.data.properties.DataAgentProperties;
 import com.phoenix.data.service.hybrid.retrieval.HybridRetrievalStrategy;
 import lombok.extern.slf4j.Slf4j;
@@ -41,6 +44,16 @@ public class AgentVectorStoreServiceImpl implements AgentVectorStoreService {
     @Autowired
     @Qualifier("simpleVectorStore")
     private VectorStore vectorStore;
+
+    /** R-03/T-06：单库按绑定模型路由向量存储（多库扇出见 T-07） */
+    @Autowired
+    private com.phoenix.data.service.vectorstore.ModelVectorStoreFactory modelVectorStoreFactory;
+
+    @Autowired
+    private KnowledgeBaseMapper knowledgeBaseMapper;
+
+    @Autowired
+    private AgentKbaseBindMapper agentKbaseBindMapper;
     @Autowired
     private Optional<HybridRetrievalStrategy> hybridRetrievalStrategy;
     @Autowired
@@ -81,9 +94,12 @@ public class AgentVectorStoreServiceImpl implements AgentVectorStoreService {
             return hybridRetrievalStrategy.get().retrieve(hybridRequest);
         }
         log.debug("Hybrid search is not enabled. use vector-search only");
-        List<Document> results = vectorStore.similaritySearch(hybridRequest.toVectorSearchRequest());
-        log.debug("Search completed with vectorType: {}, found {} documents for SearchRequest: {}",
-                searchRequest.getDocVectorType(), results.size(), searchRequest);
+        // R-03/T-06：单库 ⇒ 按该库绑定模型选表选模型；多库 ⇒ 暂用默认存储（分组扇出见 T-07）
+        Route route = resolveRoute(searchRequest.getAgentId(), searchRequest.getDocVectorType());
+        List<Document> results = route.store.similaritySearch(hybridRequest.toVectorSearchRequest());
+        log.info("检索完成（按库绑定模型路由）: agentId={}, docVectorType={}, kbId={}, modelId={}, table={}, hits={}",
+                searchRequest.getAgentId(), searchRequest.getDocVectorType(), route.kbId, route.modelId, route.table,
+                results.size());
         return results;
 
     }
@@ -152,6 +168,63 @@ public class AgentVectorStoreServiceImpl implements AgentVectorStoreService {
      * @param metadata 元数据条件
      * @return 是否删除成功
      */
+    /** 检索路由结果（R-03/T-06）；degraded 供 T-08 不可达降级使用 */
+    public static class Route {
+        public VectorStore store;
+        public Long kbId;
+        public Integer modelId;
+        public String table;
+        public int kbCount;
+    }
+
+    /**
+     * 解析本次检索应使用的向量存储：仅对知识类向量（agentKnowledge/businessTerm）按绑定库路由；
+     * 单库 ⇒ 该库绑定模型对应的表与模型；多库/无库/非知识类 ⇒ 既有默认存储（不改变原有行为）。
+     */
+    public Route resolveRoute(String agentId, String docVectorType) {
+        Route r = new Route();
+        r.store = vectorStore;
+        r.table = ModelVectorStoreFactory.TABLE_SIMPLE;
+        boolean knowledgeType = DocumentMetadataConstant.AGENT_KNOWLEDGE.equalsIgnoreCase(docVectorType)
+                || DocumentMetadataConstant.BUSINESS_TERM.equalsIgnoreCase(docVectorType);
+        if (!knowledgeType || agentId == null) {
+            return r;
+        }
+        try {
+            java.util.List<Long> kbIds = agentKbaseBindMapper.selectKbIdsByAgent(Long.valueOf(agentId));
+            r.kbCount = kbIds == null ? 0 : kbIds.size();
+            if (r.kbCount == 1) {
+                KnowledgeBase kb = knowledgeBaseMapper.selectOneById(kbIds.get(0));
+                if (kb != null) {
+                    r.kbId = kb.getId();
+                    r.modelId = kb.getEmbeddingModelId();
+                    r.table = modelVectorStoreFactory.tableName(ModelVectorStoreFactory.TABLE_SIMPLE, r.modelId);
+                    r.store = modelVectorStoreFactory.forModel(ModelVectorStoreFactory.TABLE_SIMPLE, r.modelId);
+                }
+            }
+            else if (r.kbCount > 1) {
+                log.info("检索路由：agentId={} 绑定 {} 个知识库 ⇒ 本次用默认存储（分组扇出见 T-07）", agentId, r.kbCount);
+            }
+        }
+        catch (Exception e) {
+            log.warn("检索路由解析失败，回落默认存储: agentId={}, err={}", agentId, e.toString());
+        }
+        return r;
+    }
+
+    @Override
+    public java.util.Map<String, Object> retrievalRoute(String agentId, String docVectorType) {
+        Route r = resolveRoute(agentId, docVectorType);
+        java.util.Map<String, Object> out = new java.util.LinkedHashMap<>();
+        out.put("agentId", agentId);
+        out.put("docVectorType", docVectorType);
+        out.put("kbCount", r.kbCount);
+        out.put("kbId", r.kbId);
+        out.put("modelId", r.modelId);
+        out.put("table", r.table);
+        return out;
+    }
+
     @Override
     public Boolean deleteDocumentsByMetadata(Map<String, Object> metadata) {
         Assert.notNull(metadata, "Metadata cannot be null.");

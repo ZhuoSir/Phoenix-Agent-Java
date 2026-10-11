@@ -37,6 +37,9 @@ public class KnowledgeBaseController {
 
 	private final KnowledgeBaseService knowledgeBaseService;
 
+	/** R-03/T-06：检索路由探针（无 LLM 依赖，供运维与验证） */
+	private final com.phoenix.data.service.vectorstore.AgentVectorStoreService agentVectorStoreService;
+
 	/** R-18（CR-01/T-25）：超管判定复用 R-08/R-17 守卫（单一口径） */
 	private final com.phoenix.data.component.AdminRoleGuard adminRoleGuard;
 
@@ -84,6 +87,49 @@ public class KnowledgeBaseController {
 	public ApiResponse<java.util.Map<String, Object>> reEmbed(@PathVariable Long id) {
 		assertOwner(id);
 		return ApiResponse.success("重刷完成", knowledgeBaseService.reEmbedKnowledgeBase(id));
+	}
+
+	/**
+	 * T-06 检索路由探针：给出某智能体+向量类型下的检索路由（绑定库/模型/表），可顺带执行一次真实检索。
+	 */
+	@PostMapping("/retrieval-probe")
+	public ApiResponse<java.util.Map<String, Object>> retrievalProbe(
+			@org.springframework.web.bind.annotation.RequestBody java.util.Map<String, Object> body) {
+		try {
+			if (!isSuperAdmin()) {
+				return ApiResponse.error("仅管理员可执行检索探针");
+			}
+			String agentId = body.get("agentId") == null ? null : String.valueOf(body.get("agentId"));
+			String docVectorType = body.get("docVectorType") == null ? "agentKnowledge"
+					: String.valueOf(body.get("docVectorType"));
+			java.util.Map<String, Object> out = new java.util.LinkedHashMap<>(
+					agentVectorStoreService.retrievalRoute(agentId, docVectorType));
+			int hitCount = -1;
+			if (body.get("query") != null) {
+				com.phoenix.data.dto.search.AgentSearchRequest req = com.phoenix.data.dto.search.AgentSearchRequest
+						.builder()
+						.agentId(agentId)
+						.docVectorType(docVectorType)
+						.query(String.valueOf(body.get("query")))
+						.topK(body.get("topK") == null ? null : Integer.valueOf(String.valueOf(body.get("topK"))))
+						.build();
+				java.util.List<org.springframework.ai.document.Document> hits = agentVectorStoreService.search(req);
+				hitCount = hits.size();
+				java.util.List<java.util.Map<String, Object>> hs = new java.util.ArrayList<>();
+				for (org.springframework.ai.document.Document d : hits) {
+					java.util.Map<String, Object> h = new java.util.LinkedHashMap<>();
+					h.put("id", String.valueOf(d.getId()));
+					h.put("score", d.getScore());
+					hs.add(h);
+				}
+				out.put("hits", hs);
+			}
+			out.put("hitCount", hitCount);
+			return ApiResponse.success("查询成功", out);
+		}
+		catch (Exception e) {
+			return ApiResponse.error(e.getMessage());
+		}
 	}
 
 	/** R-06 归属与失效体检（管理员）：按库列出绑定模型/空间键/规模/可用性。 */
