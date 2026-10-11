@@ -1021,3 +1021,18 @@
   ③ 验证时用**哨兵行**（往目标表塞一条能过过滤条件的特殊文档）判定"到底查了哪张表"，别只看命中数；
   ④ 命中数不变 ≠ 路由失效，也可能是**另一条腿**在出结果 ⇒ 用"把目标表塞满哨兵 + 把默认表排除"的方式二分。
 - 状态: active
+
+## L-106 运维 shell 脚本的三个"静默不执行"陷阱（psql 相关）
+- 分类: 工具 / 判断
+- 触发场景: T-14 写 `docker/scripts/vector-ops.sh`（纯 shell + psql 直连运维工具箱）
+- 坑与规则:
+  ① **`psql ... -f -` 必须重定向 stdin**。写成 `qfile "$SQLF"`（把文件名当参数）时，psql 会把路径当库名/参数，
+     脚本**不执行且不报错**（输出被 `2>&1` 捕获后又被脚本吞掉）⇒ 表现为"迁移成功但一行没搬"。
+     规则：`out="$(qfile < "$SQLF" 2>&1)"`，并**校验输出含 COMMIT**（否则 die），别只信退出码。
+  ② **`while read` 循环里再调 psql 会吞掉外层 stdin** ⇒ 循环只跑一次（本轮"重嵌完成率"只打印了 1 个库）。
+     规则：改用 `for row in $LIST` 或给内层命令加 `< /dev/null`。
+  ③ **SQL 侧不要假设 pgcrypto**：`digest()/encode()` 在未装 pgcrypto 的库上直接报
+     `function digest(text, unknown) does not exist`。需要"与 Java 同口径的短哈希"时，**在 shell 里算**
+     （`printf '%s|%s' prov model | sha256sum | cut -c1-12` 与 Java `SHA-256` 前 6 字节完全一致，已实测对齐）。
+  补充：类型别硬凑——`metadata->>'k'` 是 text，IN 列表要带引号；`coalesce(int,0)::text` 才能与 text 拼接。
+- 状态: active
