@@ -24,4 +24,13 @@ public class KnowledgeBaseVO {
     private long itemCount;
     /** 详情态：绑定的智能体名（删除保护提示源数据） */
     private List<String> boundAgentNames;
+
+    /** 绑定的向量模型 id（R-01） */
+    private Long embeddingModelId;
+
+    /** 向量空间键（R-06） */
+    private String modelSpaceKey;
+
+    /** 换模型提示：非空表示请求要求换绑但未确认，绑定未变更（R-01 附加） */
+    private String rebuildHint;
 }

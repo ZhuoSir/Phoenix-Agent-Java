@@ -10,6 +10,10 @@ import com.phoenix.data.entity.KnowledgeBase;
 import com.phoenix.data.entity.AgentKnowledge;
 import com.phoenix.data.mapper.AgentKnowledgeMapper;
 import com.phoenix.data.mapper.KnowledgeBaseMapper;
+import com.phoenix.data.enums.ModelType;
+import com.phoenix.data.dto.ModelConfigDTO;
+import com.phoenix.data.entity.ModelConfig;
+import com.phoenix.data.service.aimodelconfig.ModelConfigDataService;
 import com.mybatisflex.core.query.QueryWrapper;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -38,6 +42,8 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
 
     private final AgentKnowledgeResourceManager agentKnowledgeResourceManager;
 
+    private final ModelConfigDataService modelConfigDataService;
+
     @Override
     public KnowledgeBaseVO create(KnowledgeBaseCreateDTO dto, String operator) {
         String name = StrUtil.trim(dto.getName());
@@ -52,8 +58,11 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
         kb.setDelFlag(0);
         kb.setCreateTime(LocalDateTime.now());
         kb.setUpdateTime(LocalDateTime.now());
+          // R-01：创建时绑定向量模型——显式指定优先，否则取默认 embedding 模型
+          kb.setEmbeddingModelId(resolveBindingModelId(dto.getEmbeddingModelId()));
         knowledgeBaseMapper.insert(kb);
-        log.info("知识库创建: id={}, name={}, by={}", kb.getId(), name, operator);
+          log.info("知识库创建: id={}, name={}, by={}, embeddingModelId={}", kb.getId(), name, operator,
+                  kb.getEmbeddingModelId());
         return toVO(kb, false);
     }
 
@@ -76,6 +85,17 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
         kb.setUpdator(operator);
         kb.setUpdateTime(LocalDateTime.now());
         knowledgeBaseMapper.update(kb);
+          // R-01 附加：换模型必须走受控重建；未确认时仅提示、绑定不变
+          if (dto.getEmbeddingModelId() != null && !dto.getEmbeddingModelId().equals(kb.getEmbeddingModelId())) {
+              String hint = Boolean.TRUE.equals(dto.getConfirmRebuild())
+                      ? "已确认换绑：该知识库的向量将按新模型重建（受控重建流程落地后执行；当前绑定未变更）"
+                      : "该知识库的向量将按新模型重建，确认后执行受控重建流程（当前绑定未变更）";
+              log.info("知识库换模型请求（未变更绑定）: kbId={}, from={}, to={}, confirmRebuild={}, by={}",
+                      kb.getId(), kb.getEmbeddingModelId(), dto.getEmbeddingModelId(), dto.getConfirmRebuild(), operator);
+              KnowledgeBaseVO vo = toVO(kb, false);
+              vo.setRebuildHint(hint);
+              return vo;
+          }
         return toVO(kb, false);
     }
 
@@ -167,11 +187,28 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
         return kb;
     }
 
+    /** 解析创建时的向量模型绑定：显式指定优先（须存在），否则取默认 embedding 模型、再退任一启用行（R-01） */
+    private Long resolveBindingModelId(Long explicitModelId) {
+        if (explicitModelId != null) {
+            ModelConfig cfg = modelConfigDataService.getById(explicitModelId);
+            if (cfg == null) {
+                throw new IllegalArgumentException("指定的向量模型不存在：" + explicitModelId);
+            }
+            return explicitModelId;
+        }
+        ModelConfigDTO def = modelConfigDataService.getDefaultConfigByType(ModelType.EMBEDDING);
+        if (def == null) {
+            def = modelConfigDataService.getActiveConfigByType(ModelType.EMBEDDING);
+        }
+        return (def == null || def.getId() == null) ? null : def.getId().longValue();
+    }
+
     private KnowledgeBaseVO toVO(KnowledgeBase kb, boolean withBoundAgents) {
         return KnowledgeBaseVO.builder()
                 .id(kb.getId()).name(kb.getName()).description(kb.getDescription())
                 .status(kb.getStatus()).creator(kb.getCreator())
                 .createTime(kb.getCreateTime()).updateTime(kb.getUpdateTime())
+                  .embeddingModelId(kb.getEmbeddingModelId()).modelSpaceKey(kb.getModelSpaceKey())
                 .groupNames(knowledgeBaseMapper.selectGroupNamesByKb(kb.getId()))
                 .itemCount(knowledgeBaseMapper.countItems(kb.getId()))
                 .boundAgentNames(withBoundAgents ? knowledgeBaseMapper.selectBoundAgentNames(kb.getId()) : null)
