@@ -170,6 +170,21 @@ public class ModelVectorStoreFactory {
 		return n != null && n > 0;
 	}
 
+	/** 该模型专属表中**指定知识库**的向量条数（T-09 影响面清单用；表不存在返回 0）。 */
+	public long vectorCountForKb(String baseTable, Integer modelId, Long kbId) {
+		String t = tableName(baseTable, modelId);
+		try {
+			Integer n = jdbcTemplate.queryForObject(
+					"SELECT count(*)::int FROM " + quoteIdent(t)
+							+ " WHERE (metadata->>'knowledgeBaseId') = ? OR (metadata->>'knowledge_base_id') = ?",
+					Integer.class, String.valueOf(kbId), String.valueOf(kbId));
+			return n == null ? 0L : n.longValue();
+		}
+		catch (Exception e) {
+			return 0L;
+		}
+	}
+
 	/** 该模型的向量条数（体检用；表不存在返回 -1 表示"未建表"）。 */
 	public long vectorCount(String baseTable, Integer modelId) {
 		if (!tableExists(baseTable, modelId)) {
