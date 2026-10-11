@@ -7,13 +7,13 @@
 
 ## 1. 基础与前置能力（R-03）
 
-- [ ] T-01 `lib/common.sh` 增量新增底座/引擎/门禁通用函数（不修改既有函数签名与输出格式）
+- [x] T-01 `lib/common.sh` 增量新增底座/引擎/门禁通用函数（不修改既有函数签名与输出格式）
   关联: R-01, R-02, R-05
   依赖: 无
   验证方式: ① `sh -n` 语法检查；② **身份对照（common.sh 4 个既有调用方零回归）**：`bootstrap.sh`/`install.sh`/`package.sh`/`verify.sh` 各跑一次空转或 `--help` 路径，比对改动前后退出码与首屏输出；③ 新增函数的单元自测（临时脚本调用，断言返回值/日志格式）
   验收标准: 4 个调用方在改动前后行为无差异（退出码 + 关键输出一致），新增函数自测通过；无 `printStackTrace`/裸 `echo` 混入日志
 
-- [ ] T-02 `install.sh` 步骤 1 前置能力闸：`OSType=linux` + `docker context ls` + Compose v2（含插件系统级/用户级路径探测；删除现有 v1 回退分支）
+- [x] T-02 `install.sh` 步骤 1 前置能力闸：`OSType=linux` + `docker context ls` + Compose v2（含插件系统级/用户级路径探测；删除现有 v1 回退分支）
   关联: R-03
   依赖: T-01
   验证方式: ① **反例**：用 PATH shim 造"仅 v1、无 v2 插件"环境跑 `install.sh` → 断言在步骤 6 之前失败、退出码非 0、`docker ps -a` 无本项目容器；② **正例**：本机 v2 环境跑 → 正常进入步骤 2；③ **身份对照（install.sh 6 身份）**：全新安装 / 重跑幂等 / `--env-from` / `--offline` / `--from-wsl` / `PHOENIX_ALLOW_ARCH_MISMATCH=1` 各一条断言，确认能力充足时行为不变；④ `OSType=windows` 模拟路径断言被拒

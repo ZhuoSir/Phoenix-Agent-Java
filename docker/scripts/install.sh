@@ -44,6 +44,23 @@ port_of_env() { # 读 .env 端口（容忍行尾注释）；无则默认 9080
   echo "${p:-9080}"
 }
 
+preflight_capabilities() { # R-03（v2.1.0）：前置能力闸——引擎类型/上下文/Compose v2，早于任何容器创建
+  local stepno="$1"
+  PREFLIGHT_DONE=1
+  # 先确认依赖的共用函数存在：否则未定义函数(127)会被 `||` 吞成"看起来像检查失败"的误导信息
+  for _fn in phx_ostype_is_linux phx_compose_v2_ok; do
+    command -v "$_fn" >/dev/null 2>&1 || phx_fail "$stepno" $TOTAL "载荷内 lib/common.sh 过旧：缺少 ${_fn}（请用配套版本的 docker/scripts/lib/common.sh）"
+  done
+  phx_ostype_is_linux || phx_fail "$stepno" $TOTAL "引擎类型不符：需 Linux 容器引擎（Windows 容器引擎跑不了 Linux 镜像，L-12）"
+  phx_log INFO "docker context=$(docker context show 2>/dev/null || echo '-')"
+  if ! phx_compose_v2_ok; then
+    local created
+    created="$(docker ps -a --filter "name=^${PROJECT}-" -q 2>/dev/null | wc -l | tr -d ' ')"
+    phx_log ERROR "已创建容器数=${created}（应为 0——本闸位于任何容器创建之前）"
+    phx_fail "$stepno" $TOTAL "Compose 能力不足：需 Compose v2（docker compose）；v1 不再支持（R-03 / L-100）"
+  fi
+}
+
 phx_step 1 $TOTAL "环境探测（三查制度化，L-12）" && {
   MARCH=$(uname -m)
   case "$MARCH" in x86_64) MARCH=amd64;; aarch64|arm64) MARCH=arm64;; esac
@@ -61,8 +78,8 @@ phx_step 1 $TOTAL "环境探测（三查制度化，L-12）" && {
   phx_disk_ok "$PAYLOAD" 8000 || phx_log WARN "磁盘可用不足 8GB，load/up 可能失败（继续，失败时回看此处）"
   if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
     OST=$(docker info --format '{{.OSType}}' 2>/dev/null || echo unknown)
-    [ "$OST" = "windows" ] && phx_fail 1 $TOTAL "检测到 Windows 原生容器引擎——跑不了 Linux 镜像，请走 install.ps1 的 WSL2 路线"
     phx_log INFO "引擎已在: OSType=$OST Server=$(docker info --format '{{.ServerVersion}}' 2>/dev/null)"
+    preflight_capabilities 1   # R-03：引擎已可用 ⇒ 最早可用点即此处（取代原先单点 windows 判断）
   else
     phx_log INFO "引擎未检测到（步骤 2 处理）"
   fi
@@ -99,6 +116,7 @@ phx_step 2 $TOTAL "引擎就位" && {
   phx_engine_autostart "$SUDO"
   $SUDO usermod -aG docker "$(id -un)" >/dev/null 2>&1 || true
   docker info >/dev/null 2>&1 || phx_fail 2 $TOTAL "引擎装后仍不可达（重开终端使 docker 组生效，或检查 systemctl status docker）"
+  [ -n "${PREFLIGHT_DONE:-}" ] || preflight_capabilities 2   # R-03：引擎由本步新装 ⇒ 装好立刻做能力闸
   phx_step_mark 2
 }
 
@@ -153,9 +171,9 @@ phx_step 5 $TOTAL ".env 生成/保留" && {
 # 而它一旦被状态机标成"已完成"就会跳过 ⇒ 重打包后容器仍跑旧镜像（实测：新镜像 10:19 已就绪、
 # 线上容器却是 19 小时前的旧产物，于是修好的前端"看起来没生效"）。故本步不入状态机。
 phx_log INFO "====> 步骤 6/$TOTAL: compose up（项目名 ${PROJECT}，每次必跑：镜像变了要重建容器）"
-if docker compose version >/dev/null 2>&1; then DC="docker compose"
-elif command -v docker-compose >/dev/null 2>&1; then DC="docker-compose"
-else phx_fail 6 $TOTAL "无 docker compose 插件也无 docker-compose——装 compose 后重跑"; fi
+# R-03（v2.1.0）：只认 Compose v2 —— v1 回退分支已删除（前置能力闸已在步骤 1/2 拦下；此处为兜底二道闸）
+DC="docker compose"
+docker compose version >/dev/null 2>&1 || phx_fail 6 $TOTAL "Compose v2 不可用（前置闸因断点续传被跳过时由此拦下）——见日志指引（R-03）"
 ( cd "$PAYLOAD/docker" && $DC -p "$PROJECT" up -d ) >>"$PHX_LOG_FILE" 2>&1 || phx_fail 6 $TOTAL "compose up 失败（见日志）"
 echo "$PROJECT" > "$PAYLOAD/.phoenix-project"   # phoenix-ctl.sh 项目名自动解析锚
 # BUG-183 核验：容器实际用的镜像必须等于包内镜像——不等即说明没换镜像（旧行为会静默跳过）
