@@ -51,3 +51,9 @@
 - tasks.md → **v1.0.0 已确认**（确认人 陈卓，2026-10-11；确认③通过）
 - **三重确认自检通过**：requirements / plan / tasks 三份均 `已确认` 且确认人非空 ⇒ 放行 Implement
 - 施工分支：`feature/vector-dim-flexibility`（基点 = 版本分支 `2.1.0`）
+
+## Implement 进展（2026-10-11）
+- **T-01 完成**（commit `063117f`）：V2.1.0_01 知识库绑定列 + 回滚件；全新库/存量库/幂等/回滚四验通过
+- **T-02 完成**（commit `a388547`）：创建绑定向量模型 + 换模型守卫；真机运行验证 10/10（含 4 项身份断言）
+- 过程坑落账 **L-104**（字符串 replace 静默无操作 ⇒ 断言命中数 + grep 复核产物）
+- 运行期环境：本地起 `t02app`（`phoenix-backend:v2.0.0` + 新 jar，挂 phoenix-release_default 网络，端口 8299）供后续任务行为验证
