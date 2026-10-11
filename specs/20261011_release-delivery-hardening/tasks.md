@@ -35,7 +35,7 @@
 
 ## 3. 底座与差异记录（R-01）
 
-- [ ] T-05 `package.sh` 底座选择与差异记录：支持 `--base-image`；`manifest.json` 增 `base_images`（逐架构）与 `equivalence_note`；替代底座时打印显式 WARN
+- [x] T-05 `package.sh` 底座选择与差异记录：支持 `--base-image`；`manifest.json` 增 `base_images`（逐架构）与 `equivalence_note`；替代底座时打印显式 WARN
   关联: R-01
   依赖: T-01
   验证方式: ① 正常路径跑打包 → `jq` 读取 manifest 断言 `base_images.arm64/amd64` 字段存在且一致；② 模拟底座不可得（指定不存在镜像）→ 断言走替代分支、manifest 含差异记录、流程**成功产出**且 WARN 可见；③ 镜像摘要/字节对账（L-73）

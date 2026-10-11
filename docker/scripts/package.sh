@@ -15,6 +15,7 @@ REPO=$(cd "$HERE/../.." && pwd)
 TOTAL=8
 ARCH=""; VERSION=""; OVERSEAS=0; MIRROR=""; OUTDIR="$REPO/docker/dist"
 JRE_BASE="${JRE_BASE_IMG:-docker.elastic.co/elasticsearch/elasticsearch:9.2.5}"
+JRE_BASE_REF="${PHX_JRE_BASE_REF:-docker.elastic.co/elasticsearch/elasticsearch:9.2.5}"   # R-01：参考底座（判定"是否替代"）
 JAVA_BIN_ARG="${JAVA_BIN:-/usr/share/elasticsearch/jdk/bin/java}"
 NGINX_BASE="${NGINX_BASE_IMG:-nginx:latest}"
 while [ $# -gt 0 ]; do
@@ -25,6 +26,7 @@ while [ $# -gt 0 ]; do
     --mirror) MIRROR="$2"; shift 2;;
     --out) OUTDIR="$2"; shift 2;;
     --with-engine-debs) WITH_DEBS=1; shift;;
+    --base-image) JRE_BASE_IMG="$2"; JRE_BASE="$2"; shift 2;;   # R-01：覆盖 JRE 底座（JRE_BASE 已在其前定值，须同步覆盖）
     --engine-tgz) ENGINE_TGZ="$2"; shift 2;;        # R-02：通用静态二进制（本地路径或 URL）
     --engine-bytes) ENGINE_BYTES="$2"; shift 2;;    # 可选：期望字节数（L-73 对账）
     -h|--help) grep '^#' "$0" | head -6; exit 0;;
@@ -83,6 +85,22 @@ if true; then
     mph_from "$MP"
   fi
 fi
+
+pkg_manifest_write() { # pkg_manifest_write <out> <ver> <arch> <gitdesc> <githash> <imgjson>
+  # R-01（v2.1.0）：manifest 记录逐架构底座与差异说明，供两架构一致性核对
+  local out="$1" ver="$2" arch="$3" gd="$4" gh="$5" imgs="$6" sub note
+  if [ "$JRE_BASE" = "$JRE_BASE_REF" ]; then sub=false; else sub=true; fi
+  note="架构=${arch} JRE底座=${JRE_BASE} 参考底座=${JRE_BASE_REF} JAVA_BIN=${JAVA_BIN_ARG:-java} 是否替代=${sub}"
+  if [ "$sub" = "true" ]; then
+    note="${note}；影响=未使用参考底座，两架构镜像层不一致，出货前必须各自 install.sh 端到端验证（到收据）"
+  else
+    note="${note}；影响=无（与参考底座一致）"
+  fi
+  printf '{\n  "product": "Phoenix-Agent-Java",\n  "version": "%s",\n  "arch": "%s",\n  "git": "%s (%s)",\n  "built_at": "%s",\n  "engine_min": "20.10",\n  "base_images": {\n    "jre": "%s",\n    "jre_reference": "%s",\n    "jre_substituted": %s,\n    "nginx": "%s"\n  },\n  "equivalence_note": "%s",\n  "images": [%s]\n}\n' \
+    "$ver" "$arch" "$gd" "$gh" "$(date '+%F %T')" "$JRE_BASE" "$JRE_BASE_REF" "$sub" "$NGINX_BASE" "$note" "$imgs" > "$out"
+}
+
+if [ "${PHX_PKG_LIB_ONLY:-0}" = "1" ]; then return 0; fi   # 仅测试：source 后加载函数即返回（T-05 验证用）
 
 phx_step 3 $TOTAL "容器内编译 jar+dist（native，产物架构无关）" && {
   rm -rf "$WORK/artifacts" && mkdir -p "$WORK/artifacts"
@@ -188,10 +206,13 @@ DOCEOF
     || phx_fail 5 $TOTAL "docker save 失败（五镜像）"
   GITDESC=$(git -C "$REPO" describe --tags --always 2>/dev/null || echo unknown)
   GITHASH=$(git -C "$REPO" rev-parse --short HEAD 2>/dev/null || echo unknown)
+    if [ "$JRE_BASE" != "$JRE_BASE_REF" ]; then
+      phx_log WARN "底座差异: 本包 JRE 底座=${JRE_BASE} 参考=${JRE_BASE_REF} JAVA_BIN=${JAVA_BIN_ARG:-java}（已记入 manifest.base_images/equivalence_note；R-01：两架构各自端到端验证后方可出货）"
+    fi
   IMGJSON="\"phoenix-backend:$VERSION\", \"phoenix-frontend:$VERSION\""
   for img in $BASE_IMGS; do IMGJSON="$IMGJSON, \"$img\""; done
-  printf '{\n  "product": "Phoenix-Agent-Java",\n  "version": "%s",\n  "arch": "%s",\n  "git": "%s (%s)",\n  "built_at": "%s",\n  "engine_min": "20.10",\n  "images": [%s]\n}\n' \
-    "$VERSION" "$ARCH" "$GITDESC" "$GITHASH" "$(date '+%F %T')" "$IMGJSON" > "$PAY/manifest.json"
+    pkg_manifest_write "$PAY/manifest.json" "$VERSION" "$ARCH" "$GITDESC" "$GITHASH" "$IMGJSON" \
+      || phx_fail 5 $TOTAL "manifest 写出失败"
   python3 -c "import json;json.load(open('$PAY/manifest.json'))" 2>/dev/null || phx_log WARN "manifest.json 未过 JSON 解析自检（目标机无 python3 不影响安装，仅记录）"
   # R-02（v2.1.0）：通用静态二进制离线引擎件——**在 SHA256SUMS 之前**入包，确保安装侧完整性校验覆盖它
   if [ -n "$ENGINE_TGZ" ]; then
