@@ -1,0 +1,43 @@
+向量迁移/重建效果验收回执（R-09 五项）
+run_id      : 20261012-032029-31316
+generated_at: 2026-10-11T19:20:47Z
+command     : vector-ops.sh --mode report --pg-container phoenix-release-postgres-1 
+verdict     : PASS (exit=0)
+spec        : specs/20261011_vector-dim-flexibility (T-15 / R-09)
+----------------------------------------------------------------
+
+== 向量迁移/重建验收报告（R-09）==
+  run=20261012-032029-31324
+
+[1/5] 维度
+  tbl_vector_store_simple_data=768
+  tbl_vector_store_user_memory=768
+  tbl_harness_vector_store_knowledge=768
+  tbl_vector_store_rag=768
+  孤儿专属表=0 ✅
+
+[2/5] 约束（id 主键/非空）
+  所有向量表均有主键 ✅
+
+[3/5] 索引（hnsw）
+  所有向量表均有 hnsw 索引 ✅
+
+[4/5] 重嵌完成率（有向量条目 / 条目总数，按库）
+  库 1     制度汇编的知识库   有向量 1/3    (33%)
+  库 2     产品手册库            有向量 3/3    (100%)
+  库 6     测试知识库            有向量 2/2    (100%)
+  库 7     编写导则库            有向量 1/1    (100%)
+  库 8     现行标准库            有向量 4/4    (100%)
+  库 9     标准化政策法规库   有向量 3/3    (100%)
+  库 10    军民通用属性判定规则 有向量 1/1    (100%)
+  库 11    军用标准化技术委员会名录 有向量 1/1    (100%)
+  库 12    现行标准题录库      有向量 1/1    (100%)
+  重建任务失败/部分失败=0 ✅
+  说明：tbl_harness_vector_store_knowledge 结构独立（无 metadata 列），不参与条目级重嵌率统计
+
+[5/5] 抽样检索
+  SKIP（未提供 --api/--token；本机可用：--api http://127.0.0.1:8066 --token <admin token>）
+  说明：报告其余四项为纯 SQL 判定，**不依赖平台升级**（R-08）
+
+== 结论 ==
+  PASS（可判定项全绿）

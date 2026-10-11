@@ -196,11 +196,21 @@ do_report() {
 
   printf '\n[2/5] 约束（id 主键/非空）\n'
   miss="$(q "select count(*) from pg_class c join pg_attribute a on a.attrelid=c.oid where c.relkind='r' and a.attname='embedding' and not exists (select 1 from pg_constraint p where p.conrelid=c.oid and p.contype='p')")"
-  [ "${miss:-0}" = "0" ] && printf '  所有向量表均有主键 ✅\n' || { printf '  缺主键的表数=%s ❌\n' "$miss"; fails=$((fails+1)); printf '    修复：ALTER TABLE <表> ADD PRIMARY KEY (id);\n'; }
+  if [ "${miss:-0}" = "0" ]; then printf '  所有向量表均有主键 ✅\n'; else
+    printf '  缺主键的表数=%s ❌\n' "$miss"; fails=$((fails+1))
+    for t in $(q "select c.relname from pg_class c join pg_attribute a on a.attrelid=c.oid where c.relkind='r' and a.attname='embedding' and not exists (select 1 from pg_constraint p where p.conrelid=c.oid and p.contype='p')"); do
+      printf '    修复：ALTER TABLE "%s" ADD PRIMARY KEY (id);\n' "$t"
+    done
+  fi
 
   printf '\n[3/5] 索引（hnsw）\n'
   noidx="$(q "select count(*) from pg_class c join pg_attribute a on a.attrelid=c.oid where c.relkind='r' and a.attname='embedding' and not exists (select 1 from pg_indexes p where p.tablename=c.relname and p.indexdef ilike '%hnsw%')")"
-  [ "${noidx:-0}" = "0" ] && printf '  所有向量表均有 hnsw 索引 ✅\n' || { printf '  缺 hnsw 的表数=%s ❌\n' "$noidx"; fails=$((fails+1)); printf '    修复：CREATE INDEX IF NOT EXISTS <表>_index ON <表> USING hnsw (embedding vector_cosine_ops);\n'; }
+  if [ "${noidx:-0}" = "0" ]; then printf '  所有向量表均有 hnsw 索引 ✅\n'; else
+    printf '  缺 hnsw 的表数=%s ❌\n' "$noidx"; fails=$((fails+1))
+    for t in $(q "select c.relname from pg_class c join pg_attribute a on a.attrelid=c.oid where c.relkind='r' and a.attname='embedding' and not exists (select 1 from pg_indexes p where p.tablename=c.relname and p.indexdef ilike '%hnsw%')"); do
+      printf '    修复：CREATE INDEX IF NOT EXISTS "%s_index" ON "%s" USING hnsw (embedding vector_cosine_ops);\n' "$t" "$t"
+    done
+  fi
 
   printf '\n[4/5] 重嵌完成率（有向量条目 / 条目总数，按库）\n'
   KBS="$(q "select kb.id||'|'||kb.name||'|'||(select count(*) from tbl_data_agent_knowledge k where k.knowledge_base_id=kb.id and k.is_deleted=0) from tbl_data_knowledge_base kb where kb.del_flag=0 order by kb.id")"

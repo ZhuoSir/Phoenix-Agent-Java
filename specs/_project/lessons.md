@@ -1035,4 +1035,7 @@
      `function digest(text, unknown) does not exist`。需要"与 Java 同口径的短哈希"时，**在 shell 里算**
      （`printf '%s|%s' prov model | sha256sum | cut -c1-12` 与 Java `SHA-256` 前 6 字节完全一致，已实测对齐）。
   补充：类型别硬凑——`metadata->>'k'` 是 text，IN 列表要带引号；`coalesce(int,0)::text` 才能与 text 拼接。
+  ④ **`docker compose` 没有 `inspect` 子命令**：想按服务名取容器名要 `docker inspect -f '{{.Name}}' "$(compose ps -q postgres)"`；
+     写成 `$DC inspect ...` 时容器名为空 ⇒ 下游拿到空 `--pg-container` ⇒ 走直连 psql 失败、门禁退化成 rc=1（实测踩坑）。
+  ⑤ **`set -u` 下空数组展开 `${arr[@]}` 会报 unbound**：用 `${arr[@]+"${arr[@]}"}` 安全展开。
 - 状态: active
