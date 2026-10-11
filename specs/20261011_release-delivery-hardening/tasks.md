@@ -27,7 +27,7 @@
   验证方式: ① 用本地 tgz 跑一次打包 → `ls` + `sha256sum -c` + 字节数与源文件一致；② 用**故意截断**的 tgz 触发对账失败 → 断言拒绝入包并非 0 退出；③ 外部 URL 逐条列出并标注可达性（L-71）
   验收标准: 正常件入包且校验通过；截断件被拒；日志含"来源 / 架构 / 版本 / 字节数 / sha256"
 
-- [ ] T-04 `install.sh` 步骤 2 离线引擎落地：解包静态二进制 → `/usr/local/bin`，配 systemd unit（无 systemd 降级 `nohup` 并显式告知）；已有 Docker 则幂等跳过；架构不匹配即停止
+- [x] T-04 `install.sh` 步骤 2 离线引擎落地：解包静态二进制 → `/usr/local/bin`，配 systemd unit（无 systemd 降级 `nohup` 并显式告知）；已有 Docker 则幂等跳过；架构不匹配即停止
   关联: R-02
   依赖: T-01, T-03
   验证方式: ① 在**无 Docker 的 Debian 容器**（`--privileged` 且明确记录该限制）中执行步骤 2 路径 → 断言 `docker version` 可用、自启配置存在或显式降级告知；② 本机（已有 Docker）执行 → 断言跳过且不重复安装；③ 塞入异构架构 tgz → 断言明确报错停止；④ 日志断言：INFO 含来源/架构/版本；ERROR 含缺失项与手工指引

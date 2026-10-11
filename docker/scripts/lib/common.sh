@@ -415,3 +415,46 @@ phx_engine_tgz_stage() { # phx_engine_tgz_stage <本地路径|URL> <目标目录
   phx_log INFO "离线引擎件已入包 path=${out} arch=${arch} version=${ver} sha256=${sha}"
   printf '%s' "$out"
 }
+
+phx_engine_static_install() { # phx_engine_static_install <tgz> [SUDO] → 0=二进制就位且守护进程可达（R-02）
+  local tgz="$1" S="${2:-}" tmp b n i
+  tar -tzf "$tgz" >/dev/null 2>&1 || { phx_log ERROR "离线引擎件完整性校验失败 文件=${tgz}"; return 1; }
+  tmp="$(mktemp -d "${TMPDIR:-/tmp}/phx-engine-x.XXXXXX")" || return 1
+  tar -xzf "$tgz" -C "$tmp" || { phx_log ERROR "离线引擎件解包失败 文件=${tgz}"; return 1; }
+  [ -d "$tmp/docker" ] || { phx_log ERROR "离线引擎件结构异常 缺少=docker/ 文件=${tgz}"; return 1; }
+  n=0
+  for b in docker dockerd docker-init docker-proxy containerd containerd-shim-runc-v2 ctr runc; do
+    [ -f "$tmp/docker/$b" ] || continue
+    # shellcheck disable=SC2086
+    $S install -m 0755 "$tmp/docker/$b" "/usr/local/bin/$b" || { phx_log ERROR "二进制落地失败 bin=${b}"; return 1; }
+    n=$((n+1))
+  done
+  phx_log INFO "离线引擎二进制已落地 数量=${n} 目录=/usr/local/bin 来源=${tgz}"
+  if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then
+    $S tee /etc/systemd/system/docker.service >/dev/null <<'UNIT'
+[Unit]
+Description=Docker Engine (static binary, installed by Phoenix)
+After=network-online.target
+[Service]
+ExecStart=/usr/local/bin/dockerd
+Restart=always
+LimitNOFILE=1048576
+[Install]
+WantedBy=multi-user.target
+UNIT
+    $S systemctl daemon-reload >>"$PHX_LOG_FILE" 2>&1 || true
+    # shellcheck disable=SC2086
+    $S systemctl enable --now docker >>"$PHX_LOG_FILE" 2>&1 || phx_log WARN "systemd 启动 docker 失败（见日志）"
+    phx_log INFO "已配置开机自启 方式=systemd unit=/etc/systemd/system/docker.service"
+  else
+    phx_log WARN "无 systemd（或无 /run/systemd/system）——降级为手工启动：nohup /usr/local/bin/dockerd &（机器重启后需手工起）"
+    ( nohup /usr/local/bin/dockerd >>/var/log/dockerd.log 2>&1 & ) 2>/dev/null || phx_log WARN "dockerd 启动尝试失败（见 /var/log/dockerd.log）"
+  fi
+  i=0
+  while [ "$i" -lt 30 ]; do
+    if docker info >/dev/null 2>&1; then phx_log INFO "引擎可达 轮询=${i}次"; return 0; fi
+    i=$((i+1)); sleep 2
+  done
+  phx_log ERROR "引擎装后仍不可达 说明=本机可能不支持容器内起 dockerd（见 /var/log/dockerd.log）"
+  return 1
+}

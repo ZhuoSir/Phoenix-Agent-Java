@@ -92,6 +92,13 @@ phx_step 2 $TOTAL "引擎就位" && {
     phx_log INFO "引擎已可用，跳过安装"
   elif [ "$(uname -s)" = "Darwin" ]; then
     phx_fail 2 $TOTAL "mac 不代装引擎（A-3）：请安装 Docker Desktop 或 Colima 后重跑本脚本"
+  elif ls "$PAYLOAD"/engine/docker-*-"$PKGARCH".tgz >/dev/null 2>&1; then
+    # R-02（v2.1.0）：包内通用静态二进制——与发行版无关，优先于 deb/在线路径
+    ENGINE_TGZ_FILE="$(ls "$PAYLOAD"/engine/docker-*-"$PKGARCH".tgz | head -1)"
+    phx_log INFO "离线组件：静态二进制落地 文件=${ENGINE_TGZ_FILE} 架构=${PKGARCH}"
+    phx_engine_static_install "$ENGINE_TGZ_FILE" "$SUDO" || phx_fail 2 $TOTAL "离线引擎落地失败或装后不可达（见日志；L-71/L-73）"
+  elif ls "$PAYLOAD"/engine/docker-*.tgz >/dev/null 2>&1; then
+    phx_fail 2 $TOTAL "离线引擎件架构不匹配：包内=$(ls "$PAYLOAD"/engine/docker-*.tgz | xargs -n1 basename | tr '\n' ' ') 需要=docker-*-${PKGARCH}.tgz（换对应架构的包）"
   elif [ "$OFFLINE" -eq 1 ] && [ -d "$PAYLOAD/engine" ] && ls "$PAYLOAD/engine"/*.deb >/dev/null 2>&1; then
     phx_log INFO "离线模式：dpkg 本地安装 engine/*.deb"
     # shellcheck disable=SC2086
