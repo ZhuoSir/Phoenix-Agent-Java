@@ -955,3 +955,34 @@
   有则在群里/界面告知或等其结束再动；② 每次重启都会**丢日志**，排障前先 `docker logs > 文件` 或用持久化日志；
   ③ 若必须立即部署，部署后主动告知"刚刚的重启可能打断了 X 会话，请重试"，并**主动核对**有没有被中断的 assistant 消息。
 - 关联: 用户实测 22:13 标准草案审查会话；同类风险见 L-96（口令制动作）
+
+## L-98 构建上下文必须排除"打包产物目录"；排除规则要与 Dockerfile 的 COPY 依赖交叉核对
+- 现象：v2.0.0 打包时每次构建都白传 **3.5GB** 上下文（arm64 那次 340s+），因为 `.dockerignore` 没排除
+  `docker/dist`（内含 1.6G 包 + 1.2G 兜底包）与 `**/*.tar.gz`。
+- 连带风险：修 `.dockerignore` 时我一度加了 `docker/.stage/*.jar`，而 **`Dockerfile.backend:52` 正是 COPY 它** ⇒
+  会使"薄组装"构建失败。已及时撤回。
+- 规则：① 产物目录（`docker/dist`、`*.tar.gz`、`build/`）一律进 `.dockerignore`；
+  ② **改 `.dockerignore` 前先 grep 所有 Dockerfile 的 `COPY/ADD` 目标**，确认不会误伤；
+  ③ 构建耗时异常时，先看 `#N transferring context` 的体积。
+
+## L-99 交付包验收必须包含"全新空库安装"；脚本层的顺序耦合要在迁移前幂等解开
+- 现象：v2.0.0 交付包在**全新空库**上装不起来（migrator exit 3）：`V2.0.0_13/14` 需要"应用自建表"
+  `tbl_harness_skills`，但该表只由**应用启动时**创建，而编排又让 backend 等 migrator 成功 ⇒ 鸡生蛋。
+  本机手工验证时 backend 早已跑过（表存在），所以**一直没暴露**。
+- 规则：① 每次出交付包，必须做一次"**清空卷 + 全新库**"的 install.sh 验收（不能只在已有环境上验）；
+  ② 迁移脚本凡依赖"应用自建对象"，必须在迁移前**幂等预建**（`CREATE TABLE IF NOT EXISTS` + `to_regclass` 守卫），
+  ③ 预建块必须可重入——否则在"已有数据的重装"场景会 `already exists` 再次失败（本次踩过）。
+
+## L-100 Docker CLI 插件按用户查找；安装脚本严禁 root 与普通用户混跑
+- 现象①：现场"root 找不到 compose 插件、普通用户却可以"——因为插件装在 `~/.docker/cli-plugins/`（**按用户**）。
+  系统级路径为 `/usr/libexec/docker/cli-plugins/`、`/usr/lib/docker/cli-plugins/`、`/usr/local/lib/docker/cli-plugins/`。
+- 现象②：先用 root 跑过 install.sh，留下 root 属主的 `.phoenix-install.state`、`docker/.env`(600)、`RECEIPT`；
+  再用普通用户跑 ⇒ `common.sh:31`（写状态文件）"权限不够"，且 `.env` 可能读不到。
+- 规则：① 统一用**普通用户 + docker 组**执行安装（不 sudo）；② 换用户重跑前先
+  `sudo chown -R "$(id -un):$(id -gn)" <包目录>`；③ 交付文档里写明"插件要装系统级还是用户级"。
+
+## L-101 容器内以非 root 运行的应用，其 COPY 进镜像的产物必须显式 chown/chmod 644
+- 现象：`Dockerfile.backend.multistage` 里 jar 由 build 阶段 `COPY --from` 带入后为 **root:root 0600**，
+  容器以 uid 10001 运行 ⇒ `Unable to access jarfile` 无限重启（镜像能起、日志只说读不到 jar，极易误判为镜像缺文件）。
+- 规则：① 每个 `COPY` 后跟 `RUN chmod 644 <file>` 或使用 `--chown=`；② 排查此类问题优先
+  `docker run --rm --entrypoint sh <img> -c 'ls -l <path>; id'` 对比"文件属主/权限 vs 运行用户"。
