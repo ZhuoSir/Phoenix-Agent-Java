@@ -43,6 +43,9 @@ public class KnowledgeBaseController {
 	/** R-04/T-10：重建任务（后台执行/进度/重试/续跑） */
 	private final com.phoenix.data.service.knowledge.KnowledgeRebuildService knowledgeRebuildService;
 
+	/** R-07a/T-12：升级路径(a) 搬迁不重嵌（人工确认后执行） */
+	private final com.phoenix.data.service.knowledge.KnowledgeMigrationService knowledgeMigrationService;
+
 	/** R-18（CR-01/T-25）：超管判定复用 R-08/R-17 守卫（单一口径） */
 	private final com.phoenix.data.component.AdminRoleGuard adminRoleGuard;
 
@@ -147,6 +150,42 @@ public class KnowledgeBaseController {
 		}
 		catch (Exception e) {
 			return ApiResponse.error(e.getMessage());
+		}
+	}
+
+	/** R-07a/T-12 搬迁计划（人工确认前查看）：来源/目标表、维度、行数、动作与不可行原因。 */
+	@GetMapping("/{id}/migration-plan")
+	public ApiResponse<java.util.Map<String, Object>> migrationPlan(@PathVariable("id") Long id,
+			@org.springframework.web.bind.annotation.RequestParam("toModelId") Integer toModelId) {
+		try {
+			if (!isSuperAdmin()) {
+				return ApiResponse.error("仅管理员可查看搬迁计划");
+			}
+			return ApiResponse.success("查询成功", knowledgeMigrationService.plan(id, toModelId));
+		}
+		catch (Exception e) {
+			return ApiResponse.error("搬迁计划失败: " + e.getMessage());
+		}
+	}
+
+	/** R-07a/T-12 执行搬迁（**必须 confirm=true**）：原样搬运既有向量到目标模型专属表，不重新嵌入。 */
+	@PostMapping("/{id}/migrate")
+	public ApiResponse<java.util.Map<String, Object>> migrate(@PathVariable("id") Long id,
+			@org.springframework.web.bind.annotation.RequestBody java.util.Map<String, Object> body) {
+		try {
+			if (!isSuperAdmin()) {
+				return ApiResponse.error("仅管理员可执行搬迁");
+			}
+			Object tm = body.get("toModelId");
+			if (tm == null) {
+				return ApiResponse.error("缺少 toModelId");
+			}
+			boolean confirm = Boolean.parseBoolean(String.valueOf(body.getOrDefault("confirm", "false")));
+			return ApiResponse.success("搬迁完成", knowledgeMigrationService.migrate(id,
+					Integer.valueOf(String.valueOf(tm)), confirm));
+		}
+		catch (Exception e) {
+			return ApiResponse.error("搬迁失败: " + e.getMessage());
 		}
 	}
 
