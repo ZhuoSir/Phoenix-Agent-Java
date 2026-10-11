@@ -235,3 +235,140 @@ phx_engine_autostart() { # phx_engine_autostart [SUDO]
   phx_log WARN "  WSL 场景另有坑: WSL 会回收空闲发行版（dockerd 与容器随之停），需保活会话或手工唤醒"
   return 1
 }
+
+# =====================================================================
+# 交付链加固通用函数（v2.1.0 release-delivery-hardening · T-01）
+# 纯增量：不改动上方任何既有函数签名/输出格式（共享面身份矩阵：4 个调用方零回归）
+# 兼容契约同文件头：bash 3.2 子集 + POSIX sh（build.sh/verify.sh 为 #!/bin/sh）
+# =====================================================================
+
+phx_runid() { # phx_runid [前缀] → stdout=<前缀>-<时间戳>-<pid>
+  printf '%s-%s-%s' "${1:-run}" "$(date +%Y%m%d-%H%M%S)" "$$"
+}
+
+phx_bytes() { # phx_bytes <文件> → stdout=字节数（L-73 对账用）
+  wc -c < "$1" | tr -d ' '
+}
+
+phx_sha256() { # phx_sha256 <文件> → stdout=sha256（三源回退，兼容 mac/Linux）
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$1" | awk '{print $1}'
+  elif command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 "$1" | awk '{print $1}'
+  elif command -v openssl >/dev/null 2>&1; then
+    openssl dgst -sha256 "$1" | awk '{print $NF}'
+  else
+    return 1
+  fi
+}
+
+phx_assert_file_size() { # phx_assert_file_size <文件> <期望字节> → 0=一致 1=不一致（L-73）
+  local f="$1" want="$2" got
+  if [ ! -f "$f" ]; then
+    phx_log ERROR "字节对账失败 文件=${f} 原因=文件不存在"
+    return 1
+  fi
+  got="$(phx_bytes "$f")"
+  if [ "$got" = "$want" ]; then
+    phx_log INFO "字节对账 OK 文件=${f} 字节=${got}"
+    return 0
+  fi
+  phx_log ERROR "字节对账失败 文件=${f} 期望字节=${want} 实际字节=${got} 提示=源可能被截断(L-73)"
+  return 1
+}
+
+phx_image_info() { # phx_image_info <镜像> → stdout=Id/Size/Arch/Os（L-73 与 R-01 差异记录用）
+  docker image inspect --format 'Id={{.Id}} Size={{.Size}} Arch={{.Architecture}} Os={{.Os}}' "$1" 2>/dev/null
+}
+
+phx_ostype_is_linux() { # 引擎类型三查之一：拒绝 Windows 容器引擎（L-12）
+  local t
+  t="$(docker info --format '{{.OSType}}' 2>/dev/null || echo unknown)"
+  if [ "$t" = "linux" ]; then
+    phx_log INFO "引擎类型 OK OSType=${t}"
+    return 0
+  fi
+  phx_log ERROR "引擎类型不符 OSType=${t} 期望=linux；Windows 容器引擎无法运行 Linux 镜像 → 请在 Linux 引擎/上下文重跑"
+  return 1
+}
+
+phx_compose_v2_ok() { # 只认 Compose v2；v1 明确拒绝并给指引（R-03 / L-100）
+  if docker compose version >/dev/null 2>&1; then
+    phx_log INFO "Compose 能力 OK 形态=docker compose(v2) 版本=$(docker compose version --short 2>/dev/null || echo '-')"
+    return 0
+  fi
+  local p found=""
+  for p in /usr/libexec/docker/cli-plugins/docker-compose \
+           /usr/lib/docker/cli-plugins/docker-compose \
+           /usr/local/lib/docker/cli-plugins/docker-compose \
+           "$HOME/.docker/cli-plugins/docker-compose"; do
+    [ -x "$p" ] && found="${found} ${p}"
+  done
+  phx_log ERROR "Compose 能力不足 需要=Compose v2(docker compose) 检出插件=${found:-无}"
+  phx_log ERROR "  处置: 安装 docker-compose-plugin（系统级路径 /usr/libexec/docker/cli-plugins/）；并用普通用户+docker 组执行，勿 root/普通用户混跑(L-100)"
+  return 1
+}
+
+phx_env_checkup() { # 门禁前环境体检三件套：磁盘/运行中容器/镜像占用（L-04，非致命）
+  local dfree cps
+  dfree="$(phx_disk_free_mb "$HOME" 2>/dev/null || echo '?')"
+  cps="$(docker ps -q 2>/dev/null | wc -l | tr -d ' ')"
+  phx_log INFO "环境体检 磁盘可用MB=${dfree} 运行中容器=${cps}"
+  docker system df 2>/dev/null | while IFS= read -r l; do phx_log INFO "  占用 ${l}"; done
+  return 0
+}
+
+phx_gate_begin() { # phx_gate_begin <证据目录> <版本> <架构> → 初始化 runId/证据文件（T-07 用）
+  PHX_GATE_RUNID="$(phx_runid gate)"
+  PHX_GATE_BEGIN_TS="$(date +%s)"
+  PHX_GATE_PASS=0
+  PHX_GATE_FAIL=0
+  mkdir -p "$1" || return 1
+  PHX_GATE_EVIDENCE="$1/gate-${2}-${3}-${PHX_GATE_RUNID}.md"
+  {
+    echo "# 出货门禁证据"
+    echo
+    echo "- runId: ${PHX_GATE_RUNID}"
+    echo "- 版本: ${2}"
+    echo "- 架构: ${3}"
+    echo "- 开始: $(date '+%F %T')"
+    echo
+  } >> "$PHX_GATE_EVIDENCE" 2>/dev/null || return 1
+  phx_log INFO "门禁开始 runId=${PHX_GATE_RUNID} 版本=${2} 架构=${3} 证据=${PHX_GATE_EVIDENCE}"
+}
+
+phx_gate_item() { # phx_gate_item <项名> <命令...> → 0=PASS 非0=FAIL；证据落 $PHX_GATE_EVIDENCE
+  local name="$1"; shift
+  local out rc
+  out="$("$@" 2>&1)"; rc=$?
+  if [ "$rc" -eq 0 ]; then
+    PHX_GATE_PASS=$(( ${PHX_GATE_PASS:-0} + 1 ))
+    phx_log INFO "门禁 PASS item=${name} runId=${PHX_GATE_RUNID:-'-'}"
+  else
+    PHX_GATE_FAIL=$(( ${PHX_GATE_FAIL:-0} + 1 ))
+    phx_log ERROR "门禁 FAIL item=${name} rc=${rc} runId=${PHX_GATE_RUNID:-'-'} 复现=$*"
+  fi
+  if [ -n "${PHX_GATE_EVIDENCE:-}" ]; then
+    {
+      echo "## ${name} — $([ "$rc" -eq 0 ] && echo PASS || echo FAIL) (rc=${rc})"
+      echo
+      echo '```'
+      echo "\$ $*"
+      echo "${out}"
+      echo '```'
+      echo
+    } >> "$PHX_GATE_EVIDENCE" 2>/dev/null || true
+  fi
+  return "$rc"
+}
+
+phx_gate_end() { # phx_gate_end → 0=全绿 1=有失败；日志含 runId/通过数/失败数/耗时/结果
+  local dur
+  dur=$(( $(date +%s) - ${PHX_GATE_BEGIN_TS:-$(date +%s)} ))
+  if [ "${PHX_GATE_FAIL:-0}" -eq 0 ]; then
+    phx_log INFO "门禁结束 runId=${PHX_GATE_RUNID:-'-'} 结果=PASS 通过=${PHX_GATE_PASS:-0} 失败=0 耗时=${dur}s"
+    return 0
+  fi
+  phx_log ERROR "门禁结束 runId=${PHX_GATE_RUNID:-'-'} 结果=FAIL 通过=${PHX_GATE_PASS:-0} 失败=${PHX_GATE_FAIL} 耗时=${dur}s"
+  return 1
+}
