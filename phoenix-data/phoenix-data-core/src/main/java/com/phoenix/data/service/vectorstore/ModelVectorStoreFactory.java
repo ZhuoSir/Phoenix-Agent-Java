@@ -286,6 +286,59 @@ public class ModelVectorStoreFactory {
 		};
 	}
 
+	/** 可达性缓存：modelId → [时间戳, 是否可达]（T-08；避免每次检索都做网络预检） */
+	private final Map<Integer, long[]> reachabilityCache = new ConcurrentHashMap<>();
+
+	/**
+	 * T-08 模型可达性预检：短超时（1.5s）+ 30s 缓存。
+	 *
+	 * <p>
+	 * 背景（BUG-199 实测）：嵌入端点不可达时 Spring AI 会**重试 + 长超时**，直接把检索请求挂住，
+	 * 降级逻辑根本等不到 ⇒ 必须先做短超时预检再决定"走模型"还是"降级为关键词"。
+	 */
+	public boolean isReachable(Integer modelId) {
+		if (modelId == null) {
+			return true;
+		}
+		long now = System.currentTimeMillis();
+		long[] c = reachabilityCache.get(modelId);
+		if (c != null && now - c[0] < 30_000L) {
+			return c[1] == 1L;
+		}
+		boolean ok = false;
+		try {
+			ModelConfig cfg = modelConfigDataService.getById(modelId);
+			if (cfg != null && Boolean.TRUE.equals(cfg.getIsActive())
+					&& (cfg.getIsDeleted() == null || cfg.getIsDeleted() == 0)) {
+				String path = (cfg.getEmbeddingsPath() == null || cfg.getEmbeddingsPath().isBlank())
+						? "/v1/embeddings"
+						: cfg.getEmbeddingsPath();
+				String base = cfg.getBaseUrl() == null ? "" : cfg.getBaseUrl().replaceAll("/+$", "");
+				java.net.HttpURLConnection conn = (java.net.HttpURLConnection) java.net.URI
+						.create(base + path).toURL().openConnection();
+				conn.setConnectTimeout(1500);
+				conn.setReadTimeout(1500);
+				conn.setRequestMethod("POST");
+				conn.setDoOutput(true);
+				conn.setRequestProperty("Content-Type", "application/json");
+				String body = "{\"input\":\"ping\",\"model\":\"" + cfg.getModelName() + "\"}";
+				try (java.io.OutputStream os = conn.getOutputStream()) {
+					os.write(body.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+				}
+				int code = conn.getResponseCode();
+				// 任何 HTTP 状态码都说明主机有响应 ⇒ 可达（4xx 只是参数/路径问题，不代表不可达）
+				ok = code > 0;
+				conn.disconnect();
+			}
+		}
+		catch (Exception e) {
+			ok = false;
+			log.warn("模型可达性预检失败（将走降级）: modelId={}, err={}", modelId, e.toString());
+		}
+		reachabilityCache.put(modelId, new long[] { now, ok ? 1L : 0L });
+		return ok;
+	}
+
 	/** 嵌入调用统计（模型键 → 实际调用次数 / 缓存命中次数） */
 	public Map<String, Object> embeddingStats() {
 		Map<String, Object> m = new LinkedHashMap<>();

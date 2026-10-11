@@ -54,6 +54,10 @@ public class AgentVectorStoreServiceImpl implements AgentVectorStoreService {
 
     @Autowired
     private AgentKbaseBindMapper agentKbaseBindMapper;
+
+    /** T-08：模型不可达时的关键词兜底数据源（不依赖嵌入模型） */
+    @Autowired
+    private com.phoenix.data.mapper.AgentKnowledgeMapper agentKnowledgeMapper;
     @Autowired
     private Optional<HybridRetrievalStrategy> hybridRetrievalStrategy;
     @Autowired
@@ -97,14 +101,43 @@ public class AgentVectorStoreServiceImpl implements AgentVectorStoreService {
         if (route.knowledgeType && route.byModel.size() > 1) {
             return fanOutByModel(route, hybridRequest, searchRequest);
         }
+        // T-08/BUG-199：非默认模型先用短超时预检，不可达则直接关键词降级（避免嵌入重试把请求挂住）
+        if (route.knowledgeType && route.modelId != null
+                && !modelVectorStoreFactory.isReachable(route.modelId)) {
+            String rsn = "模型可达性预检失败（短超时探测不可达，BUG-199 场景）";
+            log.warn("检索降级触发（预检）: agentId={}, kbIds={}, modelId={}, table={}, 原因={}", searchRequest.getAgentId(),
+                    route.kbIds, route.modelId, route.table, rsn);
+            return keywordFallback(route.kbIds, hybridRequest.getQuery(),
+                    searchRequest.getTopK() == null ? 10 : searchRequest.getTopK(), rsn);
+        }
         if (dataAgentProperties.getVectorStore().isEnableHybridSearch() && hybridRetrievalStrategy.isPresent()) {
             log.info("混合检索（按库绑定模型路由）: agentId={}, docVectorType={}, kbId={}, modelId={}, table={}",
                     searchRequest.getAgentId(), searchRequest.getDocVectorType(), route.kbId, route.modelId,
                     route.table);
-            return hybridRetrievalStrategy.get().retrieve(hybridRequest);
+            try {
+                return hybridRetrievalStrategy.get().retrieve(hybridRequest);
+            }
+            catch (Exception ex) {
+                String reason = ex.getClass().getSimpleName() + ": " + ex.getMessage();
+                log.warn("检索降级触发（混合检索路径）: agentId={}, kbIds={}, modelId={}, table={}, 原因={}",
+                        searchRequest.getAgentId(), route.kbIds, route.modelId, route.table, reason);
+                return keywordFallback(route.kbIds, hybridRequest.getQuery(),
+                        searchRequest.getTopK() == null ? 10 : searchRequest.getTopK(), reason);
+            }
         }
         log.debug("Hybrid search is not enabled. use vector-search only");
-        List<Document> results = route.store.similaritySearch(hybridRequest.toVectorSearchRequest());
+        List<Document> results;
+        try {
+            results = route.store.similaritySearch(hybridRequest.toVectorSearchRequest());
+        }
+        catch (Exception ex) {
+            // T-08：单库路径同样降级（不静默漏查）
+            String reason = ex.getClass().getSimpleName() + ": " + ex.getMessage();
+            log.warn("检索降级触发（单库路径）: agentId={}, kbIds={}, modelId={}, table={}, 原因={}",
+                    searchRequest.getAgentId(), route.kbIds, route.modelId, route.table, reason);
+            results = keywordFallback(route.kbIds, hybridRequest.getQuery(), searchRequest.getTopK() == null ? 10
+                    : searchRequest.getTopK(), reason);
+        }
         log.info("检索完成（按库绑定模型路由）: agentId={}, docVectorType={}, kbId={}, modelId={}, table={}, hits={}",
                 searchRequest.getAgentId(), searchRequest.getDocVectorType(), route.kbId, route.modelId, route.table,
                 results.size());
@@ -176,6 +209,39 @@ public class AgentVectorStoreServiceImpl implements AgentVectorStoreService {
      * @param metadata 元数据条件
      * @return 是否删除成功
      */
+    /** T-08 关键词兜底（模型不可达时）：不依赖嵌入模型，直接按关键词查该库条目并标注降级提示 */
+    private List<Document> keywordFallback(java.util.List<Long> kbIds, String query, int topK, String reason) {
+        if (kbIds == null || kbIds.isEmpty() || query == null || query.isBlank()) {
+            return java.util.Collections.emptyList();
+        }
+        String csv = kbIds.stream().map(String::valueOf).collect(java.util.stream.Collectors.joining(","));
+        java.util.List<com.phoenix.data.entity.AgentKnowledge> items;
+        try {
+            items = agentKnowledgeMapper.selectKeywordFallback(csv, query, Math.max(1, topK));
+        }
+        catch (Exception e) {
+            log.error("关键词兜底失败: kbIds={}, err={}", kbIds, e.toString());
+            return java.util.Collections.emptyList();
+        }
+        java.util.List<Document> docs = new java.util.ArrayList<>(items.size());
+        for (com.phoenix.data.entity.AgentKnowledge it : items) {
+            java.util.Map<String, Object> m = new java.util.HashMap<>();
+            m.put(DocumentMetadataConstant.VECTOR_TYPE, DocumentMetadataConstant.AGENT_KNOWLEDGE);
+            m.put("agentKnowledgeId", it.getId());
+            m.put("title", it.getTitle());
+            // R-03/T-08：降级必须**显式可见**（不得静默漏查）
+            m.put("retrievalDegraded", true);
+            m.put("retrievalDegradedReason", reason);
+            m.put("retrievalDegradedMode", "keyword");
+            m.put("retrievalSourceKbIds", kbIds);
+            m.put("retrievalSourceTable", "keyword:tbl_data_agent_knowledge");
+            String text = it.getContent() == null ? String.valueOf(it.getTitle()) : it.getContent();
+            docs.add(new Document(String.valueOf(it.getId()), text, m));
+        }
+        log.warn("检索降级（模型不可达 ⇒ 关键词兜底）: kbIds={}, reason={}, 影响条数={}", kbIds, reason, docs.size());
+        return docs;
+    }
+
     /** 多模型分组扇出 + RRF 融合（R-03/T-07）：每组用其模型的表/模型独立检索，再按名次融合 */
     private List<Document> fanOutByModel(Route route, HybridSearchRequest hybridRequest,
             com.phoenix.data.dto.search.AgentSearchRequest searchRequest) {
@@ -185,14 +251,24 @@ public class AgentVectorStoreServiceImpl implements AgentVectorStoreService {
             String table = modelVectorStoreFactory.tableName(ModelVectorStoreFactory.TABLE_SIMPLE, modelId);
             java.util.List<Document> docs;
             try {
+                // T-08/BUG-199：先做短超时可达性预检，不可达立即降级（不要等嵌入调用重试挂住）
+                if (!modelVectorStoreFactory.isReachable(modelId)) {
+                    throw new IllegalStateException("模型可达性预检失败（短超时探测不可达）");
+                }
                 org.springframework.ai.vectorstore.VectorStore store = modelVectorStoreFactory
                         .forModel(ModelVectorStoreFactory.TABLE_SIMPLE, modelId);
                 docs = store.similaritySearch(hybridRequest.toVectorSearchRequest());
             }
             catch (Exception ex) {
-                // R-03：某组不可达不得拖垮整体；显式告警（T-08 会补关键词兜底与结果提示）
-                log.warn("分组检索失败（该组已跳过）: agentId={}, modelId={}, table={}, err={}", searchRequest.getAgentId(),
-                        modelId, table, ex.toString());
+                // R-03/T-08：某组不可达不得拖垮整体 ⇒ 该组降级为关键词兜底，并在结果中显式提示
+                String reason = ex.getClass().getSimpleName() + ": " + ex.getMessage();
+                log.warn("检索降级触发: agentId={}, kbIds={}, modelId={}, table={}, 原因={}", searchRequest.getAgentId(),
+                        e.getValue(), modelId, table, reason);
+                docs = keywordFallback(e.getValue(), hybridRequest.getQuery(), route.kbCount * 5, reason);
+                for (Document d : docs) {
+                    d.getMetadata().put("retrievalSourceModelId", modelId);
+                }
+                groups.add(docs);
                 continue;
             }
             java.util.List<Document> annotated = new java.util.ArrayList<>(docs.size());

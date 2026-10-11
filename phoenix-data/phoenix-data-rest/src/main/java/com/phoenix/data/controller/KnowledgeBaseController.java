@@ -104,6 +104,8 @@ public class KnowledgeBaseController {
 					: String.valueOf(body.get("docVectorType"));
 			java.util.Map<String, Object> out = new java.util.LinkedHashMap<>(
 					agentVectorStoreService.retrievalRoute(agentId, docVectorType));
+			java.util.List<Long> degradedKbIds = new java.util.ArrayList<>();
+			out.put("degradedKbIds", degradedKbIds);
 			int hitCount = -1;
 			if (body.get("query") != null) {
 				com.phoenix.data.dto.search.AgentSearchRequest req = com.phoenix.data.dto.search.AgentSearchRequest
@@ -124,6 +126,14 @@ public class KnowledgeBaseController {
 						h.put("retrievalSourceModelId", d.getMetadata().get("retrievalSourceModelId"));
 						h.put("retrievalSourceTable", d.getMetadata().get("retrievalSourceTable"));
 						h.put("retrievalSourceKbIds", d.getMetadata().get("retrievalSourceKbIds"));
+						// R-03/T-08：降级必须**显式提示**（响应可判定，不静默）
+						h.put("retrievalDegraded", d.getMetadata().get("retrievalDegraded"));
+						h.put("retrievalDegradedMode", d.getMetadata().get("retrievalDegradedMode"));
+						h.put("retrievalDegradedReason", d.getMetadata().get("retrievalDegradedReason"));
+						if (Boolean.TRUE.equals(d.getMetadata().get("retrievalDegraded"))) {
+							degradedKbIds.addAll((java.util.List<Long>) d.getMetadata().getOrDefault("retrievalSourceKbIds",
+									java.util.List.of()));
+						}
 					}
 					hs.add(h);
 				}
