@@ -7,7 +7,7 @@
 
 ## 1. 绑定与建库（R-01 / R-06）
 
-- [ ] T-01 数据模型与迁移件：`tbl_data_knowledge_base` 增 `embedding_model_id`/`model_space_key`（幂等 `ALTER TABLE IF EXISTS`）+ 存量回填规则 + 基线 SQL 同步
+- [x] T-01 数据模型与迁移件：`tbl_data_knowledge_base` 增 `embedding_model_id`/`model_space_key`（幂等 `ALTER TABLE IF EXISTS`）+ 存量回填规则 + 基线 SQL 同步
   关联: R-01, R-06
   依赖: 无
   验证方式: ①**全新库**跑基线 SQL；②**存量库**跑升级件（回填：能判定生成模型的写回该模型，不能判定的标记"待重建"）；③幂等重跑升级件（0 错误、0 变更）；④列名/类型核对 `\d`
