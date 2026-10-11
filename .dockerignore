@@ -10,3 +10,5 @@ diagrams
 logs
 AGENTS.md.bak.*
 .DS_Store
+docker/dist
+**/*.tar.gz

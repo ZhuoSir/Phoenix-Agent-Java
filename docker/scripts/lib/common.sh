@@ -63,7 +63,7 @@ phx_mirror_pick() { # phx_mirror_pick <候选前缀...> → stdout=首个活口�
         echo "$m"
         return 0
       fi
-      phx_log WARN "mirror 不可达: $m（第 $attempt/2 轮）"
+      phx_log WARN "mirror 不可达: ${m}（第 $attempt/2 轮）"
     done
     [ "$attempt" -lt 2 ] && sleep 3
     attempt=$((attempt+1))
@@ -140,7 +140,7 @@ phx_prefetch_images() { # phx_prefetch_images <镜像>... → 全绿返回 0
     [ -z "$img" ] && continue
     attempt=1
     while [ "$attempt" -le "$max" ]; do
-      phx_log INFO "预拉取+校验: $img（第 $attempt/$max 次）"
+      phx_log INFO "预拉取+校验: ${img}（第 $attempt/$max 次）"
       # shellcheck disable=SC2086
       if docker pull $plat "$img" >>"$PHX_LOG_FILE" 2>&1 \
          && docker save "$img" >/dev/null 2>>"$PHX_LOG_FILE"; then
@@ -167,7 +167,7 @@ phx_prefetch_images() { # phx_prefetch_images <镜像>... → 全绿返回 0
 # 本函数改走 docker-ce 的国内 apt 仓库；**多源有序回退**——BUG-175：此前只硬编码阿里云单源，
 # 阿里云 docker-ce 子仓索引 CDN 未同步时报 `File has unexpected size … Mirror sync in progress?`
 # ⇒ `docker-ce has no installation candidate` ⇒ 整条安装链在 A/4 硬失败且无第二源可退。
-# 成功返回 0 并在日志里留下实际生效的源；过程输出进 $PHX_LOG_FILE（调用方负责报错文案）。
+# 成功返回 0 并在日志里留下实际生效的源；过程输出进 ${PHX_LOG_FILE}（调用方负责报错文案）。
 phx_install_docker_aliyun() {
   local s="" arch="" codename="" m ok=0
   [ "$(id -u)" -ne 0 ] && s="sudo"
@@ -201,7 +201,7 @@ phx_install_docker_aliyun() {
     } >>"$PHX_LOG_FILE" 2>&1 && ok=1 && break
     phx_log WARN "  源不可用（索引未同步或被拦？）——换下一个国内源: $m"
   done
-  [ "$ok" -eq 1 ] || { phx_log ERROR "三个国内源全部失败（明细见 $PHX_LOG_FILE）"; return 1; }
+  [ "$ok" -eq 1 ] || { phx_log ERROR "三个国内源全部失败（明细见 ${PHX_LOG_FILE}）"; return 1; }
   return 0
 }
 
