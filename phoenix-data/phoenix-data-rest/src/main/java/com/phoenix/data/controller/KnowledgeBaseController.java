@@ -86,6 +86,20 @@ public class KnowledgeBaseController {
 		return ApiResponse.success("重刷完成", knowledgeBaseService.reEmbedKnowledgeBase(id));
 	}
 
+	/** R-06 归属与失效体检（管理员）：按库列出绑定模型/空间键/规模/可用性。 */
+	@GetMapping("/ownership-audit")
+	public ApiResponse<java.util.List<java.util.Map<String, Object>>> ownershipAudit() {
+	    try {
+	        if (!isSuperAdmin()) {
+	            return ApiResponse.error("仅管理员可查看归属体检");
+	        }
+	        return ApiResponse.success("查询成功", knowledgeBaseService.ownershipAudit());
+	    }
+	    catch (Exception e) {
+	        return ApiResponse.error(e.getMessage());
+	    }
+	}
+
 	@GetMapping("/{id}")
 	public ApiResponse<KnowledgeBaseVO> detail(@PathVariable("id") Long id) {
 		try {

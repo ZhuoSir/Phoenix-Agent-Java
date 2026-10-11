@@ -63,6 +63,8 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
         kb.setUpdateTime(LocalDateTime.now());
           // R-01：创建时绑定向量模型——显式指定优先，否则取默认 embedding 模型
           kb.setEmbeddingModelId(resolveBindingModelId(dto.getEmbeddingModelId()));
+          // R-06：落归属（向量空间键）——必须在 insert 之前写入实体
+          kb.setModelSpaceKey(modelVectorStoreFactory.spaceKeyFor(kb.getEmbeddingModelId()));
         knowledgeBaseMapper.insert(kb);
         // R-02：首绑某模型即确保其专属向量表存在（幂等；默认模型复用既有表，不新建）
         if (kb.getEmbeddingModelId() != null) {
@@ -186,6 +188,47 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
     public KnowledgeBaseVO detail(Long id) {
         return toVO(requireAlive(id), true);
     }
+
+        @Override
+        public java.util.List<java.util.Map<String, Object>> ownershipAudit() {
+            java.util.List<KnowledgeBase> all = knowledgeBaseMapper.selectListByQuery(QueryWrapper.create().where("del_flag = 0").orderBy("id"));
+            java.util.List<java.util.Map<String, Object>> rows = new java.util.ArrayList<>();
+            for (KnowledgeBase kb : all) {
+                java.util.Map<String, Object> row = new LinkedHashMap<>();
+                Integer mid = kb.getEmbeddingModelId();
+                String rawKey = kb.getModelSpaceKey();
+                // L-76 语义：空串是"值"，不是"未绑定"⇒ 体检显式报异常，不得回落默认模型
+                boolean keyEmpty = rawKey != null && rawKey.isEmpty();
+                com.phoenix.data.entity.ModelConfig cfg = mid == null ? null : modelConfigDataService.getById(mid);
+                boolean modelExists = cfg != null;
+                boolean modelActive = modelExists && Boolean.TRUE.equals(cfg.getIsActive());
+                boolean modelDeleted = modelExists && cfg.getIsDeleted() != null && cfg.getIsDeleted() != 0;
+                String table = mid == null ? null : modelVectorStoreFactory.tableName(ModelVectorStoreFactory.TABLE_SIMPLE, mid);
+                long count = mid == null ? -1L : modelVectorStoreFactory.vectorCount(ModelVectorStoreFactory.TABLE_SIMPLE, mid);
+                row.put("kbId", kb.getId());
+                row.put("name", kb.getName());
+                row.put("status", kb.getStatus());
+                row.put("embeddingModelId", mid);
+                row.put("modelSpaceKey", rawKey);
+                row.put("spaceKeyEmpty", keyEmpty);
+                row.put("modelExists", modelExists);
+                row.put("modelActive", modelActive);
+                row.put("modelDeleted", modelDeleted);
+                row.put("vectorTable", table);
+                row.put("vectorCount", count);
+                java.util.List<String> alerts = new java.util.ArrayList<>();
+                if (mid == null) { alerts.add("未绑定向量模型（历史数据待重建）"); }
+                if (keyEmpty) { alerts.add("向量空间键为空串（异常值，按 L-76 不回落默认）"); }
+                if (mid != null && !modelExists) { alerts.add("绑定的模型已不存在（配置被删除）"); }
+                if (modelExists && !modelActive) { alerts.add("绑定的模型已停用"); }
+                if (modelDeleted) { alerts.add("绑定的模型已逻辑删除"); }
+                if (mid != null && count < 0) { alerts.add("尚无该模型的向量表（未发生过写入）"); }
+                row.put("alerts", alerts);
+                row.put("ok", alerts.isEmpty());
+                rows.add(row);
+            }
+            return rows;
+        }
 
     private KnowledgeBase requireAlive(Long id) {
         KnowledgeBase kb = knowledgeBaseMapper.selectOneById(id);

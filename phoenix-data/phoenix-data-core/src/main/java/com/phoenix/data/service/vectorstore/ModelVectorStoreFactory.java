@@ -110,7 +110,7 @@ public class ModelVectorStoreFactory {
 			}
 			int dims = resolveDimensions(cfg);
 			String table = baseTable + "__" + shortHash(modelKey);
-			ensureTableDdl(table, dims);
+			ensureTableDdl(table, dims, spaceKeyFor(modelId));
 			EmbeddingModel embeddingModel = dynamicModelFactory.createEmbeddingModel(toDto(cfg));
 			PgVectorStore store = PgVectorStore.builder(jdbcTemplate, embeddingModel).vectorTableName(table)
 					.dimensions(dims)
@@ -139,6 +139,37 @@ public class ModelVectorStoreFactory {
 		}
 		return r;
 	}
+
+	/** 向量空间键：provider-model-dims（R-06 归属与失效体检用）。维度过探测/回落口径，与建表一致。 */
+	public String spaceKeyFor(Integer modelId) {
+		if (modelId == null) {
+			return null;
+		}
+		ModelConfig cfg = modelConfigDataService.getById(modelId);
+		if (cfg == null) {
+			return null;
+		}
+		return cfg.getProvider() + "-" + cfg.getModelName() + "-" + resolveDimensions(cfg);
+	}
+
+	/** 该模型的向量表是否存在（体检用；未建表 = 尚无向量空间）。 */
+	public boolean tableExists(String baseTable, Integer modelId) {
+		String t = tableName(baseTable, modelId);
+		Integer n = jdbcTemplate.queryForObject("select count(*)::int from pg_class where relkind='r' and relname = ?",
+				Integer.class, t);
+		return n != null && n > 0;
+	}
+
+	/** 该模型的向量条数（体检用；表不存在返回 -1 表示"未建表"）。 */
+	public long vectorCount(String baseTable, Integer modelId) {
+		if (!tableExists(baseTable, modelId)) {
+			return -1L;
+		}
+		Long c = jdbcTemplate.queryForObject("select count(*) from " + quoteIdent(tableName(baseTable, modelId)),
+				Long.class);
+		return c == null ? 0L : c;
+	}
+
 
 	/** 表名（不建表，仅计算/查询用）。 */
 	public String tableName(String baseTable, Integer modelId) {
@@ -198,7 +229,7 @@ public class ModelVectorStoreFactory {
 	}
 
 	/** 确定性建表（幂等）：镜像既有向量表结构（id uuid 主键 / content / metadata / embedding vector(N)）+ hnsw 索引。 */
-	private void ensureTableDdl(String table, int dims) {
+	private void ensureTableDdl(String table, int dims, String spaceKey) {
 		String t = quoteIdent(table);
 		jdbcTemplate.execute("CREATE TABLE IF NOT EXISTS " + t
 				+ " (id uuid DEFAULT uuid_generate_v4() PRIMARY KEY, content text, metadata json, embedding vector("
@@ -206,6 +237,13 @@ public class ModelVectorStoreFactory {
 		jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS " + quoteIdent(table + "_index") + " ON " + t
 				+ " USING hnsw (embedding vector_cosine_ops)");
 		log.info("确定性建表完成（幂等）: table={}, dims={}", table, dims);
+		try {
+			jdbcTemplate.execute("COMMENT ON TABLE " + t + " IS 'phoenix vector space: " + spaceKey
+					+ "'");
+		}
+		catch (Exception e) {
+			log.warn("表注释写入失败（不影响功能）: table={}, err={}", table, e.toString());
+		}
 	}
 
 	private static String quoteIdent(String s) {
