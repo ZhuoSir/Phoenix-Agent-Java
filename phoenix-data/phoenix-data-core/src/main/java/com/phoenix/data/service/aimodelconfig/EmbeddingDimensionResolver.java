@@ -101,9 +101,9 @@ public class EmbeddingDimensionResolver {
 		}
 		int modelDims = resolve();
 		if (tableDims != modelDims) {
-			String msg = "向量维度不一致：表 " + tableName + " 为 " + tableDims + " 维，当前 embedding 模型为 "
-					+ modelDims + " 维。本期不支持自动重建：请改用与原表维度一致的 embedding 模型，"
-					+ "或在确认可丢弃/重建既有向量后由运维执行迁移（参见 BL-34）。";
+			String msg = "向量维度不一致：表 " + tableName + " 为 " + tableDims + " 维，当前 embedding 模型为 " + modelDims
+					+ " 维。请二选一：① 对该库执行**重建**（POST /api/knowledge-base/{id}/rebuild）；"
+					+ "② 把该库**重新绑定**到与表维度一致的模型（参见 BUG-198/BL-34）。";
 			log.warn("{}（R-09 显式拒绝）", msg);
 			throw new DimensionMismatchException(msg);
 		}
@@ -116,24 +116,60 @@ public class EmbeddingDimensionResolver {
 	 * 与其猜表，不如校验全部向量表：当前 embedding 模型必须能适配**将被写入的任意表**，
 	 * 任一表维度不一致即拒绝（含表名与处置建议），避免"静默写坏/检索空结果"。
 	 */
-	public void assertAllTablesCompatible() {
-		// R-09：必须用**实时**维度（缓存可能在模型切换后滞后，导致校验放行而 INSERT 失败）
-		invalidate();
-		int modelDims = resolve();
-		java.util.List<String> tables = jdbcTemplate.queryForList(
-				"select c.table_name from information_schema.columns c "
-						+ "where c.column_name = 'embedding' and c.udt_name = 'vector'", String.class);
-		for (String table : tables) {
-			Integer tableDims = tableDimensions(table);
-			if (tableDims != null && tableDims != modelDims) {
-				String msg = "向量维度不一致：表 " + table + " 为 " + tableDims + " 维，当前 embedding 模型为 "
-						+ modelDims + " 维。本期不支持自动重建：请改用与原表维度一致的 embedding 模型，"
-						+ "或在确认可丢弃/重建既有向量后由运维执行迁移（参见 BL-34）。";
-				log.warn("{}（R-09 显式拒绝，写入/检索前拦截）", msg);
-				throw new DimensionMismatchException(msg);
-			}
+	/**
+	 * R-05/T-11：按"该库绑定模型 ↔ 其向量表"判定（**替代全表一致**）。
+	 *
+	 * <p>
+	 * 多模型下不同模型表维度天然可以不同（如 768 与 1024），全表一致校验会误拒 ⇒ 只校验本次写入/检索
+	 * 实际使用的**那一个模型的那张表**。表不存在（首绑未建）视为通过，由建表流程按该模型维度创建。
+	 */
+	public void assertModelTableCompatible(String tableName, Integer modelId) {
+		Integer tableDims = tableDimensions(tableName);
+		if (tableDims == null) {
+			return;
+		}
+		int modelDims = dimsForModel(modelId);
+		if (tableDims != modelDims) {
+			String msg = "向量维度不一致：表 " + tableName + " 为 " + tableDims + " 维，而该知识库绑定的模型为 " + modelDims
+					+ " 维。请二选一：① 对该库执行**重建**（POST /api/knowledge-base/{id}/rebuild，完成后自动切换绑定）；"
+					+ "② 把该库**重新绑定**到与表维度一致的模型（当前不支持自动改维度，参见 BUG-198/BL-34）。";
+			log.warn("{}（R-05 按库显式拒绝）", msg);
+			throw new DimensionMismatchException(msg);
 		}
 	}
+
+	/** R-05/T-11：按"表维度 ↔ 模型维度（调用方提供，与建表同口径）"判定；表不存在视为通过。 */
+	public void assertTableDimsCompatible(String tableName, int modelDims, String modelLabel) {
+		Integer tableDims = tableDimensions(tableName);
+		if (tableDims == null) {
+			return;
+		}
+		if (tableDims != modelDims) {
+			String msg = "向量维度不一致：表 " + tableName + " 为 " + tableDims + " 维，而" + modelLabel + "为 " + modelDims
+					+ " 维。请二选一：① 对该库执行**重建**（POST /api/knowledge-base/{id}/rebuild，完成后自动切换绑定）；"
+					+ "② 把该库**重新绑定**到与表维度一致的模型（当前不支持自动改维度，参见 BUG-198/BL-34）。";
+			log.warn("{}（R-05 按库显式拒绝）", msg);
+			throw new DimensionMismatchException(msg);
+		}
+	}
+
+	/** 指定模型的向量维度：优先按该模型配置解析（ollama 探测）；无法判定时回落当前默认口径 */
+	public int dimsForModel(Integer modelId) {
+		try {
+			if (modelId != null) {
+				// 用 var 免引入实体包（本类此前只依赖 DTO）
+				var cfg = modelConfigDataService.findById(modelId);
+				if (cfg != null && ModelProvider.OLLAMA.getCode().equalsIgnoreCase(cfg.getProvider())) {
+					return ollamaApiClient.probeEmbeddingDimension(cfg.getBaseUrl(), cfg.getModelName());
+				}
+			}
+		}
+		catch (Exception e) {
+			log.warn("按模型解析维度失败（回落默认口径）: modelId={}, err={}", modelId, e.toString());
+		}
+		return resolve();
+	}
+
 
 	/** 读取表 embedding 列的实际维度；表或列不存在返回 null */
 	private Integer tableDimensions(String tableName) {

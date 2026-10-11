@@ -58,6 +58,10 @@ public class AgentVectorStoreServiceImpl implements AgentVectorStoreService {
     /** T-08：模型不可达时的关键词兜底数据源（不依赖嵌入模型） */
     @Autowired
     private com.phoenix.data.mapper.AgentKnowledgeMapper agentKnowledgeMapper;
+
+    /** R-02/T-11：按文档归属库解析其绑定模型（写入路由 + 按模型维度校验） */
+    @Autowired
+    private org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
     @Autowired
     private Optional<HybridRetrievalStrategy> hybridRetrievalStrategy;
     @Autowired
@@ -172,8 +176,7 @@ public class AgentVectorStoreServiceImpl implements AgentVectorStoreService {
      */
     @Override
     public void addDocuments(String agentId, List<Document> documents) {
-        // R-09：维度不一致必须显式拒绝（防脏数据/静默失败），先于任何写入
-        embeddingDimensionResolver.assertAllTablesCompatible();
+        // R-09/R-05：维度校验**按库（按模型）**判定，替代原"全表一致"（多模型下不同模型表维度天然可不同）
         Assert.notNull(agentId, "AgentId cannot be null.");
         Assert.notEmpty(documents, "Documents cannot be empty.");
 
@@ -197,10 +200,21 @@ public class AgentVectorStoreServiceImpl implements AgentVectorStoreService {
                         "Document metadata agentId does not match.");
             }
         }
+        // R-02/T-11：按文档归属的知识库解析其绑定模型 ⇒ 用该模型专属表与其模型客户端写入（补齐写入路由）
+        Integer modelId = resolveWriteModelId(documents);
+        String table = modelVectorStoreFactory.tableName(ModelVectorStoreFactory.TABLE_SIMPLE, modelId);
+        modelVectorStoreFactory.ensureTableExists(ModelVectorStoreFactory.TABLE_SIMPLE, modelId);
+        // R-05/T-11：按"该库绑定模型 ↔ 其向量表"判定（维度与建表同口径，含通用探测）
+        embeddingDimensionResolver.assertTableDimsCompatible(table, modelVectorStoreFactory.dimsOf(modelId),
+                "该库绑定的模型(modelId=" + modelId + ")");
+        org.springframework.ai.vectorstore.VectorStore target = modelVectorStoreFactory
+                .forModel(ModelVectorStoreFactory.TABLE_SIMPLE, modelId);
         List<List<Document>> spitDocments = ListUtil.partition(documents, 10);
         for (List<Document> spit : spitDocments) {
-            vectorStore.add(spit);
+            target.add(spit);
         }
+        log.info("向量写入（按库绑定模型路由）: agentId={}, modelId={}, table={}, docs={}", agentId, modelId, table,
+                documents.size());
     }
 
     /**
@@ -209,6 +223,42 @@ public class AgentVectorStoreServiceImpl implements AgentVectorStoreService {
      * @param metadata 元数据条件
      * @return 是否删除成功
      */
+    /**
+     * 解析该批文档应写入哪个模型的表：metadata.knowledgeBaseId → 该库绑定模型；
+     * 无法判定（如库表/字段向量）⇒ 回落默认模型（与改动前行为一致）。
+     */
+    private Integer resolveWriteModelId(List<Document> documents) {
+        try {
+            for (Document d : documents) {
+                java.util.Map<String, Object> md = d.getMetadata();
+                if (md == null) {
+                    continue;
+                }
+                Object kb = md.get("knowledgeBaseId");
+                if (kb == null) {
+                    kb = md.get("knowledge_base_id");
+                }
+                if (kb == null && md.get("agentKnowledgeId") != null) {
+                    kb = jdbcTemplate.queryForObject(
+                            "SELECT knowledge_base_id FROM tbl_data_agent_knowledge WHERE id = ?", Long.class,
+                            Long.valueOf(String.valueOf(md.get("agentKnowledgeId"))));
+                }
+                if (kb != null) {
+                    Integer mid = jdbcTemplate.queryForObject(
+                            "SELECT embedding_model_id FROM tbl_data_knowledge_base WHERE id = ?", Integer.class,
+                            Long.valueOf(String.valueOf(kb)));
+                    if (mid != null) {
+                        return mid;
+                    }
+                }
+            }
+        }
+        catch (Exception e) {
+            log.warn("写入模型解析失败，回落默认模型: {}", e.toString());
+        }
+        return modelVectorStoreFactory.defaultEmbeddingModelId();
+    }
+
     /** T-08 关键词兜底（模型不可达时）：不依赖嵌入模型，直接按关键词查该库条目并标注降级提示 */
     private List<Document> keywordFallback(java.util.List<Long> kbIds, String query, int topK, String reason) {
         if (kbIds == null || kbIds.isEmpty() || query == null || query.isBlank()) {

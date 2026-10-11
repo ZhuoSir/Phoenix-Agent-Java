@@ -181,6 +181,15 @@ public class ModelVectorStoreFactory {
 		return cfg.getProvider() + "-" + cfg.getModelName() + "-" + resolveDimensions(cfg);
 	}
 
+	/** 该模型的向量维度（与建表同口径；供 R-05 按库校验使用） */
+	public int dimsOf(Integer modelId) {
+		var cfg = modelConfigDataService.getById(modelId);
+		if (cfg == null) {
+			return embeddingDimensionResolver.resolve();
+		}
+		return resolveDimensions(cfg);
+	}
+
 	/** 该模型的向量表是否存在（体检用；未建表 = 尚无向量空间）。 */
 	public boolean tableExists(String baseTable, Integer modelId) {
 		String t = tableName(baseTable, modelId);
@@ -267,8 +276,21 @@ public class ModelVectorStoreFactory {
 		catch (Exception e) {
 			log.warn("模型维度探测失败，回落平台维度: modelId={}, err={}", cfg.getId(), e.toString());
 		}
+		// BUG-198 缓解：非 ollama 也**用该模型自身**探一次（任意 OpenAI 兼容端点均可）拿到真实维度；
+		// 仅在模型不可达/探测失败时回落平台维度并告警（此时表维度可能与该模型不符，写入会被显式拒绝）
+		try {
+			float[] probe = dynamicModelFactory.createEmbeddingModel(toDto(cfg)).embed("phoenix-dimension-probe");
+			if (probe != null && probe.length > 0) {
+				log.info("模型维度探测成功（通用探测）: modelId={}, model={}, dims={}", cfg.getId(), cfg.getModelName(),
+						probe.length);
+				return probe.length;
+			}
+		}
+		catch (Exception e) {
+			log.warn("模型维度通用探测失败（回落平台维度，可能存在维度不符）: modelId={}, err={}", cfg.getId(), e.toString());
+		}
 		int d = embeddingDimensionResolver.resolve();
-		log.warn("模型维度沿用平台维度（provider={} 无探测手段）: modelId={}, dims={}", cfg.getProvider(), cfg.getId(), d);
+		log.warn("模型维度沿用平台维度（provider={} 探测不可用）: modelId={}, dims={}", cfg.getProvider(), cfg.getId(), d);
 		return d;
 	}
 
