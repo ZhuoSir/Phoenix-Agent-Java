@@ -120,6 +120,11 @@ public class KnowledgeBaseController {
 					java.util.Map<String, Object> h = new java.util.LinkedHashMap<>();
 					h.put("id", String.valueOf(d.getId()));
 					h.put("score", d.getScore());
+					if (d.getMetadata() != null) {
+						h.put("retrievalSourceModelId", d.getMetadata().get("retrievalSourceModelId"));
+						h.put("retrievalSourceTable", d.getMetadata().get("retrievalSourceTable"));
+						h.put("retrievalSourceKbIds", d.getMetadata().get("retrievalSourceKbIds"));
+					}
 					hs.add(h);
 				}
 				out.put("hits", hs);

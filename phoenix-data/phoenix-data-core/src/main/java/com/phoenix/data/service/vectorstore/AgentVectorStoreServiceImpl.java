@@ -90,10 +90,13 @@ public class AgentVectorStoreServiceImpl implements AgentVectorStoreService {
                 .filterExpression(filter)
                 .build();
 
-        // R-03/T-06：单库 ⇒ 按该库绑定模型选表选模型；多库 ⇒ 暂用默认存储（分组扇出见 T-07）
+        // R-03/T-06：单库 ⇒ 按该库绑定模型选表选模型；R-03/T-07：多库 ⇒ 按模型分组扇出 + RRF 融合
         // 注意：路由必须在混合检索分支**之前**解析，并把结果注入请求，否则混合路径会用策略自带存储（实测绕过）
         Route route = resolveRoute(searchRequest.getAgentId(), searchRequest.getDocVectorType());
         hybridRequest.setRoutingVectorStore(route.store);
+        if (route.knowledgeType && route.byModel.size() > 1) {
+            return fanOutByModel(route, hybridRequest, searchRequest);
+        }
         if (dataAgentProperties.getVectorStore().isEnableHybridSearch() && hybridRetrievalStrategy.isPresent()) {
             log.info("混合检索（按库绑定模型路由）: agentId={}, docVectorType={}, kbId={}, modelId={}, table={}",
                     searchRequest.getAgentId(), searchRequest.getDocVectorType(), route.kbId, route.modelId,
@@ -173,6 +176,61 @@ public class AgentVectorStoreServiceImpl implements AgentVectorStoreService {
      * @param metadata 元数据条件
      * @return 是否删除成功
      */
+    /** 多模型分组扇出 + RRF 融合（R-03/T-07）：每组用其模型的表/模型独立检索，再按名次融合 */
+    private List<Document> fanOutByModel(Route route, HybridSearchRequest hybridRequest,
+            com.phoenix.data.dto.search.AgentSearchRequest searchRequest) {
+        java.util.List<java.util.List<Document>> groups = new java.util.ArrayList<>();
+        for (java.util.Map.Entry<Integer, java.util.List<Long>> e : route.byModel.entrySet()) {
+            Integer modelId = e.getKey();
+            String table = modelVectorStoreFactory.tableName(ModelVectorStoreFactory.TABLE_SIMPLE, modelId);
+            java.util.List<Document> docs;
+            try {
+                org.springframework.ai.vectorstore.VectorStore store = modelVectorStoreFactory
+                        .forModel(ModelVectorStoreFactory.TABLE_SIMPLE, modelId);
+                docs = store.similaritySearch(hybridRequest.toVectorSearchRequest());
+            }
+            catch (Exception ex) {
+                // R-03：某组不可达不得拖垮整体；显式告警（T-08 会补关键词兜底与结果提示）
+                log.warn("分组检索失败（该组已跳过）: agentId={}, modelId={}, table={}, err={}", searchRequest.getAgentId(),
+                        modelId, table, ex.toString());
+                continue;
+            }
+            java.util.List<Document> annotated = new java.util.ArrayList<>(docs.size());
+            for (Document d : docs) {
+                annotated.add(annotateSource(d, modelId, table, e.getValue()));
+            }
+            docs = annotated;
+            log.info("分组检索: agentId={}, modelId={}, table={}, kbIds={}, hits={}", searchRequest.getAgentId(), modelId,
+                    table, e.getValue(), docs.size());
+            groups.add(docs);
+        }
+        int topK = searchRequest.getTopK() == null ? 10 : searchRequest.getTopK();
+        java.util.List<Document> fused = rrfFusionStrategy.fuseResults(topK, groups.toArray(new java.util.List[0]));
+        log.info("RRF 融合完成: agentId={}, groups={}, fused={}, order={}", searchRequest.getAgentId(), groups.size(),
+                fused.size(), fused.stream().map(d -> String.valueOf(d.getId())).toList());
+        return fused;
+    }
+
+    /** 结果来源标注（R-03：跨模型命中必须可标注来源；元数据不可变时构造新文档） */
+    private static Document annotateSource(Document d, Integer modelId, String table, java.util.List<Long> kbIds) {
+        try {
+            d.getMetadata().put("retrievalSourceModelId", modelId);
+            d.getMetadata().put("retrievalSourceTable", table);
+            d.getMetadata().put("retrievalSourceKbIds", kbIds);
+            return d;
+        }
+        catch (UnsupportedOperationException e) {
+            java.util.Map<String, Object> m = new java.util.HashMap<>(d.getMetadata());
+            m.put("retrievalSourceModelId", modelId);
+            m.put("retrievalSourceTable", table);
+            m.put("retrievalSourceKbIds", kbIds);
+            return new Document(d.getId(), d.getText(), m);
+        }
+    }
+
+    /** RRF 融合器（无 Spring bean，直接复用既有实现，公式 1/(60+rank)） */
+    private final com.phoenix.data.service.hybrid.fusion.impl.RrfFusionStrategy rrfFusionStrategy = new com.phoenix.data.service.hybrid.fusion.impl.RrfFusionStrategy();
+
     /** 检索路由结果（R-03/T-06）；degraded 供 T-08 不可达降级使用 */
     public static class Route {
         public VectorStore store;
@@ -180,6 +238,10 @@ public class AgentVectorStoreServiceImpl implements AgentVectorStoreService {
         public Integer modelId;
         public String table;
         public int kbCount;
+        /** 绑定的库 id 与其模型分组：modelId → kbIds（R-03/T-07 扇出用） */
+        public java.util.List<Long> kbIds = new java.util.ArrayList<>();
+        public java.util.Map<Integer, java.util.List<Long>> byModel = new java.util.LinkedHashMap<>();
+        public boolean knowledgeType;
     }
 
     /**
@@ -198,6 +260,18 @@ public class AgentVectorStoreServiceImpl implements AgentVectorStoreService {
         try {
             java.util.List<Long> kbIds = agentKbaseBindMapper.selectKbIdsByAgent(Long.valueOf(agentId));
             r.kbCount = kbIds == null ? 0 : kbIds.size();
+            r.knowledgeType = true;
+            r.kbIds = kbIds == null ? new java.util.ArrayList<>() : new java.util.ArrayList<>(kbIds);
+            Integer defId = modelVectorStoreFactory.defaultEmbeddingModelId();
+            for (Long kid : r.kbIds) {
+                KnowledgeBase kb = knowledgeBaseMapper.selectOneById(kid);
+                Integer mid = (kb == null || kb.getEmbeddingModelId() == null) ? defId : kb.getEmbeddingModelId();
+                r.byModel.computeIfAbsent(mid, k -> new java.util.ArrayList<>()).add(kid);
+            }
+            if (r.byModel.size() > 1) {
+                log.info("检索路由：agentId={} 绑定 {} 个库、分属 {} 个模型 ⇒ 分组扇出 + RRF 融合（R-03/T-07）", agentId,
+                        r.kbCount, r.byModel.size());
+            }
             if (r.kbCount == 1) {
                 KnowledgeBase kb = knowledgeBaseMapper.selectOneById(kbIds.get(0));
                 if (kb != null) {

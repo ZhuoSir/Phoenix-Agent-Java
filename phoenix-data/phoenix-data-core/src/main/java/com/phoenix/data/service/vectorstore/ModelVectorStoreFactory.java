@@ -6,7 +6,11 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.springframework.ai.embedding.Embedding;
 import org.springframework.ai.embedding.EmbeddingModel;
+import org.springframework.ai.embedding.EmbeddingRequest;
+import org.springframework.ai.embedding.EmbeddingResponse;
+import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.ai.vectorstore.pgvector.PgVectorStore;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -58,6 +62,11 @@ public class ModelVectorStoreFactory {
 	private final VectorStore defaultRagStore;
 
 	private final VectorStore defaultSimpleStore;
+
+	/** 查询嵌入调用/命中计数（R-03/T-07：按模型缓存，供验证与运维观测） */
+	private final Map<String, java.util.concurrent.atomic.AtomicInteger> embedCalls = new ConcurrentHashMap<>();
+
+	private final Map<String, java.util.concurrent.atomic.AtomicInteger> embedCacheHits = new ConcurrentHashMap<>();
 
 	/** 缓存：baseTable#modelKey → 已装配的向量存储 */
 	private final Map<String, PgVectorStore> cache = new ConcurrentHashMap<>();
@@ -111,7 +120,8 @@ public class ModelVectorStoreFactory {
 			int dims = resolveDimensions(cfg);
 			String table = baseTable + "__" + shortHash(modelKey);
 			ensureTableDdl(table, dims, spaceKeyFor(modelId));
-			EmbeddingModel embeddingModel = dynamicModelFactory.createEmbeddingModel(toDto(cfg));
+			EmbeddingModel embeddingModel = cachingEmbeddingModel(modelKey,
+					dynamicModelFactory.createEmbeddingModel(toDto(cfg)));
 			PgVectorStore store = PgVectorStore.builder(jdbcTemplate, embeddingModel).vectorTableName(table)
 					.dimensions(dims)
 					.distanceType(PgVectorStore.PgDistanceType.COSINE_DISTANCE)
@@ -226,6 +236,66 @@ public class ModelVectorStoreFactory {
 		int d = embeddingDimensionResolver.resolve();
 		log.warn("模型维度沿用平台维度（provider={} 无探测手段）: modelId={}, dims={}", cfg.getProvider(), cfg.getId(), d);
 		return d;
+	}
+
+	/**
+	 * 查询嵌入按模型缓存（R-03/T-07）：同一模型同一文本只调一次模型；计数供验证"调用次数正确"。
+	 */
+	private EmbeddingModel cachingEmbeddingModel(String modelKey, EmbeddingModel delegate) {
+		final Map<String, float[]> cache = java.util.Collections
+				.synchronizedMap(new java.util.LinkedHashMap<>(32, 0.75f, true) {
+					@Override
+					protected boolean removeEldestEntry(Map.Entry<String, float[]> eldest) {
+						return size() > 256;
+					}
+				});
+		return new EmbeddingModel() {
+			@Override
+			public EmbeddingResponse call(EmbeddingRequest request) {
+				java.util.List<String> ins = request.getInstructions();
+				if (ins != null && ins.size() == 1) {
+					String text = ins.get(0);
+					float[] hit = cache.get(text);
+					if (hit != null) {
+						embedCacheHits.computeIfAbsent(modelKey, k -> new java.util.concurrent.atomic.AtomicInteger())
+								.incrementAndGet();
+						log.debug("查询嵌入命中缓存: modelKey={}", modelKey);
+						return new EmbeddingResponse(java.util.List.of(new Embedding(hit, 0)));
+					}
+					embedCalls.computeIfAbsent(modelKey, k -> new java.util.concurrent.atomic.AtomicInteger())
+							.incrementAndGet();
+					EmbeddingResponse resp = delegate.call(request);
+					if (resp != null && resp.getResults() != null && !resp.getResults().isEmpty()) {
+						cache.put(text, resp.getResults().get(0).getOutput());
+					}
+					return resp;
+				}
+				embedCalls.computeIfAbsent(modelKey, k -> new java.util.concurrent.atomic.AtomicInteger()).incrementAndGet();
+				return delegate.call(request);
+			}
+
+			@Override
+			public float[] embed(Document document) {
+				return delegate.embed(document);
+			}
+
+			@Override
+			public int dimensions() {
+				return delegate.dimensions();
+			}
+		};
+	}
+
+	/** 嵌入调用统计（模型键 → 实际调用次数 / 缓存命中次数） */
+	public Map<String, Object> embeddingStats() {
+		Map<String, Object> m = new LinkedHashMap<>();
+		Map<String, Integer> calls = new LinkedHashMap<>();
+		embedCalls.forEach((k, v) -> calls.put(k, v.get()));
+		Map<String, Integer> hits = new LinkedHashMap<>();
+		embedCacheHits.forEach((k, v) -> hits.put(k, v.get()));
+		m.put("embeddingCalls", calls);
+		m.put("embeddingCacheHits", hits);
+		return m;
 	}
 
 	/** 确定性建表（幂等）：镜像既有向量表结构（id uuid 主键 / content / metadata / embedding vector(N)）+ hnsw 索引。 */
