@@ -3,10 +3,13 @@
  * 知识库管理（knowledge-base spec T-07）：与智能体管理平级的独立模块。
  * 数据域 ApiResponse 信封（success/message/data），删除保护 message 自带绑定清单。
  */
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 
 import {
+  ElAlert,
   ElButton,
+  ElOption,
+  ElSelect,
   ElCheckbox,
   ElDialog,
   ElDrawer,
@@ -31,6 +34,7 @@ import {
   kbUpdateApi,
   type KnowledgeBase,
 } from '#/api/core/knowledgeBase';
+import { getModelConfigListApi } from '#/api/core/modelConfig';
 import { getGroupInfoPageApi } from '#/api/core/platform-group-info';
 
 import AgentKnowledgeConfig from '#/views/agent/list/components/AgentKnowledgeConfig.vue';
@@ -45,7 +49,33 @@ const query = ref({ name: '', pageNum: 1, pageSize: 10 });
 // 新建/编辑
 const dialogVisible = ref(false);
 const editId = ref<null | number>(null);
-const form = ref<{ description: string; name: string }>({ name: '', description: '' });
+const form = ref<{ description: string; embeddingModelId?: null | number; name: string }>({
+  name: '',
+  description: '',
+  embeddingModelId: null,
+});
+const originalModelId = ref<null | number>(null);
+const embeddingModels = ref<{ id: number; label: string }[]>([]);
+const defaultModelId = ref<null | number>(null);
+/** 编辑态选择与原始绑定不一致 ⇒ 展示"将重建"告警（R-01 附加） */
+const modelChangedInForm = computed(
+  () => editId.value != null && form.value.embeddingModelId != null && form.value.embeddingModelId !== originalModelId.value,
+);
+function modelNameOf(id?: null | number) {
+  if (id == null) return '—（待重建）';
+  return embeddingModels.value.find((m) => m.id === id)?.label || `#${id}`;
+}
+/** 拉取可用向量模型（EMBEDDING）并识别默认项（R-01：下拉默认值=默认向量模型） */
+async function loadEmbeddingModels() {
+  try {
+    const all = await getModelConfigListApi();
+    const embs = (all || []).filter((m) => String(m.modelType).toUpperCase() === 'EMBEDDING' && m.id != null);
+    embeddingModels.value = embs.map((m) => ({ id: m.id as number, label: `${m.modelName}（${m.provider}）` }));
+    defaultModelId.value = embs.find((m) => m.isDefault)?.id ?? embs[0]?.id ?? null;
+  } catch {
+    embeddingModels.value = [];
+  }
+}
 const saving = ref(false);
 
 // 分配组
@@ -121,13 +151,19 @@ async function load() {
 
 function openCreate() {
   editId.value = null;
-  form.value = { name: '', description: '' };
+form.value = { name: '', description: '', embeddingModelId: defaultModelId.value };
+originalModelId.value = null;
   dialogVisible.value = true;
 }
 
 function openEdit(row: KnowledgeBase) {
   editId.value = row.id;
-  form.value = { name: row.name, description: row.description || '' };
+form.value = {
+  name: row.name,
+  description: row.description || '',
+  embeddingModelId: row.embeddingModelId ?? defaultModelId.value,
+};
+originalModelId.value = row.embeddingModelId ?? null;
   dialogVisible.value = true;
 }
 
@@ -138,14 +174,40 @@ async function save() {
   }
   saving.value = true;
   try {
-    const res = editId.value == null
-      ? await kbCreateApi({ name: form.value.name.trim(), description: form.value.description })
-      : await kbUpdateApi({ id: editId.value, ...form.value });
+if (modelChangedInForm.value) {
+  try {
+    await ElMessageBox.confirm(
+      '更换向量模型后，该知识库的向量将按新模型重建（本次提交只登记请求，实际重建由受控重建流程执行）。确认提交？',
+      '更换向量模型',
+      { confirmButtonText: '确认提交', type: 'warning' },
+    );
+  } catch {
+    return; // 用户取消
+  }
+}
+const res = editId.value == null
+  ? await kbCreateApi({
+      name: form.value.name.trim(),
+      description: form.value.description,
+      embeddingModelId: form.value.embeddingModelId ?? undefined,
+    })
+  : await kbUpdateApi({
+      id: editId.value,
+      name: form.value.name,
+      description: form.value.description,
+      embeddingModelId: form.value.embeddingModelId ?? undefined,
+      confirmRebuild: modelChangedInForm.value ? true : undefined,
+    });
     if (res.success === false) {
       ElMessage.error(res.message || '保存失败');
       return;
     }
-    ElMessage.success(editId.value == null ? '创建成功' : '更新成功');
+const hint = (res.data as any)?.rebuildHint;
+if (hint) {
+  ElMessage.warning(hint);
+} else {
+  ElMessage.success(editId.value == null ? '创建成功' : '更新成功');
+}
     dialogVisible.value = false;
     await load();
   } finally {
@@ -190,7 +252,10 @@ function openItems(row: KnowledgeBase) {
   drawerVisible.value = true;
 }
 
-onMounted(load);
+onMounted(() => {
+  load();
+  loadEmbeddingModels();
+});
 </script>
 
 <template>
@@ -211,7 +276,10 @@ onMounted(load);
 
     <ElTable v-loading="loading" :data="list" border class="kb-page__table">
       <ElTableColumn label="名称" min-width="160" prop="name" />
-      <ElTableColumn label="描述" min-width="200" prop="description" show-overflow-tooltip />
+<ElTableColumn label="描述" min-width="200" prop="description" show-overflow-tooltip />
+<ElTableColumn label="向量模型" min-width="170">
+  <template #default="{ row }">{{ modelNameOf(row.embeddingModelId) }}</template>
+</ElTableColumn>
       <ElTableColumn label="组授权" min-width="160">
         <template #default="{ row }">
           <ElTag v-for="g in row.groupNames" :key="g" class="kb-page__tag" size="small" type="info">{{ g }}</ElTag>
@@ -251,9 +319,17 @@ onMounted(load);
         <ElFormItem label="名称" required>
           <ElInput v-model="form.name" maxlength="64" show-word-limit placeholder="不超过 64 字" />
         </ElFormItem>
-        <ElFormItem label="描述">
-          <ElInput v-model="form.description" :rows="3" maxlength="512" show-word-limit type="textarea" />
-        </ElFormItem>
+<ElFormItem label="描述">
+<ElInput v-model="form.description" :rows="3" maxlength="512" show-word-limit type="textarea" />
+</ElFormItem>
+<ElFormItem label="向量模型">
+<ElSelect v-model="form.embeddingModelId" :disabled="!embeddingModels.length" placeholder="请选择向量模型" style="width: 100%">
+  <ElOption v-for="m in embeddingModels" :key="m.id" :label="m.label" :value="m.id" />
+</ElSelect>
+<div v-if="!embeddingModels.length" class="kb-page__none">暂无可用向量模型，请先到“模型管理”添加</div>
+<ElAlert v-else-if="modelChangedInForm" :closable="false" show-icon
+  title="更换向量模型将重建该知识库的向量（提交时需二次确认）" type="warning" />
+</ElFormItem>
       </ElForm>
       <template #footer>
         <ElButton @click="dialogVisible = false">取消</ElButton>
