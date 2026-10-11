@@ -269,6 +269,13 @@ public class KnowledgeRebuildService {
 			job.setSwitchApplied(updated > 0);
 			if (updated > 0) {
 				job.setStatus("SUCCEEDED");
+				// 计数口径：重试会重新处理同一条目，processed 可能超过 total ⇒ 收尾时按 total 收敛（避免出现 4/3）
+				if (job.getProcessedItems() != null && job.getTotalItems() != null
+						&& job.getProcessedItems() > job.getTotalItems()) {
+					log.info("重建计数收敛: jobId={}, 原始 processed={} > total={}（重试重复计数）", job.getId(),
+							job.getProcessedItems(), job.getTotalItems());
+					job.setProcessedItems(job.getTotalItems());
+				}
 				log.info("重建完成并原子切换绑定: jobId={}, kbId={}, from={}, to={}, spaceKey={}, processed={}/{}",
 						job.getId(), job.getKbId(), job.getFromModelId(), job.getToModelId(),
 						modelVectorStoreFactory.spaceKeyFor(job.getToModelId()), job.getProcessedItems(),
@@ -282,6 +289,10 @@ public class KnowledgeRebuildService {
 		}
 		else {
 			job.setStatus("PARTIAL");
+			if (job.getProcessedItems() != null && job.getTotalItems() != null
+					&& job.getProcessedItems() > job.getTotalItems()) {
+				job.setProcessedItems(job.getTotalItems());
+			}
 			job.setFailedItems(toJson(failures));
 			log.warn("重建部分失败（未切换绑定，旧模型继续可用）: jobId={}, kbId={}, 失败条数={}, 清单={}", job.getId(),
 					job.getKbId(), failures.size(), failures);
