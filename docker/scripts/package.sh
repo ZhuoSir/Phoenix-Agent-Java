@@ -32,7 +32,7 @@ WITH_DEBS="${WITH_DEBS:-0}"
 NATIVE=$(uname -m)
 case "$NATIVE" in x86_64) NATIVE=amd64;; aarch64|arm64) NATIVE=arm64;; *) NATIVE="";; esac
 [ -z "$ARCH" ] && ARCH="$NATIVE"
-case "$ARCH" in amd64|arm64) ;; *) phx_log ERROR "arch 仅支持 amd64/arm64（收到: $ARCH）"; exit 2;; esac
+case "$ARCH" in amd64|arm64) ;; *) phx_log ERROR "arch 仅支持 amd64/arm64（收到: ${ARCH}）"; exit 2;; esac
 [ -z "$VERSION" ] && VERSION=$(git -C "$REPO" describe --tags 2>/dev/null | sed 's/^v//')
 [ -z "$VERSION" ] && { phx_log ERROR "无法从 git tag 推断版本，请 --version 指定"; exit 2; }
 PKGNAME="phoenix-${VERSION}-${ARCH}"
@@ -60,7 +60,7 @@ phx_log INFO "====> 步骤 1/$TOTAL: 环境自检"
 phx_require_cmd docker || phx_fail 1 $TOTAL "缺 docker CLI"
 docker info >/dev/null 2>&1 || phx_fail 1 $TOTAL "docker daemon 不可达"
 phx_disk_ok "$OUTDIR" 10000 || phx_fail 1 $TOTAL "$OUTDIR 可用空间不足 10GB"
-[ -n "$NATIVE" ] || phx_log WARN "非常见架构 uname=$NATIVE，编译阶段将不加 --platform"
+[ -n "$NATIVE" ] || phx_log WARN "非常见架构 uname=${NATIVE}，编译阶段将不加 --platform"
 
 phx_log INFO "====> 步骤 2/$TOTAL: 镜像源选优"
 if true; then
@@ -88,14 +88,14 @@ phx_step 3 $TOTAL "容器内编译 jar+dist（native，产物架构无关）" &&
   phx_prefetch_images "$(ref maven:3.9-eclipse-temurin-21)" "$(ref node:22-bookworm)" \
     || phx_fail 3 $TOTAL "构建基础镜像预拉取/校验失败（镜像源传输质量差，换 --mirror 重跑）"
   PHX_PREFETCH_PLATFORM=""
-  phx_log INFO "backend 编译（MAVEN_IMAGE=$(ref maven:3.9-eclipse-temurin-21) settings=$SETTINGS_ARG）"
+  phx_log INFO "backend 编译（MAVEN_IMAGE=$(ref maven:3.9-eclipse-temurin-21) settings=${SETTINGS_ARG}）"
   # shellcheck disable=SC2086
   docker build $PLAT -f "$REPO/docker/Dockerfile.backend.multistage" --target jar \
     --build-arg "MAVEN_IMAGE=$(ref maven:3.9-eclipse-temurin-21)" \
     --build-arg "MAVEN_SETTINGS=$SETTINGS_ARG" \
     -t "phx-tmp-jar:$VERSION" "$REPO" >>"$PHX_LOG_FILE" 2>&1 \
     || phx_fail 3 $TOTAL "backend 编译失败（详见日志尾部）"
-  phx_log INFO "frontend 编译（NODE_IMAGE=$(ref node:22-bookworm) npm=$NPM_ARG）"
+  phx_log INFO "frontend 编译（NODE_IMAGE=$(ref node:22-bookworm) npm=${NPM_ARG}）"
   # shellcheck disable=SC2086
   docker build $PLAT -f "$REPO/docker/Dockerfile.frontend.multistage" --target dist \
     --build-arg "NODE_IMAGE=$(ref node:22-bookworm)" \
@@ -111,7 +111,7 @@ phx_step 3 $TOTAL "容器内编译 jar+dist（native，产物架构无关）" &&
   phx_step_mark 3
 }
 
-phx_step 4 $TOTAL "组装双侧镜像 + 基础运行时三件备齐（--platform linux/$ARCH）" && {
+phx_step 4 $TOTAL "组装双侧镜像 + 基础运行时三件备齐（--platform linux/${ARCH}）" && {
   mkdir -p "$REPO/docker/.stage"
   cp "$WORK/artifacts/phoenix-admin.jar" "$REPO/docker/.stage/phoenix-admin.jar"
   rm -rf "$REPO/docker/.stage/dist" && cp -r "$WORK/artifacts/dist" "$REPO/docker/.stage/dist"
@@ -134,17 +134,17 @@ phx_step 4 $TOTAL "组装双侧镜像 + 基础运行时三件备齐（--platform
   BARCH=$(docker image inspect "phoenix-backend:$VERSION" --format '{{.Architecture}}')
   FARCH=$(docker image inspect "phoenix-frontend:$VERSION" --format '{{.Architecture}}')
   [ "$BARCH" = "$ARCH" ] && [ "$FARCH" = "$ARCH" ] \
-    || phx_fail 4 $TOTAL "架构核验不符（期望 $ARCH 实得 backend=$BARCH frontend=$FARCH）"
+    || phx_fail 4 $TOTAL "架构核验不符（期望 $ARCH 实得 backend=$BARCH frontend=${FARCH}）"
   # 基础三件：本地缓存架构不符即按目标架构重拉（mirror 前缀 pull + retag 回裸名，compose 零改动）
   for img in $BASE_IMGS; do
     CURA=$(docker image inspect "$img" --format '{{.Architecture}}' 2>/dev/null || echo none)
     if [ "$CURA" != "$ARCH" ]; then
       SRC=$(ref_any "$img")
       phx_log INFO "基础镜像备齐: $img ($SRC, linux/$ARCH)"
-      docker pull --platform "linux/$ARCH" "$SRC" >>"$PHX_LOG_FILE" 2>&1 || phx_fail 4 $TOTAL "基础镜像拉取失败: $img（源 $SRC；可 --mirror 换源或 --overseas）"
+      docker pull --platform "linux/$ARCH" "$SRC" >>"$PHX_LOG_FILE" 2>&1 || phx_fail 4 $TOTAL "基础镜像拉取失败: ${img}（源 ${SRC}；可 --mirror 换源或 --overseas）"
       if [ "$SRC" != "$img" ]; then docker tag "$SRC" "$img"; fi
     else
-      phx_log INFO "基础镜像已在（$img, $ARCH）"
+      phx_log INFO "基础镜像已在（$img, ${ARCH}）"
     fi
   done
   phx_step_mark 4

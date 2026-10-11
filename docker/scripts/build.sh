@@ -29,7 +29,7 @@ else
        -pl phoenix-admin/phoenix-admin-manager -am ${MVN_REPO_LOCAL:+-Dmaven.repo.local="$MVN_REPO_LOCAL"})
   fi
   NEWER=$(find ../phoenix-admin/../ -name '*.java' -newer "$JAR_SRC" 2>/dev/null | head -1) || true
-  [ -n "${NEWER:-}" ] && echo "[build] ⚠️ 存在比 jar 新的源码（如 $NEWER），建议重编后重试或确认无碍" || true
+  [ -n "${NEWER:-}" ] && echo "[build] ⚠️ 存在比 jar 新的源码（如 ${NEWER}），建议重编后重试或确认无碍" || true
   cp "$JAR_SRC" "$STAGE/phoenix-admin.jar"
   # 2) dist：host pnpm 构建
   if [ "${SKIP_WEB:-0}" != "1" ]; then
