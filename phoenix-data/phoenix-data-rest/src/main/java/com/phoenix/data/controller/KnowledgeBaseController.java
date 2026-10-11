@@ -46,6 +46,9 @@ public class KnowledgeBaseController {
 	/** R-07a/T-12：升级路径(a) 搬迁不重嵌（人工确认后执行） */
 	private final com.phoenix.data.service.knowledge.KnowledgeMigrationService knowledgeMigrationService;
 
+	/** R-07/T-13：存量库升级路径选择（a 搬迁 / b 重建） */
+	private final com.phoenix.data.service.knowledge.KnowledgeUpgradeService knowledgeUpgradeService;
+
 	/** R-18（CR-01/T-25）：超管判定复用 R-08/R-17 守卫（单一口径） */
 	private final com.phoenix.data.component.AdminRoleGuard adminRoleGuard;
 
@@ -150,6 +153,40 @@ public class KnowledgeBaseController {
 		}
 		catch (Exception e) {
 			return ApiResponse.error(e.getMessage());
+		}
+	}
+
+	/** R-07/T-13 升级计划：路径判定（a/b）+ 候选模型 + 影响面（文档/分块/预计耗时）+ 原因。 */
+	@GetMapping("/{id}/upgrade-plan")
+	public ApiResponse<java.util.Map<String, Object>> upgradePlan(@PathVariable("id") Long id,
+			@org.springframework.web.bind.annotation.RequestParam(value = "toModelId", required = false) Integer toModelId) {
+		try {
+			if (!isSuperAdmin()) {
+				return ApiResponse.error("仅管理员可查看升级计划");
+			}
+			return ApiResponse.success("查询成功", knowledgeUpgradeService.upgradePlan(id, toModelId));
+		}
+		catch (Exception e) {
+			return ApiResponse.error("升级计划失败: " + e.getMessage());
+		}
+	}
+
+	/** R-07/T-13 执行升级（**必须 confirm=true**）：判定为 a ⇒ 搬迁不重嵌；判定为 b ⇒ 进入后台重建任务。 */
+	@PostMapping("/{id}/upgrade")
+	public ApiResponse<java.util.Map<String, Object>> upgrade(@PathVariable("id") Long id,
+			@org.springframework.web.bind.annotation.RequestBody java.util.Map<String, Object> body) {
+		try {
+			if (!isSuperAdmin()) {
+				return ApiResponse.error("仅管理员可执行升级");
+			}
+			boolean confirm = Boolean.parseBoolean(String.valueOf(body.getOrDefault("confirm", "false")));
+			String path = body.get("path") == null ? null : String.valueOf(body.get("path"));
+			Integer toModelId = body.get("toModelId") == null ? null
+					: Integer.valueOf(String.valueOf(body.get("toModelId")));
+			return ApiResponse.success("升级已受理", knowledgeUpgradeService.upgrade(id, path, confirm, toModelId, me()));
+		}
+		catch (Exception e) {
+			return ApiResponse.error("升级失败: " + e.getMessage());
 		}
 	}
 
