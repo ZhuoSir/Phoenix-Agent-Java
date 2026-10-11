@@ -372,3 +372,46 @@ phx_gate_end() { # phx_gate_end → 0=全绿 1=有失败；日志含 runId/通�
   phx_log ERROR "门禁结束 runId=${PHX_GATE_RUNID:-'-'} 结果=FAIL 通过=${PHX_GATE_PASS:-0} 失败=${PHX_GATE_FAIL} 耗时=${dur}s"
   return 1
 }
+
+phx_engine_tgz_stage() { # phx_engine_tgz_stage <本地路径|URL> <目标目录> <arch> [期望字节] → stdout=落盘路径
+  # R-02（v2.1.0）：通用静态二进制入包；含 来源记录 / 字节对账(L-73) / tar 完整性校验 / sha256
+  local src="$1" dest="$2" arch="$3" want="${4:-}" f base ver got sha out
+  mkdir -p "$dest" || return 1
+  if [ -f "$src" ]; then
+    f="$src"
+    phx_log INFO "离线引擎件 来源=local ref=${src}"
+  else
+    case "$src" in
+      http://*|https://*) : ;;
+      *) phx_log ERROR "离线引擎件来源非法 需=本地文件或http(s)URL src=${src}"; return 1;;
+    esac
+    f="$(mktemp "${TMPDIR:-/tmp}/phx-engine.XXXXXX")" || return 1
+    phx_log INFO "离线引擎件 来源=url ref=${src}（L-71：外部来源逐条核实）"
+    curl -fsSL --retry 3 --retry-delay 2 -m 3600 -o "$f" "$src" >>"$PHX_LOG_FILE" 2>&1 \
+      || { phx_log ERROR "离线引擎件下载失败 url=${src}"; return 1; }
+  fi
+  got="$(phx_bytes "$f")"
+  phx_log INFO "离线引擎件 字节数=${got} 临时文件=${f}"
+  if [ -n "$want" ] && [ "$got" != "$want" ]; then
+    phx_log ERROR "离线引擎件字节对账失败 期望=${want} 实际=${got}（源可能被截断，L-73）"; return 1
+  fi
+  tar -tzf "$f" >/dev/null 2>&1 \
+    || { phx_log ERROR "离线引擎件完整性校验失败 原因=tar无法解析(疑似截断/损坏) 文件=${f}"; return 1; }
+  base="$(basename "$src")"
+  ver="$(printf '%s' "$base" | sed -n 's/^docker-\([0-9][0-9.]*\).*\.tgz$/\1/p')"
+  [ -n "$ver" ] || ver=unknown
+  out="$dest/docker-${ver}-${arch}.tgz"
+  cp "$f" "$out" || return 1
+  sha="$(phx_sha256 "$out")" || return 1
+  {
+    echo "# Phoenix 离线引擎件信息（package.sh 生成）"
+    echo "source=$([ -f "$src" ] && echo local || echo url)"
+    echo "source_ref=${src}"
+    echo "arch=${arch}"
+    echo "version=${ver}"
+    echo "bytes=$(phx_bytes "$out")"
+    echo "sha256=${sha}"
+  } > "$dest/ENGINE-INFO.txt" || return 1
+  phx_log INFO "离线引擎件已入包 path=${out} arch=${arch} version=${ver} sha256=${sha}"
+  printf '%s' "$out"
+}

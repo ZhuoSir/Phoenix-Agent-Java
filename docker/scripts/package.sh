@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Phoenix 一键打包（docker-auto-pipeline T-02）
 # 用法: package.sh [--arch amd64|arm64] [--version X.Y.Z] [--overseas] [--mirror <前缀>] [--out <目录>]
+#        [--engine-tgz <本地路径|URL>]  # R-02：通用静态二进制离线引擎件（含字节对账/tar 完整性校验）
+#        [--engine-bytes <N>]           # 可选：期望字节数（L-73 对账）
 # 产物: <out>/phoenix-<ver>-<arch>.tar.gz（自包含：镜像+compose资产+安装脚本+manifest+sha256）
 # 兼容契约: bash 3.2（L-05）；失败出口唯一 phx_fail（L-02/L-03）
 # shellcheck disable=SC1091  # 动态 source 路径，shellcheck 无法跟随
@@ -23,11 +25,15 @@ while [ $# -gt 0 ]; do
     --mirror) MIRROR="$2"; shift 2;;
     --out) OUTDIR="$2"; shift 2;;
     --with-engine-debs) WITH_DEBS=1; shift;;
+    --engine-tgz) ENGINE_TGZ="$2"; shift 2;;        # R-02：通用静态二进制（本地路径或 URL）
+    --engine-bytes) ENGINE_BYTES="$2"; shift 2;;    # 可选：期望字节数（L-73 对账）
     -h|--help) grep '^#' "$0" | head -6; exit 0;;
     *) echo "未知参数: $1" >&2; exit 2;;
   esac
 done
 WITH_DEBS="${WITH_DEBS:-0}"
+ENGINE_TGZ="${ENGINE_TGZ:-}"
+ENGINE_BYTES="${ENGINE_BYTES:-}"
 
 NATIVE=$(uname -m)
 case "$NATIVE" in x86_64) NATIVE=amd64;; aarch64|arm64) NATIVE=arm64;; *) NATIVE="";; esac
@@ -187,6 +193,13 @@ DOCEOF
   printf '{\n  "product": "Phoenix-Agent-Java",\n  "version": "%s",\n  "arch": "%s",\n  "git": "%s (%s)",\n  "built_at": "%s",\n  "engine_min": "20.10",\n  "images": [%s]\n}\n' \
     "$VERSION" "$ARCH" "$GITDESC" "$GITHASH" "$(date '+%F %T')" "$IMGJSON" > "$PAY/manifest.json"
   python3 -c "import json;json.load(open('$PAY/manifest.json'))" 2>/dev/null || phx_log WARN "manifest.json 未过 JSON 解析自检（目标机无 python3 不影响安装，仅记录）"
+  # R-02（v2.1.0）：通用静态二进制离线引擎件——**在 SHA256SUMS 之前**入包，确保安装侧完整性校验覆盖它
+  if [ -n "$ENGINE_TGZ" ]; then
+    mkdir -p "$PAY/engine"
+    STAGED="$(phx_engine_tgz_stage "$ENGINE_TGZ" "$PAY/engine" "$ARCH" "$ENGINE_BYTES")" \
+      || phx_fail 5 $TOTAL "离线引擎件入包失败（来源不可达/截断/损坏；见日志）"
+    phx_log INFO "engine static 已入包 path=${STAGED}（随 SHA256SUMS 入册）"
+  fi
   # SHA256SUMS（两段式：清单先落盘再逐一算，无管道读写竞态；相对路径兼容 phx_sha_check_dir）
   ( cd "$PAY" && find . -type f ! -name SHA256SUMS | sed 's|^\./||' | sort > "$WORK/.filelist" )
   ( cd "$PAY" && while read -r f; do

@@ -21,7 +21,7 @@
 
 ## 2. 离线引擎件（R-02）
 
-- [ ] T-03 打包侧：`package.sh` 支持 `--engine-tgz <本地路径|URL>`，将静态二进制落入 payload 的 `engine/docker-<ver>-<arch>.tgz` 并生成 `sha256`；入包前按 sha256 + 字节数对账
+- [x] T-03 打包侧：`package.sh` 支持 `--engine-tgz <本地路径|URL>`，将静态二进制落入 payload 的 `engine/docker-<ver>-<arch>.tgz` 并生成 `sha256`；入包前按 sha256 + 字节数对账
   关联: R-02
   依赖: T-01
   验证方式: ① 用本地 tgz 跑一次打包 → `ls` + `sha256sum -c` + 字节数与源文件一致；② 用**故意截断**的 tgz 触发对账失败 → 断言拒绝入包并非 0 退出；③ 外部 URL 逐条列出并标注可达性（L-71）
