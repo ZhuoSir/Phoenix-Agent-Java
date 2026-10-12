@@ -1038,4 +1038,10 @@
   ④ **`docker compose` 没有 `inspect` 子命令**：想按服务名取容器名要 `docker inspect -f '{{.Name}}' "$(compose ps -q postgres)"`；
      写成 `$DC inspect ...` 时容器名为空 ⇒ 下游拿到空 `--pg-container` ⇒ 走直连 psql 失败、门禁退化成 rc=1（实测踩坑）。
   ⑤ **`set -u` 下空数组展开 `${arr[@]}` 会报 unbound**：用 `${arr[@]+"${arr[@]}"}` 安全展开。
+  ⑥ **`cp -R src/ dst/` 的尾斜杠会摊平目录**：`cp -R releases/v2.0.0/ /tmp/x/` 把该版本**内容**倒进 `/tmp/x/`，
+     于是 `/tmp/x/v2.0.0/sql/` 根本不存在 ⇒ 迁移器只跑基线、旧库缺列直接起不来（第一次搭升级测试树即踩）。
+     规则：要保留层级就别带尾斜杠（`ls -d …/ | sed "s#/$##"` 后 `cp -R "$v" dst/`）。
+  ⑦ **`package.sh --out` 必须传绝对路径**：脚本内部有 `( cd "$PAY" && … > "$WORK/.filelist" )` 这类子壳换目录，
+     相对 `--out` 会让 `$WORK` 相对解析错位 ⇒ 步骤 6/8 报 `.filelist: No such file` + tar 失败（实测）。
+     另：`upgrade.sh <vX.Y.Z>` 参数**要带 `v`**（传 `2.1.0` 会被"releases/2.1.0/sql 不存在"拒绝，非第二套流程）。
 - 状态: active
