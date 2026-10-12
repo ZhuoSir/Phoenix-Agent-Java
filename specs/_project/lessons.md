@@ -986,3 +986,62 @@
   容器以 uid 10001 运行 ⇒ `Unable to access jarfile` 无限重启（镜像能起、日志只说读不到 jar，极易误判为镜像缺文件）。
 - 规则：① 每个 `COPY` 后跟 `RUN chmod 644 <file>` 或使用 `--chown=`；② 排查此类问题优先
   `docker run --rm --entrypoint sh <img> -c 'ls -l <path>; id'` 对比"文件属主/权限 vs 运行用户"。
+
+## L-104 用字符串 `replace` 打补丁必须断言命中数——静默无操作会伪装成"打好了"
+- 分类: 工具 / 判断
+- 触发场景: T-02 用 python `s.replace(anchor, new)` 批量改 `KnowledgeBaseServiceImpl`
+- 坑: 多处锚点因缩进/上下文差异未命中，`replace` **不报错地返回原串**，脚本仍打印"✅ 已应用"⇒
+  编译产物里只有 import 落地、字段被加了两次（上一轮"失败"的补丁其实加过字段）、业务逻辑全无；
+  运行期表现为"新字段有、但值为 null"，很容易误判为解析/缓存问题，白跑两轮构建
+- 防再犯规则:
+  ① 补丁一律用 `re.subn(pattern, repl, s, count=1)` 并 **断言 `n == count`**，未命中即抛错终止；
+  ② 优先用"正则 + 宽松缩进"匹配，别抄终端里看起来一样的空格；
+  ③ 打完后**立即 `grep` 关键标记**核对（如新方法名/日志字段），别信脚本自己的成功文案；
+  ④ 运行期出现"字段存在但值为空"时，先核对**产物里是否真有该逻辑**（`strings class | grep 标记`），再查业务。
+  ⑤ 判断异步命令"跑完没"要看**进程存活/退出码**，别只看日志尾部——本轮 T-03 我在 vue-tsc 尚未跑完时读日志，
+     据此写下"0 类型错误"并提交，随后完整结果实为 203 条（其中**我改动的文件 0 条**，其余是既有错误）⇒ 已更正提交信息。
+  ⑥ 断言别用 `grep "键": "值"` 去匹配 JSON——本项目接口是**紧凑 JSON**（`"table":"x"` 冒号后无空格），
+     本轮 T-06 因此把 4 条**实际通过**的断判成失败，差点误判功能没生效；断言一律用 `python -c json.load` 取值比较。
+  ⑦ **否定标记一律精确比较，禁止子串匹配**：本轮 T-08 我用 `grep -q KW` 判"是否关键词降级"，
+     而 python 侧输出的是 `NOKW`（含子串 KW）⇒ 3 条断言**假通过**，真实的"响应缺降级字段"缺陷差点被埋掉。
+     规则：布尔/枚举判定写 `== true` / `== "keyword"`（php/python 精确比较），不要 `grep` 包含关系。
+- 状态: active
+
+## L-105 名字叫"关键词检索"的腿，其实是**向量检索**（同一个 store）——多模型改造必漏
+- 分类: 代码结构 / 判断
+- 触发场景: T-06 按知识库绑定模型路由向量存储（多模型）
+- 坑: 生效策略 `PgHyhridRetrievalStrategy.getDocumentsByKeywords()` 的实现是
+  `SearchRequest.builder()...` + **`vectorStore.similaritySearch(...)`**（继承自抽象类的默认 store），
+  并不是 SQL/全文关键词检索。于是：① 混合检索的两条腿**都是向量检索**；② 只改抽象类的向量腿**不足以**完成路由，
+  关键词腿仍打默认表 ⇒ 实测表现为"路由表已切换、命中集合却完全不变"，极易误判为"路由没生效/表没切"。
+  同类陷阱：`ElasticsearchHybridRetrievalStrategy`（关键词腿走 ES，不受向量路由影响）——两条腿的**数据源要分别确认**。
+- 防再犯规则:
+  ① 改造"检索"前，先读出**每条腿实际执行了什么**（点进 `getDocumentsByKeywords` 实现，别看方法名）；
+  ② 路由类改造必须覆盖**所有**使用 store 的位置（grep `vectorStore.` / `similaritySearch(` 全量清点）；
+  ③ 验证时用**哨兵行**（往目标表塞一条能过过滤条件的特殊文档）判定"到底查了哪张表"，别只看命中数；
+  ④ 命中数不变 ≠ 路由失效，也可能是**另一条腿**在出结果 ⇒ 用"把目标表塞满哨兵 + 把默认表排除"的方式二分。
+- 状态: active
+
+## L-106 运维 shell 脚本的三个"静默不执行"陷阱（psql 相关）
+- 分类: 工具 / 判断
+- 触发场景: T-14 写 `docker/scripts/vector-ops.sh`（纯 shell + psql 直连运维工具箱）
+- 坑与规则:
+  ① **`psql ... -f -` 必须重定向 stdin**。写成 `qfile "$SQLF"`（把文件名当参数）时，psql 会把路径当库名/参数，
+     脚本**不执行且不报错**（输出被 `2>&1` 捕获后又被脚本吞掉）⇒ 表现为"迁移成功但一行没搬"。
+     规则：`out="$(qfile < "$SQLF" 2>&1)"`，并**校验输出含 COMMIT**（否则 die），别只信退出码。
+  ② **`while read` 循环里再调 psql 会吞掉外层 stdin** ⇒ 循环只跑一次（本轮"重嵌完成率"只打印了 1 个库）。
+     规则：改用 `for row in $LIST` 或给内层命令加 `< /dev/null`。
+  ③ **SQL 侧不要假设 pgcrypto**：`digest()/encode()` 在未装 pgcrypto 的库上直接报
+     `function digest(text, unknown) does not exist`。需要"与 Java 同口径的短哈希"时，**在 shell 里算**
+     （`printf '%s|%s' prov model | sha256sum | cut -c1-12` 与 Java `SHA-256` 前 6 字节完全一致，已实测对齐）。
+  补充：类型别硬凑——`metadata->>'k'` 是 text，IN 列表要带引号；`coalesce(int,0)::text` 才能与 text 拼接。
+  ④ **`docker compose` 没有 `inspect` 子命令**：想按服务名取容器名要 `docker inspect -f '{{.Name}}' "$(compose ps -q postgres)"`；
+     写成 `$DC inspect ...` 时容器名为空 ⇒ 下游拿到空 `--pg-container` ⇒ 走直连 psql 失败、门禁退化成 rc=1（实测踩坑）。
+  ⑤ **`set -u` 下空数组展开 `${arr[@]}` 会报 unbound**：用 `${arr[@]+"${arr[@]}"}` 安全展开。
+  ⑥ **`cp -R src/ dst/` 的尾斜杠会摊平目录**：`cp -R releases/v2.0.0/ /tmp/x/` 把该版本**内容**倒进 `/tmp/x/`，
+     于是 `/tmp/x/v2.0.0/sql/` 根本不存在 ⇒ 迁移器只跑基线、旧库缺列直接起不来（第一次搭升级测试树即踩）。
+     规则：要保留层级就别带尾斜杠（`ls -d …/ | sed "s#/$##"` 后 `cp -R "$v" dst/`）。
+  ⑦ **`package.sh --out` 必须传绝对路径**：脚本内部有 `( cd "$PAY" && … > "$WORK/.filelist" )` 这类子壳换目录，
+     相对 `--out` 会让 `$WORK` 相对解析错位 ⇒ 步骤 6/8 报 `.filelist: No such file` + tar 失败（实测）。
+     另：`upgrade.sh <vX.Y.Z>` 参数**要带 `v`**（传 `2.1.0` 会被"releases/2.1.0/sql 不存在"拒绝，非第二套流程）。
+- 状态: active

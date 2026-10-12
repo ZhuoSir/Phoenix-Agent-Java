@@ -5,6 +5,9 @@ import com.phoenix.data.constant.Constant;
 import com.phoenix.data.constant.DocumentMetadataConstant;
 import com.phoenix.data.dto.search.AgentSearchRequest;
 import com.phoenix.data.dto.search.HybridSearchRequest;
+import com.phoenix.data.entity.KnowledgeBase;
+import com.phoenix.data.mapper.AgentKbaseBindMapper;
+import com.phoenix.data.mapper.KnowledgeBaseMapper;
 import com.phoenix.data.properties.DataAgentProperties;
 import com.phoenix.data.service.hybrid.retrieval.HybridRetrievalStrategy;
 import lombok.extern.slf4j.Slf4j;
@@ -41,6 +44,24 @@ public class AgentVectorStoreServiceImpl implements AgentVectorStoreService {
     @Autowired
     @Qualifier("simpleVectorStore")
     private VectorStore vectorStore;
+
+    /** R-03/T-06：单库按绑定模型路由向量存储（多库扇出见 T-07） */
+    @Autowired
+    private com.phoenix.data.service.vectorstore.ModelVectorStoreFactory modelVectorStoreFactory;
+
+    @Autowired
+    private KnowledgeBaseMapper knowledgeBaseMapper;
+
+    @Autowired
+    private AgentKbaseBindMapper agentKbaseBindMapper;
+
+    /** T-08：模型不可达时的关键词兜底数据源（不依赖嵌入模型） */
+    @Autowired
+    private com.phoenix.data.mapper.AgentKnowledgeMapper agentKnowledgeMapper;
+
+    /** R-02/T-11：按文档归属库解析其绑定模型（写入路由 + 按模型维度校验） */
+    @Autowired
+    private org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
     @Autowired
     private Optional<HybridRetrievalStrategy> hybridRetrievalStrategy;
     @Autowired
@@ -77,13 +98,53 @@ public class AgentVectorStoreServiceImpl implements AgentVectorStoreService {
                 .filterExpression(filter)
                 .build();
 
+        // R-03/T-06：单库 ⇒ 按该库绑定模型选表选模型；R-03/T-07：多库 ⇒ 按模型分组扇出 + RRF 融合
+        // 注意：路由必须在混合检索分支**之前**解析，并把结果注入请求，否则混合路径会用策略自带存储（实测绕过）
+        Route route = resolveRoute(searchRequest.getAgentId(), searchRequest.getDocVectorType());
+        hybridRequest.setRoutingVectorStore(route.store);
+        if (route.knowledgeType && route.byModel.size() > 1) {
+            return fanOutByModel(route, hybridRequest, searchRequest);
+        }
+        // T-08/BUG-199：非默认模型先用短超时预检，不可达则直接关键词降级（避免嵌入重试把请求挂住）
+        if (route.knowledgeType && route.modelId != null
+                && !modelVectorStoreFactory.isReachable(route.modelId)) {
+            String rsn = "模型可达性预检失败（短超时探测不可达，BUG-199 场景）";
+            log.warn("检索降级触发（预检）: agentId={}, kbIds={}, modelId={}, table={}, 原因={}", searchRequest.getAgentId(),
+                    route.kbIds, route.modelId, route.table, rsn);
+            return keywordFallback(route.kbIds, hybridRequest.getQuery(),
+                    searchRequest.getTopK() == null ? 10 : searchRequest.getTopK(), rsn);
+        }
         if (dataAgentProperties.getVectorStore().isEnableHybridSearch() && hybridRetrievalStrategy.isPresent()) {
-            return hybridRetrievalStrategy.get().retrieve(hybridRequest);
+            log.info("混合检索（按库绑定模型路由）: agentId={}, docVectorType={}, kbId={}, modelId={}, table={}",
+                    searchRequest.getAgentId(), searchRequest.getDocVectorType(), route.kbId, route.modelId,
+                    route.table);
+            try {
+                return hybridRetrievalStrategy.get().retrieve(hybridRequest);
+            }
+            catch (Exception ex) {
+                String reason = ex.getClass().getSimpleName() + ": " + ex.getMessage();
+                log.warn("检索降级触发（混合检索路径）: agentId={}, kbIds={}, modelId={}, table={}, 原因={}",
+                        searchRequest.getAgentId(), route.kbIds, route.modelId, route.table, reason);
+                return keywordFallback(route.kbIds, hybridRequest.getQuery(),
+                        searchRequest.getTopK() == null ? 10 : searchRequest.getTopK(), reason);
+            }
         }
         log.debug("Hybrid search is not enabled. use vector-search only");
-        List<Document> results = vectorStore.similaritySearch(hybridRequest.toVectorSearchRequest());
-        log.debug("Search completed with vectorType: {}, found {} documents for SearchRequest: {}",
-                searchRequest.getDocVectorType(), results.size(), searchRequest);
+        List<Document> results;
+        try {
+            results = route.store.similaritySearch(hybridRequest.toVectorSearchRequest());
+        }
+        catch (Exception ex) {
+            // T-08：单库路径同样降级（不静默漏查）
+            String reason = ex.getClass().getSimpleName() + ": " + ex.getMessage();
+            log.warn("检索降级触发（单库路径）: agentId={}, kbIds={}, modelId={}, table={}, 原因={}",
+                    searchRequest.getAgentId(), route.kbIds, route.modelId, route.table, reason);
+            results = keywordFallback(route.kbIds, hybridRequest.getQuery(), searchRequest.getTopK() == null ? 10
+                    : searchRequest.getTopK(), reason);
+        }
+        log.info("检索完成（按库绑定模型路由）: agentId={}, docVectorType={}, kbId={}, modelId={}, table={}, hits={}",
+                searchRequest.getAgentId(), searchRequest.getDocVectorType(), route.kbId, route.modelId, route.table,
+                results.size());
         return results;
 
     }
@@ -115,8 +176,7 @@ public class AgentVectorStoreServiceImpl implements AgentVectorStoreService {
      */
     @Override
     public void addDocuments(String agentId, List<Document> documents) {
-        // R-09：维度不一致必须显式拒绝（防脏数据/静默失败），先于任何写入
-        embeddingDimensionResolver.assertAllTablesCompatible();
+        // R-09/R-05：维度校验**按库（按模型）**判定，替代原"全表一致"（多模型下不同模型表维度天然可不同）
         Assert.notNull(agentId, "AgentId cannot be null.");
         Assert.notEmpty(documents, "Documents cannot be empty.");
 
@@ -140,10 +200,21 @@ public class AgentVectorStoreServiceImpl implements AgentVectorStoreService {
                         "Document metadata agentId does not match.");
             }
         }
+        // R-02/T-11：按文档归属的知识库解析其绑定模型 ⇒ 用该模型专属表与其模型客户端写入（补齐写入路由）
+        Integer modelId = resolveWriteModelId(documents);
+        String table = modelVectorStoreFactory.tableName(ModelVectorStoreFactory.TABLE_SIMPLE, modelId);
+        modelVectorStoreFactory.ensureTableExists(ModelVectorStoreFactory.TABLE_SIMPLE, modelId);
+        // R-05/T-11：按"该库绑定模型 ↔ 其向量表"判定（维度与建表同口径，含通用探测）
+        embeddingDimensionResolver.assertTableDimsCompatible(table, modelVectorStoreFactory.dimsOf(modelId),
+                "该库绑定的模型(modelId=" + modelId + ")");
+        org.springframework.ai.vectorstore.VectorStore target = modelVectorStoreFactory
+                .forModel(ModelVectorStoreFactory.TABLE_SIMPLE, modelId);
         List<List<Document>> spitDocments = ListUtil.partition(documents, 10);
         for (List<Document> spit : spitDocments) {
-            vectorStore.add(spit);
+            target.add(spit);
         }
+        log.info("向量写入（按库绑定模型路由）: agentId={}, modelId={}, table={}, docs={}", agentId, modelId, table,
+                documents.size());
     }
 
     /**
@@ -152,6 +223,214 @@ public class AgentVectorStoreServiceImpl implements AgentVectorStoreService {
      * @param metadata 元数据条件
      * @return 是否删除成功
      */
+    /**
+     * 解析该批文档应写入哪个模型的表：metadata.knowledgeBaseId → 该库绑定模型；
+     * 无法判定（如库表/字段向量）⇒ 回落默认模型（与改动前行为一致）。
+     */
+    private Integer resolveWriteModelId(List<Document> documents) {
+        try {
+            for (Document d : documents) {
+                java.util.Map<String, Object> md = d.getMetadata();
+                if (md == null) {
+                    continue;
+                }
+                Object kb = md.get("knowledgeBaseId");
+                if (kb == null) {
+                    kb = md.get("knowledge_base_id");
+                }
+                if (kb == null && md.get("agentKnowledgeId") != null) {
+                    kb = jdbcTemplate.queryForObject(
+                            "SELECT knowledge_base_id FROM tbl_data_agent_knowledge WHERE id = ?", Long.class,
+                            Long.valueOf(String.valueOf(md.get("agentKnowledgeId"))));
+                }
+                if (kb != null) {
+                    Integer mid = jdbcTemplate.queryForObject(
+                            "SELECT embedding_model_id FROM tbl_data_knowledge_base WHERE id = ?", Integer.class,
+                            Long.valueOf(String.valueOf(kb)));
+                    if (mid != null) {
+                        return mid;
+                    }
+                }
+            }
+        }
+        catch (Exception e) {
+            log.warn("写入模型解析失败，回落默认模型: {}", e.toString());
+        }
+        return modelVectorStoreFactory.defaultEmbeddingModelId();
+    }
+
+    /** T-08 关键词兜底（模型不可达时）：不依赖嵌入模型，直接按关键词查该库条目并标注降级提示 */
+    private List<Document> keywordFallback(java.util.List<Long> kbIds, String query, int topK, String reason) {
+        if (kbIds == null || kbIds.isEmpty() || query == null || query.isBlank()) {
+            return java.util.Collections.emptyList();
+        }
+        String csv = kbIds.stream().map(String::valueOf).collect(java.util.stream.Collectors.joining(","));
+        java.util.List<com.phoenix.data.entity.AgentKnowledge> items;
+        try {
+            items = agentKnowledgeMapper.selectKeywordFallback(csv, query, Math.max(1, topK));
+        }
+        catch (Exception e) {
+            log.error("关键词兜底失败: kbIds={}, err={}", kbIds, e.toString());
+            return java.util.Collections.emptyList();
+        }
+        java.util.List<Document> docs = new java.util.ArrayList<>(items.size());
+        for (com.phoenix.data.entity.AgentKnowledge it : items) {
+            java.util.Map<String, Object> m = new java.util.HashMap<>();
+            m.put(DocumentMetadataConstant.VECTOR_TYPE, DocumentMetadataConstant.AGENT_KNOWLEDGE);
+            m.put("agentKnowledgeId", it.getId());
+            m.put("title", it.getTitle());
+            // R-03/T-08：降级必须**显式可见**（不得静默漏查）
+            m.put("retrievalDegraded", true);
+            m.put("retrievalDegradedReason", reason);
+            m.put("retrievalDegradedMode", "keyword");
+            m.put("retrievalSourceKbIds", kbIds);
+            m.put("retrievalSourceTable", "keyword:tbl_data_agent_knowledge");
+            String text = it.getContent() == null ? String.valueOf(it.getTitle()) : it.getContent();
+            // Spring AI 的 Document id 必须为 UUID（条目 id 保留在 metadata.agentKnowledgeId）
+            docs.add(new Document(java.util.UUID.randomUUID().toString(), text, m));
+        }
+        log.warn("检索降级（模型不可达 ⇒ 关键词兜底）: kbIds={}, reason={}, 影响条数={}", kbIds, reason, docs.size());
+        return docs;
+    }
+
+    /** 多模型分组扇出 + RRF 融合（R-03/T-07）：每组用其模型的表/模型独立检索，再按名次融合 */
+    private List<Document> fanOutByModel(Route route, HybridSearchRequest hybridRequest,
+            com.phoenix.data.dto.search.AgentSearchRequest searchRequest) {
+        java.util.List<java.util.List<Document>> groups = new java.util.ArrayList<>();
+        for (java.util.Map.Entry<Integer, java.util.List<Long>> e : route.byModel.entrySet()) {
+            Integer modelId = e.getKey();
+            String table = modelVectorStoreFactory.tableName(ModelVectorStoreFactory.TABLE_SIMPLE, modelId);
+            java.util.List<Document> docs;
+            try {
+                // T-08/BUG-199：先做短超时可达性预检，不可达立即降级（不要等嵌入调用重试挂住）
+                if (!modelVectorStoreFactory.isReachable(modelId)) {
+                    throw new IllegalStateException("模型可达性预检失败（短超时探测不可达）");
+                }
+                org.springframework.ai.vectorstore.VectorStore store = modelVectorStoreFactory
+                        .forModel(ModelVectorStoreFactory.TABLE_SIMPLE, modelId);
+                docs = store.similaritySearch(hybridRequest.toVectorSearchRequest());
+            }
+            catch (Exception ex) {
+                // R-03/T-08：某组不可达不得拖垮整体 ⇒ 该组降级为关键词兜底，并在结果中显式提示
+                String reason = ex.getClass().getSimpleName() + ": " + ex.getMessage();
+                log.warn("检索降级触发: agentId={}, kbIds={}, modelId={}, table={}, 原因={}", searchRequest.getAgentId(),
+                        e.getValue(), modelId, table, reason);
+                docs = keywordFallback(e.getValue(), hybridRequest.getQuery(), route.kbCount * 5, reason);
+                for (Document d : docs) {
+                    d.getMetadata().put("retrievalSourceModelId", modelId);
+                }
+                groups.add(docs);
+                continue;
+            }
+            java.util.List<Document> annotated = new java.util.ArrayList<>(docs.size());
+            for (Document d : docs) {
+                annotated.add(annotateSource(d, modelId, table, e.getValue()));
+            }
+            docs = annotated;
+            log.info("分组检索: agentId={}, modelId={}, table={}, kbIds={}, hits={}", searchRequest.getAgentId(), modelId,
+                    table, e.getValue(), docs.size());
+            groups.add(docs);
+        }
+        int topK = searchRequest.getTopK() == null ? 10 : searchRequest.getTopK();
+        java.util.List<Document> fused = rrfFusionStrategy.fuseResults(topK, groups.toArray(new java.util.List[0]));
+        log.info("RRF 融合完成: agentId={}, groups={}, fused={}, order={}", searchRequest.getAgentId(), groups.size(),
+                fused.size(), fused.stream().map(d -> String.valueOf(d.getId())).toList());
+        return fused;
+    }
+
+    /** 结果来源标注（R-03：跨模型命中必须可标注来源；元数据不可变时构造新文档） */
+    private static Document annotateSource(Document d, Integer modelId, String table, java.util.List<Long> kbIds) {
+        try {
+            d.getMetadata().put("retrievalSourceModelId", modelId);
+            d.getMetadata().put("retrievalSourceTable", table);
+            d.getMetadata().put("retrievalSourceKbIds", kbIds);
+            return d;
+        }
+        catch (UnsupportedOperationException e) {
+            java.util.Map<String, Object> m = new java.util.HashMap<>(d.getMetadata());
+            m.put("retrievalSourceModelId", modelId);
+            m.put("retrievalSourceTable", table);
+            m.put("retrievalSourceKbIds", kbIds);
+            return new Document(d.getId(), d.getText(), m);
+        }
+    }
+
+    /** RRF 融合器（无 Spring bean，直接复用既有实现，公式 1/(60+rank)） */
+    private final com.phoenix.data.service.hybrid.fusion.impl.RrfFusionStrategy rrfFusionStrategy = new com.phoenix.data.service.hybrid.fusion.impl.RrfFusionStrategy();
+
+    /** 检索路由结果（R-03/T-06）；degraded 供 T-08 不可达降级使用 */
+    public static class Route {
+        public VectorStore store;
+        public Long kbId;
+        public Integer modelId;
+        public String table;
+        public int kbCount;
+        /** 绑定的库 id 与其模型分组：modelId → kbIds（R-03/T-07 扇出用） */
+        public java.util.List<Long> kbIds = new java.util.ArrayList<>();
+        public java.util.Map<Integer, java.util.List<Long>> byModel = new java.util.LinkedHashMap<>();
+        public boolean knowledgeType;
+    }
+
+    /**
+     * 解析本次检索应使用的向量存储：仅对知识类向量（agentKnowledge/businessTerm）按绑定库路由；
+     * 单库 ⇒ 该库绑定模型对应的表与模型；多库/无库/非知识类 ⇒ 既有默认存储（不改变原有行为）。
+     */
+    public Route resolveRoute(String agentId, String docVectorType) {
+        Route r = new Route();
+        r.store = vectorStore;
+        r.table = ModelVectorStoreFactory.TABLE_SIMPLE;
+        boolean knowledgeType = DocumentMetadataConstant.AGENT_KNOWLEDGE.equalsIgnoreCase(docVectorType)
+                || DocumentMetadataConstant.BUSINESS_TERM.equalsIgnoreCase(docVectorType);
+        if (!knowledgeType || agentId == null) {
+            return r;
+        }
+        try {
+            java.util.List<Long> kbIds = agentKbaseBindMapper.selectKbIdsByAgent(Long.valueOf(agentId));
+            r.kbCount = kbIds == null ? 0 : kbIds.size();
+            r.knowledgeType = true;
+            r.kbIds = kbIds == null ? new java.util.ArrayList<>() : new java.util.ArrayList<>(kbIds);
+            Integer defId = modelVectorStoreFactory.defaultEmbeddingModelId();
+            for (Long kid : r.kbIds) {
+                KnowledgeBase kb = knowledgeBaseMapper.selectOneById(kid);
+                Integer mid = (kb == null || kb.getEmbeddingModelId() == null) ? defId : kb.getEmbeddingModelId();
+                r.byModel.computeIfAbsent(mid, k -> new java.util.ArrayList<>()).add(kid);
+            }
+            if (r.byModel.size() > 1) {
+                log.info("检索路由：agentId={} 绑定 {} 个库、分属 {} 个模型 ⇒ 分组扇出 + RRF 融合（R-03/T-07）", agentId,
+                        r.kbCount, r.byModel.size());
+            }
+            if (r.kbCount == 1) {
+                KnowledgeBase kb = knowledgeBaseMapper.selectOneById(kbIds.get(0));
+                if (kb != null) {
+                    r.kbId = kb.getId();
+                    r.modelId = kb.getEmbeddingModelId();
+                    r.table = modelVectorStoreFactory.tableName(ModelVectorStoreFactory.TABLE_SIMPLE, r.modelId);
+                    r.store = modelVectorStoreFactory.forModel(ModelVectorStoreFactory.TABLE_SIMPLE, r.modelId);
+                }
+            }
+            else if (r.kbCount > 1) {
+                log.info("检索路由：agentId={} 绑定 {} 个知识库 ⇒ 本次用默认存储（分组扇出见 T-07）", agentId, r.kbCount);
+            }
+        }
+        catch (Exception e) {
+            log.warn("检索路由解析失败，回落默认存储: agentId={}, err={}", agentId, e.toString());
+        }
+        return r;
+    }
+
+    @Override
+    public java.util.Map<String, Object> retrievalRoute(String agentId, String docVectorType) {
+        Route r = resolveRoute(agentId, docVectorType);
+        java.util.Map<String, Object> out = new java.util.LinkedHashMap<>();
+        out.put("agentId", agentId);
+        out.put("docVectorType", docVectorType);
+        out.put("kbCount", r.kbCount);
+        out.put("kbId", r.kbId);
+        out.put("modelId", r.modelId);
+        out.put("table", r.table);
+        return out;
+    }
+
     @Override
     public Boolean deleteDocumentsByMetadata(Map<String, Object> metadata) {
         Assert.notNull(metadata, "Metadata cannot be null.");

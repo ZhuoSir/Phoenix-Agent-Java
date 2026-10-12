@@ -44,7 +44,12 @@ public class PgHyhridRetrievalStrategy extends AbstractHybridRetrievalStrategy{
             builder.filterExpression(request.getFilterExpression());
         }
         SearchRequest searchRequest = builder.build();
-        return vectorStore.similaritySearch(searchRequest);
+        // R-03/T-06：本"关键词腿"实现实为向量检索（见 L-105），必须同样使用按"库绑定模型"路由后的存储，
+        // 否则该腿仍打默认表 ⇒ 多模型下会读到错误的向量空间（实测：路由切表后命中集合却完全不变）
+        org.springframework.ai.vectorstore.VectorStore effectiveStore = request.getRoutingVectorStore() == null
+                ? vectorStore
+                : request.getRoutingVectorStore();
+        return effectiveStore.similaritySearch(searchRequest);
     }
 
 }

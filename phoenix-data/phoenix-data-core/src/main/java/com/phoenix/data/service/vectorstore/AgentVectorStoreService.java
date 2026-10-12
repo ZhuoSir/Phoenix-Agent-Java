@@ -15,6 +15,9 @@ public interface AgentVectorStoreService {
 	/**
 	 * 查询某个Agent的文档 总入口
 	 */
+	/** R-03/T-06：解析某智能体+向量类型下的检索路由（绑定库/模型/表），供探针与运维使用。 */
+	java.util.Map<String, Object> retrievalRoute(String agentId, String docVectorType);
+
 	List<Document> search(AgentSearchRequest searchRequest);
 
 	/**

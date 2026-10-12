@@ -81,4 +81,22 @@ if [ "$c" = "1" ]; then ok
 elif [ "${PHOENIX_FRESH:-0}" = "1" ]; then echo "[WARN] 首启两拍未齐——全新安装属预期（首轮对话后自动补齐），不作为安装门禁"
 else no "若为 0：应用可能未首启（表未建），启动一轮对话后重跑本断言"; fi
 
+
+step "[15] 向量迁移/重建验收（R-09 五项）"
+# 门禁：出报告 + 落回执（releases/v2.1.0/acceptance/）；无库环境 SKIP 不阻断出货，但显式提示
+GATE="$(pwd)/scripts/vector-acceptance-gate.sh"
+PGID="$($DC ps -q postgres 2>/dev/null | head -1)"   # 注意：inspect 要用 docker 原生命令，compose 无该子命令（实测踩坑）
+PGNAME=""
+[ -n "$PGID" ] && PGNAME="$(docker inspect -f '{{.Name}}' "$PGID" 2>/dev/null | sed 's#^/##')"
+if [ -x "$GATE" ] && [ -n "$PGNAME" ]; then
+  "$GATE" --pg-container "$PGNAME" >/tmp/phx-vec-gate.$$ 2>&1
+  rc=$?
+  if [ "$rc" = "0" ]; then ok
+  elif [ "$rc" = "3" ]; then echo "[WARN] 数据库不可达 ⇒ SKIP（回执见 releases/v2.1.0/acceptance/）"
+  else no "$(grep -m1 '修复：' /tmp/phx-vec-gate.$$ 2>/dev/null || grep -m1 '判定=' /tmp/phx-vec-gate.$$ 2>/dev/null || echo '报告判 FAIL，见回执')"; fi
+  rm -f /tmp/phx-vec-gate.$$
+else
+  echo "[WARN] 未找到门禁脚本或 postgres 未运行 ⇒ SKIP"
+fi
+
 exit $fail
