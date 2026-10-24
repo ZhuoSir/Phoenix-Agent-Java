@@ -444,20 +444,15 @@ function getActions(row: any) {
         </div>
         <ElTabs v-model="detailTab" v-loading="detailLoading">
           <ElTabPane label="人员" name="people">
-            <div class="mb-2 flex justify-end">
-              <ElButton v-if="detailMode === 'edit'" size="small" type="primary" @click="onDetailAssign('people', detailGroup)">添加成员</ElButton>
-            </div>
-            <div>
-              <div style="height: 460px">
+              <div v-if="detailMode === 'edit'" class="mb-2 flex h-8 items-center justify-end">
+                <ElButton size="small" type="primary" @click="onDetailAssign('people', detailGroup)">添加成员</ElButton>
+              </div>
               <MemberGrid>
                 <template #action="{ row }">
                   <ElButton link type="danger" @click="removeDetailMember(row)">移除</ElButton>
                 </template>
               </MemberGrid>
-              </div>
-            </div>
-
-          </ElTabPane>
+            </ElTabPane>
           <ElTabPane label="智能体" name="agent">
             <div v-if="detailMode === 'edit'" class="mb-2 flex h-8 items-center justify-end"><ElButton size="small" type="primary" @click="onDetailAssign('agent', detailGroup)">分配智能体</ElButton></div>
             <AgentGrid />
