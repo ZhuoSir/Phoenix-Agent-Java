@@ -112,8 +112,25 @@ const [MemberGrid, memberGridApi] = useVbenVxeGrid({
     border: false,
     stripe: false,
     emptyText: '暂无数据',
-    pagerConfig: { enabled: false },
-    data: [] as any[],
+    pagerConfig: { enabled: true, pageSize: 10, pageSizes: [10, 20, 50] },
+    // vben 要求 proxyConfig 放在 gridOptions 内，否则不会走代理取数
+    proxyConfig: {
+      ajax: {
+        query: async ({ page }: any) => {
+          const res: any = await getGroupMemberPageApi(
+            detailGroup.value.id,
+            page?.currentPage ?? 1,
+            page?.pageSize ?? 10,
+          );
+          const d = res?.data ?? res;
+          const total = d?.totalRow ?? 0;
+          detailMemberTotal.value = total;
+          // vxe proxy 需要 result + page.total 才能正确显示"共 N 条"
+          // 兜底覆盖 vben/vxe 可能读取的多种字段名，确保分页器显示真实总数
+          return { records: d?.records ?? [], total, totalRow: total, rowCount: total, page: { total, totalRow: total } };
+        },
+      },
+    },
   },
 });
 
@@ -175,31 +192,20 @@ function onToggleStatus(row: any) {
 // ===== 组详情（内联抽屉，T-05/T-06：不依赖任何跨组件 API）=====
 const detailVisible = ref(false);
 const detailGroup = ref<any>({});
-const detailMembers = ref<any[]>([]);
-const detailMemberTotal = ref(0);
-const detailPage = ref(1);
-const detailSize = ref(20);
 const detailAgents = ref<any[]>([]);
 const detailKbases = ref<any[]>([]);
 const detailSkills = ref<any[]>([]);
 const detailMcps = ref<any[]>([]);
 const detailLoading = ref(false);
+const detailMemberTotal = ref(0);
 const detailTab = ref('people');
 
 async function openDetail(row: any) {
   detailGroup.value = { ...row };
-  detailPage.value = 1;
   detailVisible.value = true;
   await loadDetail();
 }
 
-async function loadDetailMembers() {
-  const res: any = await getGroupMemberPageApi(detailGroup.value.id, detailPage.value, detailSize.value);
-  const page = res?.data || res;
-  detailMembers.value = page?.records || [];
-  detailMemberTotal.value = page?.totalRow || 0;
-  memberGridApi.setGridOptions({ data: detailMembers.value, loading: false });
-}
 
 const toList = (res: any) => {
   const data = res?.data ?? res;
@@ -261,7 +267,7 @@ async function loadDetail() {
     skillGridApi.setGridOptions({ data: skillRows, loading: false });
     mcpGridApi.setGridOptions({ data: mcpRows, loading: false });
 
-    await loadDetailMembers();
+    memberGridApi.query();
   } finally { detailLoading.value = false; }
 }
 
@@ -344,18 +350,14 @@ function getActions(row: any) {
             <div class="mb-2 flex justify-end">
               <ElButton size="small" type="primary" @click="onDetailAssign('people', detailGroup)">添加成员</ElButton>
             </div>
-            <div v-if="detailMembers.length">
+            <div>
               <MemberGrid>
                 <template #action="{ row }">
                   <ElButton link type="danger" @click="removeDetailMember(row)">移除</ElButton>
                 </template>
               </MemberGrid>
             </div>
-            <div v-else class="py-6 text-center text-sm text-gray-400">暂无数据</div>
-            <div class="mt-2 flex justify-end gap-2">
-              <ElButton :disabled="detailPage <= 1" size="small" @click="detailPage--; loadDetailMembers()">上一页</ElButton>
-              <ElButton :disabled="detailPage * detailSize >= detailMemberTotal" size="small" @click="detailPage++; loadDetailMembers()">下一页</ElButton>
-            </div>
+
           </ElTabPane>
           <ElTabPane label="智能体" name="agent">
             <div class="mb-2 flex justify-end"><ElButton size="small" type="primary" @click="onDetailAssign('agent', detailGroup)">分配智能体</ElButton></div>
