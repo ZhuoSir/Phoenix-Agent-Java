@@ -76,3 +76,19 @@
 - 自查纠错：coverage 文案原在"有失败块"时仍拼接"已全部处理"（自相矛盾），已改为
   「共 X 块，成功 Y 块；第 Z 块处理失败」
 - 说明：**真模型**验证放在 T-09/T-10（装配器接入 + 端到端），本任务用 stub 保证编排逻辑可独立验证
+
+## 2026-10-24 执行顺序调整（用户同意）+ T-09 主体落地
+
+- **顺序调整**：T-09 提前到 T-05 之前。原因：T-05（进度帧）需要装配器**真的跑分批**才有东西可发，
+  而装配器接模型属 T-09。仅调整依赖顺序，不改需求与验收标准（T-05 依赖改为 T-04,T-09；T-09 依赖改为 T-02,T-04）。
+- **T-09 主体**（代码已落地，待补齐进度帧与三链路断言）：
+  - `ChatAttachmentAssembler` 新增 `prepare(ids, viewerId, Consumer<String> progress)` 重载；
+    超长文档（> `maxExtractChars`）→ `DocumentBatchProcessor` 逐批摘要 → 以「摘要+关键摘录」替换原文注入；
+    notice 追加「内容较长，已分批处理（摘要+关键摘录）」；无 CHAT 模型/异常 ⇒ **回退原文注入**（不阻断对话）
+  - **真栈实测（30k docx，附件 37）**：`[doc-batch] 开始 chars=30029, chunkCount=6`；第 1 批因 ollama 报错重试 2 次后跳过
+    （`failed=[1]`），其余 5 批完成（`processed=5`）；对话正常返回
+  - **回归（5k docx，附件 38）**：最近 90 秒 `doc-batch` 日志 **0 条** ⇒ 未触发分批（R-10 行为不变）；对话正常应答
+- **待办（下一步）**：
+  1. 进度帧接线（T-05）：`HarnessChatServiceImpl` 三处 `prepare(...)` 传入 progress consumer，并把 notice 帧并入流
+  2. `HarnessEventMapper` 透出 `notice` 字段
+  3. 修 `BatchResult.totalMs` 打印为 1 的问题（疑似耗时统计位置/精度）
