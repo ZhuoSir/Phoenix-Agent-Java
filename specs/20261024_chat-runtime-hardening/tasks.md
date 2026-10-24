@@ -33,9 +33,9 @@
       —— **验收**：超时后点重试，落到新 message id
 
 ## 分组 E：思考展示（R-04 / BUG-201）
-- [ ] T-10 ollama 模型开启 thinking（配置项，默认开）+ 不支持时自动忽略
+- [x] T-10 ollama 模型开启 thinking（配置项，默认开）+ 不支持时自动忽略
       —— **验收**：qwen3.8(ollama) 对话出现思考内容（非空）
-- [ ] T-11 历史回传不再静默丢弃 ThinkingBlock（降级为文本或换 formatter）
+- [x] T-11 历史回传不再静默丢弃 ThinkingBlock（降级为文本或换 formatter）
       —— **验收**：≥3 轮带工具调用后，日志**不再**出现 `Unsupported block type ThinkingBlock`
 - [ ] T-12 前端思考区渲染（折叠 + 流式追加）
       —— **验收**：思考区内容随流增长，可折叠

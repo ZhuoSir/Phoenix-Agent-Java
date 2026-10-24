@@ -10,8 +10,10 @@ import io.agentscope.core.embedding.ollama.OllamaTextEmbedding;
 import io.agentscope.core.model.GenerateOptions;
 import io.agentscope.core.model.ChatModelBase;
 import io.agentscope.extensions.model.ollama.formatter.OllamaChatFormatter;
+import com.phoenix.agent.harness.formatter.ThinkingPreservingOllamaChatFormatter;
 import io.agentscope.extensions.model.ollama.OllamaChatModel;
 import io.agentscope.extensions.model.ollama.options.OllamaOptions;
+import io.agentscope.extensions.model.ollama.options.ThinkOption;
 import com.phoenix.data.enums.ModelProvider;
 import io.agentscope.extensions.model.openai.OpenAIChatModel;
 import io.agentscope.extensions.model.openai.formatter.DeepSeekFormatter;
@@ -41,6 +43,14 @@ public class HarnessModelRegistry {
     private volatile ChatModelBase currentMultimodalModel;
     /** 指定模型配置ID 的对话模型缓存（R-03：智能体可自选模型） */
     private final Map<Long, ChatModelBase> configuredChatModels = new ConcurrentHashMap<>();
+
+    /**
+     * chat-runtime-hardening T-10（BUG-201）：ollama 思考模式开关。
+     * <p>{@code auto}（默认）= 按模型名判断是否思考模型（qwen3 / deepseek-r* / r1 / gpt-oss / reasoner / think）；
+     * {@code true}/{@code false} 强制开关。开启后思考内容随流下发（前端思考区可见）。
+     */
+    @org.springframework.beans.factory.annotation.Value("${phoenix.agent.ollama.think:auto}")
+    private String ollamaThinkMode = "auto";
 
     /**
      * 获取全局 ChatClient（懒加载 + 双重检查锁缓存）
@@ -112,19 +122,40 @@ public class HarnessModelRegistry {
                 config.getBaseUrl(), config.getTemperature(), config.getMaxTokens());
     }
 
+    /** T-10：解析"是否开启 ollama 思考"。auto 时按模型名判断（仅思考模型加 think，避免非思考模型 400）。 */
+    private boolean resolveOllamaThink(String modelName) {
+        String mode = ollamaThinkMode == null ? "auto" : ollamaThinkMode.trim().toLowerCase();
+        if ("true".equals(mode)) {
+            return true;
+        }
+        if ("false".equals(mode)) {
+            return false;
+        }
+        String n = modelName == null ? "" : modelName.toLowerCase();
+        return n.contains("qwen3") || n.contains("deepseek-r") || n.contains("reasoner")
+                || n.startsWith("r1") || n.contains("gpt-oss") || n.contains("think");
+    }
+
     private ChatModelBase buildChatModel(String provider, String apiKey, String modelName, String baseUrl,
             Double temperature, Integer maxTokens) {
         if (ModelProvider.OLLAMA.getCode().equalsIgnoreCase(provider)) {
             // 可诊断：provider/模型名/端点三件套（不含密钥）
             log.info("按 provider=ollama 装配模型: modelName={}, endpoint={}", modelName, baseUrl);
+            OllamaOptions.Builder opt = OllamaOptions.builder()
+                    .temperature(temperature)
+                    .numPredict(maxTokens);
+            boolean think = resolveOllamaThink(modelName);
+            if (think) {
+                // T-10：思考模型必须显式 think 才会返回 reasoning
+                opt.thinkOption(ThinkOption.ThinkBoolean.ENABLED);
+            }
+            log.info("ollama 思考模式: model={}, enabled={}, mode={}", modelName, think, ollamaThinkMode);
             return OllamaChatModel.builder()
                     .baseUrl(baseUrl)
                     .modelName(modelName)
-                    .formatter(new OllamaChatFormatter())
-                    .defaultOptions(OllamaOptions.builder()
-                            .temperature(temperature)
-                            .numPredict(maxTokens)
-                            .build())
+                    // T-11：ThinkingBlock 降级为文本（不静默丢弃、不再刷 WARN）
+                    .formatter(new ThinkingPreservingOllamaChatFormatter())
+                    .defaultOptions(opt.build())
                     .build();
         }
         return OpenAIChatModel.builder()
