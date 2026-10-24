@@ -39,7 +39,9 @@
       —— **验收**：qwen3.8(ollama) 对话出现思考内容（非空）
 - [x] T-11 历史回传不再静默丢弃 ThinkingBlock（降级为文本或换 formatter）
       —— **验收**：≥3 轮带工具调用后，日志**不再**出现 `Unsupported block type ThinkingBlock`
-- [ ] T-12 前端思考区渲染（折叠 + 流式追加）
+- [x] T-12 前端思考区渲染（折叠 + 流式追加）
+      —— **已验证**：用户 2026-10-24 现场确认「思考区已显示」；后端 side 供数链路见 BUG-201 修复与实测
+      （`[thinking]` 日志 + SSE `thinking` 帧 54/58 + `metadata.thinking` 774~1054 字）
       —— **现状**：既有 `thinking-display` spec 已实现（`ThinkingBlock.vue` + `ChatMessages.vue` 渲染/自动折叠，
       `api-transport.ts` 回显 `metadata.thinking`）⇒ 本 spec 只需后端开启 think（T-10 ✅）+ T-17 运行时确认
       —— **验收**：思考区内容随流增长，可折叠

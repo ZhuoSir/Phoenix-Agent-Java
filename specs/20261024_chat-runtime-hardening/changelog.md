@@ -44,3 +44,7 @@
 - **本轮抓到的真 bug（已修 + 记 L-107）**：给 `@AllArgsConstructor` 的 `ChatAttachmentController` 加 `@Value` 字段 ⇒
   构造器多出 `int` 形参 ⇒ 启动即 `NoSuchBeanDefinitionException: No qualifying bean of type 'int'`；
   改为 `@RequiredArgsConstructor` 后正常。**编译通过 ≠ 能启动**。
+
+## 2026-10-24 T-12 用户现场确认
+- 用户确认后台回话的**思考区已正常显示**（前端 `components/run/index.vue` 渲染 + 后端 SSE `thinking` 帧 + `metadata.thinking`）。
+- T-12 勾选完成；后端供数链路见 BUG-201（agentscope 2.0.4 升级 + 三处映射修复）。
