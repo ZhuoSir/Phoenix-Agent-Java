@@ -60,10 +60,17 @@ public final class HarnessEventMapper {
                 eventMap.put("buttons", buttons);
             } else if (event instanceof TextBlockDeltaEvent textEvent) {
                 eventMap.put("content", textEvent.getDelta());
+            } else if (event instanceof io.agentscope.core.event.TextBlockStartEvent
+                    || event instanceof io.agentscope.core.event.TextBlockEndEvent) {
+                // BUG 修复：文本块的开始/结束事件无需处理（此前落到 else 打 `Unhandled agent_event type` 噪音 WARN）
             } else if (event instanceof ThinkingBlockStartEvent || event instanceof ThinkingBlockEndEvent) {
                 // 思考开始/结束事件，无需处理
-            } else if (event instanceof ThinkingBlockDeltaEvent || event instanceof CustomEvent) {
-                // 思考增量与自定义事件不透出（与后台既有行为一致）
+            } else if (event instanceof ThinkingBlockDeltaEvent thinkingEvent) {
+                // 思考增量**必须透出**（此前被静默吞掉 ⇒ 前端拿不到 thinking，只能依赖 state 通道；
+                // 一旦某条链路没带 thinking_text state 就彻底看不到思考）。与 state 通道同值时天然幂等。
+                eventMap.put("thinking", thinkingEvent.getDelta());
+            } else if (event instanceof CustomEvent) {
+                // 自定义事件不透出（与后台既有行为一致）
             } else {
                 log.warn("Unhandled agent_event type: {}", event.getClass().getSimpleName());
             }

@@ -42,6 +42,10 @@ import java.util.Map;
 @Component
 @RequiredArgsConstructor
 public class HarnessChatServiceImpl implements HarnessChatService {
+    /** 诊断：首次 thinking 增量只打一条 INFO（避免刷屏） */
+    private static final java.util.concurrent.atomic.AtomicBoolean THINKING_SEEN =
+            new java.util.concurrent.atomic.AtomicBoolean(false);
+
 
     /** T-06：附件装配器（attachmentIds 为空即短路，S1' 既有行为不变） */
     private final com.phoenix.agent.harness.attachment.ChatAttachmentAssembler attachmentAssembler;
@@ -420,6 +424,10 @@ public class HarnessChatServiceImpl implements HarnessChatService {
         }
         // 2b. 思考内容增量事件（DeepSeek-R1 等深度思考模型）
         if (event.getType() == AgentEventType.THINKING_BLOCK_DELTA && event instanceof ThinkingBlockDeltaEvent thinkingEvent) {
+            if (THINKING_SEEN.compareAndSet(false, true)) {
+                log.info("[thinking] 首次收到思考增量 session={}, len={} ⇒ 模型已返回 reasoning",
+                        sessionId, thinkingEvent.getDelta() == null ? 0 : thinkingEvent.getDelta().length());
+            }
             // thinking-display R-01：思考增量不再伪装成正文 chunk——经 thinking_text 状态键走
             // 独立通道，由 mapper 透出 eventMap.thinking；content 从此只含回答正文
             Map<String, Object> thinkingData = new HashMap<>();
