@@ -86,6 +86,7 @@ const gridOptions: VxeGridProps = {
 
 const [Grid, gridApi] = useVbenVxeGrid({ formOptions, gridOptions });
 const [, detailDrawerApi] = useVbenDrawer({ connectedComponent: true });
+const detailRef = ref<any>();
 
 function onCreate() {
   formModalApi.setData({}).open();
@@ -164,11 +165,11 @@ function getActions(row: any) {
 <template>
   <Page auto-content-height>
     <FormModal @success="refreshGrid" />
-    <AssignPeopleModal @success="refreshGrid" />
-    <AssignAgentModal @success="refreshGrid" />
-    <AssignKbaseModal @success="refreshGrid" />
-    <AssignSkillModal @success="refreshGrid" />
-    <AssignMcpModal @success="refreshGrid" />
+    <AssignPeopleModal @success="refreshGrid(); detailRef?.reload?.()" />
+    <AssignAgentModal @success="refreshGrid(); detailRef?.reload?.()" />
+    <AssignKbaseModal @success="refreshGrid(); detailRef?.reload?.()" />
+    <AssignSkillModal @success="refreshGrid(); detailRef?.reload?.()" />
+    <AssignMcpModal @success="refreshGrid(); detailRef?.reload?.()" />
     <Grid table-title="组管理">
       <template #toolbar-tools>
         <ElButton type="primary" @click="onCreate">新增</ElButton>

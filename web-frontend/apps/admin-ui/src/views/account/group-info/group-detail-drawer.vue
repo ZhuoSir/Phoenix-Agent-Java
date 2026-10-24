@@ -2,9 +2,13 @@
 import { computed, ref } from 'vue';
 import { useVbenDrawer } from '@vben/common-ui';
 import {
-  ElButton, ElDescriptions, ElDescriptionsItem, ElTabPane, ElTable, ElTableColumn, ElTabs, ElTag,
+  ElButton, ElDescriptions, ElDescriptionsItem, ElMessage, ElMessageBox,
+  ElTabPane, ElTable, ElTableColumn, ElTabs, ElTag,
 } from 'element-plus';
-import { getGroupMemberPageApi } from '#/api/core/platform-account-group-info';
+import {
+  deleteAccountGroupInfoByGroupAndAccountApi,
+  getGroupMemberPageApi,
+} from '#/api/core/platform-account-group-info';
 import { getGroupAgentInfoByGroupApi } from '#/api/core/platform-group-agent-info';
 import { groupKbasesApi } from '#/api/core/knowledgeBase';
 import { groupSkillsApi } from '#/api/core/group-skill';
@@ -60,6 +64,21 @@ async function loadAll() {
   } finally { loading.value = false; }
 }
 
+/** T-06：移除成员（复用既有 DELETE .../group/{g}/account/{a}），二次确认 + 刷新 */
+async function removeMember(row: any) {
+  try {
+    await ElMessageBox.confirm(`确定要把「${row.username || row.accountId}」移出本组吗？`, '移除成员', {
+      confirmButtonText: '确定移除', cancelButtonText: '取消', type: 'warning',
+    });
+  } catch { return; }
+  await deleteAccountGroupInfoByGroupAndAccountApi(group.value.id, row.accountId);
+  ElMessage.success('已移除');
+  await loadAll();
+}
+
+/** 供父组件（分配弹窗成功回调）刷新详情数据 */
+defineExpose({ reload: loadAll });
+
 function openAssign(domain: string) {
   // 分配能力仍复用现有 assign-*-form 弹窗（plan 决策），由父组件打开
   emit('assign', domain, group.value);
@@ -100,6 +119,11 @@ const statusText = computed(() => (Number(group.value.status) === 0 ? '启用' :
             <ElTableColumn prop="realName" label="姓名" width="130" />
             <ElTableColumn prop="accountStatus" label="账号状态" width="100" />
             <ElTableColumn prop="joinTime" label="加入时间" width="160" />
+            <ElTableColumn label="操作" width="90" fixed="right">
+              <template #default="{ row }">
+                <ElButton link type="danger" @click="removeMember(row)">移除</ElButton>
+              </template>
+            </ElTableColumn>
           </ElTable>
           <div class="mt-2 flex justify-end gap-2">
             <ElButton :disabled="memberPage <= 1" size="small" @click="memberPage--; loadMembers()">上一页</ElButton>
