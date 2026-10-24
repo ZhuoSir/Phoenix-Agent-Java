@@ -16,8 +16,8 @@ export const overridesPreferences = defineOverridesPreferences({
   },
   logo: {
     enable: true,
-    source: '/imgs/logo.png',
-    sourceDark: '/imgs/logo.png'
+    source: '/public/imgs/logo.png',
+    sourceDark: '/public/imgs/logo.png'
   },
   theme: {
     mode: 'light',
