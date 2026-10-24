@@ -8,7 +8,7 @@
 
 ## 组 1 · 后端（先做，前端依赖）
 
-- [ ] T-01 新增成员分页接口 `GET /platform/account-group-info/page-by-group`（VO + service + 校验 + 日志）
+- [x] T-01 新增成员分页接口 `GET /platform/account-group-info/page-by-group`（VO + service + 校验 + 日志）
   关联: R-04, R-07
   依赖: （无）
   验证方式: 起后端后用真实 token 调 `GET /platform/account-group-info/page-by-group?groupId=<真实组>&page=1&size=2`，

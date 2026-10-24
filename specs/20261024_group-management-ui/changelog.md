@@ -28,3 +28,15 @@
 - 用户「确认」tasks v0.1.0 → 定版 v1.0.0，确认人 **陈卓**，确认日期 2026-10-24。
 - 三重确认自检通过：requirements v1.0.0 / plan v1.0.0 / tasks v1.0.0，均「已确认」且确认人非空。
 - 施工分支：`feature/group-management-ui`（自 `2.1.0` 切出）。
+
+## 2026-10-24 T-01 完成（成员分页接口，真栈实测）
+
+- 新增 `GET /platform/account-group-info/page-by-group?groupId=&page=&size=`（默认 size=20，上限 500）+
+  `GroupMemberVO`（relationId/accountId/username/realName/accountStatus/joinTime）+ service `pageMembers`（批量取账号，防 N+1）。
+- **实测（9091 真栈，token=admin）**：
+  - ① 分页生效：`groupId=433382915273580544&page=1&size=2` → `total=3, records=2, pageSize=2, pageNumber=1` ✅
+  - ② `size=501` → `{"code":"101","msg":"size 需在 1~500 之间","success":false}` ✅
+  - ③ `groupId=` → `{"code":"101","msg":"groupId 不能为空","success":false}` ✅
+  - ④ 日志：`INFO … [group-members] groupId=433382915273580544, page=1, size=2, total=3` ✅；非法参数 `WARN … 非法分页参数 …` ✅
+  - ⑤ 共享面未变：`/group/{groupId}` 200、`/page` 200 ✅
+- 备注：`realName`/`accountStatus` 为 null 是**源数据为空**（`tbl_platform_account_info` 中 chenzhuo 的 real_name/status 为 NULL），非映射缺陷。
