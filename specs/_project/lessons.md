@@ -1075,3 +1075,17 @@
      相对 `--out` 会让 `$WORK` 相对解析错位 ⇒ 步骤 6/8 报 `.filelist: No such file` + tar 失败（实测）。
      另：`upgrade.sh <vX.Y.Z>` 参数**要带 `v`**（传 `2.1.0` 会被"releases/2.1.0/sql 不存在"拒绝，非第二套流程）。
 - 状态: active
+
+## L-108 项目级台账必须在"账房"（版本分支）记，不能只在施工分支记
+
+- **日期**：2026-10-24 ｜ **来源**：`group-management-ui` 立项时发现
+- **现象**：BL-66/67/69、BUG-204/205/206 及 BUG-201~203 的状态更新，全部提交在
+  `feature/chat-runtime-hardening` 分支上；切回账房 `2.1.0` 后 `backlog.md`/`bugs.md` **查不到这些行**
+  （账房是子集）。cherry-pick 两个台账提交时还在插入点产生冲突。
+- **原因**：bryanchen-spec 规定 spec 文档与**全局账**永远活在版本分支线上；我图顺手把台账提交在施工分支，
+  等于把账挂在别人的 feature 上。
+- **处置**：`git checkout feature/chat-runtime-hardening -- specs/_project/bugs.md specs/_project/backlog.md`
+  一次性把台账整体回收到账房（账房是子集，无回退风险），随后在同一提交里改 BL-69 状态。
+- **防再犯规则**：① 记 BUG/BL/L 之前先 `git symbolic-ref --short HEAD`，**不是版本分支就切回去再记**
+  （或记录后立刻在账房补一次）；② 施工分支只允许提交"代码 + 该 spec 目录内文档（Spec footer）"；
+  ③ 立项/续做前的第一件事仍是验分支，发现台账缺失先回收再继续。
