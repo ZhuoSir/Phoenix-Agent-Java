@@ -1,6 +1,6 @@
 <script lang="ts" setup>
 import { ref } from 'vue';
-import { Page, useVbenModal } from '@vben/common-ui';
+import { Page, useVbenDrawer, useVbenModal } from '@vben/common-ui';
 
 import { useVbenVxeGrid, VbenTableAction } from '#/adapter/vxe-table';
 import type { VxeGridProps } from '#/adapter/vxe-table';
@@ -85,7 +85,7 @@ const gridOptions: VxeGridProps = {
 };
 
 const [Grid, gridApi] = useVbenVxeGrid({ formOptions, gridOptions });
-const detailRef = ref<any>();
+const [DetailDrawer, detailDrawerApi] = useVbenDrawer({ connectedComponent: GroupDetailDrawer });
 
 function onCreate() {
   formModalApi.setData({}).open();
@@ -139,7 +139,7 @@ function getActions(row: any) {
     {
       text: '查看详情',
       icon: 'lucide:eye',
-      onClick: () => detailRef.value?.open?.(row),
+      onClick: () => detailDrawerApi.setData({ ...row }).open(),
     },
     {
       text: '编辑',
@@ -164,11 +164,11 @@ function getActions(row: any) {
 <template>
   <Page auto-content-height>
     <FormModal @success="refreshGrid" />
-    <AssignPeopleModal @success="refreshGrid(); detailRef?.reload?.()" />
-    <AssignAgentModal @success="refreshGrid(); detailRef?.reload?.()" />
-    <AssignKbaseModal @success="refreshGrid(); detailRef?.reload?.()" />
-    <AssignSkillModal @success="refreshGrid(); detailRef?.reload?.()" />
-    <AssignMcpModal @success="refreshGrid(); detailRef?.reload?.()" />
+    <AssignPeopleModal @success="refreshGrid()" />
+    <AssignAgentModal @success="refreshGrid()" />
+    <AssignKbaseModal @success="refreshGrid()" />
+    <AssignSkillModal @success="refreshGrid()" />
+    <AssignMcpModal @success="refreshGrid()" />
     <Grid table-title="组管理">
       <template #toolbar-tools>
         <ElButton type="primary" @click="onCreate">新增</ElButton>
