@@ -8,7 +8,7 @@
 
 ## 组 1 · 基础能力
 
-- [ ] T-01 新增 6 个配置项并把 `MAX_EXTRACT_CHARS` 改为配置驱动
+- [x] T-01 新增 6 个配置项并把 `MAX_EXTRACT_CHARS` 改为配置驱动
   关联: R-05, R-10
   依赖: （无）
   验证方式: 启动时日志打印 6 项生效值；改 env（`PHOENIX_AGENT_CHAT_ATTACHMENT_CHUNK_SIZE=4000`）重启后断言日志值变化；

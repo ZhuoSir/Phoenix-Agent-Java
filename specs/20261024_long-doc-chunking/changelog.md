@@ -26,3 +26,13 @@
 - 用户「确认」→ tasks 定版 v1.0.0（陈卓 2026-10-24）
 - 三重确认自检通过：requirements v1.0.0 / plan v1.0.0 / tasks v1.0.0 均「已确认」且确认人非空
 - 施工分支：`feature/long-doc-chunking`（自 `2.1.0` 切出）
+
+## 2026-10-24 T-01 完成（6 项配置化，真栈验证）
+
+- `ChatDocumentExtractor` 增 6 个 `@Value` 配置 + `@PostConstruct` 打印生效值 + getter；`MAX_EXTRACT_CHARS` → `DEFAULT_MAX_EXTRACT_CHARS`（仅作默认）
+- 两个调用方（装配器 / 上传服务）提示文案改为读配置
+- `docker/docker-compose.yaml` 增 6 项 env（默认 24000/2000000/6000/300/20/60）
+- **实测**：启动日志 `[attachment-batch] 生效配置: maxExtractChars=24000, safeMaxChars=2000000, chunkSize=6000, …` ✅；
+  传 `PHOENIX_AGENT_CHAT_ATTACHMENTCHUNKSIZE=4000` 重启后日志变 `chunkSize=4000` ✅；
+  代码中硬编码 24000 引用数 0 ✅
+- 坑：**Spring env 名规则是"短横线去掉"** —— `...attachment-chunk-size` → `PHOENIX_AGENT_CHAT_ATTACHMENTCHUNKSIZE`（写成 `_CHUNK_SIZE` 不生效，首次验证就踩到）

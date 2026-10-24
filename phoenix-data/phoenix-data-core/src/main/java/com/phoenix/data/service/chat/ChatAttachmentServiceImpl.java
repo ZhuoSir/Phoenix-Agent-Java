@@ -125,7 +125,7 @@ public class ChatAttachmentServiceImpl implements ChatAttachmentService {
 					if (er.isOk()) {
 						extractedChars = er.getChars();
 						if (er.isTruncated()) {
-							notice = "文档内容较长，已按顺序截断至前 " + ChatDocumentExtractor.MAX_EXTRACT_CHARS
+							notice = "文档内容较长，已按顺序截断至前 " + documentExtractor.getMaxExtractChars()
 									+ " 字符（超出部分不参与理解）";
 						}
 					}

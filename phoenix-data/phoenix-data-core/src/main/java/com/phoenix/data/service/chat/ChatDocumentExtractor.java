@@ -37,7 +37,62 @@ public class ChatDocumentExtractor {
 	 * 抽取字符上限（R-08 顺序截断阈值）。24000 字符在中文场景约 1.2~2.4 万 token，
 	 * 给提示词与回答留余量；超限即截断并告知。
 	 */
-	public static final int MAX_EXTRACT_CHARS = 24000;
+	/** 默认值（仅作配置默认，运行时以配置项为准；BL-72/T-01） */
+	public static final int DEFAULT_MAX_EXTRACT_CHARS = 24000;
+
+	/** 触发分批的字符阈值（原"截断阈值"，语义见 plan §六） */
+	@org.springframework.beans.factory.annotation.Value("${phoenix.agent.chat.attachment-max-extract-chars:24000}")
+	private int maxExtractChars = DEFAULT_MAX_EXTRACT_CHARS;
+
+	/** 抽取安全上限（防 OOM），超过才真截断 */
+	@org.springframework.beans.factory.annotation.Value("${phoenix.agent.chat.attachment-safe-max-chars:2000000}")
+	private int safeMaxChars = 2_000_000;
+
+	/** 每批字符数 */
+	@org.springframework.beans.factory.annotation.Value("${phoenix.agent.chat.attachment-chunk-size:6000}")
+	private int chunkSize = 6000;
+
+	/** 块间重叠字符 */
+	@org.springframework.beans.factory.annotation.Value("${phoenix.agent.chat.attachment-chunk-overlap:300}")
+	private int chunkOverlap = 300;
+
+	/** 最大批数（护栏） */
+	@org.springframework.beans.factory.annotation.Value("${phoenix.agent.chat.attachment-max-chunks:20}")
+	private int maxChunks = 20;
+
+	/** 单批模型调用超时（秒） */
+	@org.springframework.beans.factory.annotation.Value("${phoenix.agent.chat.attachment-chunk-timeout-seconds:60}")
+	private int chunkTimeoutSeconds = 60;
+
+	@jakarta.annotation.PostConstruct
+	void logEffectiveConfig() {
+		log.info("[attachment-batch] 生效配置: maxExtractChars={}, safeMaxChars={}, chunkSize={}, chunkOverlap={}, maxChunks={}, chunkTimeoutSeconds={}",
+				maxExtractChars, safeMaxChars, chunkSize, chunkOverlap, maxChunks, chunkTimeoutSeconds);
+	}
+
+	public int getMaxExtractChars() {
+		return maxExtractChars;
+	}
+
+	public int getSafeMaxChars() {
+		return safeMaxChars;
+	}
+
+	public int getChunkSize() {
+		return chunkSize;
+	}
+
+	public int getChunkOverlap() {
+		return chunkOverlap;
+	}
+
+	public int getMaxChunks() {
+		return maxChunks;
+	}
+
+	public int getChunkTimeoutSeconds() {
+		return chunkTimeoutSeconds;
+	}
 
 	private final Parser parser = new AutoDetectParser();
 
@@ -49,7 +104,7 @@ public class ChatDocumentExtractor {
 	 */
 	public ExtractResult extract(byte[] content, String mime, String fileName) {
 		// 多要 1 字符用于区分"刚好等于上限"与"被上限截断"
-		BodyContentHandler handler = new BodyContentHandler(MAX_EXTRACT_CHARS + 1);
+		BodyContentHandler handler = new BodyContentHandler(maxExtractChars + 1);
 		Metadata metadata = new Metadata();
 		metadata.set(Metadata.CONTENT_TYPE, mime);
 		if (fileName != null) {
@@ -77,9 +132,9 @@ public class ChatDocumentExtractor {
 			return ExtractResult.fail("文档无可提取的文本层（疑似扫描件/图片型 PDF）；本期不自动转图片理解");
 		}
 		String cleaned = text.replace("\u0000", "").trim();
-		if (cleaned.length() > MAX_EXTRACT_CHARS) {
+		if (cleaned.length() > maxExtractChars) {
 			truncated = true;
-			cleaned = cleaned.substring(0, MAX_EXTRACT_CHARS);
+			cleaned = cleaned.substring(0, maxExtractChars);
 		}
 		return ExtractResult.ok(cleaned, truncated);
 	}
