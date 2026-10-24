@@ -93,6 +93,24 @@ const gridOptions: VxeGridProps = {
 
 const [Grid, gridApi] = useVbenVxeGrid({ formOptions, gridOptions });
 
+// 详情抽屉·人员表：复用同一 useVbenVxeGrid（与列表页同组件 ⇒ 样式统一）
+const [MemberGrid, memberGridApi] = useVbenVxeGrid({
+  gridOptions: {
+    columns: [
+      { field: 'username', title: '账号', width: 200 },
+      { field: 'realName', title: '姓名', width: 140 },
+      { field: 'accountStatus', title: '账号状态', width: 110 },
+      { field: 'joinTime', title: '加入时间', width: 170 },
+      { title: '操作', width: 90, slots: { default: 'action' } },
+    ],
+    height: 360,
+    border: false,
+    stripe: false,
+    pagerConfig: { enabled: false },
+    data: [] as any[],
+  },
+});
+
 
 function onCreate() {
   formModalApi.setData({}).open();
@@ -154,6 +172,7 @@ async function loadDetailMembers() {
   const page = res?.data || res;
   detailMembers.value = page?.records || [];
   detailMemberTotal.value = page?.totalRow || 0;
+  memberGridApi.setGridOptions({ data: detailMembers.value });
 }
 
 const toList = (res: any) => {
@@ -256,22 +275,11 @@ function getActions(row: any) {
             <div class="mb-2 flex justify-end">
               <ElButton size="small" type="primary" @click="onDetailAssign('people', detailGroup)">添加成员</ElButton>
             </div>
-            <ElTable :data="detailMembers" size="small" border stripe>
-              <ElTableColumn prop="username" label="账号" width="200">
-                <template #default="{ row }">
-                  <span>{{ row.username }}</span>
-                  <ElTag v-if="row.accountExists === false" size="small" type="danger" class="ml-1">账号已删除</ElTag>
-                </template>
-              </ElTableColumn>
-              <ElTableColumn prop="realName" label="姓名" width="140" />
-              <ElTableColumn prop="accountStatus" label="账号状态" width="110" />
-              <ElTableColumn prop="joinTime" label="加入时间" width="170" />
-              <ElTableColumn label="操作" width="90" fixed="right">
-                <template #default="{ row }">
-                  <ElButton link type="danger" @click="removeDetailMember(row)">移除</ElButton>
-                </template>
-              </ElTableColumn>
-            </ElTable>
+            <MemberGrid>
+              <template #action="{ row }">
+                <ElButton link type="danger" @click="removeDetailMember(row)">移除</ElButton>
+              </template>
+            </MemberGrid>
             <div class="mt-2 flex justify-end gap-2">
               <ElButton :disabled="detailPage <= 1" size="small" @click="detailPage--; loadDetailMembers()">上一页</ElButton>
               <ElButton :disabled="detailPage * detailSize >= detailMemberTotal" size="small" @click="detailPage++; loadDetailMembers()">下一页</ElButton>
@@ -279,19 +287,19 @@ function getActions(row: any) {
           </ElTabPane>
           <ElTabPane label="智能体" name="agent">
             <div class="mb-2 flex justify-end"><ElButton size="small" type="primary" @click="onDetailAssign('agent', detailGroup)">分配智能体</ElButton></div>
-            <ElTable :data="detailAgents" size="small" border stripe><ElTableColumn prop="agentName" label="名称" /></ElTable>
+            <ElTable :data="detailAgents" size="small" border><ElTableColumn prop="agentName" label="名称" /></ElTable>
           </ElTabPane>
           <ElTabPane label="知识库" name="kbase">
             <div class="mb-2 flex justify-end"><ElButton size="small" type="primary" @click="onDetailAssign('kbase', detailGroup)">分配知识库</ElButton></div>
-            <ElTable :data="detailKbases" size="small" border stripe><ElTableColumn prop="name" label="名称" /></ElTable>
+            <ElTable :data="detailKbases" size="small" border><ElTableColumn prop="name" label="名称" /></ElTable>
           </ElTabPane>
           <ElTabPane label="技能" name="skill">
             <div class="mb-2 flex justify-end"><ElButton size="small" type="primary" @click="onDetailAssign('skill', detailGroup)">分配技能</ElButton></div>
-            <ElTable :data="detailSkills" size="small" border stripe><ElTableColumn prop="name" label="名称" /></ElTable>
+            <ElTable :data="detailSkills" size="small" border><ElTableColumn prop="name" label="名称" /></ElTable>
           </ElTabPane>
           <ElTabPane label="MCP" name="mcp">
             <div class="mb-2 flex justify-end"><ElButton size="small" type="primary" @click="onDetailAssign('mcp', detailGroup)">分配 MCP</ElButton></div>
-            <ElTable :data="detailMcps" size="small" border stripe><ElTableColumn prop="name" label="名称" /></ElTable>
+            <ElTable :data="detailMcps" size="small" border><ElTableColumn prop="name" label="名称" /></ElTable>
           </ElTabPane>
         </ElTabs>
       </div>
