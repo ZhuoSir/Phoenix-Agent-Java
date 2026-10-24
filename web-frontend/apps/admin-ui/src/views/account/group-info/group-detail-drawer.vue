@@ -77,7 +77,15 @@ async function removeMember(row: any) {
 }
 
 /** 供父组件（分配弹窗成功回调）刷新详情数据 */
-defineExpose({ reload: loadAll });
+/** 父组件调用：传入组行数据并打开（避免父层依赖 connected drawer 的 api 契约） */
+async function open(row: any) {
+  group.value = row || {};
+  memberPage.value = 1;
+  drawerApi.setData(row || {}).open();
+  await loadAll();
+}
+
+defineExpose({ reload: loadAll, open });
 
 function openAssign(domain: string) {
   // 分配能力仍复用现有 assign-*-form 弹窗（plan 决策），由父组件打开

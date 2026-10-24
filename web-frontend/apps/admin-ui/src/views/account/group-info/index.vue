@@ -1,6 +1,5 @@
 <script lang="ts" setup>
 import { ref } from 'vue';
-import { useVbenDrawer } from '@vben/common-ui';
 import { Page, useVbenModal } from '@vben/common-ui';
 
 import { useVbenVxeGrid, VbenTableAction } from '#/adapter/vxe-table';
@@ -86,7 +85,6 @@ const gridOptions: VxeGridProps = {
 };
 
 const [Grid, gridApi] = useVbenVxeGrid({ formOptions, gridOptions });
-const [, detailDrawerApi] = useVbenDrawer({ connectedComponent: true });
 const detailRef = ref<any>();
 
 function onCreate() {
@@ -141,7 +139,7 @@ function getActions(row: any) {
     {
       text: '查看详情',
       icon: 'lucide:eye',
-      onClick: () => detailDrawerApi.setData({ ...row }).open(),
+      onClick: () => detailRef.value?.open?.(row),
     },
     {
       text: '编辑',
