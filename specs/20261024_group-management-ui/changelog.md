@@ -9,3 +9,9 @@
 - 立项前里程碑审计：发现 v2.1.0 `MILESTONE.md` 中 `chat-runtime-hardening` 行版本头过期
   （仍写 v0.1.0 待确认 / plan 未开始 / tasks 未开始），已按 §1.3 先校正（commit `4928e664`）。
 - 四件套建立：requirements.md / plan.md / tasks.md / changelog.md，均 v0.1.0 草稿。
+
+## 2026-10-24 requirements v1.0.0 确认①
+
+- 用户「确认」requirements v0.2.0 → 定版 v1.0.0，确认人 **陈卓**，确认日期 2026-10-24。
+- 定稿要点：操作列 3 项 / 抽屉详情 / 后端分页 / 五页签授予+移除 / 数量概览 / 既有接口不改（新增分页接口）。
+- 下一步：Phase 2 Plan。
