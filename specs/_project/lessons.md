@@ -1101,3 +1101,15 @@
 - **防再犯规则**：① 执行会改变数据的操作前，**先备份整行**（`row_to_json`）；② 恢复后用**查询回读**证明
   （行数/total/关键字段），不允许只看命令退出码；③ 数据操作一律输出可见（禁 `>/dev/null`）；
   ④ 判断"逻辑删/物理删"看实现或直接查行是否存在，别用字段名推测。
+
+## L-110 前端「构建通过」不等于「运行可用」——全局标识符缺失只在运行时炸
+
+- **日期**：2026-10-24 ｜ **来源**：`group-management-ui` T-06（BUG-208，用户现场白屏）
+- **现象**：给 `index.vue` 加了 `const detailRef = ref<any>()` 但漏了 `import { ref } from 'vue'`；
+  `vite build` 成功（4.8s，0 error）、chunk 正常产出、部署后首页 200，**但打开组管理页直接白屏**：
+  `ReferenceError: ref is not defined`。自动导入并不覆盖所有标识符。
+- **原因**：Vite/rolldown 只做模块图与类型无关的打包，**未定义全局变量不报错**；我以"构建通过"当作功能可用。
+- **防再犯规则**：① 前端改动除构建外，必须做一次**真实加载冒烟**（有浏览器插件则开页面看 console；
+  无浏览器时至少 `node --input-type=module -e` 走一遍纯逻辑，或用 `grep` 断言新增标识符**都有 import**）；
+  ② 新增 `ref/reactive/computed/onMounted` 等 vue 标识符时，**先检查该文件 import 列表**再写；
+  ③ 白屏类问题优先看 console 第一行错误，别猜。
