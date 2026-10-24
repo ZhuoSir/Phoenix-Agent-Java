@@ -200,7 +200,29 @@ public class HarnessChatServiceImpl implements HarnessChatService {
                 .toList();
         Map<String, Object> data = new HashMap<>();
         data.put("agent_files", com.phoenix.data.util.JsonUtil.getObjectMapper().writeValueAsString(payload));
-        return Flux.just(NodeOutput.of("harness_agent", "harness", new OverAllState(data), null));
+        // R-02/T-05：**正文里给出生成物路径/下载入口**（同一帧既带正文增量、又带 agent_files 状态）
+        StringBuilder notice = new StringBuilder("\n\n📎 本轮生成文件（").append(files.size()).append(" 个）：");
+        for (AgentFile f : files) {
+            String path = (f.getRelPath() == null || f.getRelPath().isBlank()) ? f.getFileName() : f.getRelPath();
+            notice.append("\n- ").append(path).append("（").append(humanSize(f.getSizeBytes())).append("）")
+                    .append("　下载：/api/agent/files/").append(f.getId()).append("/download");
+        }
+        return Flux.just(new StreamingOutput<>(notice.toString(), "harness_agent", "harness",
+                new OverAllState(data), null));
+    }
+
+    /** 生成物体积的可读格式（R-02/T-05 正文提示用） */
+    private static String humanSize(Long bytes) {
+        if (bytes == null || bytes <= 0) {
+            return "0B";
+        }
+        if (bytes < 1024) {
+            return bytes + "B";
+        }
+        if (bytes < 1024 * 1024) {
+            return (bytes / 1024) + "KB";
+        }
+        return String.format("%.1fMB", bytes / 1024.0 / 1024.0);
     }
 
     /** 拒绝原因用内容增量事件承载，前端 content 直接可见 */

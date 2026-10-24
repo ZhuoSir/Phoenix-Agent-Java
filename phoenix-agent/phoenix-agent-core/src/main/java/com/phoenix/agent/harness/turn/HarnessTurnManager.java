@@ -241,6 +241,11 @@ public class HarnessTurnManager {
             sb.append(",\"thinking\":\"").append(escape(jsonClip(th))).append('"');
             sb.append(",\"thinkingMs\":").append(turn.thinkingMs.get());
         }
+        String gen = turn.lastAgentFiles;
+        if (gen != null && !gen.isEmpty()) {
+            // 已是 JSON 数组原文（artifactsTail 产出），直接内联
+            sb.append(",\"generatedFiles\":").append(gen);
+        }
         sb.append('}');
         return sb.toString();
     }
@@ -388,6 +393,9 @@ public class HarnessTurnManager {
         final AtomicLong framesDropped = new AtomicLong();
         /** T-03b：随合并帧捎带的状态快照（技能/文件面板），避免因每帧携带而绕过合并 */
         private String pendingAgentFiles;
+
+        /** chat-runtime-hardening T-05：最后一次 agentFiles 原文（落 metadata.generatedFiles，刷新后仍可见） */
+        private volatile String lastAgentFiles;
         private String pendingLoadedSkills;
         private Disposable mergeJanitor;
 
@@ -463,6 +471,7 @@ public class HarnessTurnManager {
                 Object af = frame.get("agentFiles");
                 if (af instanceof String afs && !afs.isEmpty()) {
                     pendingAgentFiles = afs;
+                    lastAgentFiles = afs;
                 }
                 Object ls = frame.get("loadedSkills");
                 if (ls instanceof String lss && !lss.isEmpty()) {

@@ -30,8 +30,19 @@ export const ATTACHMENT_IMAGE_EXTENSIONS: readonly string[] = [
 /** 单文件大小上限（R-04，与后端 MAX_FILE_BYTES 一致） */
 export const ATTACHMENT_MAX_FILE_BYTES = 20 * 1024 * 1024;
 
-/** 单次上传数量上限（R-04，与后端 MAX_FILES_PER_REQUEST 一致） */
-export const ATTACHMENT_MAX_FILES_PER_SEND = 5;
+/**
+ * 单次上传数量上限（R-04）。chat-runtime-hardening T-04：由硬编码 5 改为**可配置**（默认 20）——
+ * 构建期用 `VITE_ATTACHMENT_MAX_FILES` 覆盖；后端 `phoenix.agent.chat.attachment-max-count` 为**最终裁决方**，
+ * 前端只做即时反馈，两边默认值保持一致（20）。
+ */
+const ENV_MAX_FILES_PER_SEND = Number(
+  (import.meta.env as Record<string, string | undefined> | undefined)
+    ?.VITE_ATTACHMENT_MAX_FILES ?? '',
+);
+export const ATTACHMENT_MAX_FILES_PER_SEND =
+  Number.isFinite(ENV_MAX_FILES_PER_SEND) && ENV_MAX_FILES_PER_SEND > 0
+    ? ENV_MAX_FILES_PER_SEND
+    : 20;
 
 /** 类型不符的统一文案（R-03） */
 export const ATTACHMENT_TYPE_MESSAGE =

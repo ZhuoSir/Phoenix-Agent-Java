@@ -6,20 +6,20 @@
 > Xinference 方案 A）—— 2026-10-24 陈卓确认②③「确认，继续执行」采纳上述默认值。
 
 ## 分组 A：配置面（R-01 / R-03 / R-05 的配置项）
-- [ ] T-01 新增配置：`phoenix.agent.chat.attachment-max-count`（默认 20）、
+- [x] T-01 新增配置：`phoenix.agent.chat.attachment-max-count`（默认 20）、
       `phoenix.agent.model-first-frame-timeout-seconds`（默认 600）、
       `phoenix.agent.tool-repeat-breaker-threshold`（默认 5）；compose 暴露对应 env
       —— **验收**：三个配置各改一次值，行为随之变化（日志/接口可证）
 - [ ] T-02 配置默认值变更的**兼容性说明**写入发布说明草稿（默认从 5/180/3 变为 20/600/5）
 
 ## 分组 B：附件上限（R-01 / BL-62）
-- [ ] T-03 后端：附件绑定入口做数量校验，超限返回明确错误（含"最多 N 个"）
+- [x] T-03 后端：附件绑定入口做数量校验，超限返回明确错误（含"最多 N 个"）
       —— **验收**：N 个成功、N+1 被拒且错误文案准确
-- [ ] T-04 前端：附件选择器上限读配置并即时提示（超限时文案含当前上限）
+- [x] T-04 前端：附件选择器上限读配置并即时提示（超限时文案含当前上限）
       —— **验收**：前端与后端上限一致（同 N），N+1 在前端即被拦
 
 ## 分组 C：生成文件路径提示（R-02 / BL-63）
-- [ ] T-05 后端：消息 metadata 增 `generatedFiles`（path/size/mtime），并在回复正文尾部追加生成物清单
+- [x] T-05 后端：消息 metadata 增 `generatedFiles`（path/size/mtime），并在回复正文尾部追加生成物清单
       —— **验收**：一轮生成 docx 的对话，正文出现绝对路径、metadata 有对应数组
 - [ ] T-06 前端：生成物路径渲染为可点击（走既有下载/打开），刷新重进会话仍可见
       —— **验收**：刷新后仍能点开并下载成功
