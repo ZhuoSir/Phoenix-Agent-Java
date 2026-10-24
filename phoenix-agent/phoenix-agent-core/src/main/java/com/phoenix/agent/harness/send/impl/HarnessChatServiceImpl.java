@@ -205,7 +205,7 @@ public class HarnessChatServiceImpl implements HarnessChatService {
         for (AgentFile f : files) {
             String path = (f.getRelPath() == null || f.getRelPath().isBlank()) ? f.getFileName() : f.getRelPath();
             notice.append("\n- ").append(path).append("（").append(humanSize(f.getSizeBytes())).append("）")
-                    .append("　下载：/api/agent/files/").append(f.getId()).append("/download");
+                    .append("　[下载](/api/agent/files/").append(f.getId()).append("/download)");
         }
         return Flux.just(new StreamingOutput<>(notice.toString(), "harness_agent", "harness",
                 new OverAllState(data), null));

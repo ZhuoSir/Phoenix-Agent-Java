@@ -615,8 +615,13 @@ onMounted(loadConfigs);
             <ElOption label="OpenAI" value="openai" />
             <ElOption label="Siliconflow" value="siliconflow" />
             <ElOption label="Ollama（本地/内网）" value="ollama" />
-            <ElOption label="Custom" value="custom" />
+            <ElOption label="Custom / Xinference（OpenAI 兼容）" value="custom" />
           </ElSelect>
+          <!-- chat-runtime-hardening T-16：Xinference（Xorbits Inference）走 custom + OpenAI 兼容 /v1 -->
+          <div style="margin-top: 4px; color: #909399; font-size: 12px">
+            接 Xinference：提供商选 <b>Custom</b>，Base URL 填 http://&lt;xinference 主机&gt;:9997/v1
+            （OpenAI 兼容端点；chat 与 embedding 均可用）
+          </div>
         </ElFormItem>
 
         <ElFormItem label="模型类型" prop="modelType">
