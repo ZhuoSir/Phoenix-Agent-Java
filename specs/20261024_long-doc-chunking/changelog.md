@@ -92,3 +92,36 @@
   1. 进度帧接线（T-05）：`HarnessChatServiceImpl` 三处 `prepare(...)` 传入 progress consumer，并把 notice 帧并入流
   2. `HarnessEventMapper` 透出 `notice` 字段
   3. 修 `BatchResult.totalMs` 打印为 1 的问题（疑似耗时统计位置/精度）
+
+## 2026-10-25 T-05~T-10 完成（真栈逐项验证）
+
+**T-05 进度帧（实现 + 实测）**
+- `HarnessChatServiceImpl.doStream`：进度 sink + `noticeOutput()` + `Flux.merge`（进度先于正文）
+- `HarnessEventMapper` 透出 `notice`
+- **关键坑**：`HarnessTurnManager.onFrame` 的「纯空生命周期帧」过滤会把 content 为空的 notice 帧**丢弃** ⇒ 已加入白名单
+- 实测：30k docx（6 块）SSE 收到 `正在处理第 1/6…6/6 批…` + 结束 `共 6 块，成功 5 块；第 [1] 块处理失败`；**正文未被污染**
+
+**T-06 护栏/降级（实测）**
+- 临时把 `attachment-max-chunks` 置 2 → 日志 `[doc-batch] 降级: 达到最大批数 maxChunks=2, processed=2/6`；
+  notice `共 6 块，成功 2 块；第 [1] 块处理失败`；**不含「已全部处理」**
+- `totalMs` 统计已正确（此前打印 1 的问题随重构消失）
+
+**T-07 失败重试（实测）**
+- 30k 实测中第 1 批 ollama 两次失败（`attempt=1/2`、`2/2`）后跳过，其余完成；结束文案标注失败块
+
+**T-08 幂等（实测）**
+- 同附件（37）重复使用 → 日志 `[doc-batch] 命中幂等缓存，跳过重复分批: attachmentId=37, chunkChars=30029`；未重复调用模型
+
+**T-09 装配接入 + 未超阈值行为不变（实测）**
+- 5k docx：请求期间 `doc-batch` 日志 0 条（未触发分批），对话正常
+- 30k/26k docx：正常触发分批
+
+**T-10 端到端（关键证据）**
+- 造 26026 字 docx，标记 `XYZ-2048` **放在 24000 字之后**（原截断方案必然丢弃）
+- 提问「第4章第3条规定的专用条款编号是什么？」
+- 结果：进度帧 `1/3…3/3` + `共 3 块，已全部处理`；**落库回答内容 = `XYZ-2048`** ✅
+  ⇒ 后半段内容确实参与理解（旧行为下该内容会被截断丢弃）
+
+## 配置恢复
+- 验证期间临时改过的 `chunk-size=12000` / `chunk-timeout=180` / `max-chunks=2` **均已恢复默认**
+  （6000 / 60 / 20），启动日志已核对

@@ -103,6 +103,13 @@ public class ChatAttachmentAssembler {
 			.flatMap(this::describeImages);
 	}
 
+	/** digest 结果：摘要文本 + 覆盖率说明（T-06 降级文案 / T-08 幂等复用） */
+	private record DigestResult(String digest, String coverage) {
+	}
+
+	/** T-08：同轮同附件幂等缓存（key=attachmentId:chars，10 分钟过期） */
+	private final java.util.Map<String, Object[]> digestCache = new java.util.concurrent.ConcurrentHashMap<>();
+
 	/** T-09：超长文档分批（长度 > maxExtractChars 才触发；否则原样返回，R-10） */
 	private Mono<List<Loaded>> batchProcessOversized(List<Loaded> loaded, java.util.function.Consumer<String> progress) {
 		boolean anyOversized = loaded.stream()
@@ -117,20 +124,33 @@ public class ChatAttachmentAssembler {
 					out.add(l);
 					continue;
 				}
-				String digest = digestLongDoc(l, progress);
-				if (digest == null) {
+				DigestResult dr = digestLongDoc(l, progress);
+				if (dr == null) {
 					out.add(l);
 					continue;
 				}
-				String notice = "附件《" + l.att().getFileName() + "》内容较长，已分批处理（摘要+关键摘录）";
-				out.add(new Loaded(l.att(), digest, notice, null));
+				String notice = "附件《" + l.att().getFileName() + "》内容较长，已分批处理（摘要+关键摘录）；"
+						+ dr.coverage();
+				out.add(new Loaded(l.att(), dr.digest(), notice, null));
 			}
 			return out;
 		}).subscribeOn(Schedulers.boundedElastic());
 	}
 
 	/** 调模型逐批抽要点（同步，运行在 boundedElastic） */
-	private String digestLongDoc(Loaded l, java.util.function.Consumer<String> progress) {
+	private DigestResult digestLongDoc(Loaded l, java.util.function.Consumer<String> progress) {
+		// T-08：同附件同长度 10 分钟内只处理一次（重试/并发不重复计费）
+		String cacheKey = l.att().getId() + ":" + l.docText().length();
+		Object[] cached = digestCache.get(cacheKey);
+		if (cached != null && (long) cached[0] > System.currentTimeMillis()) {
+			DigestResult hit = (DigestResult) cached[1];
+			log.info("[doc-batch] 命中幂等缓存，跳过重复分批: attachmentId={}, chunkChars={}", l.att().getId(),
+					l.docText().length());
+			if (progress != null) {
+				progress.accept(hit.coverage());
+			}
+			return hit;
+		}
 		try {
 			ChatModelBase model = harnessModelRegistry.getOpenAIChatModel();
 			if (model == null) {
@@ -155,7 +175,9 @@ public class ChatAttachmentAssembler {
 			if (progress != null) {
 				progress.accept(r.coverageNote());
 			}
-			return r.digest();
+			DigestResult result = new DigestResult(r.digest(), r.coverageNote());
+			digestCache.put(cacheKey, new Object[] { System.currentTimeMillis() + 10 * 60 * 1000L, result });
+			return result;
 		}
 		catch (Exception e) {
 			log.warn("[doc-batch] 分批失败，回退原文注入: file={}, reason={}", l.att().getFileName(), e.toString());
