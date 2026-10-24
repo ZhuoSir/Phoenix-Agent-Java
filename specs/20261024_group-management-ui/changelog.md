@@ -46,7 +46,9 @@
 **T-02 成员移除（可自我恢复）**
 - 补审计日志：`deleteByGroupIdAndAccountId` 成功 INFO `[group-members] 移除成员 groupId=…, accountId=…`，失败 WARN
 - 实测：`total 3 → DELETE(group/account) 成功 → total 2` ✅；日志有行 ✅；测试后把关联 `del_flag` 复位为 0，`total` 回到 3 ✅
-- 坑：删除是**逻辑删**（`del_flag=1`），用「同主键 INSERT」恢复会主键冲突（且当时被 `>/dev/null` 吞掉）⇒ 恢复须 `UPDATE del_flag=0`
+- 坑（**已纠正两次，如实记录**）：该删除是**物理删**（行被移除），我先误判为逻辑删（`del_flag`），`UPDATE del_flag=0` 恢复无效；
+  最终用备份行的完整 JSON 重新 INSERT 才恢复（`total` 回到 3、行存在）。教训：恢复动作必须**回读验证**，不能只看命令是否报错；
+  用 `>/dev/null` 吞输出等于放弃验证（参见 L-104 同类）。
 
 **T-03 共享面六身份回归（全部 200）**
 ① `GET /group/{g}` 200 ② `GET /page` 200 ③ `DELETE /group/{g}/account/{a}` 200（T-02 已验证真删+恢复）
