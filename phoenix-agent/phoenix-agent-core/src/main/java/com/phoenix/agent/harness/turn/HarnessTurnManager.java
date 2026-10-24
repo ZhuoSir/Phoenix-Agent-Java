@@ -625,8 +625,16 @@ public class HarnessTurnManager {
                 }
             }
             // 模型偶发「工具全执行完但跳过收尾正文」（BUG-59 三报）：诚实注记兜底，不让用户面对空气泡
-            if (status.equals(STATUS_DONE) && content.length() == 0 && thinking.length() > 0) {
-                content.append("ℹ️ 本轮已完成工具执行但未输出正文总结（产物见文件面板）。如需说明请追问。");
+            if (status.equals(STATUS_DONE) && content.length() == 0) {
+                // 现场实证（2026-10-24）：模型反复 read_file 被熔断后 status=done、content 为空 ⇒ 界面**一片空白**，
+                // 用户完全不知道发生了什么。这里对"无论是否有 thinking"的空内容统一给可读兜底。
+                if (thinking.length() > 0) {
+                    content.append("ℹ️ 本轮已完成工具执行但未输出正文总结（产物见文件面板）。如需说明请追问。");
+                }
+                else {
+                    content.append("⚠️ 本轮没有产出正文内容：可能因重复工具调用被熔断、或工具未返回有效结果。"
+                            + "可补充更具体的信息后重试，或检查所上传文件是否可读。");
+                }
             }
             if (messageId != null) {
                 try {

@@ -434,6 +434,15 @@ public class HarnessChatServiceImpl implements HarnessChatService {
             thinkingData.put("thinking_text", thinkingEvent.getDelta());
             return NodeOutput.of("harness_agent", "harness", new OverAllState(thinkingData), null);
         }
+        // 2c. 停止事件（工具熔断/框架请求停止）：原因**必须让用户看见**，不能静默结束
+        if (event instanceof io.agentscope.core.event.RequestStopEvent stopEvent) {
+            String reason = stopEvent.getReason();
+            String text = (reason == null || reason.isBlank())
+                    ? "\n\n⚠️ 本轮已被停止。"
+                    : "\n\n⚠️ " + reason;
+            log.info("[turn] 收到停止事件 session={}, reason={}", sessionId, reason);
+            return new StreamingOutput<>(text, "harness_agent", "harness", new OverAllState(new HashMap<>()));
+        }
         // 3. 结束事件
         if (event.getType() == AgentEventType.AGENT_END) {
             return NodeOutput.of(StateGraph.END, "harness", new OverAllState(data), null);
