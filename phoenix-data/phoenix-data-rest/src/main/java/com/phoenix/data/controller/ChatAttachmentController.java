@@ -8,7 +8,7 @@ import com.phoenix.data.service.chat.ChatAttachmentService;
 import com.phoenix.data.vo.ApiResponse;
 import com.phoenix.data.vo.ChatAttachmentUploadResultVO;
 import com.phoenix.data.vo.ChatAttachmentVO;
-import lombok.AllArgsConstructor;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.buffer.DataBufferLimitException;
@@ -49,7 +49,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/chat/attachment")
 @CrossOrigin(origins = "*")
-@AllArgsConstructor
+@RequiredArgsConstructor
 public class ChatAttachmentController {
 
 	private final ChatAttachmentService chatAttachmentService;

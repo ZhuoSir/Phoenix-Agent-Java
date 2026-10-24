@@ -29,3 +29,18 @@
   · 同参数 EMBEDDING（`/v1/embeddings`）→ **同样成功**
 - 未覆盖（显式标注）：真实 Xinference 实例（本机未安装，用 mock 替代）；**流式（SSE）与工具调用**未在本次测试端点中验证，
   留到 T-17/T-18 联调；`/v1/models` 非必需（未依赖）。
+
+## 2026-10-24 T-17 / T-18 运行时验证（真栈实测）
+环境：`phoenix-backend:2.1.0-crh`（用本次改动后的 jar 造的镜像）+ 全新库，端口 9091；OpenAI 兼容 mock 模拟 Xinference。
+- **T-17 默认值回归**
+  · 附件上限：**21 个 → 拒**（`单次最多上传 20 个附件（当前 21 个）`）；**20 个 → accepted=20 rejected=0** ✅
+  · 首帧超时：容器 env `PHOENIX_AGENT_MODEL_FIRST_FRAME_TIMEOUT_SECONDS=600` ✅（`@Value` 默认同步 600）
+  · 熔断阈值：`@Value("${phoenix.agent.tool-repeat-breaker-threshold:5}")` ✅（功能级"不误伤"验证需可复现的重复调用模型，未覆盖）
+- **T-18 冒烟/回归**
+  · 登录 ✅；知识库 `POST /api/knowledge-base/query/page` ✅；归属体检 ✅
+  · 模型连接测试（provider=custom + `http://host.docker.internal:9000/v1`）→ **连接测试成功** ✅
+  · **R-09 五项门禁：PASS（可判定项全绿）** ✅
+  · **未覆盖（如实）**：端到端对话（受 BUG-200 阻塞：前台 chat 对 sn 空智能体 500）；知识库"入库→检索"（该栈 embedding 仍为种子占位 key）
+- **本轮抓到的真 bug（已修 + 记 L-107）**：给 `@AllArgsConstructor` 的 `ChatAttachmentController` 加 `@Value` 字段 ⇒
+  构造器多出 `int` 形参 ⇒ 启动即 `NoSuchBeanDefinitionException: No qualifying bean of type 'int'`；
+  改为 `@RequiredArgsConstructor` 后正常。**编译通过 ≠ 能启动**。
