@@ -19,3 +19,13 @@
   附件上限 20（安全 50）/ 首帧超时 600s / thinking 默认开 / 熔断阈值 5 / Xinference 方案 A。
 - 按 git-workflow §三.3：文档全部落在版本分支 `2.1.0` 后，从 `2.1.0` 切施工分支
   **`feature/chat-runtime-hardening`**（命名=spec 目录去掉日期）。
+
+## 2026-10-24 T-15 可行性实测（Xinference 接入方式）
+- 结论：**Xinference 可用"零代码"接入** —— `provider=custom` + `base_url=http://<xinference>:<port>/v1` + `model_name`，
+  `DynamicModelFactory` 对非 ollama 的 provider 统一走 `OpenAiApi`（`completionsPath/embeddingsPath` 可配）。
+- 实测（v2.1.0 栈 + 本机 OpenAI 兼容 mock，模拟 Xinference `/v1`）：
+  · `POST /api/model-config/test`（provider=custom, base_url=http://host.docker.internal:9000/v1, CHAT）
+    → **"连接测试成功！模型可用。"**
+  · 同参数 EMBEDDING（`/v1/embeddings`）→ **同样成功**
+- 未覆盖（显式标注）：真实 Xinference 实例（本机未安装，用 mock 替代）；**流式（SSE）与工具调用**未在本次测试端点中验证，
+  留到 T-17/T-18 联调；`/v1/models` 非必需（未依赖）。

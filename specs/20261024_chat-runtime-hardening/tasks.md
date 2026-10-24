@@ -38,6 +38,8 @@
 - [x] T-11 历史回传不再静默丢弃 ThinkingBlock（降级为文本或换 formatter）
       —— **验收**：≥3 轮带工具调用后，日志**不再**出现 `Unsupported block type ThinkingBlock`
 - [ ] T-12 前端思考区渲染（折叠 + 流式追加）
+      —— **现状**：既有 `thinking-display` spec 已实现（`ThinkingBlock.vue` + `ChatMessages.vue` 渲染/自动折叠，
+      `api-transport.ts` 回显 `metadata.thinking`）⇒ 本 spec 只需后端开启 think（T-10 ✅）+ T-17 运行时确认
       —— **验收**：思考区内容随流增长，可折叠
 
 ## 分组 F：熔断修正（R-05 / BUG-202）
@@ -47,7 +49,7 @@
       —— **验收**：日志行长度可控，仍可定位
 
 ## 分组 G：Xinference 接入（R-06 / BL-65）
-- [ ] T-15 可行性实测：Xinference `/v1/chat/completions`（流式 + tools）与 `/v1/embeddings`
+- [x] T-15 可行性实测：Xinference `/v1/chat/completions`（流式 + tools）与 `/v1/embeddings`
       —— **验收**：记录实测结论（可用/不可用 + 限制），决定走方案 A 还是 B
 - [ ] T-16 若方案 A：补 UI 预设（provider=custom + base_url）与文档；不改后端枚举、不动库结构
       —— **验收**：配置后在对话与向量检索中可用
