@@ -474,7 +474,9 @@ public class HarnessTurnManager {
                     return;
                 }
                 // T-03b：纯空生命周期帧（无内容、无语义、无快照）对客户端零信息量 → 丢弃，不再下发
-                if (!needsOrderingFlush(frame) && (c == null || !(c instanceof String cs2) || cs2.isEmpty())
+                // T-05：notice 帧 content 为空但**有信息量**（分批进度/告知），不得丢弃
+                if (!needsOrderingFlush(frame) && frame.get("notice") == null
+                        && (c == null || !(c instanceof String cs2) || cs2.isEmpty())
                         && (th == null || !(th instanceof String ts2) || ts2.isEmpty())
                         && pendingAgentFiles == null && pendingLoadedSkills == null) {
                     framesDropped.incrementAndGet();

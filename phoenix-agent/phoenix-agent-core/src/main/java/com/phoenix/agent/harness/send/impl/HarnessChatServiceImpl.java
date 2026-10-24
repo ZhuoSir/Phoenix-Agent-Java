@@ -128,17 +128,24 @@ public class HarnessChatServiceImpl implements HarnessChatService {
         java.util.concurrent.atomic.AtomicBoolean textDeltaSeen = new java.util.concurrent.atomic.AtomicBoolean(false);
         final Integer effMaxIters = resolveEffectiveMaxIters(request.getAgentId());
         // T-05：MCP 变体挂载（交集空=原实例零变化路径；构建/注册全在 boundedElastic）
+        // T-05：分批进度（notice 帧）与主对话流并行；进度帧先于正文到达
+        reactor.core.publisher.Sinks.Many<NodeOutput> progressSink = reactor.core.publisher.Sinks.many()
+            .unicast()
+            .onBackpressureBuffer();
         Flux<NodeOutput> body = mcpMountService
             .withMcp(harnessAgent, request.getAgentId(), request.getSessionId(),
                 effectiveMcp(request.getChannel(), request.getUserId(), request.getAgentId()))
-            .flatMapMany(agent -> attachmentAssembler.prepare(request.getAttachmentIds(), request.getUserId())
+            .flatMapMany(agent -> attachmentAssembler
+                .prepare(request.getAttachmentIds(), request.getUserId(), text -> progressSink.tryEmitNext(noticeOutput(text)))
+                .doFinally(sig -> progressSink.tryEmitComplete())
                 .flatMapMany(ctx -> agent
                     .streamEvents(buildUserMessage(request, ctx), buildRuntimeContext(request, injection.block())))
                 .map(event -> toNodeOutput(event, sessionId, textDeltaSeen, effMaxIters)));
+        Flux<NodeOutput> merged = Flux.merge(progressSink.asFlux(), body);
         // BL-19：轮末扫 workspace 产物。END 帧从 body 中剥离、在扫描事件之后统一补发——
         // 否则 agentFiles 落在 end=true 之后，前端（按 end 收尾）收不到，还会多渲染一个空消息框。
         java.time.Instant turnStart = java.time.Instant.now();
-        Flux<NodeOutput> core = body.filter(output -> !output.isEND());
+        Flux<NodeOutput> core = merged.filter(output -> !output.isEND());
         Flux<NodeOutput> filesTail = Flux.defer(() -> artifactsTail(request, turnStart));
         Flux<NodeOutput> endFrame = Flux.defer(() -> Flux.just(endOutputStatic()));
         if (injection.skillNames().isEmpty()) {
@@ -319,6 +326,13 @@ public class HarnessChatServiceImpl implements HarnessChatService {
             log.warn("MCP 有效集计算失败，按无 MCP 降级: agentId={}, err={}", agentId, e.toString());
             return List.of();
         }
+    }
+
+    /** T-05：进度/告知帧（notice 字段由 mapper 透出，不污染正文 content） */
+    private NodeOutput noticeOutput(String text) {
+        Map<String, Object> data = new HashMap<>();
+        data.put("notice", text);
+        return NodeOutput.of("harness_agent", "harness", new OverAllState(data), null);
     }
 
     private NodeOutput toNodeOutput(AgentEvent event, String sessionId,

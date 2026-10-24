@@ -85,13 +85,104 @@ public class ChatAttachmentAssembler {
 	 * 装配附件上下文。attachmentIds 为空 ⇒ 立即返回空上下文（S1' 短路，不做任何 IO）。
 	 */
 	public Mono<Context> prepare(List<Long> attachmentIds, String viewerId) {
+		return prepare(attachmentIds, viewerId, null);
+	}
+
+	/**
+	 * 装配附件上下文（T-09：超长文档走分批处理）。
+	 * @param progress 进度回调（可为 null）：参数为「第 x 批 / 共 N 批」提示文案，由上层转成 notice 帧
+	 */
+	public Mono<Context> prepare(List<Long> attachmentIds, String viewerId, java.util.function.Consumer<String> progress) {
 		if (attachmentIds == null || attachmentIds.isEmpty()) {
 			return Mono.just(Context.none());
 		}
 		boolean superAdmin = viewerId != null && adminRoleGuard.isAdmin(viewerId);
 		return Mono.fromCallable(() -> load(attachmentIds, viewerId, superAdmin))
 			.subscribeOn(Schedulers.boundedElastic())
+			.flatMap(loaded -> batchProcessOversized(loaded, progress))
 			.flatMap(this::describeImages);
+	}
+
+	/** digest 结果：摘要文本 + 覆盖率说明（T-06 降级文案 / T-08 幂等复用） */
+	private record DigestResult(String digest, String coverage) {
+	}
+
+	/** T-08：同轮同附件幂等缓存（key=attachmentId:chars，10 分钟过期） */
+	private final java.util.Map<String, Object[]> digestCache = new java.util.concurrent.ConcurrentHashMap<>();
+
+	/** T-09：超长文档分批（长度 > maxExtractChars 才触发；否则原样返回，R-10） */
+	private Mono<List<Loaded>> batchProcessOversized(List<Loaded> loaded, java.util.function.Consumer<String> progress) {
+		boolean anyOversized = loaded.stream()
+			.anyMatch(l -> l.docText() != null && l.docText().length() > documentExtractor.getMaxExtractChars());
+		if (!anyOversized) {
+			return Mono.just(loaded);
+		}
+		return Mono.fromCallable(() -> {
+			List<Loaded> out = new ArrayList<>();
+			for (Loaded l : loaded) {
+				if (l.docText() == null || l.docText().length() <= documentExtractor.getMaxExtractChars()) {
+					out.add(l);
+					continue;
+				}
+				DigestResult dr = digestLongDoc(l, progress);
+				if (dr == null) {
+					out.add(l);
+					continue;
+				}
+				String notice = "附件《" + l.att().getFileName() + "》内容较长，已分批处理（摘要+关键摘录）；"
+						+ dr.coverage();
+				out.add(new Loaded(l.att(), dr.digest(), notice, null));
+			}
+			return out;
+		}).subscribeOn(Schedulers.boundedElastic());
+	}
+
+	/** 调模型逐批抽要点（同步，运行在 boundedElastic） */
+	private DigestResult digestLongDoc(Loaded l, java.util.function.Consumer<String> progress) {
+		// T-08：同附件同长度 10 分钟内只处理一次（重试/并发不重复计费）
+		String cacheKey = l.att().getId() + ":" + l.docText().length();
+		Object[] cached = digestCache.get(cacheKey);
+		if (cached != null && (long) cached[0] > System.currentTimeMillis()) {
+			DigestResult hit = (DigestResult) cached[1];
+			log.info("[doc-batch] 命中幂等缓存，跳过重复分批: attachmentId={}, chunkChars={}", l.att().getId(),
+					l.docText().length());
+			if (progress != null) {
+				progress.accept(hit.coverage());
+			}
+			return hit;
+		}
+		try {
+			ChatModelBase model = harnessModelRegistry.getOpenAIChatModel();
+			if (model == null) {
+				log.warn("[doc-batch] 无可用 CHAT 模型，跳过分批（保持原文注入）: file={}", l.att().getFileName());
+				return null;
+			}
+			DocumentBatchProcessor.ChatFn chatFn = prompt -> {
+				UserMessage msg = new UserMessage(List.of(TextBlock.builder().text(prompt).build()));
+				StringBuilder sb = model.stream(List.of(msg), List.of(), GenerateOptions.builder().build())
+					.map(r -> textOf(r.getContent()))
+					.reduce(new StringBuilder(), StringBuilder::append)
+					.block(java.time.Duration.ofSeconds(documentExtractor.getChunkTimeoutSeconds()));
+				return sb == null ? null : sb.toString();
+			};
+			DocumentBatchProcessor.BatchResult r = DocumentBatchProcessor.process(l.docText(),
+					documentExtractor.getChunkSize(), documentExtractor.getChunkOverlap(),
+					documentExtractor.getMaxChunks(), 20000, 1, chatFn, (i, n) -> {
+						if (progress != null) {
+							progress.accept("正在处理第 " + i + "/" + n + " 批…");
+						}
+					});
+			if (progress != null) {
+				progress.accept(r.coverageNote());
+			}
+			DigestResult result = new DigestResult(r.digest(), r.coverageNote());
+			digestCache.put(cacheKey, new Object[] { System.currentTimeMillis() + 10 * 60 * 1000L, result });
+			return result;
+		}
+		catch (Exception e) {
+			log.warn("[doc-batch] 分批失败，回退原文注入: file={}, reason={}", l.att().getFileName(), e.toString());
+			return null;
+		}
 	}
 
 	/**
@@ -136,8 +227,11 @@ public class ChatAttachmentAssembler {
 								+ "（其内容未参与本次回答）", null));
 						continue;
 					}
-					String notice = er.isTruncated() ? ("附件《" + att.getFileName() + "》内容较长，已按顺序截断至前 "
-							+ ChatDocumentExtractor.MAX_EXTRACT_CHARS + " 字符，超出部分未参与理解") : null;
+					String notice = er.isTruncated()
+							? ("附件《" + att.getFileName() + "》超过单文档安全上限（"
+									+ documentExtractor.getSafeMaxChars() + " 字符），仅处理前 "
+									+ documentExtractor.getSafeMaxChars() + " 字符")
+							: null;
 					out.add(new Loaded(att, er.getText(), notice, null));
 				}
 			}
