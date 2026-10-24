@@ -21,6 +21,7 @@ import {
 } from 'element-plus';
 
 import { getGroupInfoPageApi, toggleStatusGroupInfoApi } from '#/api';
+import { updateGroupInfoApi } from '#/api/core/platform-group-info';
 
 import AssignAgentForm from './assign-agent-form.vue';
 import AssignKbaseForm from './assign-kbase-form.vue';
@@ -273,10 +274,16 @@ async function saveGroupBase() {
   }
   editSaving.value = true;
   try {
-    await updateGroupInfoApi({ ...detailGroup.value, ...editForm.value });
+    const res: any = await updateGroupInfoApi({ ...detailGroup.value, ...editForm.value });
+    if (res && res.success === false) {
+      ElMessage.error(res.msg || '保存失败');
+      return;
+    }
     ElMessage.success('保存成功');
     detailGroup.value = { ...detailGroup.value, ...editForm.value };
     refreshGrid();
+  } catch (e: any) {
+    ElMessage.error(`保存失败：${e?.message || e}`);
   } finally { editSaving.value = false; }
 }
 

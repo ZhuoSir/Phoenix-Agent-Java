@@ -1113,3 +1113,23 @@
   无浏览器时至少 `node --input-type=module -e` 走一遍纯逻辑，或用 `grep` 断言新增标识符**都有 import**）；
   ② 新增 `ref/reactive/computed/onMounted` 等 vue 标识符时，**先检查该文件 import 列表**再写；
   ③ 白屏类问题优先看 console 第一行错误，别猜。
+
+## L-111 前端"调用了不存在的导出/写错模板"不会报错，只会在点击时静默失效
+
+- **日期**：2026-10-24 ｜ **来源**：`group-management-ui`（保存无反应、分配后不刷新）
+- **现象**：① `updateGroupInfoApi` 未真正 import（`#/api` 不导出该函数）⇒ 点「保存基本信息」没有任何请求，
+  被 `finally` 吞掉无提示；② 弹窗绑定写成 `@success="refreshGrid"`（少括号）→ 字符串替换未命中，实际仍是
+  `@success="refreshGrid()"` ⇒ 抽屉表格永不刷新。
+- **防再犯规则**：① 任何"点了没反应"先看 Network 有无请求，再看 console；② 用字符串替换改模板/绑定，
+  **必须断言替换命中数**（L-104 同源）；③ 关键写操作（保存/分配）必须 `catch` 并 `ElMessage.error`，
+  禁止静默吞异常；④ 引入新 API 前先确认导出位置（`grep "export async function <name>"`）。
+
+## L-112 vben 的 vxe 网格：高度/分页/列/数据必须"整份替换"，逐项 setGridOptions 会互相覆盖
+
+- **日期**：2026-10-24 ｜ **来源**：`group-management-ui`（高度不一致、分页器消失、状态列不生效）
+- **现象**：① `setGridOptions({ columns })` 只传列 ⇒ 把 `height`、`pagerConfig` 一起冲掉（分页器消失）；
+  ② 列 `formatter`/`slots` 在 vben 包装下可能不生效（状态仍显示数字）⇒ 改为在**数据层**映射成中文；
+  ③ 同名 `pagerConfig` 写了两次，后者覆盖前者（`enabled:false` 覆盖 `true`）⇒ 授权页签一直没有分页。
+- **防再犯规则**：① `setGridOptions` 要么传全量（columns+height+pagerConfig+data），要么改用 `gridApi.query()`；
+  ② 展示型字段（状态/枚举）优先在**数据层转换**，别依赖 formatter/slots 透传；
+  ③ 配置对象里禁止出现重复键——写完后 `grep` 同名键计数校验。
