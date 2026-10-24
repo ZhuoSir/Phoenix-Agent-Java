@@ -7,7 +7,6 @@ import { getGroupAgentInfoByGroupApi } from '#/api/core/platform-group-agent-inf
 import { groupKbasesApi } from '#/api/core/knowledgeBase';
 import { groupSkillsApi } from '#/api/core/group-skill';
 import { groupMcpsApi } from '#/api/core/group-mcp';
-import GroupItemsGrid from './group-items-grid.vue';
 import { useVbenVxeGrid, VbenTableAction } from '#/adapter/vxe-table';
 import type { VxeGridProps } from '#/adapter/vxe-table';
 import type { VbenFormProps } from '@vben/common-ui';
@@ -104,9 +103,11 @@ const [MemberGrid, memberGridApi] = useVbenVxeGrid({
       { field: 'joinTime', title: '加入时间', width: 170 },
       { title: '操作', width: 90, slots: { default: 'action' } },
     ],
-    height: 360,
+    loading: false,
+    maxHeight: 360,
     border: false,
     stripe: false,
+    emptyText: '暂无数据',
     pagerConfig: { enabled: false },
     data: [] as any[],
   },
@@ -173,7 +174,7 @@ async function loadDetailMembers() {
   const page = res?.data || res;
   detailMembers.value = page?.records || [];
   detailMemberTotal.value = page?.totalRow || 0;
-  memberGridApi.setGridOptions({ data: detailMembers.value });
+  memberGridApi.setGridOptions({ data: detailMembers.value, loading: false });
 }
 
 const toList = (res: any) => {
@@ -276,11 +277,14 @@ function getActions(row: any) {
             <div class="mb-2 flex justify-end">
               <ElButton size="small" type="primary" @click="onDetailAssign('people', detailGroup)">添加成员</ElButton>
             </div>
-            <MemberGrid>
-              <template #action="{ row }">
-                <ElButton link type="danger" @click="removeDetailMember(row)">移除</ElButton>
-              </template>
-            </MemberGrid>
+            <div v-if="detailMembers.length">
+              <MemberGrid>
+                <template #action="{ row }">
+                  <ElButton link type="danger" @click="removeDetailMember(row)">移除</ElButton>
+                </template>
+              </MemberGrid>
+            </div>
+            <div v-else class="py-6 text-center text-sm text-gray-400">暂无数据</div>
             <div class="mt-2 flex justify-end gap-2">
               <ElButton :disabled="detailPage <= 1" size="small" @click="detailPage--; loadDetailMembers()">上一页</ElButton>
               <ElButton :disabled="detailPage * detailSize >= detailMemberTotal" size="small" @click="detailPage++; loadDetailMembers()">下一页</ElButton>
@@ -288,19 +292,31 @@ function getActions(row: any) {
           </ElTabPane>
           <ElTabPane label="智能体" name="agent">
             <div class="mb-2 flex justify-end"><ElButton size="small" type="primary" @click="onDetailAssign('agent', detailGroup)">分配智能体</ElButton></div>
-            <GroupItemsGrid :data="detailAgents" field="agentName" title="名称" />
+            <div v-if="detailAgents.length">
+              <ElTable :data="detailAgents" size="small" border><ElTableColumn prop="agentName" label="名称" /></ElTable>
+            </div>
+            <div v-else class="py-6 text-center text-sm text-gray-400">暂无数据</div>
           </ElTabPane>
           <ElTabPane label="知识库" name="kbase">
             <div class="mb-2 flex justify-end"><ElButton size="small" type="primary" @click="onDetailAssign('kbase', detailGroup)">分配知识库</ElButton></div>
-            <GroupItemsGrid :data="detailKbases" field="name" title="名称" />
+            <div v-if="detailKbases.length">
+              <ElTable :data="detailKbases" size="small" border><ElTableColumn prop="name" label="名称" /></ElTable>
+            </div>
+            <div v-else class="py-6 text-center text-sm text-gray-400">暂无数据</div>
           </ElTabPane>
           <ElTabPane label="技能" name="skill">
             <div class="mb-2 flex justify-end"><ElButton size="small" type="primary" @click="onDetailAssign('skill', detailGroup)">分配技能</ElButton></div>
-            <GroupItemsGrid :data="detailSkills" field="name" title="名称" />
+            <div v-if="detailSkills.length">
+              <ElTable :data="detailSkills" size="small" border><ElTableColumn prop="name" label="名称" /></ElTable>
+            </div>
+            <div v-else class="py-6 text-center text-sm text-gray-400">暂无数据</div>
           </ElTabPane>
           <ElTabPane label="MCP" name="mcp">
             <div class="mb-2 flex justify-end"><ElButton size="small" type="primary" @click="onDetailAssign('mcp', detailGroup)">分配 MCP</ElButton></div>
-            <GroupItemsGrid :data="detailMcps" field="name" title="名称" />
+            <div v-if="detailMcps.length">
+              <ElTable :data="detailMcps" size="small" border><ElTableColumn prop="name" label="名称" /></ElTable>
+            </div>
+            <div v-else class="py-6 text-center text-sm text-gray-400">暂无数据</div>
           </ElTabPane>
         </ElTabs>
       </div>

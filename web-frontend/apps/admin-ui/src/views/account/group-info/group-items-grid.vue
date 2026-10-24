@@ -14,9 +14,11 @@ const props = defineProps<{
 const [Grid, gridApi] = useVbenVxeGrid({
   gridOptions: {
     columns: [{ field: props.field, title: props.title || '名称' }],
-    height: 220,
+    loading: false,
+    maxHeight: 260,
     border: false,
     stripe: false,
+    emptyText: '暂无数据',
     pagerConfig: { enabled: false },
     data: [] as any[],
   },
@@ -24,7 +26,7 @@ const [Grid, gridApi] = useVbenVxeGrid({
 
 watch(
   () => props.data,
-  (d) => gridApi.setGridOptions({ data: d || [] }),
+  (d) => gridApi.setGridOptions({ data: d || [], loading: false }),
   { immediate: true, deep: true },
 );
 </script>
