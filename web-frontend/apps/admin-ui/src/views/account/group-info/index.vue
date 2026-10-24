@@ -1,13 +1,27 @@
 <script lang="ts" setup>
-import { Page, useVbenModal } from '@vben/common-ui';
+import { ref } from 'vue';
+import { Page, useVbenDrawer, useVbenModal } from '@vben/common-ui';
 
+import { getGroupMemberPageApi, deleteAccountGroupInfoByGroupAndAccountApi } from '#/api/core/platform-account-group-info';
+import { getGroupAgentInfoByGroupApi } from '#/api/core/platform-group-agent-info';
+import { groupKbasesApi } from '#/api/core/knowledgeBase';
+import { groupSkillsApi } from '#/api/core/group-skill';
+import { groupMcpsApi } from '#/api/core/group-mcp';
+import { getSkillPageApi } from '#/api/core/skill';
+import { getMcpPageApi } from '#/api/core/mcp';
+import { kbPageApi } from '#/api/core/knowledgeBase';
+import { getGroupAgentInfoListApi } from '#/api/core/platform-account-tenant-info';
 import { useVbenVxeGrid, VbenTableAction } from '#/adapter/vxe-table';
 import type { VxeGridProps } from '#/adapter/vxe-table';
 import type { VbenFormProps } from '@vben/common-ui';
 
-import { ElButton, ElMessage, ElMessageBox, ElTag } from 'element-plus';
+import {
+  ElButton, ElDescriptions, ElDescriptionsItem, ElDrawer, ElForm, ElFormItem, ElInput,
+  ElMessage, ElMessageBox, ElTabPane, ElTable, ElTableColumn, ElTabs, ElTag,
+} from 'element-plus';
 
 import { getGroupInfoPageApi, toggleStatusGroupInfoApi } from '#/api';
+import { updateGroupInfoApi } from '#/api/core/platform-group-info';
 
 import AssignAgentForm from './assign-agent-form.vue';
 import AssignKbaseForm from './assign-kbase-form.vue';
@@ -61,7 +75,7 @@ const gridOptions: VxeGridProps = {
   height: 'auto',
   keepSource: true,
   border: false,
-  stripe: true,
+  stripe: false,
   showOverflow: true,
   proxyConfig: {
     ajax: {
@@ -84,12 +98,91 @@ const gridOptions: VxeGridProps = {
 
 const [Grid, gridApi] = useVbenVxeGrid({ formOptions, gridOptions });
 
+// 详情抽屉·人员表：复用同一 useVbenVxeGrid（与列表页同组件 ⇒ 样式统一）
+const [MemberGrid, memberGridApi] = useVbenVxeGrid({
+  gridOptions: {
+    columns: [
+      { field: 'username', title: '账号', width: 180 },
+      { field: 'realName', title: '姓名', minWidth: 140 },
+      {
+        field: 'accountStatus',
+        title: '账号状态',
+        width: 110,
+        formatter: ({ cellValue }: any) => (String(cellValue) === '1' ? '启用' : '禁用'),
+      },
+      { field: 'joinTime', title: '加入时间', width: 170 },
+      { title: '操作', width: 90, fixed: 'right', slots: { default: 'action' } },
+    ],
+    loading: false,
+    fit: true,
+    height: 460,
+    border: false,
+    stripe: false,
+    emptyText: '暂无数据',
+    pagerConfig: { enabled: true, pageSize: 10, pageSizes: [10, 20, 50] },
+    // vben 要求 proxyConfig 放在 gridOptions 内，否则不会走代理取数
+    proxyConfig: {
+      ajax: {
+        query: async ({ page }: any) => {
+          const res: any = await getGroupMemberPageApi(
+            detailGroup.value.id,
+            page?.currentPage ?? 1,
+            page?.pageSize ?? 10,
+          );
+          const d = res?.data ?? res;
+          const total = d?.totalRow ?? 0;
+          detailMemberTotal.value = total;
+          const rows = (d?.records ?? []).map((r: any) => ({
+            ...r,
+            accountStatus: String(r.accountStatus) === '1' ? '启用' : '禁用',
+          }));
+          // vxe proxy 需要 result + page.total 才能正确显示"共 N 条"
+          // 兜底覆盖 vben/vxe 可能读取的多种字段名，确保分页器显示真实总数
+          return { records: rows, total, totalRow: total, rowCount: total, page: { total, totalRow: total } };
+        },
+      },
+    },
+  },
+});
+
+// 授权类页签：各建一个与人员表同款的网格（vxe，与列表页统一）
+function makeGrantGrid() {
+  return useVbenVxeGrid({
+    gridOptions: {
+      columns: [{ field: 'name', title: '名称', minWidth: 200 }],
+      loading: false,
+      fit: true,
+      height: 460,
+      border: false,
+      stripe: false,
+      emptyText: '暂无数据',
+      // 与人员表/列表页同一套分页器（本地数据由 vxe 自行分页）
+      pagerConfig: { enabled: true, pageSize: 10, pageSizes: [10, 20, 50] },
+      data: [] as any[],
+    },
+  });
+}
+const [AgentGrid, agentGridApi] = makeGrantGrid();
+const [KbaseGrid, kbaseGridApi] = makeGrantGrid();
+const [SkillGrid, skillGridApi] = makeGrantGrid();
+const [McpGrid, mcpGridApi] = makeGrantGrid();
+
+
 function onCreate() {
   formModalApi.setData({}).open();
 }
 
 function onEdit(row: any) {
   formModalApi.setData({ ...row }).open();
+}
+
+/** 分配类弹窗成功后：刷新列表 + 抽屉内数据（人员表重新查询） */
+function onAssignSuccess() {
+  refreshGrid();
+  if (detailVisible.value) {
+    loadDetail();
+    memberGridApi.query();
+  }
 }
 
 function refreshGrid() {
@@ -118,38 +211,192 @@ function onToggleStatus(row: any) {
     .catch(() => {});
 }
 
+// ===== 组详情（内联抽屉，T-05/T-06：不依赖任何跨组件 API）=====
+const detailVisible = ref(false);
+const detailMode = ref<'edit' | 'view'>('view');
+const editForm = ref<any>({ name: '', description: '' });
+const editSaving = ref(false);
+const detailGroup = ref<any>({});
+const detailAgents = ref<any[]>([]);
+const detailKbases = ref<any[]>([]);
+const detailSkills = ref<any[]>([]);
+const detailMcps = ref<any[]>([]);
+const detailLoading = ref(false);
+const detailMemberTotal = ref(0);
+const detailTab = ref('people');
+
+const BASE_MEMBER_COLUMNS = [
+  { field: 'username', title: '账号', width: 180 },
+  { field: 'realName', title: '姓名', minWidth: 140 },
+  { field: 'accountStatus', title: '账号状态', width: 110 },
+  { field: 'joinTime', title: '加入时间', width: 170 },
+];
+const EDIT_MEMBER_COLUMNS = [
+  ...BASE_MEMBER_COLUMNS,
+  { title: '操作', width: 90, fixed: 'right' as const, slots: { default: 'action' } },
+];
+
+async function openDetail(row: any) {
+  detailMode.value = 'view';
+  memberGridApi.setGridOptions({
+    columns: [...BASE_MEMBER_COLUMNS],
+    height: 460,
+    pagerConfig: { enabled: true, pageSize: 10, pageSizes: [10, 20, 50] },
+  });
+  detailGroup.value = { ...row };
+  detailVisible.value = true;
+  await loadDetail();
+}
+
+
+const toList = (res: any) => {
+  const data = res?.data ?? res;
+  return Array.isArray(data) ? data : (data?.records ?? []);
+};
+
+async function openEditGroup(row: any) {
+  detailMode.value = 'edit';
+  memberGridApi.setGridOptions({
+    columns: [...EDIT_MEMBER_COLUMNS],
+    height: 460,
+    pagerConfig: { enabled: true, pageSize: 10, pageSizes: [10, 20, 50] },
+  });
+  detailGroup.value = { ...row };
+  editForm.value = { name: row.name, description: row.description };
+  detailVisible.value = true;
+  await loadDetail();
+}
+
+async function saveGroupBase() {
+  if (!editForm.value.name) {
+    ElMessage.warning('组名称不能为空');
+    return;
+  }
+  editSaving.value = true;
+  try {
+    const res: any = await updateGroupInfoApi({ ...detailGroup.value, ...editForm.value });
+    if (res && res.success === false) {
+      ElMessage.error(res.msg || '保存失败');
+      return;
+    }
+    ElMessage.success('保存成功');
+    detailGroup.value = { ...detailGroup.value, ...editForm.value };
+    refreshGrid();
+  } catch (e: any) {
+    ElMessage.error(`保存失败：${e?.message || e}`);
+  } finally { editSaving.value = false; }
+}
+
+async function loadDetail() {
+  detailLoading.value = true;
+  try {
+    const gid = detailGroup.value.id;
+    const [groupAgents, skillIds, kbaseIds, mcpIds, agentCatalog, skillPage, kbasePage, mcpPage] =
+      await Promise.all([
+        getGroupAgentInfoByGroupApi(gid).catch(() => null),
+        groupSkillsApi(gid).catch(() => []),
+        groupKbasesApi(gid).catch(() => []),
+        groupMcpsApi(gid).catch(() => []),
+        getGroupAgentInfoListApi({ status: 'published' }).catch(() => null),
+        getSkillPageApi(1, 999).catch(() => null),
+        kbPageApi({ pageNum: 1, pageSize: 999 }).catch(() => null),
+        getMcpPageApi(1, 999).catch(() => null),
+      ]);
+
+    const unwrap = (res: any) => {
+      const d = res?.data ?? res;
+      if (Array.isArray(d)) return d;
+      return d?.records ?? [];
+    };
+    const nameOf = (r: any) =>
+      r?.name || r?.agentName || r?.skillName || r?.kbaseName || r?.mcpName || r?.title || '';
+
+    // 智能体：组内行只有 agentId → 用 /api/agent/list 目录映射 name
+    const agentNames = new Map<string, string>(
+      unwrap(agentCatalog).map((r: any) => [String(r.id), nameOf(r)]),
+    );
+    const agentRows = unwrap(groupAgents).map((r: any) => ({
+      id: r.agentId ?? r.id,
+      name: agentNames.get(String(r.agentId ?? r.id)) || `智能体 ${r.agentId ?? r.id}`,
+    }));
+
+    // 技能/知识库/MCP：组内是 id 列表 → 用目录映射 name
+    const byIds = (ids: any[], catalog: any[]) => {
+      const m = new Map<string, any>(catalog.map((r: any) => [String(r.id), r]));
+      return ids.map((id) => {
+        const hit = m.get(String(id));
+        return { id, name: nameOf(hit) || `ID ${id}` };
+      });
+    };
+    const skillRows = byIds(unwrap(skillIds), unwrap(skillPage));
+    const kbaseRows = byIds(unwrap(kbaseIds), unwrap(kbasePage));
+    const mcpRows = byIds(unwrap(mcpIds), unwrap(mcpPage));
+
+    detailAgents.value = agentRows;
+    detailKbases.value = kbaseRows;
+    detailSkills.value = skillRows;
+    detailMcps.value = mcpRows;
+
+    agentGridApi.setGridOptions({
+      data: agentRows,
+      loading: false,
+      pagerConfig: { enabled: true, pageSize: 10, pageSizes: [10, 20, 50], total: agentRows.length },
+    });
+    kbaseGridApi.setGridOptions({
+      data: kbaseRows,
+      loading: false,
+      pagerConfig: { enabled: true, pageSize: 10, pageSizes: [10, 20, 50], total: kbaseRows.length },
+    });
+    skillGridApi.setGridOptions({
+      data: skillRows,
+      loading: false,
+      pagerConfig: { enabled: true, pageSize: 10, pageSizes: [10, 20, 50], total: skillRows.length },
+    });
+    mcpGridApi.setGridOptions({
+      data: mcpRows,
+      loading: false,
+      pagerConfig: { enabled: true, pageSize: 10, pageSizes: [10, 20, 50], total: mcpRows.length },
+    });
+
+    memberGridApi.query();
+  } finally { detailLoading.value = false; }
+}
+
+async function removeDetailMember(row: any) {
+  try {
+    await ElMessageBox.confirm(`确定把「${row.username || row.accountId}」移出本组？`, '移除成员', {
+      confirmButtonText: '确定移除', cancelButtonText: '取消', type: 'warning',
+    });
+  } catch { return; }
+  await deleteAccountGroupInfoByGroupAndAccountApi(detailGroup.value.id, row.accountId);
+  ElMessage.success('已移除');
+  await loadDetail();
+}
+
+/** T-05：详情抽屉内的分配入口 → 复用既有 assign-*-form 弹窗 */
+function onDetailAssign(domain: string, row: any) {
+  const data = { ...row };
+  if (domain === 'people') assignPeopleModalApi.setData(data).open();
+  else if (domain === 'agent') assignAgentModalApi.setData(data).open();
+  else if (domain === 'kbase') assignKbaseModalApi.setData(data).open();
+  else if (domain === 'skill') assignSkillModalApi.setData(data).open();
+  else if (domain === 'mcp') assignMcpModalApi.setData(data).open();
+}
+
 function getActions(row: any) {
   const isEnabled = row.status === 0;
+  // R-01/R-02（group-management-ui T-04）：行内只保留 3 个动作。
+  // 原「分配人员/智能体/知识库/技能/MCP」全部迁入「查看详情」抽屉，避免动作过多把状态切换挤出可视区。
   return [
     {
-      text: '分配人员',
-      icon: 'lucide:users',
-      onClick: () => assignPeopleModalApi.setData({ ...row }).open(),
-    },
-    {
-      text: '分配智能体',
-      icon: 'lucide:bot',
-      onClick: () => assignAgentModalApi.setData({ ...row }).open(),
-    },
-    {
-      text: '分配知识库',
-      icon: 'lucide:book-open',
-      onClick: () => assignKbaseModalApi.setData({ ...row }).open(),
-    },
-    {
-      text: '分配技能',
-      icon: 'lucide:wrench',
-      onClick: () => assignSkillModalApi.setData({ ...row }).open(),
-    },
-    {
-      text: '分配 MCP',
-      icon: 'lucide:plug',
-      onClick: () => assignMcpModalApi.setData({ ...row }).open(),
+      text: '查看详情',
+      icon: 'lucide:eye',
+      onClick: () => openDetail(row),
     },
     {
       text: '编辑',
       icon: 'lucide:edit',
-      onClick: () => onEdit(row),
+      onClick: () => openEditGroup(row),
     },
     {
       text: isEnabled ? '禁用' : '启用',
@@ -168,12 +415,76 @@ function getActions(row: any) {
 
 <template>
   <Page auto-content-height>
+    <ElDrawer v-model="detailVisible" :z-index="1000" :title="`${detailMode === 'edit' ? '编辑组' : '组详情'} - ${detailGroup.name || ''}`" size="62%">
+      <div class="space-y-4">
+        <div v-if="detailMode === 'edit'" class="mb-3">
+          <ElForm label-width="90px" size="small">
+            <ElFormItem label="组名称" required>
+              <ElInput v-model="editForm.name" placeholder="请输入组名称" />
+            </ElFormItem>
+            <ElFormItem label="描述">
+              <ElInput v-model="editForm.description" type="textarea" :rows="2" placeholder="请输入描述" />
+            </ElFormItem>
+            <ElFormItem>
+              <ElButton type="primary" :loading="editSaving" @click="saveGroupBase">保存基本信息</ElButton>
+            </ElFormItem>
+          </ElForm>
+        </div>
+        <ElDescriptions v-else :column="2" border size="small">
+          <ElDescriptionsItem label="组名称">{{ detailGroup.name }}</ElDescriptionsItem>
+          <ElDescriptionsItem label="组编码">{{ detailGroup.sn }}</ElDescriptionsItem>
+          <ElDescriptionsItem label="状态">
+            <ElTag :type="Number(detailGroup.status) === 0 ? 'success' : 'danger'">
+              {{ Number(detailGroup.status) === 0 ? '启用' : '禁用' }}
+            </ElTag>
+          </ElDescriptionsItem>
+          <ElDescriptionsItem label="描述">{{ detailGroup.description || '-' }}</ElDescriptionsItem>
+          <ElDescriptionsItem label="创建时间">{{ detailGroup.createTime }}</ElDescriptionsItem>
+          <ElDescriptionsItem label="更新时间">{{ detailGroup.updateTime }}</ElDescriptionsItem>
+        </ElDescriptions>
+        <div class="flex gap-2">
+          <ElTag>人员 {{ detailMemberTotal }}</ElTag>
+          <ElTag type="info">智能体 {{ detailAgents.length }}</ElTag>
+          <ElTag type="info">知识库 {{ detailKbases.length }}</ElTag>
+          <ElTag type="info">技能 {{ detailSkills.length }}</ElTag>
+          <ElTag type="info">MCP {{ detailMcps.length }}</ElTag>
+        </div>
+        <ElTabs v-model="detailTab" v-loading="detailLoading">
+          <ElTabPane label="人员" name="people">
+              <div v-if="detailMode === 'edit'" class="mb-2 flex h-8 items-center justify-end">
+                <ElButton size="small" type="primary" @click="onDetailAssign('people', detailGroup)">添加成员</ElButton>
+              </div>
+              <MemberGrid>
+                <template #action="{ row }">
+                  <ElButton link type="danger" @click="removeDetailMember(row)">移除</ElButton>
+                </template>
+              </MemberGrid>
+            </ElTabPane>
+          <ElTabPane label="智能体" name="agent">
+            <div v-if="detailMode === 'edit'" class="mb-2 flex h-8 items-center justify-end"><ElButton size="small" type="primary" @click="onDetailAssign('agent', detailGroup)">分配智能体</ElButton></div>
+            <AgentGrid />
+          </ElTabPane>
+          <ElTabPane label="知识库" name="kbase">
+            <div v-if="detailMode === 'edit'" class="mb-2 flex h-8 items-center justify-end"><ElButton size="small" type="primary" @click="onDetailAssign('kbase', detailGroup)">分配知识库</ElButton></div>
+            <KbaseGrid />
+          </ElTabPane>
+          <ElTabPane label="技能" name="skill">
+            <div v-if="detailMode === 'edit'" class="mb-2 flex h-8 items-center justify-end"><ElButton size="small" type="primary" @click="onDetailAssign('skill', detailGroup)">分配技能</ElButton></div>
+            <SkillGrid />
+          </ElTabPane>
+          <ElTabPane label="MCP" name="mcp">
+            <div v-if="detailMode === 'edit'" class="mb-2 flex h-8 items-center justify-end"><ElButton size="small" type="primary" @click="onDetailAssign('mcp', detailGroup)">分配 MCP</ElButton></div>
+            <McpGrid />
+          </ElTabPane>
+        </ElTabs>
+      </div>
+    </ElDrawer>
     <FormModal @success="refreshGrid" />
-    <AssignPeopleModal @success="refreshGrid" />
-    <AssignAgentModal @success="refreshGrid" />
-    <AssignKbaseModal @success="refreshGrid" />
-    <AssignSkillModal @success="refreshGrid" />
-    <AssignMcpModal @success="refreshGrid" />
+    <AssignPeopleModal @success="onAssignSuccess" />
+    <AssignAgentModal @success="onAssignSuccess" />
+    <AssignKbaseModal @success="onAssignSuccess" />
+    <AssignSkillModal @success="onAssignSuccess" />
+    <AssignMcpModal @success="onAssignSuccess" />
     <Grid table-title="组管理">
       <template #toolbar-tools>
         <ElButton type="primary" @click="onCreate">新增</ElButton>

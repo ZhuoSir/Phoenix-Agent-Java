@@ -26,6 +26,7 @@
     "#/*": "./src/*"
   },
   "dependencies": {
+    "vxe-table": "catalog:",
     "@element-plus/icons-vue": "catalog:",
     "@phoenix/chat-shared": "workspace:*",
     "@vben/access": "workspace:*",

@@ -1089,3 +1089,47 @@
 - **防再犯规则**：① 记 BUG/BL/L 之前先 `git symbolic-ref --short HEAD`，**不是版本分支就切回去再记**
   （或记录后立刻在账房补一次）；② 施工分支只允许提交"代码 + 该 spec 目录内文档（Spec footer）"；
   ③ 立项/续做前的第一件事仍是验分支，发现台账缺失先回收再继续。
+
+## L-109 删除语义（逻辑删 vs 物理删）必须回读验证，别凭 `del_flag` 猜测；恢复动作不能吞输出
+
+- **日期**：2026-10-24 ｜ **来源**：`group-management-ui` T-02 成员移除实测
+- **现象**：`DELETE /platform/account-group-info/group/{g}/account/{a}` 删掉关联后，我用同主键 INSERT 恢复，
+  命令 `>/dev/null 2>&1` 吞掉错误、误判为"该行是逻辑删，须 `UPDATE del_flag=0`"，结果两轮恢复都无效，
+  测试数据一度缺失（`total` 仍为 2）。
+- **原因**：① 未先确认删除实现（实际是物理 remove）；② 恢复命令全部重定向到 `/dev/null`，等于放弃验证；
+  ③ 未在每步后回读 `total`/行数。
+- **防再犯规则**：① 执行会改变数据的操作前，**先备份整行**（`row_to_json`）；② 恢复后用**查询回读**证明
+  （行数/total/关键字段），不允许只看命令退出码；③ 数据操作一律输出可见（禁 `>/dev/null`）；
+  ④ 判断"逻辑删/物理删"看实现或直接查行是否存在，别用字段名推测。
+
+## L-110 前端「构建通过」不等于「运行可用」——全局标识符缺失只在运行时炸
+
+- **日期**：2026-10-24 ｜ **来源**：`group-management-ui` T-06（BUG-208，用户现场白屏）
+- **现象**：给 `index.vue` 加了 `const detailRef = ref<any>()` 但漏了 `import { ref } from 'vue'`；
+  `vite build` 成功（4.8s，0 error）、chunk 正常产出、部署后首页 200，**但打开组管理页直接白屏**：
+  `ReferenceError: ref is not defined`。自动导入并不覆盖所有标识符。
+- **原因**：Vite/rolldown 只做模块图与类型无关的打包，**未定义全局变量不报错**；我以"构建通过"当作功能可用。
+- **防再犯规则**：① 前端改动除构建外，必须做一次**真实加载冒烟**（有浏览器插件则开页面看 console；
+  无浏览器时至少 `node --input-type=module -e` 走一遍纯逻辑，或用 `grep` 断言新增标识符**都有 import**）；
+  ② 新增 `ref/reactive/computed/onMounted` 等 vue 标识符时，**先检查该文件 import 列表**再写；
+  ③ 白屏类问题优先看 console 第一行错误，别猜。
+
+## L-111 前端"调用了不存在的导出/写错模板"不会报错，只会在点击时静默失效
+
+- **日期**：2026-10-24 ｜ **来源**：`group-management-ui`（保存无反应、分配后不刷新）
+- **现象**：① `updateGroupInfoApi` 未真正 import（`#/api` 不导出该函数）⇒ 点「保存基本信息」没有任何请求，
+  被 `finally` 吞掉无提示；② 弹窗绑定写成 `@success="refreshGrid"`（少括号）→ 字符串替换未命中，实际仍是
+  `@success="refreshGrid()"` ⇒ 抽屉表格永不刷新。
+- **防再犯规则**：① 任何"点了没反应"先看 Network 有无请求，再看 console；② 用字符串替换改模板/绑定，
+  **必须断言替换命中数**（L-104 同源）；③ 关键写操作（保存/分配）必须 `catch` 并 `ElMessage.error`，
+  禁止静默吞异常；④ 引入新 API 前先确认导出位置（`grep "export async function <name>"`）。
+
+## L-112 vben 的 vxe 网格：高度/分页/列/数据必须"整份替换"，逐项 setGridOptions 会互相覆盖
+
+- **日期**：2026-10-24 ｜ **来源**：`group-management-ui`（高度不一致、分页器消失、状态列不生效）
+- **现象**：① `setGridOptions({ columns })` 只传列 ⇒ 把 `height`、`pagerConfig` 一起冲掉（分页器消失）；
+  ② 列 `formatter`/`slots` 在 vben 包装下可能不生效（状态仍显示数字）⇒ 改为在**数据层**映射成中文；
+  ③ 同名 `pagerConfig` 写了两次，后者覆盖前者（`enabled:false` 覆盖 `true`）⇒ 授权页签一直没有分页。
+- **防再犯规则**：① `setGridOptions` 要么传全量（columns+height+pagerConfig+data），要么改用 `gridApi.query()`；
+  ② 展示型字段（状态/枚举）优先在**数据层转换**，别依赖 formatter/slots 透传；
+  ③ 配置对象里禁止出现重复键——写完后 `grep` 同名键计数校验。

@@ -48,7 +48,7 @@ const gridOptions: VxeGridProps = {
   height: 'auto',
   keepSource: true,
   border: false,
-  stripe: true,
+  stripe: false,
   showOverflow: true,
   proxyConfig: {
     ajax: {

@@ -76,3 +76,14 @@ export async function deleteAccountGroupInfoByGroupAndAccountApi(
     { responseReturn: 'body' },
   );
 }
+
+/** 组成员分页（group-management-ui T-01/R-04）：GET /platform/account-group-info/page-by-group */
+export async function getGroupMemberPageApi(
+  groupId: string,
+  page = 1,
+  size = 20,
+) {
+  return requestClient.get('/platform/account-group-info/page-by-group', {
+    params: { groupId, page, size },
+  });
+}
