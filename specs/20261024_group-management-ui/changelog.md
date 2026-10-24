@@ -54,3 +54,13 @@
 ① `GET /group/{g}` 200 ② `GET /page` 200 ③ `DELETE /group/{g}/account/{a}` 200（T-02 已验证真删+恢复）
 ④ `PUT /group-info/{g}/toggle-status`：status 0→1→0 复原 ✅ ⑤ `GET /account-info/getUnGroupPageByGroupId` 200
 ⑥ `index.vue` 仍 import 5 个 assign 表单 ✅
+
+## 2026-10-24 T-04 / T-05 完成（构建产物断言通过，目视待确认）
+
+- 已部署 9091：前端镜像重建 + nginx 重建（`group-info-CNGRGRKb.js`、`group-detail-drawer` chunk 存在，首页 200）
+- **构建产物断言（Python 精确匹配，避免 shell 转义误判）**：
+  - 组页 chunk 含：`查看详情` ✅ / `编辑` ✅ / `禁用` ✅ / `启用` ✅
+  - 组页 chunk **不含**：`分配人员` / `分配智能体` / `分配知识库` / `分配技能` / `分配 MCP` ✅（已迁出）
+- 详情抽屉实现：组信息含**创建/更新时间**、五类数量概览、**五个页签**（人员分页/智能体/知识库/技能/MCP，各带分配入口），
+  分配弹窗复用既有 `assign-*-form`（通过 `@assign` 事件由 index.vue 打开）
+- **未做（诚实标注）**：1440×900 下的**目视**断言（3 个按钮齐全、状态按钮不被截断、抽屉可打开）——需人工确认

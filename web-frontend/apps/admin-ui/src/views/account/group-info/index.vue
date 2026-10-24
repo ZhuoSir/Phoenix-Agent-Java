@@ -121,6 +121,16 @@ function onToggleStatus(row: any) {
     .catch(() => {});
 }
 
+/** T-05：详情抽屉内的分配入口 → 复用既有 assign-*-form 弹窗 */
+function onDetailAssign(domain: string, row: any) {
+  const data = { ...row };
+  if (domain === 'people') assignPeopleModalApi.setData(data).open();
+  else if (domain === 'agent') assignAgentModalApi.setData(data).open();
+  else if (domain === 'kbase') assignKbaseModalApi.setData(data).open();
+  else if (domain === 'skill') assignSkillModalApi.setData(data).open();
+  else if (domain === 'mcp') assignMcpModalApi.setData(data).open();
+}
+
 function getActions(row: any) {
   const isEnabled = row.status === 0;
   // R-01/R-02（group-management-ui T-04）：行内只保留 3 个动作。
