@@ -101,14 +101,14 @@ const [Grid, gridApi] = useVbenVxeGrid({ formOptions, gridOptions });
 const [MemberGrid, memberGridApi] = useVbenVxeGrid({
   gridOptions: {
     columns: [
-      { field: 'username', title: '账号', width: 200 },
-      { field: 'realName', title: '姓名', width: 140 },
+      { field: 'username', title: '账号', width: 180 },
+      { field: 'realName', title: '姓名', minWidth: 140 },
       { field: 'accountStatus', title: '账号状态', width: 110 },
       { field: 'joinTime', title: '加入时间', width: 170 },
-      { title: '操作', width: 90, slots: { default: 'action' } },
+      { title: '操作', width: 90, fixed: 'right', slots: { default: 'action' } },
     ],
     loading: false,
-    maxHeight: 360,
+    height: 'auto',
     border: false,
     stripe: false,
     emptyText: '暂无数据',
@@ -138,9 +138,10 @@ const [MemberGrid, memberGridApi] = useVbenVxeGrid({
 function makeGrantGrid() {
   return useVbenVxeGrid({
     gridOptions: {
-      columns: [{ field: 'name', title: '名称' }],
+      columns: [{ field: 'name', title: '名称', minWidth: 200 }],
       loading: false,
-      maxHeight: 300,
+      height: 'auto',
+      pagerConfig: { enabled: true, pageSize: 10, pageSizes: [10, 20, 50] },
       border: false,
       stripe: false,
       emptyText: '暂无数据',
