@@ -30,6 +30,9 @@ public class GroupMemberVO implements Serializable {
 	/** 账号状态（account_info.status，沿用账号域语义） */
 	private String accountStatus;
 
+	/** 账号是否仍存在（false = 悬挂关联：账号已删除） */
+	private Boolean accountExists;
+
 	/** 加入时间（关联记录 create_time） */
 	@JsonFormat(timezone = "GMT+8", pattern = "yyyy-MM-dd HH:mm:ss")
 	private Date joinTime;

@@ -104,12 +104,14 @@ public class AccountGroupInfoServiceImpl extends ServiceImpl<AccountGroupInfoMap
 			vo.setJoinTime(rel.getCreateTime());
 			AccountInfo acc = accountMap.get(rel.getAccountId());
 			if (acc != null) {
+				vo.setAccountExists(true);
 				vo.setUsername(acc.getUsername());
 				vo.setRealName(acc.getRealName());
 				vo.setAccountStatus(acc.getStatus());
 			}
 			else {
-				// 关联存在但账号已不存在：保留账号 id，避免整页 500
+				// BUG-207：悬挂关联（账号已删除）——标记出来，前端据此提示"账号已删除"，避免整页 500
+				vo.setAccountExists(false);
 				vo.setUsername(rel.getAccountName());
 			}
 			return vo;

@@ -140,6 +140,7 @@ const detailKbases = ref<any[]>([]);
 const detailSkills = ref<any[]>([]);
 const detailMcps = ref<any[]>([]);
 const detailLoading = ref(false);
+const detailTab = ref('people');
 
 async function openDetail(row: any) {
   detailGroup.value = { ...row };
@@ -250,13 +251,18 @@ function getActions(row: any) {
           <ElTag type="info">技能 {{ detailSkills.length }}</ElTag>
           <ElTag type="info">MCP {{ detailMcps.length }}</ElTag>
         </div>
-        <ElTabs v-loading="detailLoading">
+        <ElTabs v-model="detailTab" v-loading="detailLoading">
           <ElTabPane label="人员" name="people">
             <div class="mb-2 flex justify-end">
               <ElButton size="small" type="primary" @click="onDetailAssign('people', detailGroup)">添加成员</ElButton>
             </div>
             <ElTable :data="detailMembers" size="small" border>
-              <ElTableColumn prop="username" label="账号" width="150" />
+              <ElTableColumn prop="username" label="账号" width="180">
+                <template #default="{ row }">
+                  <span>{{ row.username }}</span>
+                  <ElTag v-if="row.accountExists === false" size="small" type="danger" class="ml-1">账号已删除</ElTag>
+                </template>
+              </ElTableColumn>
               <ElTableColumn prop="realName" label="姓名" width="130" />
               <ElTableColumn prop="accountStatus" label="账号状态" width="100" />
               <ElTableColumn prop="joinTime" label="加入时间" width="160" />
