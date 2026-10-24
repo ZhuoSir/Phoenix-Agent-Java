@@ -4,6 +4,7 @@ import com.alibaba.cloud.ai.graph.NodeOutput;
 import com.alibaba.cloud.ai.graph.OverAllState;
 import com.alibaba.cloud.ai.graph.StateGraph;
 import com.alibaba.cloud.ai.graph.streaming.StreamingOutput;
+import com.phoenix.agent.harness.support.TodoStateRepair;
 import com.phoenix.agent.harness.agent.HarnessStaticLoader;
 import com.phoenix.agent.harness.factory.HarnessAgentRegistry;
 import com.phoenix.data.exception.InvalidInputException;
@@ -136,8 +137,13 @@ public class HarnessChatServiceImpl implements HarnessChatService {
             .withMcp(harnessAgent, request.getAgentId(), request.getSessionId(),
                 effectiveMcp(request.getChannel(), request.getUserId(), request.getAgentId()))
             .flatMapMany(agent -> attachmentAssembler.prepare(request.getAttachmentIds(), request.getUserId())
-                .flatMapMany(ctx -> agent
-                    .streamEvents(buildUserMessage(request, ctx), buildRuntimeContext(request, injection.block())))
+                .flatMapMany(ctx -> {
+                    // BUG-205：从**运行时上下文**取 AgentState（agent.getAgentState() 在此路径为 null），
+                    // 轮次开始前把 todo 规范化为「最多一个 in_progress」，避免上一轮被强行终止留下的脏状态绊住模型
+                    io.agentscope.core.agent.RuntimeContext rt = buildRuntimeContext(request, injection.block());
+                    TodoStateRepair.normalize(rt, agent);
+                    return agent.streamEvents(buildUserMessage(request, ctx), rt);
+                })
                 .map(event -> toNodeOutput(event, sessionId, textDeltaSeen, effMaxIters)));
         // BL-19：轮末扫 workspace 产物。END 帧从 body 中剥离、在扫描事件之后统一补发——
         // 否则 agentFiles 落在 end=true 之后，前端（按 end 收尾）收不到，还会多渲染一个空消息框。
