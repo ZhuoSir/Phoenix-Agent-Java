@@ -80,7 +80,7 @@ public class HarnessTurnManager {
     private long silenceHeartbeatSeconds;
 
     /** T-09：模型调用**首帧超时**（秒）——MODEL 阶段自调用发起起算；0=关闭 */
-    @Value("${phoenix.agent.model-first-frame-timeout-seconds:180}")
+    @Value("${phoenix.agent.model-first-frame-timeout-seconds:600}")
     private long modelFirstFrameTimeoutSeconds;
 
     @Value("${phoenix.agent.turn-flush-seconds:5}")
@@ -437,6 +437,12 @@ public class HarnessTurnManager {
         }
 
         private void onFrame(Map<String, Object> frame) {
+            // BUG-203（T-07）：**终态守卫**。finish() 之后（超时/取消/正常结束）上游在途帧仍可能到达
+            // （sourceSub.dispose() 只是 Reactor 取消，底层 HTTP 未必立刻取消），
+            // 旧实现会继续 append 正文并增量落库 ⇒ 用户看到"已超时/已结束"之后又冒出内容。
+            if (sinkDone.get()) {
+                return;
+            }
             try {
                 lastActivityAt = System.currentTimeMillis();
                 framesSeen.incrementAndGet();
