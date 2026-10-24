@@ -15,7 +15,7 @@
     断言代码中不再有硬编码 24000（`grep` 计数 0，常量改为 DEFAULT_ 前缀仅供默认值引用）。
   验收标准: 6 项均可配、生效值可在日志核对；无残留硬编码。
 
-- [ ] T-02 `ChatDocumentExtractor` 返回全文 + 安全上限（2M）
+- [x] T-02 `ChatDocumentExtractor` 返回全文 + 安全上限（2M）
   关联: R-03, R-05
   依赖: T-01
   验证方式: 用 3 万字 docx 抽取，断言 `text.length=30000` 且 `truncated=false`；

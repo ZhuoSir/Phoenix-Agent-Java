@@ -136,8 +136,11 @@ public class ChatAttachmentAssembler {
 								+ "（其内容未参与本次回答）", null));
 						continue;
 					}
-					String notice = er.isTruncated() ? ("附件《" + att.getFileName() + "》内容较长，已按顺序截断至前 "
-							+ documentExtractor.getMaxExtractChars() + " 字符，超出部分未参与理解") : null;
+					String notice = er.isTruncated()
+							? ("附件《" + att.getFileName() + "》超过单文档安全上限（"
+									+ documentExtractor.getSafeMaxChars() + " 字符），仅处理前 "
+									+ documentExtractor.getSafeMaxChars() + " 字符")
+							: null;
 					out.add(new Loaded(att, er.getText(), notice, null));
 				}
 			}

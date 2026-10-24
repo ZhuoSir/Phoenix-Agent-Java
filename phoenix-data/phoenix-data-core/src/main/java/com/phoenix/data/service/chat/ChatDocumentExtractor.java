@@ -96,6 +96,20 @@ public class ChatDocumentExtractor {
 
 	private final Parser parser = new AutoDetectParser();
 
+	/** Tika 的写上限异常可能在异常链里（SAXException/TikaException 包装） */
+	private static boolean isWriteLimit(Throwable e) {
+		for (Throwable t = e; t != null; t = t.getCause()) {
+			if (t instanceof WriteLimitReachedException) {
+				return true;
+			}
+			String msg = t.getMessage();
+			if (msg != null && msg.contains("more than")) {
+				return true;
+			}
+		}
+		return false;
+	}
+
 	/**
 	 * 抽取文档文本。
 	 * @param content 文件字节
@@ -103,14 +117,19 @@ public class ChatDocumentExtractor {
 	 * @param fileName 原始文件名（仅用于日志）
 	 */
 	public ExtractResult extract(byte[] content, String mime, String fileName) {
-		// 多要 1 字符用于区分"刚好等于上限"与"被上限截断"
-		BodyContentHandler handler = new BodyContentHandler(maxExtractChars + 1);
+		// T-02：抽取阶段**不再按 24000 截断**（24000 只是"触发分批"的阈值，见 plan §六）；
+		// 这里只受**安全上限**保护（默认 2,000,000 字符，防 OOM）。多要 1 字符用于区分边界。
+		// 用**不设限**的 handler，抽取后再按安全上限截断：
+		// Tika 触达写上限时会抛 TIKA-237（异常链里丢掉 WriteLimitReached、且 handler 内容不可靠），
+		// 导致"超长文档被误判为解析失败"。改为不设限 + 事后截断，行为确定。
+		BodyContentHandler handler = new BodyContentHandler(-1);
 		Metadata metadata = new Metadata();
 		metadata.set(Metadata.CONTENT_TYPE, mime);
 		if (fileName != null) {
 			metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, fileName);
 		}
 		boolean truncated = false;
+		Throwable parseError = null;
 		try (InputStream in = new ByteArrayInputStream(content)) {
 			parser.parse(in, handler, metadata, new ParseContext());
 		}
@@ -123,18 +142,33 @@ public class ChatDocumentExtractor {
 			truncated = true;
 		}
 		catch (TikaException | SAXException | java.io.IOException e) {
-			log.warn("文档解析失败: name={}, reason={}", fileName, e.getMessage());
-			return ExtractResult.fail("文档无法解析（文件可能已损坏或格式不完整）");
+			// T-02：Tika 触达写上限时抛的是 TIKA-237（Illegal SAXException），异常链里已丢失 WriteLimitReached
+			// ⇒ 不能只看异常类型，改为**看已抽取到的文本长度**：达到安全上限即视为截断成功，否则才判失败。
+			parseError = e;
 		}
 		String text = handler.toString();
+		if (parseError != null) {
+			boolean hitLimit = (text != null && text.length() >= safeMaxChars) || isWriteLimit(parseError);
+			if (hitLimit) {
+				truncated = true;
+				log.warn("[attachment-batch] 超安全上限截断: name={}, extracted={}, safeMaxChars={}, reason={}", fileName,
+						text == null ? 0 : text.length(), safeMaxChars, parseError.getMessage());
+			}
+			else {
+				log.warn("文档解析失败: name={}, reason={}", fileName, parseError.getMessage());
+				return ExtractResult.fail("文档无法解析（文件可能已损坏或格式不完整）");
+			}
+		}
 		if (text == null || text.isBlank()) {
 			log.warn("文档无可提取文本（疑似扫描件/图片型）: name={}, mime={}", fileName, mime);
 			return ExtractResult.fail("文档无可提取的文本层（疑似扫描件/图片型 PDF）；本期不自动转图片理解");
 		}
 		String cleaned = text.replace("\u0000", "").trim();
-		if (cleaned.length() > maxExtractChars) {
+		if (cleaned.length() > safeMaxChars) {
 			truncated = true;
-			cleaned = cleaned.substring(0, maxExtractChars);
+			log.warn("[attachment-batch] 超安全上限截断: name={}, chars={}, safeMaxChars={}", fileName, cleaned.length(),
+					safeMaxChars);
+			cleaned = cleaned.substring(0, safeMaxChars);
 		}
 		return ExtractResult.ok(cleaned, truncated);
 	}

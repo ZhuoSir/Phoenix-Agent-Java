@@ -38,3 +38,16 @@
 - 坑：**Spring env 名规则是"短横线去掉"** —— `...attachment-chunk-size` → `PHOENIX_AGENT_CHAT_ATTACHMENTCHUNKSIZE`（写成 `_CHUNK_SIZE` 不生效，首次验证就踩到）
 - 按用户要求改为**配置文件驱动**：默认值落 `application.yml`（`phoenix.agent.chat.attachment-*`），
   实测不传任何 env 时日志显示 6 项默认值 ✅；容器内 ATTACHMENT env 条数 = 0 ✅（env 仍可覆盖，优先级更高）
+
+## 2026-10-24 T-02 完成（extractor 返回全文 + 2M 安全上限，真栈验证）
+
+- `ChatDocumentExtractor`：抽取阶段**不再按 24000 截断**；仅受 `safeMaxChars`（默认 2,000,000）保护；
+  handler 改为**不设限**并事后截断（Tika 触达写上限时抛 TIKA-237、异常链丢失 WriteLimitReached，会误判为解析失败）
+- 两处文案改为安全上限语义（装配器 / 上传服务）
+- **实测**：
+  - 3 万字 docx → `extracted_chars=30029`、`status=ACTIVE`、`notice=null`（证明不再 24000 截断）✅
+  - 210 万字 docx（**随机文本**，避免 Tika zip-bomb 误判）→ `extracted_chars=2000000`、
+    `notice=文档超过单文档安全上限（2000000 字符），仅处理前 2000000 字符` ✅；
+    日志 `[attachment-batch] 超安全上限截断: name=…, chars=2102399, safeMaxChars=2000000` ✅
+- 坑 ①：Tika 的写上限异常是 `TIKA-237: Illegal SAXException`，不能靠异常类型判断 ⇒ 改为不设限 + 事后截断
+- 坑 ②：用大段重复字符造的大 docx 会被 Tika **zip-bomb 保护**判失败（压缩比过高）⇒ 测试数据要用**随机内容**
