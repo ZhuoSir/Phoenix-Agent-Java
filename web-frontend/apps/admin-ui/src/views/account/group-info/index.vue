@@ -16,8 +16,8 @@ import type { VxeGridProps } from '#/adapter/vxe-table';
 import type { VbenFormProps } from '@vben/common-ui';
 
 import {
-  ElButton, ElDescriptions, ElDescriptionsItem, ElDrawer, ElMessage, ElMessageBox,
-  ElTabPane, ElTable, ElTableColumn, ElTabs, ElTag,
+  ElButton, ElDescriptions, ElDescriptionsItem, ElDrawer, ElForm, ElFormItem, ElInput,
+  ElMessage, ElMessageBox, ElTabPane, ElTable, ElTableColumn, ElTabs, ElTag,
 } from 'element-plus';
 
 import { getGroupInfoPageApi, toggleStatusGroupInfoApi } from '#/api';
@@ -195,6 +195,9 @@ function onToggleStatus(row: any) {
 
 // ===== 组详情（内联抽屉，T-05/T-06：不依赖任何跨组件 API）=====
 const detailVisible = ref(false);
+const detailMode = ref<'edit' | 'view'>('view');
+const editForm = ref<any>({ name: '', description: '' });
+const editSaving = ref(false);
 const detailGroup = ref<any>({});
 const detailAgents = ref<any[]>([]);
 const detailKbases = ref<any[]>([]);
@@ -204,7 +207,20 @@ const detailLoading = ref(false);
 const detailMemberTotal = ref(0);
 const detailTab = ref('people');
 
+const BASE_MEMBER_COLUMNS = [
+  { field: 'username', title: '账号', width: 180 },
+  { field: 'realName', title: '姓名', minWidth: 140 },
+  { field: 'accountStatus', title: '账号状态', width: 110 },
+  { field: 'joinTime', title: '加入时间', width: 170 },
+];
+const EDIT_MEMBER_COLUMNS = [
+  ...BASE_MEMBER_COLUMNS,
+  { title: '操作', width: 90, fixed: 'right' as const, slots: { default: 'action' } },
+];
+
 async function openDetail(row: any) {
+  detailMode.value = 'view';
+  memberGridApi.setGridOptions({ columns: [...BASE_MEMBER_COLUMNS] });
   detailGroup.value = { ...row };
   detailVisible.value = true;
   await loadDetail();
@@ -215,6 +231,29 @@ const toList = (res: any) => {
   const data = res?.data ?? res;
   return Array.isArray(data) ? data : (data?.records ?? []);
 };
+
+async function openEditGroup(row: any) {
+  detailMode.value = 'edit';
+  memberGridApi.setGridOptions({ columns: [...EDIT_MEMBER_COLUMNS] });
+  detailGroup.value = { ...row };
+  editForm.value = { name: row.name, description: row.description };
+  detailVisible.value = true;
+  await loadDetail();
+}
+
+async function saveGroupBase() {
+  if (!editForm.value.name) {
+    ElMessage.warning('组名称不能为空');
+    return;
+  }
+  editSaving.value = true;
+  try {
+    await updateGroupInfoApi({ ...detailGroup.value, ...editForm.value });
+    ElMessage.success('保存成功');
+    detailGroup.value = { ...detailGroup.value, ...editForm.value };
+    refreshGrid();
+  } finally { editSaving.value = false; }
+}
 
 async function loadDetail() {
   detailLoading.value = true;
@@ -325,7 +364,7 @@ function getActions(row: any) {
     {
       text: '编辑',
       icon: 'lucide:edit',
-      onClick: () => onEdit(row),
+      onClick: () => openEditGroup(row),
     },
     {
       text: isEnabled ? '禁用' : '启用',
@@ -344,9 +383,22 @@ function getActions(row: any) {
 
 <template>
   <Page auto-content-height>
-    <ElDrawer v-model="detailVisible" :title="`组详情 - ${detailGroup.name || ''}`" size="62%">
+    <ElDrawer v-model="detailVisible" :title="`${detailMode === 'edit' ? '编辑组' : '组详情'} - ${detailGroup.name || ''}`" size="62%">
       <div class="space-y-4">
-        <ElDescriptions :column="2" border size="small">
+        <div v-if="detailMode === 'edit'" class="mb-3">
+          <ElForm label-width="90px" size="small">
+            <ElFormItem label="组名称" required>
+              <ElInput v-model="editForm.name" placeholder="请输入组名称" />
+            </ElFormItem>
+            <ElFormItem label="描述">
+              <ElInput v-model="editForm.description" type="textarea" :rows="2" placeholder="请输入描述" />
+            </ElFormItem>
+            <ElFormItem>
+              <ElButton type="primary" :loading="editSaving" @click="saveGroupBase">保存基本信息</ElButton>
+            </ElFormItem>
+          </ElForm>
+        </div>
+        <ElDescriptions v-else :column="2" border size="small">
           <ElDescriptionsItem label="组名称">{{ detailGroup.name }}</ElDescriptionsItem>
           <ElDescriptionsItem label="组编码">{{ detailGroup.sn }}</ElDescriptionsItem>
           <ElDescriptionsItem label="状态">
@@ -368,7 +420,7 @@ function getActions(row: any) {
         <ElTabs v-model="detailTab" v-loading="detailLoading">
           <ElTabPane label="人员" name="people">
             <div class="mb-2 flex justify-end">
-              <ElButton size="small" type="primary" @click="onDetailAssign('people', detailGroup)">添加成员</ElButton>
+              <ElButton v-if="detailMode === 'edit'" size="small" type="primary" @click="onDetailAssign('people', detailGroup)">添加成员</ElButton>
             </div>
             <div>
               <MemberGrid>
@@ -380,19 +432,19 @@ function getActions(row: any) {
 
           </ElTabPane>
           <ElTabPane label="智能体" name="agent">
-            <div class="mb-2 flex justify-end"><ElButton size="small" type="primary" @click="onDetailAssign('agent', detailGroup)">分配智能体</ElButton></div>
+            <div v-if="detailMode === 'edit'" class="mb-2 flex justify-end"><ElButton size="small" type="primary" @click="onDetailAssign('agent', detailGroup)">分配智能体</ElButton></div>
             <AgentGrid />
           </ElTabPane>
           <ElTabPane label="知识库" name="kbase">
-            <div class="mb-2 flex justify-end"><ElButton size="small" type="primary" @click="onDetailAssign('kbase', detailGroup)">分配知识库</ElButton></div>
+            <div v-if="detailMode === 'edit'" class="mb-2 flex justify-end"><ElButton size="small" type="primary" @click="onDetailAssign('kbase', detailGroup)">分配知识库</ElButton></div>
             <KbaseGrid />
           </ElTabPane>
           <ElTabPane label="技能" name="skill">
-            <div class="mb-2 flex justify-end"><ElButton size="small" type="primary" @click="onDetailAssign('skill', detailGroup)">分配技能</ElButton></div>
+            <div v-if="detailMode === 'edit'" class="mb-2 flex justify-end"><ElButton size="small" type="primary" @click="onDetailAssign('skill', detailGroup)">分配技能</ElButton></div>
             <SkillGrid />
           </ElTabPane>
           <ElTabPane label="MCP" name="mcp">
-            <div class="mb-2 flex justify-end"><ElButton size="small" type="primary" @click="onDetailAssign('mcp', detailGroup)">分配 MCP</ElButton></div>
+            <div v-if="detailMode === 'edit'" class="mb-2 flex justify-end"><ElButton size="small" type="primary" @click="onDetailAssign('mcp', detailGroup)">分配 MCP</ElButton></div>
             <McpGrid />
           </ElTabPane>
         </ElTabs>
