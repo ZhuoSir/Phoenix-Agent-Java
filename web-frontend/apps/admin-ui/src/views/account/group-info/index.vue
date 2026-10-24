@@ -103,7 +103,12 @@ const [MemberGrid, memberGridApi] = useVbenVxeGrid({
     columns: [
       { field: 'username', title: '账号', width: 180 },
       { field: 'realName', title: '姓名', minWidth: 140 },
-      { field: 'accountStatus', title: '账号状态', width: 110 },
+      {
+        field: 'accountStatus',
+        title: '账号状态',
+        width: 110,
+        formatter: ({ cellValue }: any) => (String(cellValue) === '1' ? '启用' : '禁用'),
+      },
       { field: 'joinTime', title: '加入时间', width: 170 },
       { title: '操作', width: 90, fixed: 'right', slots: { default: 'action' } },
     ],
@@ -126,10 +131,13 @@ const [MemberGrid, memberGridApi] = useVbenVxeGrid({
           const d = res?.data ?? res;
           const total = d?.totalRow ?? 0;
           detailMemberTotal.value = total;
-          const rows = d?.records ?? [];
+          const rows = (d?.records ?? []).map((r: any) => ({
+            ...r,
+            accountStatus: String(r.accountStatus) === '1' ? '启用' : '禁用',
+          }));
           // vxe proxy 需要 result + page.total 才能正确显示"共 N 条"
           // 兜底覆盖 vben/vxe 可能读取的多种字段名，确保分页器显示真实总数
-          return { records: d?.records ?? [], total, totalRow: total, rowCount: total, page: { total, totalRow: total } };
+          return { records: rows, total, totalRow: total, rowCount: total, page: { total, totalRow: total } };
         },
       },
     },
@@ -165,6 +173,15 @@ function onCreate() {
 
 function onEdit(row: any) {
   formModalApi.setData({ ...row }).open();
+}
+
+/** 分配类弹窗成功后：刷新列表 + 抽屉内数据（人员表重新查询） */
+function onAssignSuccess() {
+  refreshGrid();
+  if (detailVisible.value) {
+    loadDetail();
+    memberGridApi.query();
+  }
 }
 
 function refreshGrid() {
@@ -220,7 +237,11 @@ const EDIT_MEMBER_COLUMNS = [
 
 async function openDetail(row: any) {
   detailMode.value = 'view';
-  memberGridApi.setGridOptions({ columns: [...BASE_MEMBER_COLUMNS] });
+  memberGridApi.setGridOptions({
+    columns: [...BASE_MEMBER_COLUMNS],
+    height: 460,
+    pagerConfig: { enabled: true, pageSize: 10, pageSizes: [10, 20, 50] },
+  });
   detailGroup.value = { ...row };
   detailVisible.value = true;
   await loadDetail();
@@ -234,7 +255,11 @@ const toList = (res: any) => {
 
 async function openEditGroup(row: any) {
   detailMode.value = 'edit';
-  memberGridApi.setGridOptions({ columns: [...EDIT_MEMBER_COLUMNS] });
+  memberGridApi.setGridOptions({
+    columns: [...EDIT_MEMBER_COLUMNS],
+    height: 460,
+    pagerConfig: { enabled: true, pageSize: 10, pageSizes: [10, 20, 50] },
+  });
   detailGroup.value = { ...row };
   editForm.value = { name: row.name, description: row.description };
   detailVisible.value = true;
@@ -423,29 +448,31 @@ function getActions(row: any) {
               <ElButton v-if="detailMode === 'edit'" size="small" type="primary" @click="onDetailAssign('people', detailGroup)">添加成员</ElButton>
             </div>
             <div>
+              <div style="height: 460px">
               <MemberGrid>
                 <template #action="{ row }">
                   <ElButton link type="danger" @click="removeDetailMember(row)">移除</ElButton>
                 </template>
               </MemberGrid>
+              </div>
             </div>
 
           </ElTabPane>
           <ElTabPane label="智能体" name="agent">
-            <div v-if="detailMode === 'edit'" class="mb-2 flex justify-end"><ElButton size="small" type="primary" @click="onDetailAssign('agent', detailGroup)">分配智能体</ElButton></div>
-            <AgentGrid />
+            <div v-if="detailMode === 'edit'" class="mb-2 flex h-8 items-center justify-end"><ElButton size="small" type="primary" @click="onDetailAssign('agent', detailGroup)">分配智能体</ElButton></div>
+            <div style="height: 460px"><AgentGrid /></div>
           </ElTabPane>
           <ElTabPane label="知识库" name="kbase">
-            <div v-if="detailMode === 'edit'" class="mb-2 flex justify-end"><ElButton size="small" type="primary" @click="onDetailAssign('kbase', detailGroup)">分配知识库</ElButton></div>
-            <KbaseGrid />
+            <div v-if="detailMode === 'edit'" class="mb-2 flex h-8 items-center justify-end"><ElButton size="small" type="primary" @click="onDetailAssign('kbase', detailGroup)">分配知识库</ElButton></div>
+            <div style="height: 460px"><KbaseGrid /></div>
           </ElTabPane>
           <ElTabPane label="技能" name="skill">
-            <div v-if="detailMode === 'edit'" class="mb-2 flex justify-end"><ElButton size="small" type="primary" @click="onDetailAssign('skill', detailGroup)">分配技能</ElButton></div>
-            <SkillGrid />
+            <div v-if="detailMode === 'edit'" class="mb-2 flex h-8 items-center justify-end"><ElButton size="small" type="primary" @click="onDetailAssign('skill', detailGroup)">分配技能</ElButton></div>
+            <div style="height: 460px"><SkillGrid /></div>
           </ElTabPane>
           <ElTabPane label="MCP" name="mcp">
-            <div v-if="detailMode === 'edit'" class="mb-2 flex justify-end"><ElButton size="small" type="primary" @click="onDetailAssign('mcp', detailGroup)">分配 MCP</ElButton></div>
-            <McpGrid />
+            <div v-if="detailMode === 'edit'" class="mb-2 flex h-8 items-center justify-end"><ElButton size="small" type="primary" @click="onDetailAssign('mcp', detailGroup)">分配 MCP</ElButton></div>
+            <div style="height: 460px"><McpGrid /></div>
           </ElTabPane>
         </ElTabs>
       </div>
