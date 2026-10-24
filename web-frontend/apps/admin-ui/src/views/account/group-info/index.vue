@@ -1,4 +1,5 @@
 <script lang="ts" setup>
+import { useVbenDrawer } from '@vben/common-ui';
 import { Page, useVbenModal } from '@vben/common-ui';
 
 import { useVbenVxeGrid, VbenTableAction } from '#/adapter/vxe-table';
@@ -9,6 +10,7 @@ import { ElButton, ElMessage, ElMessageBox, ElTag } from 'element-plus';
 
 import { getGroupInfoPageApi, toggleStatusGroupInfoApi } from '#/api';
 
+import GroupDetailDrawer from './group-detail-drawer.vue';
 import AssignAgentForm from './assign-agent-form.vue';
 import AssignKbaseForm from './assign-kbase-form.vue';
 import AssignMcpForm from './assign-mcp-form.vue';
@@ -83,6 +85,7 @@ const gridOptions: VxeGridProps = {
 };
 
 const [Grid, gridApi] = useVbenVxeGrid({ formOptions, gridOptions });
+const [, detailDrawerApi] = useVbenDrawer({ connectedComponent: true });
 
 function onCreate() {
   formModalApi.setData({}).open();
@@ -120,31 +123,13 @@ function onToggleStatus(row: any) {
 
 function getActions(row: any) {
   const isEnabled = row.status === 0;
+  // R-01/R-02（group-management-ui T-04）：行内只保留 3 个动作。
+  // 原「分配人员/智能体/知识库/技能/MCP」全部迁入「查看详情」抽屉，避免动作过多把状态切换挤出可视区。
   return [
     {
-      text: '分配人员',
-      icon: 'lucide:users',
-      onClick: () => assignPeopleModalApi.setData({ ...row }).open(),
-    },
-    {
-      text: '分配智能体',
-      icon: 'lucide:bot',
-      onClick: () => assignAgentModalApi.setData({ ...row }).open(),
-    },
-    {
-      text: '分配知识库',
-      icon: 'lucide:book-open',
-      onClick: () => assignKbaseModalApi.setData({ ...row }).open(),
-    },
-    {
-      text: '分配技能',
-      icon: 'lucide:wrench',
-      onClick: () => assignSkillModalApi.setData({ ...row }).open(),
-    },
-    {
-      text: '分配 MCP',
-      icon: 'lucide:plug',
-      onClick: () => assignMcpModalApi.setData({ ...row }).open(),
+      text: '查看详情',
+      icon: 'lucide:eye',
+      onClick: () => detailDrawerApi.setData({ ...row }).open(),
     },
     {
       text: '编辑',
