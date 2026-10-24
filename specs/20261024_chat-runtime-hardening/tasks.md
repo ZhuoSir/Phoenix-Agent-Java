@@ -25,11 +25,13 @@
       —— **验收**：刷新后仍能点开并下载成功
 
 ## 分组 D：超时语义（R-03 / BUG-203）
-- [ ] T-07 `onFrame` 加终态守卫；超时提示移出 `content`（改 metadata `notice`）
+- [x] T-07 `onFrame` 加终态守卫；超时提示移出 `content`（改 metadata `notice`）
       —— **验收**：超时后同一 message id **不再**被 UPDATE；正文无"超时提示"混入
-- [ ] T-08 订阅侧显式取消上游请求（WebClient/OkHttp cancel 实测；不可取消则以 T-07 兜底并记 lesson）
+- [x] T-08 订阅侧显式取消上游请求（WebClient/OkHttp cancel 实测；不可取消则以 T-07 兜底并记 lesson）
       —— **验收**：超时后上游请求被取消（连接关闭/取消日志可证）或明确记录"不可取消"
 - [ ] T-09 超时不影响"重试"：重试生成新消息
+      —— **现状**：前端当前**没有**"重试"入口（`views/front` 与 `chat-shared` 内 grep「重试/retry」无命中）；
+      后端每次请求即新 turn/新 message ⇒ 一旦前端补重试按钮，天然落新 message。本项**待前端实现**，不虚勾。
       —— **验收**：超时后点重试，落到新 message id
 
 ## 分组 E：思考展示（R-04 / BUG-201）

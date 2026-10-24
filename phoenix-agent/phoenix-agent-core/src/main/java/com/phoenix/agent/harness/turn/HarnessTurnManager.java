@@ -241,6 +241,10 @@ public class HarnessTurnManager {
             sb.append(",\"thinking\":\"").append(escape(jsonClip(th))).append('"');
             sb.append(",\"thinkingMs\":").append(turn.thinkingMs.get());
         }
+        String nt = turn.noticeText;
+        if (nt != null && !nt.isEmpty()) {
+            sb.append(",\"notice\":\"").append(escape(jsonClip(nt))).append('"');
+        }
         String gen = turn.lastAgentFiles;
         if (gen != null && !gen.isEmpty()) {
             // 已是 JSON 数组原文（artifactsTail 产出），直接内联
@@ -396,6 +400,9 @@ public class HarnessTurnManager {
 
         /** chat-runtime-hardening T-05：最后一次 agentFiles 原文（落 metadata.generatedFiles，刷新后仍可见） */
         private volatile String lastAgentFiles;
+
+        /** chat-runtime-hardening T-07：终态提示（超时/取消）落 metadata.notice；正文有内容时不混入正文 */
+        private volatile String noticeText;
         private String pendingLoadedSkills;
         private Disposable mergeJanitor;
 
@@ -600,12 +607,22 @@ public class HarnessTurnManager {
                 // sink 可能已关闭，忽略
             }
             if (sourceSub != null) {
+                // T-08：dispose 即向框架订阅发起 cancel（框架未暴露底层 HTTP 句柄，无法更细粒度中断）；
+                // 不可控的"在途响应"由 onFrame 的终态守卫兜底（T-07），不会串内容。
                 sourceSub.dispose();
+                log.info("[turn] 已取消上游订阅 session={} turnId={} status={}", sessionId, turnId, status);
             }
             turns.remove(sessionId, this);
             if (status.equals(STATUS_TIMEOUT) || status.equals(STATUS_CANCELLED)
                     || status.equals(STATUS_MODEL_TIMEOUT)) {
-                content.append(suffix == null ? "" : suffix);
+                if (suffix != null && !suffix.isEmpty()) {
+                    noticeText = suffix;
+                    // T-07：**提示不再无条件混入正文**。正文已有内容 ⇒ 只记 metadata.notice（正文保持干净）；
+                    // 正文为空 ⇒ 才写入正文，避免空气泡/用户看不到原因。
+                    if (content.length() == 0) {
+                        content.append(suffix);
+                    }
+                }
             }
             // 模型偶发「工具全执行完但跳过收尾正文」（BUG-59 三报）：诚实注记兜底，不让用户面对空气泡
             if (status.equals(STATUS_DONE) && content.length() == 0 && thinking.length() > 0) {
@@ -631,6 +648,9 @@ public class HarnessTurnManager {
                     Map<String, Object> end = new LinkedHashMap<>();
                     end.put("content", "");
                     end.put("end", true);
+                    if (noticeText != null && !noticeText.isEmpty()) {
+                        end.put("notice", noticeText);
+                    }
                     sink.emitNext(end, Sinks.EmitFailureHandler.busyLooping(Duration.ofMillis(100)));
                 }
                 catch (Exception ignored) {
