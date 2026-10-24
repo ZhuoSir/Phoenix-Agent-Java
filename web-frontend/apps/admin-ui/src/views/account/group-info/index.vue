@@ -109,7 +109,7 @@ const [MemberGrid, memberGridApi] = useVbenVxeGrid({
     ],
     loading: false,
     fit: true,
-    height: 360,
+    height: 460,
     border: false,
     stripe: false,
     emptyText: '暂无数据',
@@ -143,7 +143,7 @@ function makeGrantGrid() {
       columns: [{ field: 'name', title: '名称', minWidth: 200 }],
       loading: false,
       fit: true,
-      height: 360,
+      height: 460,
       border: false,
       stripe: false,
       emptyText: '暂无数据',
@@ -383,7 +383,7 @@ function getActions(row: any) {
 
 <template>
   <Page auto-content-height>
-    <ElDrawer v-model="detailVisible" :title="`${detailMode === 'edit' ? '编辑组' : '组详情'} - ${detailGroup.name || ''}`" size="62%">
+    <ElDrawer v-model="detailVisible" :z-index="1000" :title="`${detailMode === 'edit' ? '编辑组' : '组详情'} - ${detailGroup.name || ''}`" size="62%">
       <div class="space-y-4">
         <div v-if="detailMode === 'edit'" class="mb-3">
           <ElForm label-width="90px" size="small">
