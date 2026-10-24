@@ -22,7 +22,7 @@ const year = new Date().getFullYear();
           <img src="/imgs/logo.png" />
         </span>
         <div class="brand-logo__text">
-          <strong>军用标准智能服务系统</strong>
+          <strong>Phoenix Agent</strong>
           <span>智能体协作平台</span>
         </div>
       </div>
@@ -47,7 +47,7 @@ const year = new Date().getFullYear();
     </div>
 
     <div class="brand-panel__footer">
-      <span>© {{ year }} 军用标准智能服务系统</span>
+      <span>© {{ year }} Phoenix Agent</span>
       <span>v 1.0.0</span>
     </div>
   </section>

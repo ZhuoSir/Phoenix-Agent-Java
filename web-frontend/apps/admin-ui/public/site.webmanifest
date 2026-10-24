@@ -1,6 +1,6 @@
 {
-  "name": "军用标准智能服务系统",
-  "short_name": "军用标准",
+  "name": "Phoenix Agent",
+  "short_name": "Phoenix",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",

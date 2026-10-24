@@ -63,9 +63,9 @@ async function handleSubmit() {
   <div class="login">
     <header class="login__hero">
       <div class="login__logo">
-        <img src="/imgs/logo.png" alt="军用标准智能服务系统" class="login__logo-img" />
+        <img src="/imgs/logo.png" alt="Phoenix" class="login__logo-img" />
       </div>
-      <div class="login__title">军用标准智能服务系统</div>
+      <div class="login__title">Phoenix 智能体助手</div>
       <div class="login__slogan">一句话，让数据为你做事</div>
     </header>
 
@@ -120,7 +120,7 @@ async function handleSubmit() {
               <p class="legal-overlay__updated">最后更新日期：2026 年 7 月 6 日</p>
 
               <section>
-                <p>欢迎使用 军用标准智能服务系统。本平台基于人工智能技术，提供多智能体协作能力，帮助你高效完成数据分析、文档处理、代码生成、报告撰写等任务。请在使用前仔细阅读以下条款，使用即视为你已充分理解并同意接受本条款的全部约束。如你不同意本条款的任何内容，请立即停止使用本平台服务。</p>
+                <p>欢迎使用 Phoenix Agent。本平台基于人工智能技术，提供多智能体协作能力，帮助你高效完成数据分析、文档处理、代码生成、报告撰写等任务。请在使用前仔细阅读以下条款，使用即视为你已充分理解并同意接受本条款的全部约束。如你不同意本条款的任何内容，请立即停止使用本平台服务。</p>
               </section>
 
               <section>
@@ -174,7 +174,7 @@ async function handleSubmit() {
               <p class="legal-overlay__updated">最后更新日期：2026 年 7 月 6 日</p>
 
               <section>
-                <p>我们重视并尊重每一位用户的隐私。本协议说明 军用标准智能服务系统 在你使用智能体服务过程中如何收集、使用、存储与保护你的信息。请在使用本平台服务前仔细阅读本协议，如你不同意本协议的任何条款，请立即停止使用平台服务。</p>
+                <p>我们重视并尊重每一位用户的隐私。本协议说明 Phoenix Agent 在你使用智能体服务过程中如何收集、使用、存储与保护你的信息。请在使用本平台服务前仔细阅读本协议，如你不同意本协议的任何条款，请立即停止使用平台服务。</p>
               </section>
 
               <section>
