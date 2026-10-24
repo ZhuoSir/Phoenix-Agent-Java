@@ -72,7 +72,13 @@ public final class HarnessEventMapper {
             } else if (event instanceof CustomEvent) {
                 // 自定义事件不透出（与后台既有行为一致）
             } else {
-                log.warn("Unhandled agent_event type: {}", event.getClass().getSimpleName());
+                // 生命周期类事件（AgentStart/AgentEnd、ModelCall*、ToolCall*、ToolResult*）本身无内容，
+                // 未映射是**预期行为** ⇒ 静默；只有真正未知的类型才告警（避免刷屏误导现场排查）。
+                String simple = event.getClass().getSimpleName();
+                if (!(simple.startsWith("Agent") || simple.startsWith("ModelCall")
+                        || simple.startsWith("ToolCall") || simple.startsWith("ToolResult"))) {
+                    log.warn("Unhandled agent_event type: {}", simple);
+                }
             }
         });
         return eventMap;
