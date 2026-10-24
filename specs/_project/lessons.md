@@ -1133,3 +1133,17 @@
 - **防再犯规则**：① `setGridOptions` 要么传全量（columns+height+pagerConfig+data），要么改用 `gridApi.query()`；
   ② 展示型字段（状态/枚举）优先在**数据层转换**，别依赖 formatter/slots 透传；
   ③ 配置对象里禁止出现重复键——写完后 `grep` 同名键计数校验。
+
+## L-113 业务类配置优先写进工程配置文件（application.yml），不要依赖环境变量手传
+
+- **日期**：2026-10-24 ｜ **来源**：`long-doc-chunking` T-01（用户纠正）｜ **用户原话**：「后续相关业务类的配置，首先考虑的是工程配置，而不是环境变量」
+- **现象**：我把 6 个附件分批参数先做成 compose 的 env（`${VAR:-默认}`），要靠部署时手传；
+  用户指出应当写进 `application.yml`，否则部署方不可见、易漏传，且"默认值"散落在编排文件里。
+- **规则**：
+  1. **业务参数**（阈值、条数、超时、开关）→ 一律落 `application.yml`，写清注释与默认值；
+  2. **环境变量只用于**环境差异与敏感项（host、账号、密钥、部署端口、镜像 tag），不作为业务默认值的唯一来源；
+  3. **不要同时**在 compose 与 yml 写同一项：env 优先级更高，会把 yml 覆盖掉 ⇒ 出现"改了配置文件不生效"的陷阱；
+     若确需 compose 注入，只注入差异值，且**默认值留空**（不写 `${VAR:-默认}`）；
+  4. 生效值必须在启动日志打印（本次 `[attachment-batch] 生效配置: …`），便于现场核对；
+  5. env 覆盖命名规则：Spring 宽松绑定**短横线去掉**（`attachment-chunk-size` → `PHOENIX_AGENT_CHAT_ATTACHMENTCHUNKSIZE`）。
+- **落地**：`application.yml` 的 `phoenix.agent.chat.attachment-*` 六项；compose 已移除对应 env（提交 `94649598`）。
