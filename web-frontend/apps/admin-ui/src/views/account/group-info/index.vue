@@ -7,6 +7,7 @@ import { getGroupAgentInfoByGroupApi } from '#/api/core/platform-group-agent-inf
 import { groupKbasesApi } from '#/api/core/knowledgeBase';
 import { groupSkillsApi } from '#/api/core/group-skill';
 import { groupMcpsApi } from '#/api/core/group-mcp';
+import GroupItemsGrid from './group-items-grid.vue';
 import { useVbenVxeGrid, VbenTableAction } from '#/adapter/vxe-table';
 import type { VxeGridProps } from '#/adapter/vxe-table';
 import type { VbenFormProps } from '@vben/common-ui';
@@ -287,19 +288,19 @@ function getActions(row: any) {
           </ElTabPane>
           <ElTabPane label="智能体" name="agent">
             <div class="mb-2 flex justify-end"><ElButton size="small" type="primary" @click="onDetailAssign('agent', detailGroup)">分配智能体</ElButton></div>
-            <ElTable :data="detailAgents" size="small" border><ElTableColumn prop="agentName" label="名称" /></ElTable>
+            <GroupItemsGrid :data="detailAgents" field="agentName" title="名称" />
           </ElTabPane>
           <ElTabPane label="知识库" name="kbase">
             <div class="mb-2 flex justify-end"><ElButton size="small" type="primary" @click="onDetailAssign('kbase', detailGroup)">分配知识库</ElButton></div>
-            <ElTable :data="detailKbases" size="small" border><ElTableColumn prop="name" label="名称" /></ElTable>
+            <GroupItemsGrid :data="detailKbases" field="name" title="名称" />
           </ElTabPane>
           <ElTabPane label="技能" name="skill">
             <div class="mb-2 flex justify-end"><ElButton size="small" type="primary" @click="onDetailAssign('skill', detailGroup)">分配技能</ElButton></div>
-            <ElTable :data="detailSkills" size="small" border><ElTableColumn prop="name" label="名称" /></ElTable>
+            <GroupItemsGrid :data="detailSkills" field="name" title="名称" />
           </ElTabPane>
           <ElTabPane label="MCP" name="mcp">
             <div class="mb-2 flex justify-end"><ElButton size="small" type="primary" @click="onDetailAssign('mcp', detailGroup)">分配 MCP</ElButton></div>
-            <ElTable :data="detailMcps" size="small" border><ElTableColumn prop="name" label="名称" /></ElTable>
+            <GroupItemsGrid :data="detailMcps" field="name" title="名称" />
           </ElTabPane>
         </ElTabs>
       </div>
