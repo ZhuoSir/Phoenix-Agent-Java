@@ -17,14 +17,14 @@
     与非法参数时的 WARN 行。保留真实命令与输出。
   验收标准: 四个断言全过并贴出输出；既有接口 diff 为空（未改动任何既有端点）。
 
-- [ ] T-02 成员移除能力回归（既有接口验证 + 必要日志补齐）
+- [x] T-02 成员移除能力回归（既有接口验证 + 必要日志补齐）
   关联: R-05
   依赖: T-01
   验证方式: 对一个测试组：先 `GET .../page-by-group` 记录 total=N → `DELETE /platform/account-group-info/group/{g}/account/{a}`
     → 再查断言 total=N-1 且该成员不在列表；后端日志出现移除记录（INFO，含 groupId/accountId）。测完恢复数据。
   验收标准: total 变化断言通过、日志有行、测试数据已恢复（复查 total 回到 N）。
 
-- [ ] T-03 共享面身份回归（plan §五 六个身份逐条断言）
+- [x] T-03 共享面身份回归（plan §五 六个身份逐条断言）
   关联: R-07, R-10
   依赖: T-01
   验证方式: 逐条 curl 并记录：① `GET /platform/account-group-info/group/{g}` 仍返回 List；② `GET /platform/account-group-info/page?page=1&size=10` 仍正常；

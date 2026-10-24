@@ -122,7 +122,15 @@ public class AccountGroupInfoServiceImpl extends ServiceImpl<AccountGroupInfoMap
 
 	@Override
 	public boolean deleteByGroupIdAndAccountId(String groupId, String accountId) {
-		return getMapper().deleteByGroupIdAndAccountId(groupId, accountId) > 0;
+		boolean removed = getMapper().deleteByGroupIdAndAccountId(groupId, accountId) > 0;
+		// T-02：成员移除是安全敏感操作，留 INFO 审计日志（plan §六 日志点 2）
+		if (removed) {
+			log.info("[group-members] 移除成员 groupId={}, accountId={}", groupId, accountId);
+		}
+		else {
+			log.warn("[group-members] 移除成员失败（关联不存在）groupId={}, accountId={}", groupId, accountId);
+		}
+		return removed;
 	}
 
 	@Override

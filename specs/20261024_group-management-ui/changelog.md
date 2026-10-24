@@ -40,3 +40,15 @@
   - ④ 日志：`INFO … [group-members] groupId=433382915273580544, page=1, size=2, total=3` ✅；非法参数 `WARN … 非法分页参数 …` ✅
   - ⑤ 共享面未变：`/group/{groupId}` 200、`/page` 200 ✅
 - 备注（**已纠正**）：`realName`/`accountStatus` 为 null 的真实原因是**悬挂关联** —— 该组 3 条关联中 2 条指向的账号已被删除（`left join account_info` 为空），非源数据为空、也非映射缺陷；首行 username 来自关联表冗余字段 `account_name`（兜底生效）。已登记 **BUG-207**（账号删除后组关联未清理）。
+
+## 2026-10-24 T-02 / T-03 完成（真栈实测）
+
+**T-02 成员移除（可自我恢复）**
+- 补审计日志：`deleteByGroupIdAndAccountId` 成功 INFO `[group-members] 移除成员 groupId=…, accountId=…`，失败 WARN
+- 实测：`total 3 → DELETE(group/account) 成功 → total 2` ✅；日志有行 ✅；测试后把关联 `del_flag` 复位为 0，`total` 回到 3 ✅
+- 坑：删除是**逻辑删**（`del_flag=1`），用「同主键 INSERT」恢复会主键冲突（且当时被 `>/dev/null` 吞掉）⇒ 恢复须 `UPDATE del_flag=0`
+
+**T-03 共享面六身份回归（全部 200）**
+① `GET /group/{g}` 200 ② `GET /page` 200 ③ `DELETE /group/{g}/account/{a}` 200（T-02 已验证真删+恢复）
+④ `PUT /group-info/{g}/toggle-status`：status 0→1→0 复原 ✅ ⑤ `GET /account-info/getUnGroupPageByGroupId` 200
+⑥ `index.vue` 仍 import 5 个 assign 表单 ✅
