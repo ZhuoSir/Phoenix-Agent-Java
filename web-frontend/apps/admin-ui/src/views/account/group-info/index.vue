@@ -7,6 +7,10 @@ import { getGroupAgentInfoByGroupApi } from '#/api/core/platform-group-agent-inf
 import { groupKbasesApi } from '#/api/core/knowledgeBase';
 import { groupSkillsApi } from '#/api/core/group-skill';
 import { groupMcpsApi } from '#/api/core/group-mcp';
+import { getSkillPageApi } from '#/api/core/skill';
+import { getMcpPageApi } from '#/api/core/mcp';
+import { kbPageApi } from '#/api/core/knowledgeBase';
+import { getGroupAgentInfoListApi } from '#/api/core/platform-account-tenant-info';
 import { useVbenVxeGrid, VbenTableAction } from '#/adapter/vxe-table';
 import type { VxeGridProps } from '#/adapter/vxe-table';
 import type { VbenFormProps } from '@vben/common-ui';
@@ -186,14 +190,49 @@ async function loadDetail() {
   detailLoading.value = true;
   try {
     const gid = detailGroup.value.id;
-    const [a, k, sk, m] = await Promise.all([
-      getGroupAgentInfoByGroupApi(gid).catch(() => null),
-      groupKbasesApi(gid).catch(() => null),
-      groupSkillsApi(gid).catch(() => null),
-      groupMcpsApi(gid).catch(() => null),
-    ]);
-    detailAgents.value = toList(a); detailKbases.value = toList(k);
-    detailSkills.value = toList(sk); detailMcps.value = toList(m);
+    // 与「分配」弹窗同一套取数方式：先拿已选 id，再拉全量目录映射出真实名称
+    const [agentRows, skillIds, kbaseIds, mcpIds, agentCatalog, skillPage, kbasePage, mcpPage] =
+      await Promise.all([
+        getGroupAgentInfoByGroupApi(gid).catch(() => null),
+        groupSkillsApi(gid).catch(() => []),
+        groupKbasesApi(gid).catch(() => []),
+        groupMcpsApi(gid).catch(() => []),
+        getGroupAgentInfoListApi({ status: 'published' }).catch(() => null),
+        getSkillPageApi(1, 999).catch(() => null),
+        kbPageApi({ pageNum: 1, pageSize: 999 }).catch(() => null),
+        getMcpPageApi(1, 999).catch(() => null),
+      ]);
+
+    const nameOf = (r: any) =>
+      r?.name || r?.agentName || r?.skillName || r?.kbaseName || r?.mcpName || r?.title || '';
+    const catalog = (res: any) => {
+      const d = res?.data ?? res;
+      if (Array.isArray(d)) return d;
+      return d?.records ?? [];
+    };
+    const idsOf = (res: any): any[] => {
+      const d = res?.data ?? res;
+      return Array.isArray(d) ? d : [];
+    };
+
+    // 智能体：组内行有 agentId，用目录补名字
+    const agentNameById = new Map<string, string>(
+      catalog(agentCatalog).map((r: any) => [String(r.id ?? r.agentId), nameOf(r)]),
+    );
+    detailAgents.value = (toList(agentRows) as any[]).map((r: any) => ({
+      id: r.agentId ?? r.id,
+      name: agentNameById.get(String(r.agentId ?? r.id)) || `智能体 ${r.agentId ?? r.id}`,
+    }));
+
+    // 技能 / 知识库 / MCP：组内是 id 列表，用目录补给名字
+    const mapIds = (ids: any[], cat: any[]) => {
+      const byId = new Map<string, any>(cat.map((r: any) => [String(r.id), r]));
+      return ids.map((id) => ({ id, name: nameOf(byId.get(String(id))) || `${id}` }));
+    };
+    detailSkills.value = mapIds(idsOf(skillIds), catalog(skillPage));
+    detailKbases.value = mapIds(idsOf(kbaseIds), catalog(kbasePage));
+    detailMcps.value = mapIds(idsOf(mcpIds), catalog(mcpPage));
+
     await loadDetailMembers();
   } finally { detailLoading.value = false; }
 }
