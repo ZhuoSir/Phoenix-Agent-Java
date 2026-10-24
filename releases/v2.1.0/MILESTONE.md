@@ -1,10 +1,11 @@
 # 里程碑 v2.1.0
 
-> 状态：**Implement 完成（10/10）**（M0 立项 2026-10-11；在途 spec 1 个——`release-delivery-hardening`，三文档 v1.0.0 已确认；**待用户口令进入 M2 冻结**）
+> 状态：**Implement 完成（2 个 spec 全绿：`release-delivery-hardening` 10/10、`vector-dim-flexibility` 16/16，均已并入 `2.1.0`）**（M0 立项 2026-10-11；**待用户口令进入 M2 冻结/发版**——当前未 tag、未 push）
 
 > 创建: 2026-10-11 | 类型: **MINOR**（新增交付链能力，不改库表结构、不改应用行为）
 > **版本分支**: `2.1.0`（基点 = **`2.0.1` tip `10d4504`**，链式切——v2.0.1 尚未合 main，属在途/悬空，按 git-workflow §一 从该线 tip 切）
 > 前置账：v2.0.0 已发布（tag `v2.0.0` @ `d123ad0`，已 `--no-ff` 合 main = `9c635ae`）；v2.0.1 为部署问题修复包（在途、未冻结、未 tag）
+> 交付包：按最终代码（含 V2.1.0_01/_02/_03 与交付链加固）重打 `docker/dist/phoenix-2.1.0-arm64.tar.gz`（sha256 `749c6c2c46285cfd9aec1ceb1b4c3629496ae14fb03c2af2ff2e09fbb9a06b32`；包内门禁四项 PASS、引擎件与文档已入包）
 
 ## 一、需求挂接表（M1）
 
