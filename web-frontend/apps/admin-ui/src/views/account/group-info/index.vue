@@ -460,29 +460,29 @@ function getActions(row: any) {
           </ElTabPane>
           <ElTabPane label="智能体" name="agent">
             <div v-if="detailMode === 'edit'" class="mb-2 flex h-8 items-center justify-end"><ElButton size="small" type="primary" @click="onDetailAssign('agent', detailGroup)">分配智能体</ElButton></div>
-            <div style="height: 460px"><AgentGrid /></div>
+            <AgentGrid />
           </ElTabPane>
           <ElTabPane label="知识库" name="kbase">
             <div v-if="detailMode === 'edit'" class="mb-2 flex h-8 items-center justify-end"><ElButton size="small" type="primary" @click="onDetailAssign('kbase', detailGroup)">分配知识库</ElButton></div>
-            <div style="height: 460px"><KbaseGrid /></div>
+            <KbaseGrid />
           </ElTabPane>
           <ElTabPane label="技能" name="skill">
             <div v-if="detailMode === 'edit'" class="mb-2 flex h-8 items-center justify-end"><ElButton size="small" type="primary" @click="onDetailAssign('skill', detailGroup)">分配技能</ElButton></div>
-            <div style="height: 460px"><SkillGrid /></div>
+            <SkillGrid />
           </ElTabPane>
           <ElTabPane label="MCP" name="mcp">
             <div v-if="detailMode === 'edit'" class="mb-2 flex h-8 items-center justify-end"><ElButton size="small" type="primary" @click="onDetailAssign('mcp', detailGroup)">分配 MCP</ElButton></div>
-            <div style="height: 460px"><McpGrid /></div>
+            <McpGrid />
           </ElTabPane>
         </ElTabs>
       </div>
     </ElDrawer>
     <FormModal @success="refreshGrid" />
-    <AssignPeopleModal @success="refreshGrid()" />
-    <AssignAgentModal @success="refreshGrid()" />
-    <AssignKbaseModal @success="refreshGrid()" />
-    <AssignSkillModal @success="refreshGrid()" />
-    <AssignMcpModal @success="refreshGrid()" />
+    <AssignPeopleModal @success="onAssignSuccess" />
+    <AssignAgentModal @success="onAssignSuccess" />
+    <AssignKbaseModal @success="onAssignSuccess" />
+    <AssignSkillModal @success="onAssignSuccess" />
+    <AssignMcpModal @success="onAssignSuccess" />
     <Grid table-title="组管理">
       <template #toolbar-tools>
         <ElButton type="primary" @click="onCreate">新增</ElButton>
