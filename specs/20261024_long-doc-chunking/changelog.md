@@ -125,3 +125,7 @@
 ## 配置恢复
 - 验证期间临时改过的 `chunk-size=12000` / `chunk-timeout=180` / `max-chunks=2` **均已恢复默认**
   （6000 / 60 / 20），启动日志已核对
+
+## 2026-10-25 收尾（completion 生成）
+
+- 10/10 任务完成，completion.md 已生成；证据见各任务 changelog 段
