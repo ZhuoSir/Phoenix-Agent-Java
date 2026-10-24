@@ -39,4 +39,4 @@
   - ③ `groupId=` → `{"code":"101","msg":"groupId 不能为空","success":false}` ✅
   - ④ 日志：`INFO … [group-members] groupId=433382915273580544, page=1, size=2, total=3` ✅；非法参数 `WARN … 非法分页参数 …` ✅
   - ⑤ 共享面未变：`/group/{groupId}` 200、`/page` 200 ✅
-- 备注：`realName`/`accountStatus` 为 null 是**源数据为空**（`tbl_platform_account_info` 中 chenzhuo 的 real_name/status 为 NULL），非映射缺陷。
+- 备注（**已纠正**）：`realName`/`accountStatus` 为 null 的真实原因是**悬挂关联** —— 该组 3 条关联中 2 条指向的账号已被删除（`left join account_info` 为空），非源数据为空、也非映射缺陷；首行 username 来自关联表冗余字段 `account_name`（兜底生效）。已登记 **BUG-207**（账号删除后组关联未清理）。
