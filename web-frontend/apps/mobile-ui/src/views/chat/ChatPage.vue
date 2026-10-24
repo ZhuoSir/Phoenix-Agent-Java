@@ -391,8 +391,8 @@ async function onAttachmentDownload(att: ChatAttachmentMeta) {
       <div ref="scrollRef" class="chat-page__scroll">
         <div v-if="!hasAgent" class="no-agent-state">
           <div class="no-agent-state__brand">
-            <img src="/imgs/logo.png" alt="Phoenix" class="no-agent-state__logo" />
-            <span class="no-agent-state__app-name">Phoenix智能体助手</span>
+            <img src="/imgs/logo.png" alt="军用标准智能服务系统" class="no-agent-state__logo" />
+            <span class="no-agent-state__app-name">军用标准智能服务系统</span>
           </div>
           <span class="select-agent-trigger" @click="pickerOpen = true">请选择智能体开始对话</span>
         </div>

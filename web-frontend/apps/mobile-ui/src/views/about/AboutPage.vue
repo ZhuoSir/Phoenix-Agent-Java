@@ -30,14 +30,14 @@ const router = useRouter();
 
     <section class="about__hero">
       <div class="about__logo">
-        <img src="/imgs/logo.png" alt="Phoenix" class="about__logo-img" />
+        <img src="/imgs/logo.png" alt="军用标准智能服务系统" class="about__logo-img" />
       </div>
-      <h1 class="about__name">Phoenix — 企业级智能体管理平台</h1>
+      <h1 class="about__name">军用标准智能服务系统</h1>
     </section>
 
     <section class="about__body">
       <p class="about__desc">
-        Phoenix 是一个基于 Spring AI Alibaba Graph 打造的企业级智能体（AI Agent）管理与数据分析平台。平台分为两大核心模块：
+        本系统是一个基于 Spring AI Alibaba Graph 打造的企业级智能体（AI Agent）管理与数据分析平台。平台分为两大核心模块：
       </p>
       <ul class="about__list">
         <li>
