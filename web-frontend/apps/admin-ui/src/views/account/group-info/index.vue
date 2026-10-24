@@ -117,6 +117,26 @@ const [MemberGrid, memberGridApi] = useVbenVxeGrid({
   },
 });
 
+// 授权类页签：各建一个与人员表同款的网格（vxe，与列表页统一）
+function makeGrantGrid() {
+  return useVbenVxeGrid({
+    gridOptions: {
+      columns: [{ field: 'name', title: '名称' }],
+      loading: false,
+      maxHeight: 300,
+      border: false,
+      stripe: false,
+      emptyText: '暂无数据',
+      pagerConfig: { enabled: false },
+      data: [] as any[],
+    },
+  });
+}
+const [AgentGrid, agentGridApi] = makeGrantGrid();
+const [KbaseGrid, kbaseGridApi] = makeGrantGrid();
+const [SkillGrid, skillGridApi] = makeGrantGrid();
+const [McpGrid, mcpGridApi] = makeGrantGrid();
+
 
 function onCreate() {
   formModalApi.setData({}).open();
@@ -190,8 +210,7 @@ async function loadDetail() {
   detailLoading.value = true;
   try {
     const gid = detailGroup.value.id;
-    // 与「分配」弹窗同一套取数方式：先拿已选 id，再拉全量目录映射出真实名称
-    const [agentRows, skillIds, kbaseIds, mcpIds, agentCatalog, skillPage, kbasePage, mcpPage] =
+    const [groupAgents, skillIds, kbaseIds, mcpIds, agentCatalog, skillPage, kbasePage, mcpPage] =
       await Promise.all([
         getGroupAgentInfoByGroupApi(gid).catch(() => null),
         groupSkillsApi(gid).catch(() => []),
@@ -203,35 +222,44 @@ async function loadDetail() {
         getMcpPageApi(1, 999).catch(() => null),
       ]);
 
-    const nameOf = (r: any) =>
-      r?.name || r?.agentName || r?.skillName || r?.kbaseName || r?.mcpName || r?.title || '';
-    const catalog = (res: any) => {
+    const unwrap = (res: any) => {
       const d = res?.data ?? res;
       if (Array.isArray(d)) return d;
       return d?.records ?? [];
     };
-    const idsOf = (res: any): any[] => {
-      const d = res?.data ?? res;
-      return Array.isArray(d) ? d : [];
-    };
+    const nameOf = (r: any) =>
+      r?.name || r?.agentName || r?.skillName || r?.kbaseName || r?.mcpName || r?.title || '';
 
-    // 智能体：组内行有 agentId，用目录补名字
-    const agentNameById = new Map<string, string>(
-      catalog(agentCatalog).map((r: any) => [String(r.id ?? r.agentId), nameOf(r)]),
+    // 智能体：组内行只有 agentId → 用 /api/agent/list 目录映射 name
+    const agentNames = new Map<string, string>(
+      unwrap(agentCatalog).map((r: any) => [String(r.id), nameOf(r)]),
     );
-    detailAgents.value = (toList(agentRows) as any[]).map((r: any) => ({
+    const agentRows = unwrap(groupAgents).map((r: any) => ({
       id: r.agentId ?? r.id,
-      name: agentNameById.get(String(r.agentId ?? r.id)) || `智能体 ${r.agentId ?? r.id}`,
+      name: agentNames.get(String(r.agentId ?? r.id)) || `智能体 ${r.agentId ?? r.id}`,
     }));
 
-    // 技能 / 知识库 / MCP：组内是 id 列表，用目录补给名字
-    const mapIds = (ids: any[], cat: any[]) => {
-      const byId = new Map<string, any>(cat.map((r: any) => [String(r.id), r]));
-      return ids.map((id) => ({ id, name: nameOf(byId.get(String(id))) || `${id}` }));
+    // 技能/知识库/MCP：组内是 id 列表 → 用目录映射 name
+    const byIds = (ids: any[], catalog: any[]) => {
+      const m = new Map<string, any>(catalog.map((r: any) => [String(r.id), r]));
+      return ids.map((id) => {
+        const hit = m.get(String(id));
+        return { id, name: nameOf(hit) || `ID ${id}` };
+      });
     };
-    detailSkills.value = mapIds(idsOf(skillIds), catalog(skillPage));
-    detailKbases.value = mapIds(idsOf(kbaseIds), catalog(kbasePage));
-    detailMcps.value = mapIds(idsOf(mcpIds), catalog(mcpPage));
+    const skillRows = byIds(unwrap(skillIds), unwrap(skillPage));
+    const kbaseRows = byIds(unwrap(kbaseIds), unwrap(kbasePage));
+    const mcpRows = byIds(unwrap(mcpIds), unwrap(mcpPage));
+
+    detailAgents.value = agentRows;
+    detailKbases.value = kbaseRows;
+    detailSkills.value = skillRows;
+    detailMcps.value = mcpRows;
+
+    agentGridApi.setGridOptions({ data: agentRows, loading: false });
+    kbaseGridApi.setGridOptions({ data: kbaseRows, loading: false });
+    skillGridApi.setGridOptions({ data: skillRows, loading: false });
+    mcpGridApi.setGridOptions({ data: mcpRows, loading: false });
 
     await loadDetailMembers();
   } finally { detailLoading.value = false; }
@@ -331,31 +359,19 @@ function getActions(row: any) {
           </ElTabPane>
           <ElTabPane label="智能体" name="agent">
             <div class="mb-2 flex justify-end"><ElButton size="small" type="primary" @click="onDetailAssign('agent', detailGroup)">分配智能体</ElButton></div>
-            <div v-if="detailAgents.length">
-              <ElTable :data="detailAgents" size="small" border><ElTableColumn prop="agentName" label="名称" /></ElTable>
-            </div>
-            <div v-else class="py-6 text-center text-sm text-gray-400">暂无数据</div>
+            <AgentGrid />
           </ElTabPane>
           <ElTabPane label="知识库" name="kbase">
             <div class="mb-2 flex justify-end"><ElButton size="small" type="primary" @click="onDetailAssign('kbase', detailGroup)">分配知识库</ElButton></div>
-            <div v-if="detailKbases.length">
-              <ElTable :data="detailKbases" size="small" border><ElTableColumn prop="name" label="名称" /></ElTable>
-            </div>
-            <div v-else class="py-6 text-center text-sm text-gray-400">暂无数据</div>
+            <KbaseGrid />
           </ElTabPane>
           <ElTabPane label="技能" name="skill">
             <div class="mb-2 flex justify-end"><ElButton size="small" type="primary" @click="onDetailAssign('skill', detailGroup)">分配技能</ElButton></div>
-            <div v-if="detailSkills.length">
-              <ElTable :data="detailSkills" size="small" border><ElTableColumn prop="name" label="名称" /></ElTable>
-            </div>
-            <div v-else class="py-6 text-center text-sm text-gray-400">暂无数据</div>
+            <SkillGrid />
           </ElTabPane>
           <ElTabPane label="MCP" name="mcp">
             <div class="mb-2 flex justify-end"><ElButton size="small" type="primary" @click="onDetailAssign('mcp', detailGroup)">分配 MCP</ElButton></div>
-            <div v-if="detailMcps.length">
-              <ElTable :data="detailMcps" size="small" border><ElTableColumn prop="name" label="名称" /></ElTable>
-            </div>
-            <div v-else class="py-6 text-center text-sm text-gray-400">暂无数据</div>
+            <McpGrid />
           </ElTabPane>
         </ElTabs>
       </div>
