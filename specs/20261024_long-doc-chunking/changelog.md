@@ -31,8 +31,10 @@
 
 - `ChatDocumentExtractor` 增 6 个 `@Value` 配置 + `@PostConstruct` 打印生效值 + getter；`MAX_EXTRACT_CHARS` → `DEFAULT_MAX_EXTRACT_CHARS`（仅作默认）
 - 两个调用方（装配器 / 上传服务）提示文案改为读配置
-- `docker/docker-compose.yaml` 增 6 项 env（默认 24000/2000000/6000/300/20/60）
+- **默认值写在 `application.yml`**（`phoenix.agent.chat.attachment-*` 6 项，带注释）；compose **不再**塞 env（避免覆盖 yml）
 - **实测**：启动日志 `[attachment-batch] 生效配置: maxExtractChars=24000, safeMaxChars=2000000, chunkSize=6000, …` ✅；
   传 `PHOENIX_AGENT_CHAT_ATTACHMENTCHUNKSIZE=4000` 重启后日志变 `chunkSize=4000` ✅；
   代码中硬编码 24000 引用数 0 ✅
 - 坑：**Spring env 名规则是"短横线去掉"** —— `...attachment-chunk-size` → `PHOENIX_AGENT_CHAT_ATTACHMENTCHUNKSIZE`（写成 `_CHUNK_SIZE` 不生效，首次验证就踩到）
+- 按用户要求改为**配置文件驱动**：默认值落 `application.yml`（`phoenix.agent.chat.attachment-*`），
+  实测不传任何 env 时日志显示 6 项默认值 ✅；容器内 ATTACHMENT env 条数 = 0 ✅（env 仍可覆盖，优先级更高）
