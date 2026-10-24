@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import { useVbenDrawer } from '@vben/common-ui';
 import {
-  ElButton, ElDescriptions, ElDescriptionsItem, ElMessage, ElMessageBox,
+  ElButton, ElDescriptions, ElDescriptionsItem, ElDrawer, ElMessage, ElMessageBox,
   ElTabPane, ElTable, ElTableColumn, ElTabs, ElTag,
 } from 'element-plus';
 import {
@@ -28,14 +27,7 @@ const skills = ref<any[]>([]);
 const mcps = ref<any[]>([]);
 const loading = ref(false);
 
-const [Drawer, drawerApi] = useVbenDrawer({
-  onOpenChange(isOpen: boolean) {
-    if (!isOpen) return;
-    group.value = drawerApi.getData<any>() || {};
-    memberPage.value = 1;
-    void loadAll();
-  },
-});
+const visible = ref(false);
 
 const listOf = (res: any) => {
   const data = res?.data ?? res;
@@ -81,7 +73,7 @@ async function removeMember(row: any) {
 async function open(row: any) {
   group.value = row || {};
   memberPage.value = 1;
-  drawerApi.setData(row || {}).open();
+  visible.value = true;
   await loadAll();
 }
 
@@ -96,7 +88,7 @@ const statusText = computed(() => (Number(group.value.status) === 0 ? '启用' :
 </script>
 
 <template>
-  <Drawer :title="`组详情 - ${group.name || ''}`" class="w-[760px]">
+  <ElDrawer v-model="visible" :title="`组详情 - ${group.name || ''}`" size="62%">
     <div class="space-y-4">
       <ElDescriptions :column="2" border size="small">
         <ElDescriptionsItem label="组名称">{{ group.name }}</ElDescriptionsItem>
@@ -160,5 +152,5 @@ const statusText = computed(() => (Number(group.value.status) === 0 ? '启用' :
         </ElTabPane>
       </ElTabs>
     </div>
-  </Drawer>
+  </ElDrawer>
 </template>

@@ -2,15 +2,22 @@
 import { ref } from 'vue';
 import { Page, useVbenDrawer, useVbenModal } from '@vben/common-ui';
 
+import { getGroupMemberPageApi, deleteAccountGroupInfoByGroupAndAccountApi } from '#/api/core/platform-account-group-info';
+import { getGroupAgentInfoByGroupApi } from '#/api/core/platform-group-agent-info';
+import { groupKbasesApi } from '#/api/core/knowledgeBase';
+import { groupSkillsApi } from '#/api/core/group-skill';
+import { groupMcpsApi } from '#/api/core/group-mcp';
 import { useVbenVxeGrid, VbenTableAction } from '#/adapter/vxe-table';
 import type { VxeGridProps } from '#/adapter/vxe-table';
 import type { VbenFormProps } from '@vben/common-ui';
 
-import { ElButton, ElMessage, ElMessageBox, ElTag } from 'element-plus';
+import {
+  ElButton, ElDescriptions, ElDescriptionsItem, ElDrawer, ElMessage, ElMessageBox,
+  ElTabPane, ElTable, ElTableColumn, ElTabs, ElTag,
+} from 'element-plus';
 
 import { getGroupInfoPageApi, toggleStatusGroupInfoApi } from '#/api';
 
-import GroupDetailDrawer from './group-detail-drawer.vue';
 import AssignAgentForm from './assign-agent-form.vue';
 import AssignKbaseForm from './assign-kbase-form.vue';
 import AssignMcpForm from './assign-mcp-form.vue';
@@ -85,7 +92,7 @@ const gridOptions: VxeGridProps = {
 };
 
 const [Grid, gridApi] = useVbenVxeGrid({ formOptions, gridOptions });
-const [DetailDrawer, detailDrawerApi] = useVbenDrawer({ connectedComponent: GroupDetailDrawer });
+
 
 function onCreate() {
   formModalApi.setData({}).open();
@@ -121,6 +128,65 @@ function onToggleStatus(row: any) {
     .catch(() => {});
 }
 
+// ===== 组详情（内联抽屉，T-05/T-06：不依赖任何跨组件 API）=====
+const detailVisible = ref(false);
+const detailGroup = ref<any>({});
+const detailMembers = ref<any[]>([]);
+const detailMemberTotal = ref(0);
+const detailPage = ref(1);
+const detailSize = ref(20);
+const detailAgents = ref<any[]>([]);
+const detailKbases = ref<any[]>([]);
+const detailSkills = ref<any[]>([]);
+const detailMcps = ref<any[]>([]);
+const detailLoading = ref(false);
+
+async function openDetail(row: any) {
+  detailGroup.value = { ...row };
+  detailPage.value = 1;
+  detailVisible.value = true;
+  await loadDetail();
+}
+
+async function loadDetailMembers() {
+  const res: any = await getGroupMemberPageApi(detailGroup.value.id, detailPage.value, detailSize.value);
+  const page = res?.data || res;
+  detailMembers.value = page?.records || [];
+  detailMemberTotal.value = page?.totalRow || 0;
+}
+
+const toList = (res: any) => {
+  const data = res?.data ?? res;
+  return Array.isArray(data) ? data : (data?.records ?? []);
+};
+
+async function loadDetail() {
+  detailLoading.value = true;
+  try {
+    const gid = detailGroup.value.id;
+    const [a, k, sk, m] = await Promise.all([
+      getGroupAgentInfoByGroupApi(gid).catch(() => null),
+      groupKbasesApi(gid).catch(() => null),
+      groupSkillsApi(gid).catch(() => null),
+      groupMcpsApi(gid).catch(() => null),
+    ]);
+    detailAgents.value = toList(a); detailKbases.value = toList(k);
+    detailSkills.value = toList(sk); detailMcps.value = toList(m);
+    await loadDetailMembers();
+  } finally { detailLoading.value = false; }
+}
+
+async function removeDetailMember(row: any) {
+  try {
+    await ElMessageBox.confirm(`确定把「${row.username || row.accountId}」移出本组？`, '移除成员', {
+      confirmButtonText: '确定移除', cancelButtonText: '取消', type: 'warning',
+    });
+  } catch { return; }
+  await deleteAccountGroupInfoByGroupAndAccountApi(detailGroup.value.id, row.accountId);
+  ElMessage.success('已移除');
+  await loadDetail();
+}
+
 /** T-05：详情抽屉内的分配入口 → 复用既有 assign-*-form 弹窗 */
 function onDetailAssign(domain: string, row: any) {
   const data = { ...row };
@@ -139,7 +205,7 @@ function getActions(row: any) {
     {
       text: '查看详情',
       icon: 'lucide:eye',
-      onClick: () => detailDrawerApi.setData({ ...row }).open(),
+      onClick: () => openDetail(row),
     },
     {
       text: '编辑',
@@ -163,6 +229,67 @@ function getActions(row: any) {
 
 <template>
   <Page auto-content-height>
+    <ElDrawer v-model="detailVisible" :title="`组详情 - ${detailGroup.name || ''}`" size="62%">
+      <div class="space-y-4">
+        <ElDescriptions :column="2" border size="small">
+          <ElDescriptionsItem label="组名称">{{ detailGroup.name }}</ElDescriptionsItem>
+          <ElDescriptionsItem label="组编码">{{ detailGroup.sn }}</ElDescriptionsItem>
+          <ElDescriptionsItem label="状态">
+            <ElTag :type="Number(detailGroup.status) === 0 ? 'success' : 'danger'">
+              {{ Number(detailGroup.status) === 0 ? '启用' : '禁用' }}
+            </ElTag>
+          </ElDescriptionsItem>
+          <ElDescriptionsItem label="描述">{{ detailGroup.description || '-' }}</ElDescriptionsItem>
+          <ElDescriptionsItem label="创建时间">{{ detailGroup.createTime }}</ElDescriptionsItem>
+          <ElDescriptionsItem label="更新时间">{{ detailGroup.updateTime }}</ElDescriptionsItem>
+        </ElDescriptions>
+        <div class="flex gap-2">
+          <ElTag>人员 {{ detailMemberTotal }}</ElTag>
+          <ElTag type="info">智能体 {{ detailAgents.length }}</ElTag>
+          <ElTag type="info">知识库 {{ detailKbases.length }}</ElTag>
+          <ElTag type="info">技能 {{ detailSkills.length }}</ElTag>
+          <ElTag type="info">MCP {{ detailMcps.length }}</ElTag>
+        </div>
+        <ElTabs v-loading="detailLoading">
+          <ElTabPane label="人员" name="people">
+            <div class="mb-2 flex justify-end">
+              <ElButton size="small" type="primary" @click="onDetailAssign('people', detailGroup)">添加成员</ElButton>
+            </div>
+            <ElTable :data="detailMembers" size="small" border>
+              <ElTableColumn prop="username" label="账号" width="150" />
+              <ElTableColumn prop="realName" label="姓名" width="130" />
+              <ElTableColumn prop="accountStatus" label="账号状态" width="100" />
+              <ElTableColumn prop="joinTime" label="加入时间" width="160" />
+              <ElTableColumn label="操作" width="90" fixed="right">
+                <template #default="{ row }">
+                  <ElButton link type="danger" @click="removeDetailMember(row)">移除</ElButton>
+                </template>
+              </ElTableColumn>
+            </ElTable>
+            <div class="mt-2 flex justify-end gap-2">
+              <ElButton :disabled="detailPage <= 1" size="small" @click="detailPage--; loadDetailMembers()">上一页</ElButton>
+              <ElButton :disabled="detailPage * detailSize >= detailMemberTotal" size="small" @click="detailPage++; loadDetailMembers()">下一页</ElButton>
+            </div>
+          </ElTabPane>
+          <ElTabPane label="智能体" name="agent">
+            <div class="mb-2 flex justify-end"><ElButton size="small" type="primary" @click="onDetailAssign('agent', detailGroup)">分配智能体</ElButton></div>
+            <ElTable :data="detailAgents" size="small" border><ElTableColumn prop="agentName" label="名称" /></ElTable>
+          </ElTabPane>
+          <ElTabPane label="知识库" name="kbase">
+            <div class="mb-2 flex justify-end"><ElButton size="small" type="primary" @click="onDetailAssign('kbase', detailGroup)">分配知识库</ElButton></div>
+            <ElTable :data="detailKbases" size="small" border><ElTableColumn prop="name" label="名称" /></ElTable>
+          </ElTabPane>
+          <ElTabPane label="技能" name="skill">
+            <div class="mb-2 flex justify-end"><ElButton size="small" type="primary" @click="onDetailAssign('skill', detailGroup)">分配技能</ElButton></div>
+            <ElTable :data="detailSkills" size="small" border><ElTableColumn prop="name" label="名称" /></ElTable>
+          </ElTabPane>
+          <ElTabPane label="MCP" name="mcp">
+            <div class="mb-2 flex justify-end"><ElButton size="small" type="primary" @click="onDetailAssign('mcp', detailGroup)">分配 MCP</ElButton></div>
+            <ElTable :data="detailMcps" size="small" border><ElTableColumn prop="name" label="名称" /></ElTable>
+          </ElTabPane>
+        </ElTabs>
+      </div>
+    </ElDrawer>
     <FormModal @success="refreshGrid" />
     <AssignPeopleModal @success="refreshGrid()" />
     <AssignAgentModal @success="refreshGrid()" />
