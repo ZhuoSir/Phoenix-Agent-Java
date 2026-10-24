@@ -108,6 +108,7 @@ const [MemberGrid, memberGridApi] = useVbenVxeGrid({
       { title: '操作', width: 90, fixed: 'right', slots: { default: 'action' } },
     ],
     loading: false,
+    fit: true,
     height: 'auto',
     border: false,
     stripe: false,
@@ -125,6 +126,9 @@ const [MemberGrid, memberGridApi] = useVbenVxeGrid({
           const d = res?.data ?? res;
           const total = d?.totalRow ?? 0;
           detailMemberTotal.value = total;
+          const rows = d?.records ?? [];
+          // 高度跟随行数（最多 360），避免只有 1 行时下方出现空占位区
+          memberGridApi.setGridOptions({ height: Math.min(360, 64 + rows.length * 44) });
           // vxe proxy 需要 result + page.total 才能正确显示"共 N 条"
           // 兜底覆盖 vben/vxe 可能读取的多种字段名，确保分页器显示真实总数
           return { records: d?.records ?? [], total, totalRow: total, rowCount: total, page: { total, totalRow: total } };
@@ -140,12 +144,13 @@ function makeGrantGrid() {
     gridOptions: {
       columns: [{ field: 'name', title: '名称', minWidth: 200 }],
       loading: false,
+      fit: true,
       height: 'auto',
-      pagerConfig: { enabled: true, pageSize: 10, pageSizes: [10, 20, 50] },
       border: false,
       stripe: false,
       emptyText: '暂无数据',
-      pagerConfig: { enabled: false },
+      // 与人员表/列表页同一套分页器（本地数据由 vxe 自行分页）
+      pagerConfig: { enabled: true, pageSize: 10, pageSizes: [10, 20, 50] },
       data: [] as any[],
     },
   });
@@ -263,10 +268,30 @@ async function loadDetail() {
     detailSkills.value = skillRows;
     detailMcps.value = mcpRows;
 
-    agentGridApi.setGridOptions({ data: agentRows, loading: false });
-    kbaseGridApi.setGridOptions({ data: kbaseRows, loading: false });
-    skillGridApi.setGridOptions({ data: skillRows, loading: false });
-    mcpGridApi.setGridOptions({ data: mcpRows, loading: false });
+    agentGridApi.setGridOptions({
+      data: agentRows,
+      loading: false,
+      height: Math.min(300, 64 + agentRows.length * 44),
+      pagerConfig: { enabled: true, pageSize: 10, pageSizes: [10, 20, 50], total: agentRows.length },
+    });
+    kbaseGridApi.setGridOptions({
+      data: kbaseRows,
+      loading: false,
+      height: Math.min(300, 64 + kbaseRows.length * 44),
+      pagerConfig: { enabled: true, pageSize: 10, pageSizes: [10, 20, 50], total: kbaseRows.length },
+    });
+    skillGridApi.setGridOptions({
+      data: skillRows,
+      loading: false,
+      height: Math.min(300, 64 + skillRows.length * 44),
+      pagerConfig: { enabled: true, pageSize: 10, pageSizes: [10, 20, 50], total: skillRows.length },
+    });
+    mcpGridApi.setGridOptions({
+      data: mcpRows,
+      loading: false,
+      height: Math.min(300, 64 + mcpRows.length * 44),
+      pagerConfig: { enabled: true, pageSize: 10, pageSizes: [10, 20, 50], total: mcpRows.length },
+    });
 
     memberGridApi.query();
   } finally { detailLoading.value = false; }
