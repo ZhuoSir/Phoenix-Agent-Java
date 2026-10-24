@@ -13,3 +13,9 @@
   · BUG-201：ollama 未开 `think`（源头无思考）+ `OllamaChatFormatter` 丢弃 ThinkingBlock
 - `plan.md` / `tasks.md` 为 **v0.1.0 待确认**；plan 附待确认 Q1~Q5（附件上限 20/50、超时 600s、
   thinking 默认开、熔断阈值 5、Xinference 方案 A）。
+
+## 2026-10-24 plan / tasks v1.0.0 定版（三重确认齐）+ 建施工分支
+- 用户口令「确认，继续执行」⇒ plan/tasks 定版 **v1.0.0 已确认**（陈卓 2026-10-24）。默认值口径：
+  附件上限 20（安全 50）/ 首帧超时 600s / thinking 默认开 / 熔断阈值 5 / Xinference 方案 A。
+- 按 git-workflow §三.3：文档全部落在版本分支 `2.1.0` 后，从 `2.1.0` 切施工分支
+  **`feature/chat-runtime-hardening`**（命名=spec 目录去掉日期）。
