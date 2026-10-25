@@ -1,4 +1,4 @@
-> 版本: v0.1.0 | 状态: 草稿 | 更新: 2026-10-25 | 确认人: （待确认）
+> 版本: v0.2.0 | 状态: 草稿 | 更新: 2026-10-25 | 确认人: （待确认）
 
 # 需求规格：图标与前端静态资源本地化（离线内网可用）
 
@@ -47,17 +47,25 @@
 
 ## 我正在做的假设
 
-1. 采用 **构建期打包离线集合**：新增 `@iconify-json/lucide`（必做）与 `@iconify-json/ant-design`（图标选择器需要），
-   在应用启动处 `addCollection()` 注册；**不引入运行时 API 请求**。
-2. 报表 HTML 的 marked/echarts 改为**随产物发布的本地静态文件**（拷贝到 `dist/js/vendor/`），HTML 内引用相对路径。
-3. 允许 `package.json`/`pnpm-lock.yaml` 变更（新增两个 `@iconify-json/*` 依赖，packages 体积计入包体）。
-4. 若 lucide 全量过大，则只打包**用到的 39 个**（脚本生成子集 JSON），R-06 要求给出体积实测。
+1. **已定（用户 2026-10-25，Q3）**：采用**本地静态资源**方式（不是把图标数据打进 JS 包）：
+   把图标集合 JSON 作为静态文件放 `public/icons/`（随产物发布到 nginx），前端把 Iconify 的 API provider
+   指向**本站 `/icons`**，运行时只访问本站、不出外网。
+2. 报表 HTML 的 marked/echarts 改为**随产物发布的本地静态文件**（`public/js/vendor/` → `dist/js/vendor/`），
+   HTML 内引用本站相对路径（不再用 jsDelivr）。本地已有 `marked@12.0.2`、`echarts@6.1.0` 可用于拷贝。
+3. **已定（Q4）**：lucide 采用**全量集合**（体积换省事）；ant-design 集合供图标选择器使用。
+   两者以静态 JSON 形式发布（不打包进 JS）。
+4. 图标 JSON 的获取方式：一次性从 npm 取 `@iconify-json/lucide`、`@iconify-json/ant-design` 的 `icons.json`，
+   落到 `public/icons/<prefix>.json`（**发布后不再需要外网**）；R-06 给出体积实测。
 
 现在纠正，否则按此执行。
 
-## 待确认问题
+## 决策记录（用户 2026-10-25 答复）
 
-- **Q1 版本归属**：挂 v2.1.0 还是新开 v2.2.0？
-- **Q2 范围**：只做「图标本地化」（R-01~R-04、R-06）？还是**同时**做报表 HTML 的 CDN 资源本地化（R-05）？
-- **Q3 方案**：构建期打包离线集合（推荐，简单可靠）还是自托管 Iconify API（nginx 提供 JSON，多一层服务）？
-- **Q4 取舍**：lucide 打包**全量集合**（简单、体积大）还是**仅用到的 39 个**（省体积、需生成脚本）？
+| # | 问题 | 决策 |
+|---|---|---|
+| Q1 | 版本归属 | **挂 v2.1.0** |
+| Q2 | 范围 | **同时做**：图标本地化 + 报表 HTML 的 CDN 资源本地化（R-05） |
+| Q3 | 方案 | **改成本地静态资源**（不是构建期打包进 JS）：图标 JSON 放 `public/icons/`，Iconify provider 指向本站 `/icons` |
+| Q4 | 体积取舍 | **lucide 全量集合**（+ ant-design 供图标选择器） |
+
+余下仅待「确认①」（requirements 定版 v1.0.0）。
