@@ -57,9 +57,10 @@ public class ChatAttachmentController {
 	/** R-11：超管豁免沿用 R-18/R-08 同一守卫（单一口径，不新造判定） */
 	private final AdminRoleGuard adminRoleGuard;
 
-	/** chat-runtime-hardening T-01/T-03：单次上传数量上限（默认 20；phoenix.agent.chat.attachment-max-count 可覆盖） */
-	@org.springframework.beans.factory.annotation.Value("${phoenix.agent.chat.attachment-max-count:20}")
-	private int attachmentMaxCount = 20;
+	/** chat-runtime-hardening T-01/T-03：单次上传数量上限（默认 20；phoenix.agent.chat.attachment-max-count 可覆盖）
+	 * 2026-10-25 用户要求默认提升到 50（客户场景批量上传） */
+	@org.springframework.beans.factory.annotation.Value("${phoenix.agent.chat.attachment-max-count:50}")
+	private int attachmentMaxCount = 50;
 
 	@PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
 	public Mono<ApiResponse<ChatAttachmentUploadResultVO>> upload(ServerWebExchange exchange,
