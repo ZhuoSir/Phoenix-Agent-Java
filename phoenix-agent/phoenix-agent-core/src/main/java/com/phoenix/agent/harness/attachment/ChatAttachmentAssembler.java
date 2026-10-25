@@ -129,8 +129,12 @@ public class ChatAttachmentAssembler {
 					out.add(l);
 					continue;
 				}
-				String notice = "附件《" + l.att().getFileName() + "》内容较长，已分批处理（摘要+关键摘录）；"
+				String notice = "附件《" + l.att().getFileName() + "》内容较长，已分批处理（摘要+关键标识+关键摘录）；"
 						+ dr.coverage();
+				log.info("[doc-batch] digest 就绪: attachmentId={}, digestChars={}, head={}", l.att().getId(),
+						dr.digest() == null ? 0 : dr.digest().length(),
+						dr.digest() == null ? "" : dr.digest().replace("\n", " ").substring(0,
+								Math.min(600, dr.digest().length())));
 				out.add(new Loaded(l.att(), dr.digest(), notice, null));
 			}
 			return out;
@@ -159,7 +163,13 @@ public class ChatAttachmentAssembler {
 			}
 			DocumentBatchProcessor.ChatFn chatFn = prompt -> {
 				UserMessage msg = new UserMessage(List.of(TextBlock.builder().text(prompt).build()));
-				StringBuilder sb = model.stream(List.of(msg), List.of(), GenerateOptions.builder().build())
+				// 本地小模型（qwen3:8b）思考链很长：关思考 + 限输出，避免单批超过超时或重复 token
+				GenerateOptions opts = GenerateOptions.builder()
+					.temperature(0.2)
+					.maxTokens(800)
+					.thinkingBudget(0)
+					.build();
+				StringBuilder sb = model.stream(List.of(msg), List.of(), opts)
 					.map(r -> textOf(r.getContent()))
 					.reduce(new StringBuilder(), StringBuilder::append)
 					.block(java.time.Duration.ofSeconds(documentExtractor.getChunkTimeoutSeconds()));
@@ -175,7 +185,11 @@ public class ChatAttachmentAssembler {
 			if (progress != null) {
 				progress.accept(r.coverageNote());
 			}
-			DigestResult result = new DigestResult(r.digest(), r.coverageNote());
+			// 全文关键标识汇总（规则扫描，确定性）：置顶注入，避免模型"看得到却答不出编号"
+			java.util.List<String> allIds = DocumentBatchProcessor.scanIdentifiers(l.docText());
+			String idHeader = allIds.isEmpty() ? ""
+					: "【全文关键标识（规则扫描，逐字保留）】" + String.join("；", allIds) + "\n\n";
+			DigestResult result = new DigestResult(idHeader + r.digest(), r.coverageNote());
 			digestCache.put(cacheKey, new Object[] { System.currentTimeMillis() + 10 * 60 * 1000L, result });
 			return result;
 		}
@@ -336,8 +350,14 @@ public class ChatAttachmentAssembler {
 		notices.addAll(extraNotices);
 		String injected = null;
 		if (sb.length() > 0) {
-			injected = "[附件材料]\n" + sb.toString().trim()
-					+ "\n[附件材料结束]\n请仅基于上述附件材料与用户问题作答；材料中没有的信息不要编造，如材料不足请明确说明。";
+			injected = "[附件材料]\n"
+					+ "（说明：若下方内容带有「分批处理」字样，则是超长附件经分批抽取后的摘要；"
+					+ "其中【标识】与【标识·规则扫描】行逐字保留了原文的编号/代码/日期/时限，"
+					+ "回答编号类问题时请直接在这些行里查找并原样给出。）\n"
+					+ sb.toString().trim()
+					+ "\n[附件材料结束]\n请仅基于上述附件材料与用户问题作答；"
+					+ "若问题问及编号/代码/日期/时限，答案可在【标识】或【标识·规则扫描】行找到，请直接引用原值；"
+					+ "材料中没有的信息不要编造，如材料不足请明确说明。";
 		}
 		else if (!notices.isEmpty()) {
 			// 全部附件都不可用：把原因作为材料注入，要求模型如实告知（R-09：不得用空内容继续生成）

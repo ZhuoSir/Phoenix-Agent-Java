@@ -47,6 +47,7 @@ public final class DocumentBatchProcessor {
 		int outChars = 0;
 		boolean degraded = false;
 		List<Integer> failed = new ArrayList<>();
+		int[] fallback = { 0 };
 
 		for (Chunk c : chunks) {
 			// 护栏①：批数超上限
@@ -65,7 +66,7 @@ public final class DocumentBatchProcessor {
 			if (progress != null) {
 				progress.accept(c.index() + 1, total);
 			}
-			String part = mapWithRetry(c, total, retry, chat, failed);
+			String part = mapWithRetry(c, total, retry, chat, failed, fallback);
 			if (part == null) {
 				continue;
 			}
@@ -85,7 +86,8 @@ public final class DocumentBatchProcessor {
 			coverage = "已按摘要方式处理：" + processed + "/" + total + " 块（约 " + pct(processed, total) + "% 内容）";
 		}
 		else {
-			coverage = "共 " + total + " 块，已全部处理";
+			coverage = "共 " + total + " 块，已全部处理"
+					+ (fallback[0] > 0 ? "（其中 " + fallback[0] + " 块模型输出不合格式，已用原文摘录+规则扫描兜底）" : "");
 		}
 		long ms = System.currentTimeMillis() - t0;
 		log.info("[doc-batch] 结束 chunkCount={}, processed={}, degraded={}, failed={}, outChars={}, totalMs={}", total,
@@ -93,37 +95,92 @@ public final class DocumentBatchProcessor {
 		return new BatchResult(total, processed, degraded, digest, coverage, ms);
 	}
 
-	private static String mapWithRetry(Chunk c, int total, int retry, ChatFn chat, List<Integer> failed) {
+	/** 规则扫描关键标识（不依赖模型）：编号/代码、日期、时限、条款号 */
+	private static final java.util.regex.Pattern[] ID_PATTERNS = {
+			java.util.regex.Pattern.compile("\\b[A-Z]{2,}[A-Z0-9]*(?:-\\d+){1,3}\\b"),   // TC-8899 / FD-2026-0117
+			java.util.regex.Pattern.compile("\\b\\d{4}-\\d{2}-\\d{2}\\b"),                 // 2026-07-01
+			java.util.regex.Pattern.compile("\\d+\\s*个工作日"),                             // 7 个工作日
+			java.util.regex.Pattern.compile("第[0-9一二三四五六七八九十百零]+[章条]") };
+
+	static java.util.List<String> scanIdentifiers(String text) {
+		java.util.LinkedHashSet<String> out = new java.util.LinkedHashSet<>();
+		if (text == null) {
+			return java.util.List.of();
+		}
+		for (java.util.regex.Pattern p : ID_PATTERNS) {
+			java.util.regex.Matcher m = p.matcher(text);
+			while (m.find()) {
+				String v = m.group().trim();
+				if (!v.isEmpty()) {
+					out.add(v);
+				}
+				if (out.size() >= 40) {
+					return new java.util.ArrayList<>(out);
+				}
+			}
+		}
+		return new java.util.ArrayList<>(out);
+	}
+
+	/** 模型输出是否"像模板回声"（实测 qwen3 会原样回抄【要点】… 这种占位） */
+	private static boolean looksLikeEcho(String out) {
+		if (out == null) {
+			return true;
+		}
+		String t = out.replace(" ", "");
+		return t.contains("【要点】…") || t.contains("【要点】...") || out.contains("… / 【标识】") || out.length() < 12;
+	}
+
+	private static String mapWithRetry(Chunk c, int total, int retry, ChatFn chat, List<Integer> failed, int[] fallback) {
 		int attempts = Math.max(0, retry) + 1;
 		for (int i = 1; i <= attempts; i++) {
 			try {
 				String out = chat.call(buildMapPrompt(c, total));
-				if (out != null && !out.isBlank()) {
-					return out.trim();
+				if (out == null || out.isBlank()) {
+					throw new IllegalStateException("模型返回空内容");
 				}
-				throw new IllegalStateException("模型返回空内容");
+				// 模型可能不守格式（实测：答成评审意见 / 回抄模板）⇒ 不注入垃圾，按失败重试
+				if (!out.contains("【") || looksLikeEcho(out)) {
+					throw new IllegalStateException("模型输出不合格式或为模板回声，拒绝注入");
+				}
+				// 关键标识由**规则扫描**兜底拼接（模型漏抄也不丢编号/日期/时限）
+				List<String> ids = scanIdentifiers(c.text());
+				log.info("[doc-batch] 块{}/{} 规则扫描标识数={} 明细={}", c.index() + 1, total, ids.size(),
+						ids.isEmpty() ? "无" : String.join(",", ids.subList(0, Math.min(12, ids.size()))));
+				String scanned = ids.isEmpty() ? "无" : String.join("；", ids);
+				return out.trim() + "\n【标识·规则扫描】" + scanned;
 			}
 			catch (Exception e) {
 				log.warn("[doc-batch] 单批失败 index={}, attempt={}/{}, error={}", c.index(), i, attempts, e.toString());
 			}
 		}
-		failed.add(c.index() + 1);
-		return null;
+		// 模型不守格式/失败 ⇒ **确定性兜底**（不判失败、不丢内容）：原文前 400 字 + 规则扫描标识
+		fallback[0]++;
+		log.warn("[doc-batch] 块{}/{} 模型输出不可用，改用确定性兜底（原文摘录+规则扫描）", c.index() + 1, total);
+		String head = c.text().replace("\n", " ").trim();
+		if (head.length() > 400) {
+			head = head.substring(0, 400) + "…";
+		}
+		List<String> ids = scanIdentifiers(c.text());
+		return "【要点】原文摘录：" + head + "\n【标识】" + (ids.isEmpty() ? "无" : String.join("；", ids))
+				+ "\n【摘录】" + head;
 	}
 
 	static String buildMapPrompt(Chunk c, int total) {
-		return """
-				你是文档分析助手。下面是长文档的第 %d/%d 块（可能不完整，属正常）。
-				请输出两项，务必简洁、只依据本块原文：
-				1) 【本块要点】不超过 120 字；
-				2) 【关键原文摘录】3~5 条，逐字摘录（每条不超过 40 字，不要改写）。
-				不要编造本块没有的内容。
-
-				--- 第 %d/%d 块开始 ---
-				%s
-				--- 第 %d/%d 块结束 ---
-				""".formatted(c.index() + 1, total, c.index() + 1, total, c.text(), c.index() + 1, total);
+		String instruction = """
+				【任务】只做信息抽取，不做任何评价、分析、建议、纠错或格式意见。
+				【输出格式】严格三行，行首标签不可改：
+				【要点】<不超过 120 字>
+				【标识】<把本块出现的编号/代码/文号/日期/时限/金额/比例/责任人/部门，逐条原样抄录，用「；」分隔；没有则写 无>
+				【摘录】<3~5 条原文逐字摘录，每条不超过 40 字，用「；」分隔>
+				【硬约束】编号类短标识必须出现在【标识】里；不得输出除这三行以外的任何文字。
+				""";
+		return instruction + "\n--- 第 %d/%d 块原文开始 ---\n".formatted(c.index() + 1, total)
+				+ c.text()
+				+ "\n--- 第 %d/%d 块原文结束 ---\n".formatted(c.index() + 1, total)
+				+ "【重复一遍】只输出三行：【要点】… / 【标识】… / 【摘录】…。禁止评价或建议。";
 	}
+
 
 	private static int pct(int a, int b) {
 		return b == 0 ? 0 : (int) Math.round(a * 100.0 / b);

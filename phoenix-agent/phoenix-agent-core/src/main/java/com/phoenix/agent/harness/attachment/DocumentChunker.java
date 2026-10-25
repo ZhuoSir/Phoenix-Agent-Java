@@ -65,8 +65,11 @@ public final class DocumentChunker {
 			if (cur.length() > 0 && cur.length() + unit.length() > chunkSize) {
 				// 收口当前块
 				out.add(new Chunk(index++, cur.toString(), curStart, cursor));
-				// 生成重叠尾巴作为下一块开头
+				// 生成重叠尾巴作为下一块开头；若尾巴 + 本单元会超限，则丢弃尾巴（保证块 ≤ chunkSize）
 				String tail = tailOf(cur.toString(), ov);
+				if (tail.length() + unit.length() > chunkSize) {
+					tail = "";
+				}
 				cur.setLength(0);
 				cur.append(tail);
 				curStart = Math.max(0, cursor - tail.length());
@@ -75,7 +78,13 @@ public final class DocumentChunker {
 			cursor = unitStart + unit.length();
 		}
 		if (cur.length() > 0) {
-			out.add(new Chunk(index, cur.toString(), curStart, normalized.length()));
+			String tailText = cur.toString();
+			while (tailText.length() > chunkSize) {
+				out.add(new Chunk(index++, tailText.substring(0, chunkSize), curStart, normalized.length()));
+				tailText = tailText.substring(chunkSize);
+				curStart = Math.max(0, normalized.length() - tailText.length());
+			}
+			out.add(new Chunk(index, tailText, curStart, normalized.length()));
 		}
 		return out;
 	}

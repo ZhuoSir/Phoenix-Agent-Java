@@ -63,4 +63,4 @@ phoenix:
       # 最大批数（护栏）
       attachment-max-chunks: 20
       # 单批模型调用超时（秒）
-      attachment-chunk-timeout-seconds: 60
+      attachment-chunk-timeout-seconds: 180
