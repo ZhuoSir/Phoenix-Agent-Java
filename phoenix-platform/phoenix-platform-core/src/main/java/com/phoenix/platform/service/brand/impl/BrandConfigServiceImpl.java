@@ -65,6 +65,61 @@ public class BrandConfigServiceImpl implements BrandConfigService {
 	}
 
 	@Override
+	@org.springframework.transaction.annotation.Transactional
+	public BrandConfigVO update(com.phoenix.platform.dto.brand.BrandConfigUpdateDTO dto, String operator) {
+		String name = dto.getSystemName() == null ? "" : dto.getSystemName().trim();
+		if (name.isEmpty() || name.length() > 40) {
+			throw new IllegalArgumentException("系统名称长度需在 1~40 字");
+		}
+		String color = dto.getPrimaryColor() == null ? "" : dto.getPrimaryColor().trim();
+		if (!color.matches("^#[0-9a-fA-F]{6}$")) {
+			throw new IllegalArgumentException("主题色需为 #RRGGBB 格式（例如 #006BE6）");
+		}
+		String logo = normalizeUrl(dto.getLogoUrl(), "Logo");
+		String favicon = normalizeUrl(dto.getFaviconUrl(), "favicon");
+
+		BrandConfig row = QueryChain.of(brandConfigMapper).where(BrandConfig::getId).eq(1).one();
+		boolean insert = row == null;
+		if (insert) {
+			row = new BrandConfig();
+			row.setId(1);
+			row.setCreateTime(java.time.LocalDateTime.now());
+		}
+		row.setSystemName(name);
+		row.setPrimaryColor(color);
+		row.setLogoUrl(logo);
+		row.setFaviconUrl(favicon);
+		row.setUpdatedBy(operator);
+		row.setUpdateTime(java.time.LocalDateTime.now());
+		if (insert) {
+			brandConfigMapper.insert(row);
+		}
+		else {
+			brandConfigMapper.update(row);
+		}
+		evictCache();
+		log.info("[brand] 更新 by={}, systemName={}, primaryColor={}, logoSet={}, faviconSet={}", operator, name, color,
+				logo != null, favicon != null);
+		return new BrandConfigVO(name, logo == null ? DEFAULT_LOGO : logo, favicon == null ? DEFAULT_FAVICON : favicon,
+				color);
+	}
+
+	/** URL 规范化：空 ⇒ null（沿用默认）；相对路径必须以 / 开头；http(s) 放行 */
+	private static String normalizeUrl(String raw, String label) {
+		if (raw == null || raw.isBlank()) {
+			return null;
+		}
+		String v = raw.trim();
+		if (v.length() > 512) {
+			throw new IllegalArgumentException(label + " 地址过长（需 ≤512 字符）");
+		}
+		if (!v.startsWith("/") && !v.startsWith("http://") && !v.startsWith("https://")) {
+			throw new IllegalArgumentException(label + " 需为 / 开头的相对路径或 http(s) 地址");
+		}
+		return v;
+	}
+
+	@Override
 	public void evictCache() {
 		cached = null;
 		cachedAt = 0;

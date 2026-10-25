@@ -55,6 +55,8 @@ phoenix:
   platform:
     brand:
       cache-seconds: 60
+      # 品牌图上传大小上限（字节，默认 2MB）
+      asset-max-bytes: 2097152
   agent:
     chat:
       # 单次上传附件数量上限（chat-runtime-hardening T-01；2026-10-25 用户：做成系统配置，默认 50）

@@ -50,3 +50,19 @@
   ④ 缓存行为：改库为 `#123456` 后 60s 内接口仍返回 `#006BE6`；65s 后返回 `#123456`；还原后回 `#006BE6` ✅
 - 踩坑：把 `phoenix:` 块**追加**到 application.yml 产生重复顶层键 ⇒ SnakeYAML `DuplicateKeyException`，后端启动失败（502）；
   已合并为单块。**教训：改 yml 后必须看启动日志，不能只看编译通过**
+
+## 2026-10-25 T-03 / T-04 完成（写接口 + 上传，实测含越权）
+
+**T-03 超管更新**
+- `PUT /platform/brand-config`：**token 显式解析** + `AdminRoleGuard` 校验超管 + 名称/色值/URL 校验 + 审计 + 清缓存
+- 实测：①超管合法值 → 200 且库更新（`by=1000000000000000001`）②GET 立即反映新值（缓存已清）
+  ③`primaryColor=red` → 「主题色需为 #RRGGBB 格式」④名称 41 字 → 「系统名称长度需在 1~40 字」
+  ⑤`logoUrl=javascript:...` → 「需为 / 开头或 http(s)」⑥**临时移除 admin 角色后 PUT → 「仅超级管理员可修改品牌配置」且未落库**，
+  随后角色已恢复（3 行）
+
+**T-04 品牌图上传**
+- `POST /platform/brand-config/asset`：2MB（`phoenix.platform.brand.asset-max-bytes`）+ 白名单 png/jpg/jpeg/webp/ico + **不开放 SVG**
+- 实测：png → 返回 `data=URL`；svg/exe → 拒绝；3MB → 「文件过大（3145732 字节），上限 2097152 字节」；无 token → 401
+- **踩坑**：大文件 multipart 下 `StpUtil.getLoginIdAsString()` 抛 `SaTokenContextException`（Reactor 上下文未初始化）
+  ⇒ 改为 `StpUtil.getLoginIdByToken(token)` 显式解析，PUT 与上传统一
+- **踩坑**：`ReturnVo.ok(url)` 命中了 `ok(String msg)` 重载 ⇒ URL 落到 msg、data 为 null ⇒ 改为 `ok("上传成功", url)`
