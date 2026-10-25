@@ -139,3 +139,10 @@
 - 合并将带入 **28 个文件**（10 新增 Java + 1 新增 Vue + 2 新增 TS + 迁移件/回滚件 + 发布说明/MILESTONE/台账）
 - 临时 worktree 已清理（当前仓库仍为 1 个 worktree，分支未被改动）
 - 结论：**满足合并条件，等用户口令执行**
+
+## 2026-10-25 补验两处边界（ico 上传 / 保存失败可见）
+
+- **`.ico` 上传**：最小合法 ico（70 字节）→ `{"success":true,"data":"data-agent/brand/….ico"}`；白名单含 ico ✅
+- **保存失败必须弹错**（T-07 验收项）：Playwright 拦截 `PUT /platform/brand-config` 返回 500 →
+  页面出现错误提示（`保存失败` / `模拟服务端错误` 命中 = true），**不静默** ✅
+- 品牌数据未被这两次验证污染（仍为默认 `Phoenix Agent / #006BE6`）
