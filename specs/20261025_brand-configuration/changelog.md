@@ -36,3 +36,17 @@
   ⑥ 回滚件执行后表消失、重新应用后恢复（行数 1）
 - **已知偏差（已写入迁移件注释与升级说明待办）**：浏览器标签标题将从现状 `Phoenix Admin`
   变为 `<system_name> - 页面名`（R-01「三处统一」的必然结果，非缺陷）
+
+## 2026-10-25 T-02 完成（匿名 GET + 60s 缓存，实测）
+
+- 新增：`BrandConfig`（实体）/`BrandConfigVO`（record，仅 4 公开字段）/`BrandConfigMapper`/
+  `BrandConfigService(+Impl)`/`BrandConfigController`；`application.yml` 增 `phoenix.platform.brand.cache-seconds: 60`
+- Sa-Token 白名单增 `/platform/brand-config`（登录页渲染前需要）；**注意**：路径级排除对 PUT 同样生效
+  ⇒ T-03 的写接口必须在方法内自校验超管（已写入代码注释）
+- **实测**：
+  ① 匿名 `GET /platform/brand-config` → `{systemName:Phoenix Agent, logoUrl:/imgs/logo.png, faviconUrl:/favicon.ico, primaryColor:#006BE6}` ✅
+  ② 响应**不含** updatedBy/createTime/updateTime ✅
+  ③ 带 token 结果与匿名一致 ✅
+  ④ 缓存行为：改库为 `#123456` 后 60s 内接口仍返回 `#006BE6`；65s 后返回 `#123456`；还原后回 `#006BE6` ✅
+- 踩坑：把 `phoenix:` 块**追加**到 application.yml 产生重复顶层键 ⇒ SnakeYAML `DuplicateKeyException`，后端启动失败（502）；
+  已合并为单块。**教训：改 yml 后必须看启动日志，不能只看编译通过**

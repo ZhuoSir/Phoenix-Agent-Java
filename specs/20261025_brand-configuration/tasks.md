@@ -16,7 +16,7 @@
     `faviconUrl=/favicon.ico`）；重复执行幂等（第二次数 0 行变更）；rollback 件可执行。
   验收标准: 四条断言全过并贴输出。
 
-- [ ] T-02 服务 + 匿名 GET（4 公开字段 + 60s 缓存）
+- [x] T-02 服务 + 匿名 GET（4 公开字段 + 60s 缓存）
   关联: R-01, R-02, R-03
   依赖: T-01
   验证方式: 无 token `curl GET /api/chat/attachment/...` 同款方式调 `GET /api/platform/brand-config` → 200 且

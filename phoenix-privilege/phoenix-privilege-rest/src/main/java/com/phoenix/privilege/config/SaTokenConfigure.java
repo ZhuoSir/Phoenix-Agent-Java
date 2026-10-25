@@ -59,7 +59,10 @@ public class SaTokenConfigure implements WebFilter {
                 .addInclude("/api/**", "/platform/**")
                 .addExclude("favicon.ico", "/api/privilege/auth/*", "/api/auth/*",
                           // 附件上限：登录页/未登录也要拿到一致的上限提示（只读、无敏感信息）
-                          "/api/chat/attachment/limit")
+                          "/api/chat/attachment/limit",
+                          // 品牌公开信息：登录页渲染前就需要（只读，仅 4 个公开字段）；
+                          // 注意：路径级排除对 PUT 同样生效 ⇒ 写接口必须在方法内自行校验超管（T-03）
+                          "/platform/brand-config")
                 .setAuth(r -> StpUtil.checkLogin())
                 .setError(e -> {
                     log.error("---------- sa全局异常 ", e);

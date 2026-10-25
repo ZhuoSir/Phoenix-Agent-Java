@@ -50,6 +50,11 @@ logging:
 # 说明：以下为**默认值**，环境变量可覆盖（Spring 宽松绑定：短横线去掉，
 # 如 attachment-chunk-size → PHOENIX_AGENT_CHAT_ATTACHMENTCHUNKSIZE）
 phoenix:
+  # ===== 品牌外观配置（brand-configuration T-02）=====
+  # 品牌**业务值**存 DB（tbl_platform_brand_config，运行时可改）；此处仅工程参数（缓存秒数，0=不缓存）
+  platform:
+    brand:
+      cache-seconds: 60
   agent:
     chat:
       # 单次上传附件数量上限（chat-runtime-hardening T-01；2026-10-25 用户：做成系统配置，默认 50）
