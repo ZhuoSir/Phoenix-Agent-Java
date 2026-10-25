@@ -1,6 +1,6 @@
-const MARKED_URL = 'https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js';
+const MARKED_URL = '/js/vendor/marked.min.js';
 const ECHARTS_URL =
-  'https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js';
+  '/js/vendor/echarts.min.js';
 
 function escapeForHtml(text: string): string {
   return text

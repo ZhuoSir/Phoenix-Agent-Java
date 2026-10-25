@@ -3,6 +3,7 @@ import { createApp, watchEffect } from 'vue';
 import { registerAccessDirective } from '@vben/access';
 import { registerLoadingDirective, setDefaultModalProps } from '@vben/common-ui';
 import { preferences } from '@vben/preferences';
+import { addAPIProvider } from '@vben/icons';
 import { initStores } from '@vben/stores';
 import '@vben/styles';
 import '@vben/styles/ele';
@@ -16,6 +17,15 @@ import { initComponentAdapter } from './adapter/component';
 import { initSetupVbenForm } from './adapter/form';
 import App from './app.vue';
 import { router } from './router';
+
+// 图标本地化（offline-icons R-01）：把 Iconify 默认 API provider 指向本站静态目录 /icons，
+// 运行时只请求本站（不再访问 https://api.iconify.design），适配内网离线环境。
+addAPIProvider('', {
+  resources: ['/icons'],
+  maxURL: 512,
+  rotate: 750,
+  timeout: 2000,
+});
 
 async function bootstrap(namespace: string) {
   // 初始化组件适配器

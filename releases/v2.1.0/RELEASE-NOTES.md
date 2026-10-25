@@ -38,6 +38,17 @@
   **已知偏差**：浏览器标签标题由旧版 `Phoenix Admin` 变为 `<系统名称> - 页面名`（R-01「三处统一」的必然结果）。
 - 支持 **Xinference**（Xorbits Inference）接入：`provider=custom` + `base_url=.../v1`，零代码（详见 `docs/XINFERENCE.md`）。
 
+## 四之二、内网离线资源（offline-icons / BL-74）
+
+| 资源 | 位置 | 体积 | 说明 |
+|---|---|---|---|
+| 图标集合（Iconify） | 前端产物 `/icons/{lucide,ant-design,ep,meteor-icons,fluent-mdl2}.json` | 2.3MB | 运行期 Iconify provider 指向本站 `/icons`，**不再访问 `api.iconify.design`** |
+| 报表 vendor | 前端产物 `/js/vendor/{marked.min.js,echarts.min.js}` | 1.2MB | 报表 HTML 引用本站路径，**不再访问 jsDelivr** |
+
+- 更新方式：替换 `apps/admin-ui/public/icons/*.json` 或 `public/js/vendor/*` 后重新构建前端即可（取自 `@iconify-json/*` 与 `marked`/`echarts` 包内文件）
+- nginx 对 `/icons/`、`/js/vendor/` 采用 `try_files $uri =404`：缺失文件返回 404，不会静默回落 index.html
+- 实测：拦截 `api.iconify.design`/`cdn.jsdelivr.net` 后，登录并遍历主要页面 → 外网请求 **0**、图标 404 **0**、破损图标 **0**
+
 ## 五、已知限制
 
 - 前端暂未提供"重试"入口（超时后重试落新消息的能力后端已具备）。
