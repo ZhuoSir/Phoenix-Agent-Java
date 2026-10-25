@@ -94,7 +94,7 @@ import {
 } from '#/api/core/chatAttachment';
 import type { ChatAttachmentMeta } from '@phoenix/chat-shared';
 import {
-  ATTACHMENT_MAX_FILES_PER_SEND,
+  getAttachmentMaxFiles,
   attachmentCountMessage,
   validateAttachmentsLocally,
 } from '@phoenix/chat-shared';
@@ -673,7 +673,7 @@ async function onAttachmentPicked(event: Event) {
     return;
   }
   const existed = pendingAttachments.value.get(sid) || [];
-  if (existed.length + files.length > ATTACHMENT_MAX_FILES_PER_SEND) {
+  if (existed.length + files.length > getAttachmentMaxFiles()) {
     ElMessage.error(attachmentCountMessage(existed.length + files.length));
     return;
   }

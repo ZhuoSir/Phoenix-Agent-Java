@@ -52,6 +52,8 @@ logging:
 phoenix:
   agent:
     chat:
+      # 单次上传附件数量上限（chat-runtime-hardening T-01；2026-10-25 用户：做成系统配置，默认 50）
+      attachment-max-count: 50
       # 触发分批的字符阈值（原"截断阈值"语义已改为"分批阈值"）
       attachment-max-extract-chars: 24000
       # 抽取安全上限（防 OOM）：只有超过它才真截断并提示

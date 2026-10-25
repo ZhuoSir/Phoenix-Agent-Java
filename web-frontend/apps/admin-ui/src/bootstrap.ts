@@ -78,6 +78,37 @@ async function bootstrap(namespace: string) {
     }
   });
 
+  // 附件单次上传上限：后端下发（application.yml: phoenix.agent.chat.attachment-max-count）
+
+  // 失败保持构建期默认，不阻塞启动
+
+  try {
+
+    const resp = await fetch('/api/chat/attachment/limit', {
+
+      headers: { 'phoenix-token': localStorage.getItem('phoenix-token') ?? '' },
+
+    });
+
+    const body: any = await resp.json();
+
+    const maxCount = body?.data?.maxCount;
+
+    if (typeof maxCount === 'number' && maxCount > 0) {
+
+      const { setAttachmentMaxFiles } = await import('@phoenix/chat-shared');
+
+      setAttachmentMaxFiles(maxCount);
+
+    }
+
+  } catch {
+
+    // 忽略：回落到构建期默认值
+
+  }
+
+
   app.mount('#app');
 }
 

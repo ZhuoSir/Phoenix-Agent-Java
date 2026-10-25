@@ -39,10 +39,30 @@ const ENV_MAX_FILES_PER_SEND = Number(
   (import.meta.env as Record<string, string | undefined> | undefined)
     ?.VITE_ATTACHMENT_MAX_FILES ?? '',
 );
-export const ATTACHMENT_MAX_FILES_PER_SEND =
-  Number.isFinite(ENV_MAX_FILES_PER_SEND) && ENV_MAX_FILES_PER_SEND > 0
+const BUILD_DEFAULT_MAX_FILES = 50;
+
+/** 运行期覆盖值（后端 `GET /api/chat/attachment/limit` 下发；null=未拉取） */
+let runtimeMaxFiles: null | number = null;
+
+/** 启动时由后端下发上限（失败保持构建期默认） */
+export function setAttachmentMaxFiles(n: null | number): void {
+  if (typeof n === 'number' && Number.isFinite(n) && n > 0) {
+    runtimeMaxFiles = Math.floor(n);
+  }
+}
+
+/** 当前生效的单次上传上限：运行期下发 > 构建期 env > 默认 50 */
+export function getAttachmentMaxFiles(): number {
+  if (runtimeMaxFiles !== null) {
+    return runtimeMaxFiles;
+  }
+  return Number.isFinite(ENV_MAX_FILES_PER_SEND) && ENV_MAX_FILES_PER_SEND > 0
     ? ENV_MAX_FILES_PER_SEND
-    : 20;
+    : BUILD_DEFAULT_MAX_FILES;
+}
+
+/** @deprecated 改用 getAttachmentMaxFiles()（值可能在运行期变化） */
+export const ATTACHMENT_MAX_FILES_PER_SEND = BUILD_DEFAULT_MAX_FILES;
 
 /** 类型不符的统一文案（R-03） */
 export const ATTACHMENT_TYPE_MESSAGE =
@@ -80,7 +100,7 @@ export function attachmentSizeMessage(): string {
 }
 
 export function attachmentCountMessage(actual: number): string {
-  return `单次最多上传 ${ATTACHMENT_MAX_FILES_PER_SEND} 个附件（当前 ${actual} 个）`;
+  return `单次最多上传 ${getAttachmentMaxFiles()} 个附件（当前 ${actual} 个）`;
 }
 
 /** 本地预校验：返回每个文件的拒绝原因（null = 通过），供两端复用同一规则 */

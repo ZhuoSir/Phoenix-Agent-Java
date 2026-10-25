@@ -12,7 +12,7 @@ import { setExplicitSkillIds, setPendingAttachments } from '../api-transport';
 
 import type { ChatAttachmentMeta } from '@phoenix/chat-shared';
 import {
-  ATTACHMENT_MAX_FILES_PER_SEND,
+  getAttachmentMaxFiles,
   attachmentCountMessage,
   validateAttachmentsLocally,
 } from '@phoenix/chat-shared';
@@ -116,7 +116,7 @@ async function onAttachmentsPicked(event: Event) {
   }
   if (!sid) return;
   const existed = attachmentDrafts.value.get(sid) || [];
-  if (existed.length + files.length > ATTACHMENT_MAX_FILES_PER_SEND) {
+  if (existed.length + files.length > getAttachmentMaxFiles()) {
     ElMessage.error(attachmentCountMessage(existed.length + files.length));
     return;
   }

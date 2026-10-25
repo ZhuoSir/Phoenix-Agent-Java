@@ -4,7 +4,7 @@ import { storeToRefs } from 'pinia';
 import { useChatStore } from '@phoenix/chat-shared';
 import type { ChatAttachmentMeta } from '@phoenix/chat-shared';
 import {
-  ATTACHMENT_MAX_FILES_PER_SEND,
+  getAttachmentMaxFiles,
   attachmentCountMessage,
   validateAttachmentsLocally,
 } from '@phoenix/chat-shared';
@@ -69,7 +69,7 @@ async function onPicked(event: Event) {
   const sid = activeSessionId.value;
   if (!sid) { showToast('请先选择或创建会话'); return; }
   const existed = drafts.value.get(sid) || [];
-  if (existed.length + files.length > ATTACHMENT_MAX_FILES_PER_SEND) {
+  if (existed.length + files.length > getAttachmentMaxFiles()) {
     showToast(attachmentCountMessage(existed.length + files.length));
     return;
   }
