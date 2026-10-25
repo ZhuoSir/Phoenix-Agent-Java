@@ -57,7 +57,9 @@ public class SaTokenConfigure implements WebFilter {
     public SaReactorFilter getSaReactorFilter() {
         return new SaReactorFilter()
                 .addInclude("/api/**", "/platform/**")
-                .addExclude("favicon.ico", "/api/privilege/auth/*", "/api/auth/*")
+                .addExclude("favicon.ico", "/api/privilege/auth/*", "/api/auth/*",
+                          // 附件上限：登录页/未登录也要拿到一致的上限提示（只读、无敏感信息）
+                          "/api/chat/attachment/limit")
                 .setAuth(r -> StpUtil.checkLogin())
                 .setError(e -> {
                     log.error("---------- sa全局异常 ", e);
