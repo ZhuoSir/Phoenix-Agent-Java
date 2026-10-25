@@ -1147,3 +1147,15 @@
   4. 生效值必须在启动日志打印（本次 `[attachment-batch] 生效配置: …`），便于现场核对；
   5. env 覆盖命名规则：Spring 宽松绑定**短横线去掉**（`attachment-chunk-size` → `PHOENIX_AGENT_CHAT_ATTACHMENTCHUNKSIZE`）。
 - **落地**：`application.yml` 的 `phoenix.agent.chat.attachment-*` 六项；compose 已移除对应 env（提交 `94649598`）。
+
+## L-107 `@AllArgsConstructor` 类里加 `@Value` 字段 ⇒ 启动即 `No qualifying bean of type int/String`
+- 分类: Spring / 工具
+- 触发场景: chat-runtime-hardening T-03 给 `ChatAttachmentController` 加
+  `@Value("${phoenix.agent.chat.attachment-max-count:20}") private int attachmentMaxCount;`
+- 坑: 该类原本是 `@AllArgsConstructor`（Lombok 的 all-args **包含非 final 字段**）⇒ 构造器多出 `int` 形参 ⇒
+  Spring 试图按类型注入 `int`，报 `NoSuchBeanDefinitionException: No qualifying bean of type 'int'`，
+  容器启动失败（日志里只有 bean 创建栈，不点名字段，很容易误判成"新加的依赖没注入"）
+- 规则: 给已有类加 `@Value` **字段注入**时，先看 Lombok 注解 ——
+  ① `@AllArgsConstructor` ⇒ 改成 `@RequiredArgsConstructor`（只保留 final 字段构造），或
+  ② 字段改走 `@Value` 的 setter，或 ③ 该类本来就用 `@RequiredArgsConstructor`（如 `HarnessModelRegistry`）则安全
+  验证最小动作：**编译通过 ≠ 能启动**，涉及 Spring 装配的改动必须真起一次容器

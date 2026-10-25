@@ -15,8 +15,11 @@ public interface ChatAttachmentService {
 	/** 单文件大小上限（R-04，20MB） */
 	long MAX_FILE_BYTES = 20L * 1024 * 1024;
 
-	/** 单次上传数量上限（R-04，5 个） */
-	int MAX_FILES_PER_REQUEST = 5;
+	/**
+	 * 单次上传数量上限（R-04；chat-runtime-hardening T-01/T-03：默认由 5 调为 20）。
+	 * 运行期以配置 {@code phoenix.agent.chat.attachment-max-count} 为准，本常量作为兜底默认值。
+	 */
+	int MAX_FILES_PER_REQUEST = 20;
 
 	/**
 	 * 批量上传：逐个做「扩展名 + 真实内容类型」双判定与大小校验，合法者落盘并落库。

@@ -19,3 +19,39 @@
   附件上限 20（安全 50）/ 首帧超时 600s / thinking 默认开 / 熔断阈值 5 / Xinference 方案 A。
 - 按 git-workflow §三.3：文档全部落在版本分支 `2.1.0` 后，从 `2.1.0` 切施工分支
   **`feature/chat-runtime-hardening`**（命名=spec 目录去掉日期）。
+
+## 2026-10-24 T-15 可行性实测（Xinference 接入方式）
+- 结论：**Xinference 可用"零代码"接入** —— `provider=custom` + `base_url=http://<xinference>:<port>/v1` + `model_name`，
+  `DynamicModelFactory` 对非 ollama 的 provider 统一走 `OpenAiApi`（`completionsPath/embeddingsPath` 可配）。
+- 实测（v2.1.0 栈 + 本机 OpenAI 兼容 mock，模拟 Xinference `/v1`）：
+  · `POST /api/model-config/test`（provider=custom, base_url=http://host.docker.internal:9000/v1, CHAT）
+    → **"连接测试成功！模型可用。"**
+  · 同参数 EMBEDDING（`/v1/embeddings`）→ **同样成功**
+- 未覆盖（显式标注）：真实 Xinference 实例（本机未安装，用 mock 替代）；**流式（SSE）与工具调用**未在本次测试端点中验证，
+  留到 T-17/T-18 联调；`/v1/models` 非必需（未依赖）。
+
+## 2026-10-24 T-17 / T-18 运行时验证（真栈实测）
+环境：`phoenix-backend:2.1.0-crh`（用本次改动后的 jar 造的镜像）+ 全新库，端口 9091；OpenAI 兼容 mock 模拟 Xinference。
+- **T-17 默认值回归**
+  · 附件上限：**21 个 → 拒**（`单次最多上传 20 个附件（当前 21 个）`）；**20 个 → accepted=20 rejected=0** ✅
+  · 首帧超时：容器 env `PHOENIX_AGENT_MODEL_FIRST_FRAME_TIMEOUT_SECONDS=600` ✅（`@Value` 默认同步 600）
+  · 熔断阈值：`@Value("${phoenix.agent.tool-repeat-breaker-threshold:5}")` ✅（功能级"不误伤"验证需可复现的重复调用模型，未覆盖）
+- **T-18 冒烟/回归**
+  · 登录 ✅；知识库 `POST /api/knowledge-base/query/page` ✅；归属体检 ✅
+  · 模型连接测试（provider=custom + `http://host.docker.internal:9000/v1`）→ **连接测试成功** ✅
+  · **R-09 五项门禁：PASS（可判定项全绿）** ✅
+  · **未覆盖（如实）**：端到端对话（受 BUG-200 阻塞：前台 chat 对 sn 空智能体 500）；知识库"入库→检索"（该栈 embedding 仍为种子占位 key）
+- **本轮抓到的真 bug（已修 + 记 L-107）**：给 `@AllArgsConstructor` 的 `ChatAttachmentController` 加 `@Value` 字段 ⇒
+  构造器多出 `int` 形参 ⇒ 启动即 `NoSuchBeanDefinitionException: No qualifying bean of type 'int'`；
+  改为 `@RequiredArgsConstructor` 后正常。**编译通过 ≠ 能启动**。
+
+## 2026-10-24 T-12 用户现场确认
+- 用户确认后台回话的**思考区已正常显示**（前端 `components/run/index.vue` 渲染 + 后端 SSE `thinking` 帧 + `metadata.thinking`）。
+- T-12 勾选完成；后端供数链路见 BUG-201（agentscope 2.0.4 升级 + 三处映射修复）。
+
+## 2026-10-25 收尾（T-19）与合并
+
+- **用户指令**：「收尾，合并吧」
+- tasks v1.0.0 → **v1.1.0**：T-09（重试落新消息）**作废转 BL-73**（前端无重试入口）；T-19 勾选完成
+- 新增 `completion.md`：18/19 完成 + 1 作废；含默认值变更表（附件 5→20 / 首帧 180→600 / 熔断 3→5 / agentscope 2.0.0→2.0.4）
+- 合并入 `2.1.0`（merge --no-ff），合并后重新构建部署并验证 **thinking 帧**在 2.1.0 上生效

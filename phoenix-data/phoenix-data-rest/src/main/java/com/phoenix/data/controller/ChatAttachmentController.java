@@ -8,7 +8,7 @@ import com.phoenix.data.service.chat.ChatAttachmentService;
 import com.phoenix.data.vo.ApiResponse;
 import com.phoenix.data.vo.ChatAttachmentUploadResultVO;
 import com.phoenix.data.vo.ChatAttachmentVO;
-import lombok.AllArgsConstructor;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.buffer.DataBufferLimitException;
@@ -49,13 +49,17 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/chat/attachment")
 @CrossOrigin(origins = "*")
-@AllArgsConstructor
+@RequiredArgsConstructor
 public class ChatAttachmentController {
 
 	private final ChatAttachmentService chatAttachmentService;
 
 	/** R-11：超管豁免沿用 R-18/R-08 同一守卫（单一口径，不新造判定） */
 	private final AdminRoleGuard adminRoleGuard;
+
+	/** chat-runtime-hardening T-01/T-03：单次上传数量上限（默认 20；phoenix.agent.chat.attachment-max-count 可覆盖） */
+	@org.springframework.beans.factory.annotation.Value("${phoenix.agent.chat.attachment-max-count:20}")
+	private int attachmentMaxCount = 20;
 
 	@PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
 	public Mono<ApiResponse<ChatAttachmentUploadResultVO>> upload(ServerWebExchange exchange,
@@ -69,9 +73,10 @@ public class ChatAttachmentController {
 			if (fileParts.isEmpty()) {
 				return Mono.just(ApiResponse.error("未收到文件"));
 			}
-			// R-04：数量上限，提示含具体上限值
-			if (fileParts.size() > ChatAttachmentService.MAX_FILES_PER_REQUEST) {
-				return Mono.just(ApiResponse.error("单次最多上传 " + ChatAttachmentService.MAX_FILES_PER_REQUEST + " 个附件（当前 "
+			// R-04：数量上限，提示含具体上限值（T-01/T-03：上限可配置，默认 20）
+			int maxFiles = attachmentMaxCount > 0 ? attachmentMaxCount : ChatAttachmentService.MAX_FILES_PER_REQUEST;
+			if (fileParts.size() > maxFiles) {
+				return Mono.just(ApiResponse.error("单次最多上传 " + maxFiles + " 个附件（当前 "
 						+ fileParts.size() + " 个）"));
 			}
 			String sessionId = firstFormValue(parts.get("sessionId"));

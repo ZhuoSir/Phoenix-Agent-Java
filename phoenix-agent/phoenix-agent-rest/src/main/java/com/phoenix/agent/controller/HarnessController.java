@@ -85,7 +85,11 @@ public class HarnessController {
                     } else if (event instanceof TextBlockDeltaEvent textEvent) {
                         eventMap.put("content", textEvent.getDelta());
                     } else if (event instanceof ThinkingBlockDeltaEvent thinkingEvent) {
-                        eventMap.put("content", thinkingEvent.getDelta());
+                        // 修复：思考增量**不能**塞进 content（会污染正文），走独立 thinking 键
+                        eventMap.put("thinking", thinkingEvent.getDelta());
+                    } else if (event instanceof io.agentscope.core.event.TextBlockStartEvent
+                            || event instanceof io.agentscope.core.event.TextBlockEndEvent) {
+                        // 文本块开始/结束边界事件，无内容，静默忽略（避免 Unhandled 噪音 WARN）
                     } else if (event instanceof ThinkingBlockStartEvent || event instanceof ThinkingBlockEndEvent) {
                         // 思考开始/结束事件，无需处理，静默忽略
                     } else if (!(event instanceof CustomEvent)) {

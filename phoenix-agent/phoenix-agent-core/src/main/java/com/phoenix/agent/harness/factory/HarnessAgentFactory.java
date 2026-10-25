@@ -55,7 +55,7 @@ import java.util.List;
 public class HarnessAgentFactory {
 
     /** BUG-188：同一工具连续重复调用多少次后熔断（默认 3） */
-    @org.springframework.beans.factory.annotation.Value("${phoenix.agent.tool-repeat-breaker-threshold:3}")
+    @org.springframework.beans.factory.annotation.Value("${phoenix.agent.tool-repeat-breaker-threshold:5}")
     private int toolRepeatBreakerThreshold;
 
     /** 工作区（与存量自注册智能体保持一致，避免两套目录） */

@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>GJB 图标 · 透明版预览</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { margin:0; font:14px/1.6 -apple-system,"PingFang SC","Microsoft YaHei",sans-serif; background:#f5f6f8; color:#1f2937; }
+  section { padding:32px 40px; border-bottom:1px solid #e5e7eb; }
+  section.dark { background:#1e293b; color:#e5e7eb; border-bottom-color:#334155; }
+  h2 { font-size:15px; font-weight:600; margin:0 0 20px; opacity:.7; letter-spacing:.02em; }
+  .row { display:flex; align-items:flex-end; gap:40px; flex-wrap:wrap; }
+  figure { margin:0; text-align:center; }
+  figure img { display:block; margin:0 auto 8px; }
+  figcaption { font-size:12px; opacity:.55; }
+  .chip { display:inline-flex; align-items:center; gap:10px; padding:6px 14px 6px 8px; border-radius:999px; font-weight:600; letter-spacing:.04em; }
+  .chip.light { background:#fff; box-shadow:0 1px 2px rgba(0,0,0,.08); }
+  .chip.dark { background:#0f172a; color:#fff; }
+  .chip img { width:26px; height:26px; }
+  code { background:rgba(125,125,125,.15); padding:2px 6px; border-radius:4px; font-size:12px; }
+</style>
+</head>
+<body>
+
+<section>
+  <h2>深色描边版（gjb-logo-ink-*.png）· 浅色界面使用</h2>
+  <div class="row">
+    <figure><img src="gjb-logo-ink-256.png" width="160" height="160" alt="GJB 图标 160"><figcaption>160px</figcaption></figure>
+    <figure><img src="gjb-logo-ink-128.png" width="96" height="96" alt="GJB 图标 96"><figcaption>96px</figcaption></figure>
+    <figure><img src="gjb-logo-ink-128.png" width="48" height="48" alt="GJB 图标 48"><figcaption>48px</figcaption></figure>
+    <figure><img src="gjb-logo-ink-128.png" width="32" height="32" alt="GJB 图标 32"><figcaption>32px（favicon 尺度）</figcaption></figure>
+    <figure>
+      <div class="chip light"><img src="gjb-logo-ink-128.png" alt="">GJB 标准化</div>
+      <figcaption style="margin-top:8px">与文字组合</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section class="dark">
+  <h2>白色描边版（gjb-logo-transparent-*.png）· 深色界面使用</h2>
+  <div class="row">
+    <figure><img src="gjb-logo-transparent-256.png" width="160" height="160" alt="GJB 图标 160"><figcaption>160px</figcaption></figure>
+    <figure><img src="gjb-logo-transparent-128.png" width="96" height="96" alt="GJB 图标 96"><figcaption>96px</figcaption></figure>
+    <figure><img src="gjb-logo-transparent-128.png" width="48" height="48" alt="GJB 图标 48"><figcaption>48px</figcaption></figure>
+    <figure><img src="gjb-logo-transparent-128.png" width="32" height="32" alt="GJB 图标 32"><figcaption>32px（favicon 尺度）</figcaption></figure>
+    <figure>
+      <div class="chip dark"><img src="gjb-logo-transparent-128.png" alt="">GJB 标准化</div>
+      <figcaption style="margin-top:8px">与文字组合</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section>
+  <h2>用法</h2>
+  <p><code>&lt;img src="/icons/gjb-logo-transparent-128.png" width="32" height="32" alt="GJB"&gt;</code></p>
+  <p>两张图都没有圆角、没有底色，透明区域可以直接叠在任意背景上；小尺寸建议用 128px 图按需缩放，或用 256px 图做 2x 屏。</p>
+</section>
+
+</body>
+</html>

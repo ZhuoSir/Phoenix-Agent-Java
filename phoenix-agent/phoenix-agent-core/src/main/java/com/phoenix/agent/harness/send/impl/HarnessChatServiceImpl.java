@@ -4,6 +4,7 @@ import com.alibaba.cloud.ai.graph.NodeOutput;
 import com.alibaba.cloud.ai.graph.OverAllState;
 import com.alibaba.cloud.ai.graph.StateGraph;
 import com.alibaba.cloud.ai.graph.streaming.StreamingOutput;
+import com.phoenix.agent.harness.support.TodoStateRepair;
 import com.phoenix.agent.harness.agent.HarnessStaticLoader;
 import com.phoenix.agent.harness.factory.HarnessAgentRegistry;
 import com.phoenix.data.exception.InvalidInputException;
@@ -42,6 +43,10 @@ import java.util.Map;
 @Component
 @RequiredArgsConstructor
 public class HarnessChatServiceImpl implements HarnessChatService {
+    /** 诊断：首次 thinking 增量只打一条 INFO（避免刷屏） */
+    private static final java.util.concurrent.atomic.AtomicBoolean THINKING_SEEN =
+            new java.util.concurrent.atomic.AtomicBoolean(false);
+
 
     /** T-06：附件装配器（attachmentIds 为空即短路，S1' 既有行为不变） */
     private final com.phoenix.agent.harness.attachment.ChatAttachmentAssembler attachmentAssembler;
@@ -135,11 +140,17 @@ public class HarnessChatServiceImpl implements HarnessChatService {
         Flux<NodeOutput> body = mcpMountService
             .withMcp(harnessAgent, request.getAgentId(), request.getSessionId(),
                 effectiveMcp(request.getChannel(), request.getUserId(), request.getAgentId()))
-            .flatMapMany(agent -> attachmentAssembler
-                .prepare(request.getAttachmentIds(), request.getUserId(), text -> progressSink.tryEmitNext(noticeOutput(text)), request.getMessage())
-                .doFinally(sig -> progressSink.tryEmitComplete())
-                .flatMapMany(ctx -> agent
-                    .streamEvents(buildUserMessage(request, ctx), buildRuntimeContext(request, injection.block())))
+              .flatMapMany(agent -> attachmentAssembler
+                  .prepare(request.getAttachmentIds(), request.getUserId(),
+                      text -> progressSink.tryEmitNext(noticeOutput(text)), request.getMessage())
+                  .doFinally(sig -> progressSink.tryEmitComplete())
+                  .flatMapMany(ctx -> {
+                      // BUG-205：从**运行时上下文**取 AgentState（agent.getAgentState() 在此路径为 null），
+                      // 轮次开始前把 todo 规范化为「最多一个 in_progress」，避免上一轮被强行终止留下的脏状态绊住模型
+                      io.agentscope.core.agent.RuntimeContext rt = buildRuntimeContext(request, injection.block());
+                      TodoStateRepair.normalize(rt, agent);
+                      return agent.streamEvents(buildUserMessage(request, ctx), rt);
+                  })
                 .map(event -> toNodeOutput(event, sessionId, textDeltaSeen, effMaxIters)));
         Flux<NodeOutput> merged = Flux.merge(progressSink.asFlux(), body);
         // BL-19：轮末扫 workspace 产物。END 帧从 body 中剥离、在扫描事件之后统一补发——
@@ -207,7 +218,29 @@ public class HarnessChatServiceImpl implements HarnessChatService {
                 .toList();
         Map<String, Object> data = new HashMap<>();
         data.put("agent_files", com.phoenix.data.util.JsonUtil.getObjectMapper().writeValueAsString(payload));
-        return Flux.just(NodeOutput.of("harness_agent", "harness", new OverAllState(data), null));
+        // R-02/T-05：**正文里给出生成物路径/下载入口**（同一帧既带正文增量、又带 agent_files 状态）
+        StringBuilder notice = new StringBuilder("\n\n📎 本轮生成文件（").append(files.size()).append(" 个）：");
+        for (AgentFile f : files) {
+            String path = (f.getRelPath() == null || f.getRelPath().isBlank()) ? f.getFileName() : f.getRelPath();
+            notice.append("\n- ").append(path).append("（").append(humanSize(f.getSizeBytes())).append("）")
+                    .append("　[下载](/api/agent/files/").append(f.getId()).append("/download)");
+        }
+        return Flux.just(new StreamingOutput<>(notice.toString(), "harness_agent", "harness",
+                new OverAllState(data), null));
+    }
+
+    /** 生成物体积的可读格式（R-02/T-05 正文提示用） */
+    private static String humanSize(Long bytes) {
+        if (bytes == null || bytes <= 0) {
+            return "0B";
+        }
+        if (bytes < 1024) {
+            return bytes + "B";
+        }
+        if (bytes < 1024 * 1024) {
+            return (bytes / 1024) + "KB";
+        }
+        return String.format("%.1fMB", bytes / 1024.0 / 1024.0);
     }
 
     /** 拒绝原因用内容增量事件承载，前端 content 直接可见 */
@@ -412,11 +445,24 @@ public class HarnessChatServiceImpl implements HarnessChatService {
         }
         // 2b. 思考内容增量事件（DeepSeek-R1 等深度思考模型）
         if (event.getType() == AgentEventType.THINKING_BLOCK_DELTA && event instanceof ThinkingBlockDeltaEvent thinkingEvent) {
+            if (THINKING_SEEN.compareAndSet(false, true)) {
+                log.info("[thinking] 首次收到思考增量 session={}, len={} ⇒ 模型已返回 reasoning",
+                        sessionId, thinkingEvent.getDelta() == null ? 0 : thinkingEvent.getDelta().length());
+            }
             // thinking-display R-01：思考增量不再伪装成正文 chunk——经 thinking_text 状态键走
             // 独立通道，由 mapper 透出 eventMap.thinking；content 从此只含回答正文
             Map<String, Object> thinkingData = new HashMap<>();
             thinkingData.put("thinking_text", thinkingEvent.getDelta());
             return NodeOutput.of("harness_agent", "harness", new OverAllState(thinkingData), null);
+        }
+        // 2c. 停止事件（工具熔断/框架请求停止）：原因**必须让用户看见**，不能静默结束
+        if (event instanceof io.agentscope.core.event.RequestStopEvent stopEvent) {
+            String reason = stopEvent.getReason();
+            String text = (reason == null || reason.isBlank())
+                    ? "\n\n⚠️ 本轮已被停止。"
+                    : "\n\n⚠️ " + reason;
+            log.info("[turn] 收到停止事件 session={}, reason={}", sessionId, reason);
+            return new StreamingOutput<>(text, "harness_agent", "harness", new OverAllState(new HashMap<>()));
         }
         // 3. 结束事件
         if (event.getType() == AgentEventType.AGENT_END) {
