@@ -18,3 +18,21 @@
 - 用户「BL-66 确认」→ plan 定版 v1.0.0（陈卓 2026-10-25）
 - 方案要点：单行表 + 匿名 GET（4 公开字段）+ 超管 PUT/上传 + 前端启动拉取注入 CSS 变量
 - 坑核对 112 条相交 5 条（L-113 例外理由已记录）；共享面 5 行；日志 5 条；被拒方案 5 个；风险 5 条
+
+## 2026-10-25 tasks v1.0.0 确认③ + 建施工分支
+
+- 用户「确认」→ tasks 定版 v1.0.0（陈卓 2026-10-25）
+- 三重确认自检：requirements v1.0.0 / plan v1.0.0 / tasks v1.0.0 均「已确认」且确认人非空
+- 施工分支：`feature/brand-configuration`（自 `2.1.0`）
+
+## 2026-10-25 T-01 完成（建表 + 默认值，真库断言全过）
+
+- `sql/V2.1.0_04__brand_config.sql`（+ rollback + `releases/v2.1.0/sql/` 镜像）：单行表 `tbl_platform_brand_config`
+  （`CHECK (id=1)` 单行约束 + `CHECK (primary_color ~ '^#[0-9a-fA-F]{6}$')` 色值约束）+ 幂等默认行
+- **默认值（= 升级前实际表现）**：`Phoenix Agent` / `/imgs/logo.png` / `/favicon.ico` / `#006BE6`
+  （`#006BE6` 等价于现状 vben 默认 `hsl(212 100% 45%)`）
+- **实测断言**：① 表结构 8 列符合预期 ② 默认行值逐字正确 ③ 重跑幂等（`INSERT 0 0`，行数仍 1）
+  ④ 插入 id=2 被 `ck_brand_config_single_row` 拒绝 ⑤ `primary_color='red'` 被 `ck_brand_config_color` 拒绝
+  ⑥ 回滚件执行后表消失、重新应用后恢复（行数 1）
+- **已知偏差（已写入迁移件注释与升级说明待办）**：浏览器标签标题将从现状 `Phoenix Admin`
+  变为 `<system_name> - 页面名`（R-01「三处统一」的必然结果，非缺陷）
