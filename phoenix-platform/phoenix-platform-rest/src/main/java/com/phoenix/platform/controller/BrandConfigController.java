@@ -97,4 +97,15 @@ public class BrandConfigController {
 			return null;
 		}
 	}
+
+	/**
+	 * 当前登录者是否有权编辑品牌（T-07：前端据此做「无权限」拦截；菜单可见性仍由既有体系决定）。
+	 */
+	@GetMapping("/permission")
+	public ReturnVo<java.util.Map<String, Boolean>> permission(
+			@RequestHeader(value = "phoenix-token", required = false) String token) {
+		String userId = resolveUserId(token);
+		boolean canEdit = userId != null && adminRoleGuard.isAdmin(userId);
+		return ReturnVo.ok(java.util.Map.of("canEdit", canEdit));
+	}
 }

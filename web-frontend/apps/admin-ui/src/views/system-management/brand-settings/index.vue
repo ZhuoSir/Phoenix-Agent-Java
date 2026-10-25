@@ -3,6 +3,7 @@ import { onMounted, reactive, ref } from 'vue';
 import { ElButton, ElInput, ElMessage } from 'element-plus';
 import {
   getBrandConfigApi,
+  getBrandPermissionApi,
   updateBrandConfigApi,
   uploadBrandAssetApi,
   type BrandConfig,
@@ -17,8 +18,20 @@ const form = reactive<BrandConfig>({
 });
 const saving = ref(false);
 const uploading = ref('');
+const canEdit = ref(true);
 
 onMounted(async () => {
+  // 无权限直接拦截（写接口本身也会拒，这里给明确 UI 反馈）
+  try {
+    const perm = await getBrandPermissionApi();
+    canEdit.value = perm?.canEdit !== false;
+  } catch {
+    canEdit.value = false;
+  }
+  if (!canEdit.value) {
+    ElMessage.error('仅超级管理员可修改品牌配置');
+    return;
+  }
   try {
     const cfg = await getBrandConfigApi();
     Object.assign(form, cfg);
@@ -69,7 +82,11 @@ async function save() {
       修改系统名称、Logo、favicon 与主题主色；保存后**刷新页面**即生效（无需重新构建、无需重启）。
     </p>
 
-    <div class="grid max-w-3xl grid-cols-1 gap-5 md:grid-cols-2">
+    <div v-if="!canEdit" class="max-w-3xl rounded border border-red-200 bg-red-50 p-4 text-sm text-red-600">
+      仅超级管理员可访问本页面（当前账号无权限）。
+    </div>
+
+    <div v-else class="grid max-w-3xl grid-cols-1 gap-5 md:grid-cols-2">
       <div class="md:col-span-2">
         <label class="mb-1 block text-sm font-medium">系统名称（1~40 字）</label>
         <ElInput v-model="form.systemName" maxlength="40" show-word-limit placeholder="例如：××标准院智能平台" />

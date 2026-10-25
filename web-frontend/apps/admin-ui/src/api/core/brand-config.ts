@@ -39,6 +39,11 @@ export function updateBrandConfigApi(data: Partial<BrandConfig>): Promise<BrandC
   return request<BrandConfig>(BASE, { method: 'PUT', body: JSON.stringify(data) });
 }
 
+/** 当前登录者是否可编辑品牌（T-07 页面级拦截） */
+export function getBrandPermissionApi(): Promise<{ canEdit: boolean }> {
+  return request<{ canEdit: boolean }>(`${BASE}/permission`, { method: 'GET' });
+}
+
 /** 上传品牌图（超管，返回可访问 URL） */
 export async function uploadBrandAssetApi(file: File): Promise<string> {
   const form = new FormData();
