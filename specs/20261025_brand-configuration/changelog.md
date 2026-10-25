@@ -83,3 +83,29 @@
 - 替换点：`BrandPanel.vue`（logo/名称/版权）、`PolicyDialog.vue`、`privacy-agreement.vue`、`terms-of-service.vue`、
   `index.html` meta keywords
 - `grep -rn "Phoenix Agent|Phoenix Admin" apps/admin-ui/src apps/admin-ui/index.html` → **仅剩默认值常量 1 处**（`stores/brand.ts`），其余 0 ✅
+
+## 2026-10-25 T-07 / T-08 / T-09 完成
+
+**T-07 外观设置页**（`/system-management/brand-settings`）
+- 页面：名称（≤40）/ 主色（color picker + 文本）/ Logo 与 favicon 上传 / 预览 / 保存（失败必弹错）
+- 菜单：`V2.1.0_04` 迁移件幂等插入 `tbl_privilege_module` 行（pid=系统管理，component 指向新页）
+- **实测（Playwright 自动登录 + 滑块）**：侧边栏出现「外观设置」→ 页面渲染（名称回填 `Phoenix Agent`、色值 `#006be6`）
+  → 改为「××标准院智能平台 / #0AA06E」保存 → 库内 `system_name=××标准院智能平台, primary_color=#0aa06e, by=1000000000000000001`
+  → 刷新后 `title=外观设置 - ××标准院智能平台`、`--el-color-primary=#0aa06e`；随后已还原默认
+- **未自测项（如实）**：普通管理员「看不到菜单」未做端到端（菜单 ACL 由既有角色-模块授权体系控制；写接口越权已在 T-03 验证为拒绝）
+
+**T-08 端到端回归（五链路 + 色阶）**
+- 登录 200 / 知识库列表 200 / 组列表 200 / 品牌匿名 200 / 附件上限 `{maxCount:50}` / 对话 thinking 帧 **105** + 回答 43 字
+- 派生色阶（页面计算值）：`primary=#006BE6`、`light-3=rgb(77,151,238)`、`light-5=rgb(128,181,243)`、
+  `light-7=rgb(179,211,248)`、`light-8=rgb(204,225,250)`、`light-9=rgb(230,240,253)`、`dark-2=rgb(0,86,184)` ✅
+
+**T-09 发布物料**
+- `sql/V2.1.0_04__brand_config.sql` + `releases/v2.1.0/sql/` 镜像 + `rollback/`
+- `RELEASE-NOTES.md` 更新：附件上限 5→**50**、品牌配置化能力、新增 2 个工程配置项、`V2.1.0_04` 升级件与回滚件、
+  以及「浏览器标题由 Phoenix Admin 变为 <系统名称> - 页面」的已知偏差
+
+## 踩坑记录（本轮）
+- YAML 追加第二个 `phoenix:` 顶层键 → SnakeYAML `DuplicateKeyException` → 后端启动失败（已改为单块）
+- 大文件 multipart 下 `StpUtil.getLoginIdAsString()` 抛 `SaTokenContextException` → 改 token 显式解析
+- `ReturnVo.ok(url)` 命中 `ok(String msg)` 重载 → URL 落到 msg（改 `ok("上传成功", url)`）
+- 路由切换会覆盖 `document.title` ⇒ `applyBrand` 同步 `preferences.app.name`（否则标题不含品牌名）

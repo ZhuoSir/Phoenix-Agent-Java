@@ -68,6 +68,12 @@ export function applyBrand(cfg: BrandConfig) {
   Object.assign(state, cfg);
   applyPrimaryColor(cfg.primaryColor);
   applyIconAndTitle(cfg);
+  // 让 Vben 的动态标题（路由切换时生成）也使用品牌名：否则每次路由切换会把我们的 title 覆盖回 VITE_APP_TITLE
+  import('@vben/preferences')
+    .then(({ updatePreferences }) => {
+      updatePreferences({ app: { name: cfg.systemName } });
+    })
+    .catch(() => {});
 }
 
 /**
