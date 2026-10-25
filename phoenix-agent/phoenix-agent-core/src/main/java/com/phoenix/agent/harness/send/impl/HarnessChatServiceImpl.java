@@ -136,7 +136,7 @@ public class HarnessChatServiceImpl implements HarnessChatService {
             .withMcp(harnessAgent, request.getAgentId(), request.getSessionId(),
                 effectiveMcp(request.getChannel(), request.getUserId(), request.getAgentId()))
             .flatMapMany(agent -> attachmentAssembler
-                .prepare(request.getAttachmentIds(), request.getUserId(), text -> progressSink.tryEmitNext(noticeOutput(text)))
+                .prepare(request.getAttachmentIds(), request.getUserId(), text -> progressSink.tryEmitNext(noticeOutput(text)), request.getMessage())
                 .doFinally(sig -> progressSink.tryEmitComplete())
                 .flatMapMany(ctx -> agent
                     .streamEvents(buildUserMessage(request, ctx), buildRuntimeContext(request, injection.block())))

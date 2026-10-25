@@ -122,6 +122,38 @@ public final class DocumentBatchProcessor {
 		return new java.util.ArrayList<>(out);
 	}
 
+	/**
+	 * A：标签化上下文抽取 —— 对每个标识取**前后文窗口**，保留"标签→值"的绑定
+	 * （例如「本章设立专项管理代码 TC-8899」），避免只吐裸值导致模型无法判断含义。
+	 */
+	static java.util.List<String> scanLabeledContexts(String text, int window) {
+		java.util.LinkedHashSet<String> out = new java.util.LinkedHashSet<>();
+		if (text == null) {
+			return java.util.List.of();
+		}
+		String flat = text.replace("\r", " ").replace("\n", " ").replaceAll("\\s+", " ");
+		for (java.util.regex.Pattern p : ID_PATTERNS) {
+			java.util.regex.Matcher m = p.matcher(flat);
+			while (m.find()) {
+				int st = Math.max(0, m.start() - window);
+				int en = Math.min(flat.length(), m.end() + Math.min(8, window / 2));
+				String snippet = flat.substring(st, en).trim();
+				// 去掉片段开头的半句（从第一个标点之后开始更干净）
+				int cut = Math.max(snippet.lastIndexOf('。'), snippet.lastIndexOf('；'));
+				if (cut >= 0 && cut + 1 < snippet.length()) {
+					snippet = snippet.substring(cut + 1).trim();
+				}
+				if (!snippet.isEmpty()) {
+					out.add(snippet);
+				}
+				if (out.size() >= 30) {
+					return new java.util.ArrayList<>(out);
+				}
+			}
+		}
+		return new java.util.ArrayList<>(out);
+	}
+
 	/** 模型输出是否"像模板回声"（实测 qwen3 会原样回抄【要点】… 这种占位） */
 	private static boolean looksLikeEcho(String out) {
 		if (out == null) {

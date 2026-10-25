@@ -93,6 +93,16 @@ public class ChatAttachmentAssembler {
 	 * @param progress 进度回调（可为 null）：参数为「第 x 批 / 共 N 批」提示文案，由上层转成 notice 帧
 	 */
 	public Mono<Context> prepare(List<Long> attachmentIds, String viewerId, java.util.function.Consumer<String> progress) {
+		return prepare(attachmentIds, viewerId, progress, null);
+	}
+
+	/**
+	 * 装配附件上下文（T-09 + A/B 优化）。
+	 * @param question 用户问题（用于 B：检索式前置；可为 null）
+	 */
+	public Mono<Context> prepare(List<Long> attachmentIds, String viewerId,
+			java.util.function.Consumer<String> progress, String question) {
+		this.currentQuestion = question;
 		if (attachmentIds == null || attachmentIds.isEmpty()) {
 			return Mono.just(Context.none());
 		}
@@ -109,6 +119,9 @@ public class ChatAttachmentAssembler {
 
 	/** T-08：同轮同附件幂等缓存（key=attachmentId:chars，10 分钟过期） */
 	private final java.util.Map<String, Object[]> digestCache = new java.util.concurrent.ConcurrentHashMap<>();
+
+	/** 当前轮用户问题（B：检索式前置用；仅本实例短暂使用） */
+	private volatile String currentQuestion;
 
 	/** T-09：超长文档分批（长度 > maxExtractChars 才触发；否则原样返回，R-10） */
 	private Mono<List<Loaded>> batchProcessOversized(List<Loaded> loaded, java.util.function.Consumer<String> progress) {
@@ -139,6 +152,49 @@ public class ChatAttachmentAssembler {
 			}
 			return out;
 		}).subscribeOn(Schedulers.boundedElastic());
+	}
+
+	/** A+B：按问题关键词从全文里挑出「标签—值」原文句，作为直接答案（首尾各注入一次） */
+	private static String buildDirectAnswer(String text, String question) {
+		if (text == null || question == null || question.isBlank()) {
+			return "";
+		}
+		String[] keys = { "代码", "编号", "文号", "时限", "日期", "金额", "比例", "部门", "责任人" };
+		java.util.List<String> hits = new java.util.ArrayList<>();
+		for (String ctx : DocumentBatchProcessor.scanLabeledContexts(text, 24)) {
+			for (String k : keys) {
+				if (question.contains(k) && ctx.contains(k)) {
+					hits.add("「" + k + "」" + ctx);
+					break;
+				}
+			}
+			if (hits.size() >= 3) {
+				break;
+			}
+		}
+		return String.join("\n", hits);
+	}
+
+	/** B：按用户问题关键词把最相关的前文提到最上面（代码/编号/文号/日期/时限/金额） */
+	private static java.util.List<String> prioritizeByQuestion(java.util.List<String> ctxs, String question) {
+		if (question == null || question.isBlank() || ctxs.isEmpty()) {
+			return ctxs;
+		}
+		String[] keys = { "代码", "编号", "文号", "日期", "时限", "金额", "比例", "部门", "责任人" };
+		java.util.List<String> hit = new java.util.ArrayList<>();
+		java.util.List<String> rest = new java.util.ArrayList<>();
+		for (String c : ctxs) {
+			boolean matched = false;
+			for (String k : keys) {
+				if (question.contains(k) && c.contains(k)) {
+					matched = true;
+					break;
+				}
+			}
+			(matched ? hit : rest).add(c);
+		}
+		hit.addAll(rest);
+		return hit;
 	}
 
 	/** 调模型逐批抽要点（同步，运行在 boundedElastic） */
@@ -185,11 +241,26 @@ public class ChatAttachmentAssembler {
 			if (progress != null) {
 				progress.accept(r.coverageNote());
 			}
-			// 全文关键标识汇总（规则扫描，确定性）：置顶注入，避免模型"看得到却答不出编号"
-			java.util.List<String> allIds = DocumentBatchProcessor.scanIdentifiers(l.docText());
-			String idHeader = allIds.isEmpty() ? ""
-					: "【全文关键标识（规则扫描，逐字保留）】" + String.join("；", allIds) + "\n\n";
-			DigestResult result = new DigestResult(idHeader + r.digest(), r.coverageNote());
+			// A：标签化上下文（保留「专项管理代码 TC-8899」这种绑定）；B：按用户问题关键词前置
+			java.util.List<String> ctxs = DocumentBatchProcessor.scanLabeledContexts(l.docText(), 24);
+			ctxs = prioritizeByQuestion(ctxs, currentQuestion);
+			StringBuilder idHeaderBuf = new StringBuilder();
+			if (!ctxs.isEmpty()) {
+				idHeaderBuf.append("【全文关键标识（含上下文，规则扫描逐字保留）】\n");
+				for (int i = 0; i < Math.min(10, ctxs.size()); i++) {
+					idHeaderBuf.append("- ").append(ctxs.get(i)).append('\n');
+				}
+				idHeaderBuf.append('\n');
+			}
+			String idHeader = idHeaderBuf.toString();
+			// A+B 强化：把"问题关键词命中"的那些上下文抽成【直接答案】，**首尾各放一次**
+			// （8B 模型对长材料的中间内容注意力弱，首尾锚点显著提升命中率）
+			String direct = buildDirectAnswer(l.docText(), currentQuestion);
+			if (!direct.isEmpty()) {
+				idHeader = "【直接答案（规则匹配原文，逐字）】\n" + direct + "\n\n" + idHeader;
+			}
+			String tailDirect = direct.isEmpty() ? "" : "\n\n【再次强调·直接答案】" + direct;
+			DigestResult result = new DigestResult(idHeader + r.digest() + tailDirect, r.coverageNote());
 			digestCache.put(cacheKey, new Object[] { System.currentTimeMillis() + 10 * 60 * 1000L, result });
 			return result;
 		}
