@@ -107,6 +107,14 @@ async function bootstrap(namespace: string) {
     // 忽略：回落到构建期默认值
 
   }
+  // 品牌外观（brand-configuration T-05）：3s 超时 + 失败回落默认，绝不阻塞挂载
+  try {
+    const { loadBrand } = await import('#/stores/brand');
+    await loadBrand();
+  } catch (e) {
+    console.warn('[brand] 初始化异常（已忽略）', e);
+  }
+
 
 
   app.mount('#app');
