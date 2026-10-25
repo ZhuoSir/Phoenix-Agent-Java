@@ -40,14 +40,14 @@
 
 ## 组 2 · 前端接入
 
-- [ ] T-05 品牌 store + 启动注入（失败回落默认，不阻塞）
+- [x] T-05 品牌 store + 启动注入（失败回落默认，不阻塞）
   关联: R-01, R-02, R-03, R-04, R-05
   依赖: T-02
   验证方式: 正常网络：刷新后 title/favicon/CSS 变量与后端一致（DOM 断言 `document.title` 与 `--el-color-primary` 计算值）；
     模拟接口 500/超时：页面仍能打开（回落默认值），console 有 WARN 但不白屏。
   验收标准: 两种网络场景均可复现。
 
-- [ ] T-06 6 处硬编码替换 + 零残留
+- [x] T-06 6 处硬编码替换 + 零残留
   关联: R-01, R-02, R-07
   依赖: T-05
   验证方式: `grep -rn "Phoenix Agent\|Phoenix Admin"` 在 `apps/admin-ui/src` 与 `index.html` 的命中数 = **0**

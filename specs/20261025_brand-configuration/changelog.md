@@ -66,3 +66,20 @@
 - **踩坑**：大文件 multipart 下 `StpUtil.getLoginIdAsString()` 抛 `SaTokenContextException`（Reactor 上下文未初始化）
   ⇒ 改为 `StpUtil.getLoginIdByToken(token)` 显式解析，PUT 与上传统一
 - **踩坑**：`ReturnVo.ok(url)` 命中了 `ok(String msg)` 重载 ⇒ URL 落到 msg、data 为 null ⇒ 改为 `ok("上传成功", url)`
+
+## 2026-10-25 T-05 / T-06 完成（前端注入 + 硬编码替换，Playwright 实测）
+
+**T-05 品牌 store + 启动注入**
+- 新增 `api/core/brand-config.ts`（GET/PUT/上传）、`stores/brand.ts`（load/apply + 默认回落 + 3s 超时）
+- `bootstrap.ts` 挂载前 `await loadBrand()`，失败仅 console.warn（不阻塞）
+- 注入内容：`document.title`、`link[rel=icon]`、`--el-color-primary` 及 `light-3/5/7/8/9`、`dark-2`
+- **Playwright 实测（登录页）**：
+  · 默认：`title=Phoenix Agent - Phoenix Admin`、`--el-color-primary=#006BE6`、`light-3=rgb(77,151,238)`
+  · 后端 PUT 改为「测试品牌B / #1F6FEB」后**仅刷新页面**（未重建、未重启）：`title=测试品牌B - Phoenix Admin`、
+    `--el-color-primary=#1F6FEB`、`light-3=rgb(98,154,241)`、品牌文案变为测试品牌B ✅
+  · 还原后再刷新回到默认值 ✅（R-05 达成）
+
+**T-06 硬编码替换 + 零残留**
+- 替换点：`BrandPanel.vue`（logo/名称/版权）、`PolicyDialog.vue`、`privacy-agreement.vue`、`terms-of-service.vue`、
+  `index.html` meta keywords
+- `grep -rn "Phoenix Agent|Phoenix Admin" apps/admin-ui/src apps/admin-ui/index.html` → **仅剩默认值常量 1 处**（`stores/brand.ts`），其余 0 ✅

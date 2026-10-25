@@ -33,3 +33,14 @@ COMMENT ON COLUMN tbl_platform_brand_config.primary_color IS '主题主色 #RRGG
 INSERT INTO tbl_platform_brand_config (id, system_name, logo_url, favicon_url, primary_color, updated_by)
 VALUES (1, 'Phoenix Agent', '/imgs/logo.png', '/favicon.ico', '#006BE6', 'system')
 ON CONFLICT (id) DO NOTHING;
+
+-- 菜单：系统管理 → 外观设置（幂等；超管可见，ACL 由既有角色-模块授权体系控制）
+INSERT INTO tbl_privilege_module
+    (id, name, url, sn, state, component, system_id, status, image, order_no, is_show,
+     create_time, create_by, update_time, del_flag, pid, category_id, type)
+VALUES
+    ('b7a1c2d3e4f5061728394a5b6c7d8e9f', '外观设置', '/system-management/brand-settings',
+     'PlatformBrandSettings', '32', '#/views/system-management/brand-settings/index.vue',
+     110, 1, 'lucide:palette', 9, 1, now(), 'system', now(), 0,
+     '02b733aa08774219a23c2f21f1b3f6b5', 111, '1')
+ON CONFLICT (id) DO NOTHING;

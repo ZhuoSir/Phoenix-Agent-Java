@@ -12,6 +12,8 @@ const highlights: Highlight[] = [
 ];
 
 const year = new Date().getFullYear();
+
+import { brand } from '#/stores/brand';
 </script>
 
 <template>
@@ -19,10 +21,10 @@ const year = new Date().getFullYear();
     <div class="brand-panel__top">
       <div class="brand-logo">
         <span class="brand-logo__mark">
-          <img src="/imgs/logo.png" />
+          <img :src="brand.logoUrl" alt="logo" />
         </span>
         <div class="brand-logo__text">
-          <strong>Phoenix Agent</strong>
+          <strong>{{ brand.systemName }}</strong>
           <span>智能体协作平台</span>
         </div>
       </div>
@@ -47,7 +49,7 @@ const year = new Date().getFullYear();
     </div>
 
     <div class="brand-panel__footer">
-      <span>© {{ year }} Phoenix Agent</span>
+      <span>© {{ year }} {{ brand.systemName }}</span>
       <span>v 1.0.0</span>
     </div>
   </section>
