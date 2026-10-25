@@ -109,3 +109,8 @@
 - 大文件 multipart 下 `StpUtil.getLoginIdAsString()` 抛 `SaTokenContextException` → 改 token 显式解析
 - `ReturnVo.ok(url)` 命中 `ok(String msg)` 重载 → URL 落到 msg（改 `ok("上传成功", url)`）
 - 路由切换会覆盖 `document.title` ⇒ `applyBrand` 同步 `preferences.app.name`（否则标题不含品牌名）
+
+## 2026-10-25 收尾（completion.md）
+
+- 9/9 完成并自测；completion.md 已生成
+- **未合并**（等用户口令）；合并后建议再验一次登录页标题与设置入口
