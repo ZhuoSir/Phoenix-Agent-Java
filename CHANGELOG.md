@@ -3,6 +3,20 @@
 本项目版本记录。语义化版本 + 里程碑制（细则：bryanchen-spec skill / releases/ 目录）。
 tag 之前无正式发版记录，历史 1.1.x 分支线（phoenix-1.1.1-release / 1.1.2-dev）未打过 tag，不追溯。
 
+## [v2.1.1] - 2026-10-26
+### 修复（打包链）
+- **BUG-212**：`apps/admin-ui/package.json` 残留 `"vxe-table": "catalog:"` 依赖行、锁文件未收录 ⇒
+  容器内 `pnpm install --frozen-lockfile` 报 `ERR_PNPM_OUTDATED_LOCKFILE`，`package.sh` 第 3/8 步中断
+  （即 BUG-149「干净环境无法产出前端镜像」的具体成因）。删除该依赖行（代码走 `useVbenVxeGrid`，无直接 import）。
+
+### 交付包
+- `phoenix-2.1.1-arm64.tar.gz`（1.7G）｜ sha256 `3a08a1f94a14eac820b324da258cfca89160229c6a4c7978d10c2e67801fa37d`
+- `package.sh` 8/8 步通过；出货门禁 4/4 PASS（含 `fresh-db-install`）
+
+### 兼容性
+- 与 v2.1.0 行为一致（仅打包链修复）；**无 SQL、无配置变更**
+- 已知限制沿用 v2.1.0（9 条 P1 已延期，`BL-75` 跟进）
+
 ## [v2.1.0] - 2026-10-25
 ### 新增 / 变更（7 个 spec 并入；SQL 4 件 + rollback 4 件；配置默认值 3 项变更 + 9 项新增）
 
