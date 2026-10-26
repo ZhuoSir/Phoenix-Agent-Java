@@ -1,6 +1,6 @@
 # 里程碑 v2.1.0
 
-> 状态：**已冻结（M2，2026-10-25）· 口径 A（带缺陷冻结）**（7 个 spec：release-delivery-hardening 10/10、vector-dim-flexibility 16/16、chat-runtime-hardening 18/19（T-09 作废转 BL-73）、group-management-ui 9/10（T-08 作废转 BL-70）、long-doc-chunking 10/10、brand-configuration 9/9、offline-icons 9/9；全部已并入 `2.1.0`）**（2026-10-25 更新）
+> 状态：**已发布（M4，2026-10-25）· 口径 A（带缺陷冻结）**（7 个 spec：release-delivery-hardening 10/10、vector-dim-flexibility 16/16、chat-runtime-hardening 18/19（T-09 作废转 BL-73）、group-management-ui 9/10（T-08 作废转 BL-70）、long-doc-chunking 10/10、brand-configuration 9/9、offline-icons 9/9；全部已并入 `2.1.0`）
 
 > 创建: 2026-10-11 | 类型: **MINOR**（新增交付链能力，不改库表结构、不改应用行为）
 > **版本分支**: `2.1.0`（基点 = **`2.0.1` tip `10d4504`**，链式切——v2.0.1 尚未合 main，属在途/悬空，按 git-workflow §一 从该线 tip 切）
@@ -118,3 +118,30 @@
 ### 7.4 M3 结论
 
 **汇总完成，可进入 M4 发版**（发版动作——落账批处理、tag、合 main、push——均需用户口令，agent 不自主执行）。
+
+## 八、M4 发布（2026-10-25）
+
+### 8.1 落账批处理
+
+| 账本 | 动作 | 结果 |
+|---|---|---|
+| MILESTONE | 状态 → **已发布（M4，2026-10-25）** | ✅ |
+| MILESTONE 需求表 | 7 个 spec 状态 → 已完成并合并 | ✅（与 git 事实一致） |
+| bugs.md | 本版「已修复(v2.1.0)」保持原状**不翻「已发布」**（未做专项回归，诚实口径） | 见 8.3 例外说明 |
+| bugs.md | 9 条 P1 → 已延期（v2.1.1，随 BL-75） | ✅ |
+| CHANGELOG.md | 新增 `[v2.1.0] - 2026-10-25` 条目（从本 MILESTONE 升级项聚合） | ✅ |
+
+### 8.2 四步核验
+
+| 步骤 | 结果 |
+|---|---|
+| ① 逐条 grep 回验（RELEASE-NOTES / UPGRADE / config / SQL 关键条目在文件中存在） | ✅（见提交说明） |
+| ② 审计复跑（spec 挂接 + 任务勾选 + completion 齐备 + 分支已合并） | ✅ 账平 |
+| ③ 工作树干净 | ✅ `git status --porcelain` 为空 |
+| ④ tag 前置：账已落、核验已过 | ✅ 才打 `v2.1.0` |
+
+### 8.3 例外与诚实说明
+
+- 本版有 **9 条 P1** 以「已延期」随版发布（口径 A），未声称已修复/已发布；明细见 RELEASE-NOTES §四之三 + BL-75。
+- 本版修复的缺陷（BUG-201~205、207~211 等）状态停在「已修复」，**未翻「已验证/已发布」**——因为缺客户现场/专项回归证据；
+  回归完成后再由 BL-75 统一推进，避免账目虚高。
