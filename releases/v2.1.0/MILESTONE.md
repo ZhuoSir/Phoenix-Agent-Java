@@ -83,3 +83,38 @@
 | **A. 带缺陷冻结** | 上述 P1 全部写入 RELEASE-NOTES「已知限制/发版阻断项」，冻结 v2.1.0 | 可立即进 M3/M4；发版说明需明确列出 |
 | **B. 先回归再冻** | 先对 BUG-201~205 做专项回归（5 条），把状态推到「已验证」 | 需 1 个回归轮次（约 1–2 小时），BUG-199/200 仍需口径 |
 | **C. 先修再冻** | 先定 BUG-200 方案 + 修 BUG-199，再冻结 | 需新 spec/CR，冻结顺延 |
+
+## 七、M3 汇总（2026-10-25 完成）
+
+### 7.1 步骤0 · spec 挂接对账
+
+| 对账项 | 结果 |
+|---|---|
+| MILESTONE 需求表 spec 数 | **7** |
+| `git log` 带 `Spec:` footer 的 spec | 8（多出 `20261009_ollama-model-support` —— 其提交在 2.1.0 的**祖先链**上，属 v2.0.0 已交付内容，**非本版漏挂**） |
+| `feature/*` 分支未合并提交 | 0（全部已并入 `2.1.0`） |
+| 结论 | **账平**，无漏挂 |
+
+### 7.2 升级件汇总（4 件 SQL，编号连续，根目录与 releases 镜像 sha256 一致）
+
+| 序号 | 文件 | rollback | 来源 spec |
+|---|---|---|---|
+| 01 | `V2.1.0_01__kb_embedding_binding_ddl.sql` | ✅ | vector-dim-flexibility |
+| 02 | `V2.1.0_02__kb_rebuild_job_ddl.sql` | ✅ | vector-dim-flexibility |
+| 03 | `V2.1.0_03__vector_tables_pk_ddl.sql` | ✅ | vector-dim-flexibility |
+| 04 | `V2.1.0_04__brand_config.sql` | ✅ | brand-configuration |
+
+> 命名偏差（已记录）：04 的 rollback 文件名是 `V2.1.0_04__brand_config_rollback.sql`，其余为 `…_ddl_rollback.sql`；不影响执行。
+
+### 7.3 产出物
+
+| 文件 | 内容 |
+|---|---|
+| `RELEASE-NOTES.md` | 默认值变更 / 新增配置 / 能力增强 / 离线资源 / **发版遗留缺陷（口径 A）** / 已知限制 |
+| `config/changes.md` | 配置变更汇总（默认值 3 + 新增 9 + 前端构建期 1 + env 命名规则） |
+| `UPGRADE.md` | 升级前检查 / SQL 顺序（4 件）/ 配置 / 部署顺序 / **验证 11 项** / 回滚（应用+SQL 逆序+数据）/ 已知限制 |
+| `specs/*/artifacts.md` | 新增 4 份（vector-dim-flexibility、chat-runtime-hardening、long-doc-chunking、brand-configuration） |
+
+### 7.4 M3 结论
+
+**汇总完成，可进入 M4 发版**（发版动作——落账批处理、tag、合 main、push——均需用户口令，agent 不自主执行）。

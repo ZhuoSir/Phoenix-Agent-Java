@@ -3,6 +3,9 @@
 > 状态：**在途**（未 tag、未 push）。本文件随版本冻结点更新。
 > 组成：`release-delivery-hardening`（10/10）+ `vector-dim-flexibility`（16/16）+ `chat-runtime-hardening`（进行中）。
 
+> **升级操作请配合 `UPGRADE.md`**（部署顺序 / SQL 顺序 / 配置 / 验证 11 项 / 回滚）；
+> **配置明细见 `config/changes.md`**；**升级件共 4 件 SQL**：`V2.1.0_01`（KB 向量模型绑定）→ `_02`（重建任务表）→ `_03`（历史向量表补约束）→ `_04`（品牌配置表+菜单行），均幂等、均带 rollback。
+
 ## 一、⚠️ 默认值变更（升级方必须知晓）
 
 | 配置项 | 旧值 | 新值 | 影响 |
