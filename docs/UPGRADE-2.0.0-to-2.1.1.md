@@ -4,6 +4,25 @@
 > 演练形态：同机并行栈（不复用生产栈），项目名 `phxupg`、端口 `9191`、DB 卷 `phxupg_*`。
 > 结论：**9 步安装器全通过 + 11 项验证全绿 + 回滚可逆**。
 
+## 0.1 端口可改（本次已实测切换）
+
+端口**唯一入口**是 `.env` 的 `PHOENIX_HTTP_PORT`（compose 里 `${PHOENIX_HTTP_PORT:-9080}:80`）。
+
+```bash
+# 方式 A：改 .env（推荐，升级/重装都沿用）
+sed -i '' 's|^PHOENIX_HTTP_PORT=.*|PHOENIX_HTTP_PORT=8901|' docker/.env
+docker compose -p <project> up -d --force-recreate nginx    # 只重建 nginx 即可换端口
+
+# 方式 B：安装器首次生成 .env 时指定
+bash install.sh --project <project> --port 8901
+```
+
+本次演练：`9191 → 8900 失败（本机 8900 被 Python 占用）→ 实际切到 8901`，
+`0.0.0.0:8901->80/tcp`，登录 200、首页/品牌/图标/vendor 全 200。
+
+> 提醒：改端口只需重建 **nginx**（backend 不用动）；若端口被占用，`docker compose` 会明确报
+> `Ports are not available: ... address already in use`，换一个空闲端口即可。
+
 ## 0. 演练环境
 
 | 项 | 值 |
@@ -11,7 +30,7 @@
 | 宿主 | macOS / Docker Desktop 20.10.20 / Compose v2.12.0 / arm64 |
 | 基线 | v2.0.0（镜像 `phoenix-backend:v2.0.0`、`phoenix-frontend:v2.0.0`） |
 | 目标 | v2.1.1（交付包 `phoenix-2.1.1-arm64.tar.gz`，sha256 `3a08a1f9…`） |
-| 项目名/端口 | `phxupg` / `9191`（与主栈 `phx210`/`9091` 隔离） |
+| 项目名/端口 | `phxupg` / **8901**（演练中由 9191 切换而来；与主栈 `phx210`/`9091` 隔离） |
 
 ## 1. 准备 v2.0.0 基线（模拟客户现网）
 
