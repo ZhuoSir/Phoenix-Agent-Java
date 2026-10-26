@@ -13,6 +13,8 @@ export {
   ATTACHMENT_IMAGE_EXTENSIONS,
   ATTACHMENT_MAX_FILE_BYTES,
   ATTACHMENT_MAX_FILES_PER_SEND,
+  getAttachmentMaxFiles,
+  setAttachmentMaxFiles,
   ATTACHMENT_TYPE_MESSAGE,
   attachmentCountMessage,
   attachmentExtOf,

@@ -12,4 +12,7 @@ public class KnowledgeBaseCreateDTO {
     private String name;
     @Size(max = 512, message = "描述不超过 512 字")
     private String description;
+
+    /** 向量模型 id；为空则绑定当前默认 embedding 模型（R-01） */
+    private Integer embeddingModelId;
 }

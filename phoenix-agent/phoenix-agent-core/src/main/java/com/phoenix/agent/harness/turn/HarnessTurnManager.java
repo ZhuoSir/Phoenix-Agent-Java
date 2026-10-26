@@ -80,7 +80,7 @@ public class HarnessTurnManager {
     private long silenceHeartbeatSeconds;
 
     /** T-09：模型调用**首帧超时**（秒）——MODEL 阶段自调用发起起算；0=关闭 */
-    @Value("${phoenix.agent.model-first-frame-timeout-seconds:180}")
+    @Value("${phoenix.agent.model-first-frame-timeout-seconds:600}")
     private long modelFirstFrameTimeoutSeconds;
 
     @Value("${phoenix.agent.turn-flush-seconds:5}")
@@ -241,6 +241,15 @@ public class HarnessTurnManager {
             sb.append(",\"thinking\":\"").append(escape(jsonClip(th))).append('"');
             sb.append(",\"thinkingMs\":").append(turn.thinkingMs.get());
         }
+        String nt = turn.noticeText;
+        if (nt != null && !nt.isEmpty()) {
+            sb.append(",\"notice\":\"").append(escape(jsonClip(nt))).append('"');
+        }
+        String gen = turn.lastAgentFiles;
+        if (gen != null && !gen.isEmpty()) {
+            // 已是 JSON 数组原文（artifactsTail 产出），直接内联
+            sb.append(",\"generatedFiles\":").append(gen);
+        }
         sb.append('}');
         return sb.toString();
     }
@@ -388,6 +397,12 @@ public class HarnessTurnManager {
         final AtomicLong framesDropped = new AtomicLong();
         /** T-03b：随合并帧捎带的状态快照（技能/文件面板），避免因每帧携带而绕过合并 */
         private String pendingAgentFiles;
+
+        /** chat-runtime-hardening T-05：最后一次 agentFiles 原文（落 metadata.generatedFiles，刷新后仍可见） */
+        private volatile String lastAgentFiles;
+
+        /** chat-runtime-hardening T-07：终态提示（超时/取消）落 metadata.notice；正文有内容时不混入正文 */
+        private volatile String noticeText;
         private String pendingLoadedSkills;
         private Disposable mergeJanitor;
 
@@ -437,6 +452,12 @@ public class HarnessTurnManager {
         }
 
         private void onFrame(Map<String, Object> frame) {
+            // BUG-203（T-07）：**终态守卫**。finish() 之后（超时/取消/正常结束）上游在途帧仍可能到达
+            // （sourceSub.dispose() 只是 Reactor 取消，底层 HTTP 未必立刻取消），
+            // 旧实现会继续 append 正文并增量落库 ⇒ 用户看到"已超时/已结束"之后又冒出内容。
+            if (sinkDone.get()) {
+                return;
+            }
             try {
                 lastActivityAt = System.currentTimeMillis();
                 framesSeen.incrementAndGet();
@@ -457,6 +478,7 @@ public class HarnessTurnManager {
                 Object af = frame.get("agentFiles");
                 if (af instanceof String afs && !afs.isEmpty()) {
                     pendingAgentFiles = afs;
+                    lastAgentFiles = afs;
                 }
                 Object ls = frame.get("loadedSkills");
                 if (ls instanceof String lss && !lss.isEmpty()) {
@@ -474,7 +496,9 @@ public class HarnessTurnManager {
                     return;
                 }
                 // T-03b：纯空生命周期帧（无内容、无语义、无快照）对客户端零信息量 → 丢弃，不再下发
-                if (!needsOrderingFlush(frame) && (c == null || !(c instanceof String cs2) || cs2.isEmpty())
+                // T-05：notice 帧 content 为空但**有信息量**（分批进度/告知），不得丢弃
+                if (!needsOrderingFlush(frame) && frame.get("notice") == null
+                        && (c == null || !(c instanceof String cs2) || cs2.isEmpty())
                         && (th == null || !(th instanceof String ts2) || ts2.isEmpty())
                         && pendingAgentFiles == null && pendingLoadedSkills == null) {
                     framesDropped.incrementAndGet();
@@ -585,16 +609,34 @@ public class HarnessTurnManager {
                 // sink 可能已关闭，忽略
             }
             if (sourceSub != null) {
+                // T-08：dispose 即向框架订阅发起 cancel（框架未暴露底层 HTTP 句柄，无法更细粒度中断）；
+                // 不可控的"在途响应"由 onFrame 的终态守卫兜底（T-07），不会串内容。
                 sourceSub.dispose();
+                log.info("[turn] 已取消上游订阅 session={} turnId={} status={}", sessionId, turnId, status);
             }
             turns.remove(sessionId, this);
             if (status.equals(STATUS_TIMEOUT) || status.equals(STATUS_CANCELLED)
                     || status.equals(STATUS_MODEL_TIMEOUT)) {
-                content.append(suffix == null ? "" : suffix);
+                if (suffix != null && !suffix.isEmpty()) {
+                    noticeText = suffix;
+                    // T-07：**提示不再无条件混入正文**。正文已有内容 ⇒ 只记 metadata.notice（正文保持干净）；
+                    // 正文为空 ⇒ 才写入正文，避免空气泡/用户看不到原因。
+                    if (content.length() == 0) {
+                        content.append(suffix);
+                    }
+                }
             }
             // 模型偶发「工具全执行完但跳过收尾正文」（BUG-59 三报）：诚实注记兜底，不让用户面对空气泡
-            if (status.equals(STATUS_DONE) && content.length() == 0 && thinking.length() > 0) {
-                content.append("ℹ️ 本轮已完成工具执行但未输出正文总结（产物见文件面板）。如需说明请追问。");
+            if (status.equals(STATUS_DONE) && content.length() == 0) {
+                // 现场实证（2026-10-24）：模型反复 read_file 被熔断后 status=done、content 为空 ⇒ 界面**一片空白**，
+                // 用户完全不知道发生了什么。这里对"无论是否有 thinking"的空内容统一给可读兜底。
+                if (thinking.length() > 0) {
+                    content.append("ℹ️ 本轮已完成工具执行但未输出正文总结（产物见文件面板）。如需说明请追问。");
+                }
+                else {
+                    content.append("⚠️ 本轮没有产出正文内容：可能因重复工具调用被熔断、或工具未返回有效结果。"
+                            + "可补充更具体的信息后重试，或检查所上传文件是否可读。");
+                }
             }
             if (messageId != null) {
                 try {
@@ -616,6 +658,9 @@ public class HarnessTurnManager {
                     Map<String, Object> end = new LinkedHashMap<>();
                     end.put("content", "");
                     end.put("end", true);
+                    if (noticeText != null && !noticeText.isEmpty()) {
+                        end.put("notice", noticeText);
+                    }
                     sink.emitNext(end, Sinks.EmitFailureHandler.busyLooping(Duration.ofMillis(100)));
                 }
                 catch (Exception ignored) {

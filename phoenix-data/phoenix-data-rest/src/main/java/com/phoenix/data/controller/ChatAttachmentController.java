@@ -8,7 +8,7 @@ import com.phoenix.data.service.chat.ChatAttachmentService;
 import com.phoenix.data.vo.ApiResponse;
 import com.phoenix.data.vo.ChatAttachmentUploadResultVO;
 import com.phoenix.data.vo.ChatAttachmentVO;
-import lombok.AllArgsConstructor;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.buffer.DataBufferLimitException;
@@ -49,13 +49,18 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/chat/attachment")
 @CrossOrigin(origins = "*")
-@AllArgsConstructor
+@RequiredArgsConstructor
 public class ChatAttachmentController {
 
 	private final ChatAttachmentService chatAttachmentService;
 
 	/** R-11：超管豁免沿用 R-18/R-08 同一守卫（单一口径，不新造判定） */
 	private final AdminRoleGuard adminRoleGuard;
+
+	/** chat-runtime-hardening T-01/T-03：单次上传数量上限（默认 20；phoenix.agent.chat.attachment-max-count 可覆盖）
+	 * 2026-10-25 用户要求默认提升到 50（客户场景批量上传） */
+	@org.springframework.beans.factory.annotation.Value("${phoenix.agent.chat.attachment-max-count:50}")
+	private int attachmentMaxCount = 50;
 
 	@PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
 	public Mono<ApiResponse<ChatAttachmentUploadResultVO>> upload(ServerWebExchange exchange,
@@ -69,9 +74,10 @@ public class ChatAttachmentController {
 			if (fileParts.isEmpty()) {
 				return Mono.just(ApiResponse.error("未收到文件"));
 			}
-			// R-04：数量上限，提示含具体上限值
-			if (fileParts.size() > ChatAttachmentService.MAX_FILES_PER_REQUEST) {
-				return Mono.just(ApiResponse.error("单次最多上传 " + ChatAttachmentService.MAX_FILES_PER_REQUEST + " 个附件（当前 "
+			// R-04：数量上限，提示含具体上限值（T-01/T-03：上限可配置，默认 20）
+			int maxFiles = attachmentMaxCount > 0 ? attachmentMaxCount : ChatAttachmentService.MAX_FILES_PER_REQUEST;
+			if (fileParts.size() > maxFiles) {
+				return Mono.just(ApiResponse.error("单次最多上传 " + maxFiles + " 个附件（当前 "
 						+ fileParts.size() + " 个）"));
 			}
 			String sessionId = firstFormValue(parts.get("sessionId"));
@@ -109,6 +115,12 @@ public class ChatAttachmentController {
 	/**
 	 * R-10 + L-58：按会话列出附件（**与单对象校验成对**）。普通用户仅见本人；超管见全部。
 	 */
+	/** 前端启动时拉取单次上传上限（改 application.yml 即可，无需重构建前端） */
+	@GetMapping("/limit")
+	public Mono<ApiResponse<java.util.Map<String, Integer>>> limit() {
+		return Mono.just(ApiResponse.success("ok", java.util.Map.of("maxCount", attachmentMaxCount)));
+	}
+
 	@GetMapping
 	public ApiResponse<List<ChatAttachmentVO>> list(@RequestParam(required = false) String sessionId,
 			@RequestHeader(value = "phoenix-token", required = false) String token) {

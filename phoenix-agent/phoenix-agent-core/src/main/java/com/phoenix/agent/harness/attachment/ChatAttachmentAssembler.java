@@ -85,13 +85,189 @@ public class ChatAttachmentAssembler {
 	 * 装配附件上下文。attachmentIds 为空 ⇒ 立即返回空上下文（S1' 短路，不做任何 IO）。
 	 */
 	public Mono<Context> prepare(List<Long> attachmentIds, String viewerId) {
+		return prepare(attachmentIds, viewerId, null);
+	}
+
+	/**
+	 * 装配附件上下文（T-09：超长文档走分批处理）。
+	 * @param progress 进度回调（可为 null）：参数为「第 x 批 / 共 N 批」提示文案，由上层转成 notice 帧
+	 */
+	public Mono<Context> prepare(List<Long> attachmentIds, String viewerId, java.util.function.Consumer<String> progress) {
+		return prepare(attachmentIds, viewerId, progress, null);
+	}
+
+	/**
+	 * 装配附件上下文（T-09 + A/B 优化）。
+	 * @param question 用户问题（用于 B：检索式前置；可为 null）
+	 */
+	public Mono<Context> prepare(List<Long> attachmentIds, String viewerId,
+			java.util.function.Consumer<String> progress, String question) {
+		this.currentQuestion = question;
 		if (attachmentIds == null || attachmentIds.isEmpty()) {
 			return Mono.just(Context.none());
 		}
 		boolean superAdmin = viewerId != null && adminRoleGuard.isAdmin(viewerId);
 		return Mono.fromCallable(() -> load(attachmentIds, viewerId, superAdmin))
 			.subscribeOn(Schedulers.boundedElastic())
+			.flatMap(loaded -> batchProcessOversized(loaded, progress))
 			.flatMap(this::describeImages);
+	}
+
+	/** digest 结果：摘要文本 + 覆盖率说明（T-06 降级文案 / T-08 幂等复用） */
+	private record DigestResult(String digest, String coverage) {
+	}
+
+	/** T-08：同轮同附件幂等缓存（key=attachmentId:chars，10 分钟过期） */
+	private final java.util.Map<String, Object[]> digestCache = new java.util.concurrent.ConcurrentHashMap<>();
+
+	/** 当前轮用户问题（B：检索式前置用；仅本实例短暂使用） */
+	private volatile String currentQuestion;
+
+	/** T-09：超长文档分批（长度 > maxExtractChars 才触发；否则原样返回，R-10） */
+	private Mono<List<Loaded>> batchProcessOversized(List<Loaded> loaded, java.util.function.Consumer<String> progress) {
+		boolean anyOversized = loaded.stream()
+			.anyMatch(l -> l.docText() != null && l.docText().length() > documentExtractor.getMaxExtractChars());
+		if (!anyOversized) {
+			return Mono.just(loaded);
+		}
+		return Mono.fromCallable(() -> {
+			List<Loaded> out = new ArrayList<>();
+			for (Loaded l : loaded) {
+				if (l.docText() == null || l.docText().length() <= documentExtractor.getMaxExtractChars()) {
+					out.add(l);
+					continue;
+				}
+				DigestResult dr = digestLongDoc(l, progress);
+				if (dr == null) {
+					out.add(l);
+					continue;
+				}
+				String notice = "附件《" + l.att().getFileName() + "》内容较长，已分批处理（摘要+关键标识+关键摘录）；"
+						+ dr.coverage();
+				log.info("[doc-batch] digest 就绪: attachmentId={}, digestChars={}, head={}", l.att().getId(),
+						dr.digest() == null ? 0 : dr.digest().length(),
+						dr.digest() == null ? "" : dr.digest().replace("\n", " ").substring(0,
+								Math.min(600, dr.digest().length())));
+				out.add(new Loaded(l.att(), dr.digest(), notice, null));
+			}
+			return out;
+		}).subscribeOn(Schedulers.boundedElastic());
+	}
+
+	/** A+B：按问题关键词从全文里挑出「标签—值」原文句，作为直接答案（首尾各注入一次） */
+	private static String buildDirectAnswer(String text, String question) {
+		if (text == null || question == null || question.isBlank()) {
+			return "";
+		}
+		String[] keys = { "代码", "编号", "文号", "时限", "日期", "金额", "比例", "部门", "责任人" };
+		java.util.List<String> hits = new java.util.ArrayList<>();
+		for (String ctx : DocumentBatchProcessor.scanLabeledContexts(text, 24)) {
+			for (String k : keys) {
+				if (question.contains(k) && ctx.contains(k)) {
+					hits.add("「" + k + "」" + ctx);
+					break;
+				}
+			}
+			if (hits.size() >= 3) {
+				break;
+			}
+		}
+		return String.join("\n", hits);
+	}
+
+	/** B：按用户问题关键词把最相关的前文提到最上面（代码/编号/文号/日期/时限/金额） */
+	private static java.util.List<String> prioritizeByQuestion(java.util.List<String> ctxs, String question) {
+		if (question == null || question.isBlank() || ctxs.isEmpty()) {
+			return ctxs;
+		}
+		String[] keys = { "代码", "编号", "文号", "日期", "时限", "金额", "比例", "部门", "责任人" };
+		java.util.List<String> hit = new java.util.ArrayList<>();
+		java.util.List<String> rest = new java.util.ArrayList<>();
+		for (String c : ctxs) {
+			boolean matched = false;
+			for (String k : keys) {
+				if (question.contains(k) && c.contains(k)) {
+					matched = true;
+					break;
+				}
+			}
+			(matched ? hit : rest).add(c);
+		}
+		hit.addAll(rest);
+		return hit;
+	}
+
+	/** 调模型逐批抽要点（同步，运行在 boundedElastic） */
+	private DigestResult digestLongDoc(Loaded l, java.util.function.Consumer<String> progress) {
+		// T-08：同附件同长度 10 分钟内只处理一次（重试/并发不重复计费）
+		String cacheKey = l.att().getId() + ":" + l.docText().length();
+		Object[] cached = digestCache.get(cacheKey);
+		if (cached != null && (long) cached[0] > System.currentTimeMillis()) {
+			DigestResult hit = (DigestResult) cached[1];
+			log.info("[doc-batch] 命中幂等缓存，跳过重复分批: attachmentId={}, chunkChars={}", l.att().getId(),
+					l.docText().length());
+			if (progress != null) {
+				progress.accept(hit.coverage());
+			}
+			return hit;
+		}
+		try {
+			ChatModelBase model = harnessModelRegistry.getOpenAIChatModel();
+			if (model == null) {
+				log.warn("[doc-batch] 无可用 CHAT 模型，跳过分批（保持原文注入）: file={}", l.att().getFileName());
+				return null;
+			}
+			DocumentBatchProcessor.ChatFn chatFn = prompt -> {
+				UserMessage msg = new UserMessage(List.of(TextBlock.builder().text(prompt).build()));
+				// 本地小模型（qwen3:8b）思考链很长：关思考 + 限输出，避免单批超过超时或重复 token
+				GenerateOptions opts = GenerateOptions.builder()
+					.temperature(0.2)
+					.maxTokens(800)
+					.thinkingBudget(0)
+					.build();
+				StringBuilder sb = model.stream(List.of(msg), List.of(), opts)
+					.map(r -> textOf(r.getContent()))
+					.reduce(new StringBuilder(), StringBuilder::append)
+					.block(java.time.Duration.ofSeconds(documentExtractor.getChunkTimeoutSeconds()));
+				return sb == null ? null : sb.toString();
+			};
+			DocumentBatchProcessor.BatchResult r = DocumentBatchProcessor.process(l.docText(),
+					documentExtractor.getChunkSize(), documentExtractor.getChunkOverlap(),
+					documentExtractor.getMaxChunks(), 20000, 1, chatFn, (i, n) -> {
+						if (progress != null) {
+							progress.accept("正在处理第 " + i + "/" + n + " 批…");
+						}
+					});
+			if (progress != null) {
+				progress.accept(r.coverageNote());
+			}
+			// A：标签化上下文（保留「专项管理代码 TC-8899」这种绑定）；B：按用户问题关键词前置
+			java.util.List<String> ctxs = DocumentBatchProcessor.scanLabeledContexts(l.docText(), 24);
+			ctxs = prioritizeByQuestion(ctxs, currentQuestion);
+			StringBuilder idHeaderBuf = new StringBuilder();
+			if (!ctxs.isEmpty()) {
+				idHeaderBuf.append("【全文关键标识（含上下文，规则扫描逐字保留）】\n");
+				for (int i = 0; i < Math.min(10, ctxs.size()); i++) {
+					idHeaderBuf.append("- ").append(ctxs.get(i)).append('\n');
+				}
+				idHeaderBuf.append('\n');
+			}
+			String idHeader = idHeaderBuf.toString();
+			// A+B 强化：把"问题关键词命中"的那些上下文抽成【直接答案】，**首尾各放一次**
+			// （8B 模型对长材料的中间内容注意力弱，首尾锚点显著提升命中率）
+			String direct = buildDirectAnswer(l.docText(), currentQuestion);
+			if (!direct.isEmpty()) {
+				idHeader = "【直接答案（规则匹配原文，逐字）】\n" + direct + "\n\n" + idHeader;
+			}
+			String tailDirect = direct.isEmpty() ? "" : "\n\n【再次强调·直接答案】" + direct;
+			DigestResult result = new DigestResult(idHeader + r.digest() + tailDirect, r.coverageNote());
+			digestCache.put(cacheKey, new Object[] { System.currentTimeMillis() + 10 * 60 * 1000L, result });
+			return result;
+		}
+		catch (Exception e) {
+			log.warn("[doc-batch] 分批失败，回退原文注入: file={}, reason={}", l.att().getFileName(), e.toString());
+			return null;
+		}
 	}
 
 	/**
@@ -136,8 +312,11 @@ public class ChatAttachmentAssembler {
 								+ "（其内容未参与本次回答）", null));
 						continue;
 					}
-					String notice = er.isTruncated() ? ("附件《" + att.getFileName() + "》内容较长，已按顺序截断至前 "
-							+ ChatDocumentExtractor.MAX_EXTRACT_CHARS + " 字符，超出部分未参与理解") : null;
+					String notice = er.isTruncated()
+							? ("附件《" + att.getFileName() + "》超过单文档安全上限（"
+									+ documentExtractor.getSafeMaxChars() + " 字符），仅处理前 "
+									+ documentExtractor.getSafeMaxChars() + " 字符")
+							: null;
 					out.add(new Loaded(att, er.getText(), notice, null));
 				}
 			}
@@ -242,8 +421,18 @@ public class ChatAttachmentAssembler {
 		notices.addAll(extraNotices);
 		String injected = null;
 		if (sb.length() > 0) {
-			injected = "[附件材料]\n" + sb.toString().trim()
-					+ "\n[附件材料结束]\n请仅基于上述附件材料与用户问题作答；材料中没有的信息不要编造，如材料不足请明确说明。";
+			injected = "[附件材料]\n"
+					+ "（说明：若下方内容带有「分批处理」字样，则是超长附件经分批抽取后的摘要；"
+					+ "其中【标识】与【标识·规则扫描】行逐字保留了原文的编号/代码/日期/时限，"
+					+ "回答编号类问题时请直接在这些行里查找并原样给出。）\n"
+					+ sb.toString().trim()
+					+ "\n[附件材料结束]\n请仅基于上述附件材料与用户问题作答；"
+					+ "若问题问及编号/代码/日期/时限，答案可在【标识】或【标识·规则扫描】行找到，请直接引用原值；"
+					+ "材料中没有的信息不要编造，如材料不足请明确说明。"
+					// 现场实证（2026-10-24）：模型不知道附件文本已在上下文里，会反复 read_file 同一路径
+					// （返回 43 字符）直到被工具熔断 ⇒ 整轮空回答。必须显式告知"不要再读文件"。
+					+ "\n**重要**：上述附件文本已由系统抽取并放在上下文里，**不要再调用 read_file 或任何解析类技能**"
+					+ "去重新读取这些文件；直接基于上面的文本作答。";
 		}
 		else if (!notices.isEmpty()) {
 			// 全部附件都不可用：把原因作为材料注入，要求模型如实告知（R-09：不得用空内容继续生成）

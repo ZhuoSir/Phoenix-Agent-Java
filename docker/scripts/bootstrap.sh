@@ -62,7 +62,7 @@ else
     $SUDO sh /tmp/phx-getdocker.sh --mirror Aliyun >>"$PHX_LOG_FILE" 2>&1 || phx_fail 1 4 "引擎安装失败（见日志）"
   else
     phx_log WARN "get.docker.com 不可达（受限网络）——回退国内源（阿里云→清华→中科大，多源有序回退）"
-    phx_install_docker_aliyun || phx_fail 1 4 "国内源装引擎失败（见日志 $PHX_LOG_FILE）"
+    phx_install_docker_aliyun || phx_fail 1 4 "国内源装引擎失败（见日志 ${PHX_LOG_FILE}）"
   fi
   phx_engine_autostart "$SUDO"   # BUG-178: 设置并核实开机自启（原为静默 || true，失败了也无人知道）
   # shellcheck disable=SC2086
@@ -71,7 +71,7 @@ else
 fi
 
 # ── B/4 本机打包（native 架构，国内源默认） ──
-phx_log INFO "[B/4] 源码打包 package.sh（--arch $ARCH --version $VERSION）"
+phx_log INFO "[B/4] 源码打包 package.sh（--arch $ARCH --version ${VERSION}）"
 [ "$OFFLINE" -eq 1 ] && phx_log WARN "--offline 仅作用于安装段；打包段需外网（镜像源/依赖源）"
 PKG_MIRROR_ARG=""; [ -n "$MIRROR_OPT" ] && PKG_MIRROR_ARG="--mirror $MIRROR_OPT"
 # 打包 40-70 分钟，全程静默会让人以为卡死（BUG-146）：日志照存、明细仍只进日志，
@@ -81,7 +81,7 @@ PKG_MIRROR_ARG=""; [ -n "$MIRROR_OPT" ] && PKG_MIRROR_ARG="--mirror $MIRROR_OPT"
 bash "$SRC/docker/scripts/package.sh" --arch "$ARCH" --version "$VERSION" $PKG_MIRROR_ARG 2>&1 \
   | tee -a "$PHX_LOG_FILE" \
   | { grep --line-buffered -E '\[(INFO|WARN|ERROR)\]' || true; } \
-  || phx_fail 2 4 "打包失败（明细见日志尾部: tail -n 50 $PHX_LOG_FILE）"
+  || phx_fail 2 4 "打包失败（明细见日志尾部: tail -n 50 ${PHX_LOG_FILE}）"
 TAR="$SRC/docker/dist/phoenix-${VERSION}-${ARCH}.tar.gz"
 [ -f "$TAR" ] || phx_fail 2 4 "打包产物缺失: $TAR"
 phx_log INFO "[B/4] 产包就绪: $TAR ($(du -h "$TAR" | awk '{print $1}'))——可拷贝至其它机器离线安装"

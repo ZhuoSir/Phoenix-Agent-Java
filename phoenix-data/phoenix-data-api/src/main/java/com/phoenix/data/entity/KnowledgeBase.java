@@ -38,4 +38,10 @@ public class KnowledgeBase {
 	private LocalDateTime createTime;
 
 	private LocalDateTime updateTime;
+
+	/** 绑定的向量模型 id（tbl_data_model_config.id）；NULL=未绑定/待重建（vector-dim-flexibility R-01/R-06） */
+	private Integer embeddingModelId;
+
+	/** 向量空间键（provider+model+版本摘要+维度）；归属与失效体检用（R-06，T-05 起写入） */
+	private String modelSpaceKey;
 }

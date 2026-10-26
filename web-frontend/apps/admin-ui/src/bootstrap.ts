@@ -3,6 +3,7 @@ import { createApp, watchEffect } from 'vue';
 import { registerAccessDirective } from '@vben/access';
 import { registerLoadingDirective, setDefaultModalProps } from '@vben/common-ui';
 import { preferences } from '@vben/preferences';
+import { addAPIProvider } from '@vben/icons';
 import { initStores } from '@vben/stores';
 import '@vben/styles';
 import '@vben/styles/ele';
@@ -16,6 +17,15 @@ import { initComponentAdapter } from './adapter/component';
 import { initSetupVbenForm } from './adapter/form';
 import App from './app.vue';
 import { router } from './router';
+
+// 图标本地化（offline-icons R-01）：把 Iconify 默认 API provider 指向本站静态目录 /icons，
+// 运行时只请求本站（不再访问 https://api.iconify.design），适配内网离线环境。
+addAPIProvider('', {
+  resources: ['/icons'],
+  maxURL: 512,
+  rotate: 750,
+  timeout: 2000,
+});
 
 async function bootstrap(namespace: string) {
   // 初始化组件适配器
@@ -77,6 +87,45 @@ async function bootstrap(namespace: string) {
       useTitle(pageTitle);
     }
   });
+
+  // 附件单次上传上限：后端下发（application.yml: phoenix.agent.chat.attachment-max-count）
+
+  // 失败保持构建期默认，不阻塞启动
+
+  try {
+
+    const resp = await fetch('/api/chat/attachment/limit', {
+
+      headers: { 'phoenix-token': localStorage.getItem('phoenix-token') ?? '' },
+
+    });
+
+    const body: any = await resp.json();
+
+    const maxCount = body?.data?.maxCount;
+
+    if (typeof maxCount === 'number' && maxCount > 0) {
+
+      const { setAttachmentMaxFiles } = await import('@phoenix/chat-shared');
+
+      setAttachmentMaxFiles(maxCount);
+
+    }
+
+  } catch {
+
+    // 忽略：回落到构建期默认值
+
+  }
+  // 品牌外观（brand-configuration T-05）：3s 超时 + 失败回落默认，绝不阻塞挂载
+  try {
+    const { loadBrand } = await import('#/stores/brand');
+    await loadBrand();
+  } catch (e) {
+    console.warn('[brand] 初始化异常（已忽略）', e);
+  }
+
+
 
   app.mount('#app');
 }

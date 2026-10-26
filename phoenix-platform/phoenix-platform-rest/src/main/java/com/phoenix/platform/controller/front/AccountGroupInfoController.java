@@ -3,6 +3,7 @@ package com.phoenix.platform.controller.front;
 import com.mybatisflex.core.paginate.Page;
 import com.phoenix.platform.model.front.AccountGroupInfo;
 import com.phoenix.platform.service.front.AccountGroupInfoService;
+import com.phoenix.common.vo.front.GroupMemberVO;
 import com.phoenix.common.vo.front.UserGroupVO;
 import com.phoenix.tools.vo.ReturnVo;
 import lombok.RequiredArgsConstructor;
@@ -35,6 +36,27 @@ public class AccountGroupInfoController {
     @GetMapping("/group/{groupId}")
     public ReturnVo<List<AccountGroupInfo>> getByGroupId(@PathVariable String groupId) {
         return ReturnVo.ok(accountGroupInfoService.getByGroupId(groupId));
+    }
+
+    /**
+     * 组成员分页（组详情「人员」页签，R-04）。
+     * 与既有 `GET /group/{groupId}`（返回全量 List，保持不变）并存。
+     */
+    @GetMapping("/page-by-group")
+    public ReturnVo<Page<GroupMemberVO>> pageByGroup(@RequestParam(required = false) String groupId,
+                                                     @RequestParam(defaultValue = "1") long page,
+                                                     @RequestParam(defaultValue = "20") long size) {
+        // 入参校验前置：返回明确文案（否则 BusinessException 落到全局兜底，用户只看到"服务器内部错误"）
+        if (groupId == null || groupId.isBlank()) {
+            return ReturnVo.fail("groupId 不能为空");
+        }
+        if (page < 1) {
+            return ReturnVo.fail("page 需 >= 1");
+        }
+        if (size < 1 || size > 500) {
+            return ReturnVo.fail("size 需在 1~500 之间");
+        }
+        return ReturnVo.ok(accountGroupInfoService.pageMembers(groupId, page, size));
     }
 
     /**

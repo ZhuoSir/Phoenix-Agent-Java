@@ -28,6 +28,12 @@ public class HybridSearchRequest implements Serializable {
 
 	private Filter.Expression filterExpression;
 
+	/**
+	 * R-03/T-06：调用方按"命中库绑定模型"路由后注入的向量存储；为空则用策略默认存储。
+	 * transient：不参与序列化（VectorStore 不可序列化，仅进程内传递）。
+	 */
+	private transient org.springframework.ai.vectorstore.VectorStore routingVectorStore;
+
 	// 向量检索权重
 	@Builder.Default
 	private Double vectorWeight = 0.5;

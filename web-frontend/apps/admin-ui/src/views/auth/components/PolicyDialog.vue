@@ -30,6 +30,8 @@ function accept() {
   emit('agree');
   close();
 }
+
+import { brand } from '#/stores/brand';
 </script>
 
 <template>
@@ -67,7 +69,7 @@ function accept() {
           <template v-if="tab === 'privacy'">
             <h3>隐私协议</h3>
             <p>
-              我们重视并尊重每一位用户的隐私。本协议说明 Phoenix Agent
+              我们重视并尊重每一位用户的隐私。本协议说明 {{ brand.systemName }}
               在你使用智能体服务过程中如何收集、使用、存储与保护你的信息。
             </p>
             <h4>1. 我们收集的信息</h4>

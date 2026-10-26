@@ -31,5 +31,8 @@ public interface KnowledgeBaseService {
     /** BUG-18(T-04)：按库重刷 QA/FAQ 联合向量（幂等，DOCUMENT 不在范围） */
     java.util.Map<String, Object> reEmbedKnowledgeBase(Long id);
 
+      /** R-06 归属与失效体检：按库列出绑定模型/空间键/规模/可用性（空串空间键按 L-76 视为异常值，不回落默认）。 */
+      java.util.List<java.util.Map<String, Object>> ownershipAudit();
+
     KnowledgeBaseVO detail(Long id);
 }

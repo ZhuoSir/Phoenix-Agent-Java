@@ -46,3 +46,30 @@ logging:
     com.alibaba.cloud.ai.mapper: debug
     org.springframework.jdbc: debug
 
+# ===== 超长附件分批（BL-67 / T-01）=====
+# 说明：以下为**默认值**，环境变量可覆盖（Spring 宽松绑定：短横线去掉，
+# 如 attachment-chunk-size → PHOENIX_AGENT_CHAT_ATTACHMENTCHUNKSIZE）
+phoenix:
+  # ===== 品牌外观配置（brand-configuration T-02）=====
+  # 品牌**业务值**存 DB（tbl_platform_brand_config，运行时可改）；此处仅工程参数（缓存秒数，0=不缓存）
+  platform:
+    brand:
+      cache-seconds: 60
+      # 品牌图上传大小上限（字节，默认 2MB）
+      asset-max-bytes: 2097152
+  agent:
+    chat:
+      # 单次上传附件数量上限（chat-runtime-hardening T-01；2026-10-25 用户：做成系统配置，默认 50）
+      attachment-max-count: 50
+      # 触发分批的字符阈值（原"截断阈值"语义已改为"分批阈值"）
+      attachment-max-extract-chars: 24000
+      # 抽取安全上限（防 OOM）：只有超过它才真截断并提示
+      attachment-safe-max-chars: 2000000
+      # 每批字符数
+      attachment-chunk-size: 6000
+      # 块间重叠字符（避免语义切断）
+      attachment-chunk-overlap: 300
+      # 最大批数（护栏）
+      attachment-max-chunks: 20
+      # 单批模型调用超时（秒）
+      attachment-chunk-timeout-seconds: 180

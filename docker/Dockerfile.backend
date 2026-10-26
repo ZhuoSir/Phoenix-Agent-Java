@@ -50,6 +50,7 @@ RUN mkdir -p /app/logs /app/uploads \
     && (chown -R 10001:10001 /app 2>/dev/null || chmod -R 777 /app)
 WORKDIR /app
 COPY --chown=app:app docker/.stage/phoenix-admin.jar /app/phoenix-admin.jar
+RUN chmod 644 /app/phoenix-admin.jar
 USER 10001
 EXPOSE 8066
 ENTRYPOINT ["sh","-c","exec ${JAVA_BIN:-java} $JAVA_OPTS -jar /app/phoenix-admin.jar"]

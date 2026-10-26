@@ -22,7 +22,7 @@ bad=$(grep -oE 'sk-[A-Za-z0-9._-]{20,}' ../sql/all_data.sql | grep -vcE '^sk-x+$
 
 step "[2] 当前追踪树+种子无长密钥指纹"
 hits=$(cd .. && git grep -lE 'sk-[A-Za-z0-9._-]{24,}' -- ':!docker/scripts/verify.sh' 2>/dev/null | wc -l | tr -d ' ')
-[ "${hits:-0}" = "0" ] && ok || no "命中文件数=$hits（历史审计 2026-09-30 全历史 0 命中，结论见 spec changelog）"
+[ "${hits:-0}" = "0" ] && ok || no "命中文件数=${hits}（历史审计 2026-09-30 全历史 0 命中，结论见 spec changelog）"
 
 step "[3] 仅 nginx 对外(其余服务无宿主端口绑定)"
 extra=0
@@ -57,18 +57,18 @@ b8=$(curl -s --max-time 10 -X POST -H 'Content-Type: application/json' -d '{"use
 step "[10] 会话文件面板表与端点在位 (BL-19)"
 b10=$($DC exec -T postgres psql -U phoenix -d phoenix -tAc "select count(*) from information_schema.tables where table_name='tbl_data_agent_file'" 2>/dev/null || echo 0)
 l10=$(curl -s --max-time 10 -H "phoenix-token: $(curl -s --max-time 10 -X POST -H 'Content-Type: application/json' -d '{"username":"admin","password":"123456"}' "http://127.0.0.1:${PHOENIX_HTTP_PORT:-9080}/api/privilege/auth/login" | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')" "http://127.0.0.1:${PHOENIX_HTTP_PORT:-9080}/api/agent/files?sessionId=verify-nonexistent" | grep -cE '"code":|"success":' || true)
-[ "${b10:-0}" = "1" ] && [ "${l10:-0}" -ge 1 ] && ok || no "表=$b10 端点信封=$l10（需跑 V1.3.0_01 并部署 T-04）"
+[ "${b10:-0}" = "1" ] && [ "${l10:-0}" -ge 1 ] && ok || no "表=$b10 端点信封=${l10}（需跑 V1.3.0_01 并部署 T-04）"
 
 step "[12] 知识库模块就位（表×菜单×端点）(knowledge-base)"
 kb12=$($DC exec -T postgres psql -U phoenix -d phoenix -tAc "select count(*) from information_schema.tables where table_name in ('tbl_data_knowledge_base','tbl_data_agent_kbase_bind','tbl_platform_group_kbase_info')" 2>/dev/null || echo 0)
 km12=$($DC exec -T postgres psql -U phoenix -d phoenix -tAc "select count(*) from tbl_privilege_module where url='/knowledge-base' and del_flag=0" 2>/dev/null || echo 0)
 en12=$(curl -s --max-time 10 -X POST -H "phoenix-token: $(curl -s --max-time 10 -X POST -H 'Content-Type: application/json' -d '{"username":"admin","password":"123456"}' "http://127.0.0.1:${PHOENIX_HTTP_PORT:-9080}/api/privilege/auth/login" | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')" -H 'Content-Type: application/json' -d '{"pageNum":1,"pageSize":1}' "http://127.0.0.1:${PHOENIX_HTTP_PORT:-9080}/api/knowledge-base/query/page" | grep -cE '"success":true|"message"' || true)
-[ "${kb12:-0}" = "3" ] && [ "${km12:-0}" = "1" ] && [ "${en12:-0}" -ge 1 ] && ok || no "表=$kb12 菜单=$km12 端点=$en12（需 V1.3.0_02 + 部署 T-02）"
+[ "${kb12:-0}" = "3" ] && [ "${km12:-0}" = "1" ] && [ "${en12:-0}" -ge 1 ] && ok || no "表=$kb12 菜单=$km12 端点=${en12}（需 V1.3.0_02 + 部署 T-02）"
 
 step "[13] /auth/login 双面共存（GET=SPA 页 / POST=后端信封）(BUG-56 防回归)"
 g13=$(curl -s -m 8 "http://127.0.0.1:${PHOENIX_HTTP_PORT:-9080}/auth/login" | grep -ciE '<html|<!doctype' || true)
 p13=$(curl -s -m 8 -X POST -H 'Content-Type: application/json' -d '{"username":"verify-probe","password":"x"}' "http://127.0.0.1:${PHOENIX_HTTP_PORT:-9080}/auth/login" | grep -cE '"success":|"code":' || true)
-[ "$g13" -ge 1 ] && [ "$p13" -ge 1 ] && ok || no "GET非SPA=$g13 POST非信封=$p13（nginx 方法分流被改动？）"
+[ "$g13" -ge 1 ] && [ "$p13" -ge 1 ] && ok || no "GET非SPA=$g13 POST非信封=${p13}（nginx 方法分流被改动？）"
 
 step "[14] 断线续传轮次端点在位 (detached-stream)"
 tk=$(curl -s --max-time 10 -X POST -H 'Content-Type: application/json' -d '{"username":"admin","password":"123456"}' "http://127.0.0.1:${PHOENIX_HTTP_PORT:-9080}/api/privilege/auth/login" | grep -o '"token":"[^"]*"' | cut -d'"' -f4)
@@ -80,5 +80,23 @@ c=$($DC exec -T postgres psql -U phoenix -d phoenix -tAc "select count(*) from i
 if [ "$c" = "1" ]; then ok
 elif [ "${PHOENIX_FRESH:-0}" = "1" ]; then echo "[WARN] 首启两拍未齐——全新安装属预期（首轮对话后自动补齐），不作为安装门禁"
 else no "若为 0：应用可能未首启（表未建），启动一轮对话后重跑本断言"; fi
+
+
+step "[15] 向量迁移/重建验收（R-09 五项）"
+# 门禁：出报告 + 落回执（releases/v2.1.0/acceptance/）；无库环境 SKIP 不阻断出货，但显式提示
+GATE="$(pwd)/scripts/vector-acceptance-gate.sh"
+PGID="$($DC ps -q postgres 2>/dev/null | head -1)"   # 注意：inspect 要用 docker 原生命令，compose 无该子命令（实测踩坑）
+PGNAME=""
+[ -n "$PGID" ] && PGNAME="$(docker inspect -f '{{.Name}}' "$PGID" 2>/dev/null | sed 's#^/##')"
+if [ -x "$GATE" ] && [ -n "$PGNAME" ]; then
+  "$GATE" --pg-container "$PGNAME" >/tmp/phx-vec-gate.$$ 2>&1
+  rc=$?
+  if [ "$rc" = "0" ]; then ok
+  elif [ "$rc" = "3" ]; then echo "[WARN] 数据库不可达 ⇒ SKIP（回执见 releases/v2.1.0/acceptance/）"
+  else no "$(grep -m1 '修复：' /tmp/phx-vec-gate.$$ 2>/dev/null || grep -m1 '判定=' /tmp/phx-vec-gate.$$ 2>/dev/null || echo '报告判 FAIL，见回执')"; fi
+  rm -f /tmp/phx-vec-gate.$$
+else
+  echo "[WARN] 未找到门禁脚本或 postgres 未运行 ⇒ SKIP"
+fi
 
 exit $fail

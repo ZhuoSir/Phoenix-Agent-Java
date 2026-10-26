@@ -3,6 +3,7 @@ package com.phoenix.platform.service.front;
 import com.mybatisflex.core.paginate.Page;
 import com.mybatisflex.core.service.IService;
 import com.phoenix.platform.model.front.AccountGroupInfo;
+import com.phoenix.common.vo.front.GroupMemberVO;
 import com.phoenix.common.vo.front.UserGroupVO;
 
 import java.util.List;
@@ -15,6 +16,14 @@ public interface AccountGroupInfoService extends IService<AccountGroupInfo> {
 	Page<AccountGroupInfo> page(Page<AccountGroupInfo> page, AccountGroupInfo query);
 
 	List<AccountGroupInfo> getByGroupId(String groupId);
+
+	/**
+	 * 组成员分页（组详情「人员」页签，R-04）。
+	 * @param groupId 组 id（必填）
+	 * @param page 页码，从 1 起
+	 * @param size 每页条数，1~500
+	 */
+	Page<GroupMemberVO> pageMembers(String groupId, long page, long size);
 
 	List<AccountGroupInfo> getByAccountId(String accountId);
 

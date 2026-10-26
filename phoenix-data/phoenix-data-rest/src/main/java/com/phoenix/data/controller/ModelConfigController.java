@@ -22,6 +22,11 @@ public class ModelConfigController {
 
 	private final ModelConfigDataService modelConfigDataService;
 
+
+	/** R-04/T-09：模型删除前置校验与护栏 */
+
+	private final com.phoenix.data.service.aimodelconfig.ModelDeletionGuard modelDeletionGuard;
+
 	private final ModelConfigOpsService modelConfigOpsService;
 
 	/**
@@ -85,10 +90,22 @@ public class ModelConfigController {
 	 * @param id 配置ID
 	 * @return 操作结果
 	 */
-	@DeleteMapping("/{id}")
-	public ApiResponse<String> delete(@PathVariable Integer id) {
+	/** R-04/T-09 影响面清单（库/文档数/分块数/预计耗时 + 可删判定与阻塞原因） */
+	@GetMapping("/{id}/delete-impact")
+	public ApiResponse<java.util.Map<String, Object>> deleteImpact(@PathVariable Integer id) {
 		try {
-			modelConfigDataService.deleteConfig(id);
+			return ApiResponse.success("查询成功", modelDeletionGuard.deleteImpact(id));
+		}
+		catch (Exception e) {
+			return ApiResponse.error("影响面查询失败: " + e.getMessage());
+		}
+	}
+
+	@DeleteMapping("/{id}")
+	public ApiResponse<String> delete(@PathVariable Integer id,
+			@RequestParam(value = "confirmImpact", required = false, defaultValue = "false") boolean confirmImpact) {
+		try {
+			modelDeletionGuard.deleteWithGuard(id, confirmImpact);
 			return ApiResponse.success("配置已删除");
 		}
 		catch (Exception e) {

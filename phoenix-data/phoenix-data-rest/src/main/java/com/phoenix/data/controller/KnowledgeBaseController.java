@@ -37,6 +37,18 @@ public class KnowledgeBaseController {
 
 	private final KnowledgeBaseService knowledgeBaseService;
 
+	/** R-03/T-06：检索路由探针（无 LLM 依赖，供运维与验证） */
+	private final com.phoenix.data.service.vectorstore.AgentVectorStoreService agentVectorStoreService;
+
+	/** R-04/T-10：重建任务（后台执行/进度/重试/续跑） */
+	private final com.phoenix.data.service.knowledge.KnowledgeRebuildService knowledgeRebuildService;
+
+	/** R-07a/T-12：升级路径(a) 搬迁不重嵌（人工确认后执行） */
+	private final com.phoenix.data.service.knowledge.KnowledgeMigrationService knowledgeMigrationService;
+
+	/** R-07/T-13：存量库升级路径选择（a 搬迁 / b 重建） */
+	private final com.phoenix.data.service.knowledge.KnowledgeUpgradeService knowledgeUpgradeService;
+
 	/** R-18（CR-01/T-25）：超管判定复用 R-08/R-17 守卫（单一口径） */
 	private final com.phoenix.data.component.AdminRoleGuard adminRoleGuard;
 
@@ -84,6 +96,216 @@ public class KnowledgeBaseController {
 	public ApiResponse<java.util.Map<String, Object>> reEmbed(@PathVariable Long id) {
 		assertOwner(id);
 		return ApiResponse.success("重刷完成", knowledgeBaseService.reEmbedKnowledgeBase(id));
+	}
+
+	/**
+	 * T-06 检索路由探针：给出某智能体+向量类型下的检索路由（绑定库/模型/表），可顺带执行一次真实检索。
+	 */
+	@PostMapping("/retrieval-probe")
+	public ApiResponse<java.util.Map<String, Object>> retrievalProbe(
+			@org.springframework.web.bind.annotation.RequestBody java.util.Map<String, Object> body) {
+		try {
+			if (!isSuperAdmin()) {
+				return ApiResponse.error("仅管理员可执行检索探针");
+			}
+			String agentId = body.get("agentId") == null ? null : String.valueOf(body.get("agentId"));
+			String docVectorType = body.get("docVectorType") == null ? "agentKnowledge"
+					: String.valueOf(body.get("docVectorType"));
+			java.util.Map<String, Object> out = new java.util.LinkedHashMap<>(
+					agentVectorStoreService.retrievalRoute(agentId, docVectorType));
+			java.util.List<Long> degradedKbIds = new java.util.ArrayList<>();
+			out.put("degradedKbIds", degradedKbIds);
+			int hitCount = -1;
+			if (body.get("query") != null) {
+				com.phoenix.data.dto.search.AgentSearchRequest req = com.phoenix.data.dto.search.AgentSearchRequest
+						.builder()
+						.agentId(agentId)
+						.docVectorType(docVectorType)
+						.query(String.valueOf(body.get("query")))
+						.topK(body.get("topK") == null ? null : Integer.valueOf(String.valueOf(body.get("topK"))))
+						.build();
+				java.util.List<org.springframework.ai.document.Document> hits = agentVectorStoreService.search(req);
+				hitCount = hits.size();
+				java.util.List<java.util.Map<String, Object>> hs = new java.util.ArrayList<>();
+				for (org.springframework.ai.document.Document d : hits) {
+					java.util.Map<String, Object> h = new java.util.LinkedHashMap<>();
+					h.put("id", String.valueOf(d.getId()));
+					h.put("score", d.getScore());
+					if (d.getMetadata() != null) {
+						h.put("retrievalSourceModelId", d.getMetadata().get("retrievalSourceModelId"));
+						h.put("retrievalSourceTable", d.getMetadata().get("retrievalSourceTable"));
+						h.put("retrievalSourceKbIds", d.getMetadata().get("retrievalSourceKbIds"));
+						// R-03/T-08：降级必须**显式提示**（响应可判定，不静默）
+						h.put("retrievalDegraded", d.getMetadata().get("retrievalDegraded"));
+						h.put("retrievalDegradedMode", d.getMetadata().get("retrievalDegradedMode"));
+						h.put("retrievalDegradedReason", d.getMetadata().get("retrievalDegradedReason"));
+						if (Boolean.TRUE.equals(d.getMetadata().get("retrievalDegraded"))) {
+							degradedKbIds.addAll((java.util.List<Long>) d.getMetadata().getOrDefault("retrievalSourceKbIds",
+									java.util.List.of()));
+						}
+					}
+					hs.add(h);
+				}
+				out.put("hits", hs);
+			}
+			out.put("hitCount", hitCount);
+			return ApiResponse.success("查询成功", out);
+		}
+		catch (Exception e) {
+			return ApiResponse.error(e.getMessage());
+		}
+	}
+
+	/** R-07/T-13 升级计划：路径判定（a/b）+ 候选模型 + 影响面（文档/分块/预计耗时）+ 原因。 */
+	@GetMapping("/{id}/upgrade-plan")
+	public ApiResponse<java.util.Map<String, Object>> upgradePlan(@PathVariable("id") Long id,
+			@org.springframework.web.bind.annotation.RequestParam(value = "toModelId", required = false) Integer toModelId) {
+		try {
+			if (!isSuperAdmin()) {
+				return ApiResponse.error("仅管理员可查看升级计划");
+			}
+			return ApiResponse.success("查询成功", knowledgeUpgradeService.upgradePlan(id, toModelId));
+		}
+		catch (Exception e) {
+			return ApiResponse.error("升级计划失败: " + e.getMessage());
+		}
+	}
+
+	/** R-07/T-13 执行升级（**必须 confirm=true**）：判定为 a ⇒ 搬迁不重嵌；判定为 b ⇒ 进入后台重建任务。 */
+	@PostMapping("/{id}/upgrade")
+	public ApiResponse<java.util.Map<String, Object>> upgrade(@PathVariable("id") Long id,
+			@org.springframework.web.bind.annotation.RequestBody java.util.Map<String, Object> body) {
+		try {
+			if (!isSuperAdmin()) {
+				return ApiResponse.error("仅管理员可执行升级");
+			}
+			boolean confirm = Boolean.parseBoolean(String.valueOf(body.getOrDefault("confirm", "false")));
+			String path = body.get("path") == null ? null : String.valueOf(body.get("path"));
+			Integer toModelId = body.get("toModelId") == null ? null
+					: Integer.valueOf(String.valueOf(body.get("toModelId")));
+			return ApiResponse.success("升级已受理", knowledgeUpgradeService.upgrade(id, path, confirm, toModelId, me()));
+		}
+		catch (Exception e) {
+			return ApiResponse.error("升级失败: " + e.getMessage());
+		}
+	}
+
+	/** R-07a/T-12 搬迁计划（人工确认前查看）：来源/目标表、维度、行数、动作与不可行原因。 */
+	@GetMapping("/{id}/migration-plan")
+	public ApiResponse<java.util.Map<String, Object>> migrationPlan(@PathVariable("id") Long id,
+			@org.springframework.web.bind.annotation.RequestParam("toModelId") Integer toModelId) {
+		try {
+			if (!isSuperAdmin()) {
+				return ApiResponse.error("仅管理员可查看搬迁计划");
+			}
+			return ApiResponse.success("查询成功", knowledgeMigrationService.plan(id, toModelId));
+		}
+		catch (Exception e) {
+			return ApiResponse.error("搬迁计划失败: " + e.getMessage());
+		}
+	}
+
+	/** R-07a/T-12 执行搬迁（**必须 confirm=true**）：原样搬运既有向量到目标模型专属表，不重新嵌入。 */
+	@PostMapping("/{id}/migrate")
+	public ApiResponse<java.util.Map<String, Object>> migrate(@PathVariable("id") Long id,
+			@org.springframework.web.bind.annotation.RequestBody java.util.Map<String, Object> body) {
+		try {
+			if (!isSuperAdmin()) {
+				return ApiResponse.error("仅管理员可执行搬迁");
+			}
+			Object tm = body.get("toModelId");
+			if (tm == null) {
+				return ApiResponse.error("缺少 toModelId");
+			}
+			boolean confirm = Boolean.parseBoolean(String.valueOf(body.getOrDefault("confirm", "false")));
+			return ApiResponse.success("搬迁完成", knowledgeMigrationService.migrate(id,
+					Integer.valueOf(String.valueOf(tm)), confirm));
+		}
+		catch (Exception e) {
+			return ApiResponse.error("搬迁失败: " + e.getMessage());
+		}
+	}
+
+	/** R-04/T-10 启动重建任务（管理员）：把该库向量重建到目标模型，完成后原子切换绑定。 */
+	@PostMapping("/{id}/rebuild")
+	public ApiResponse<java.util.Map<String, Object>> startRebuild(@PathVariable("id") Long id,
+			@org.springframework.web.bind.annotation.RequestBody java.util.Map<String, Object> body) {
+		try {
+			if (!isSuperAdmin()) {
+				return ApiResponse.error("仅管理员可发起重建");
+			}
+			Object tm = body.get("toModelId");
+			if (tm == null) {
+				return ApiResponse.error("缺少 toModelId");
+			}
+			Long jobId = knowledgeRebuildService.start(id, Integer.valueOf(String.valueOf(tm)), me());
+			java.util.Map<String, Object> out = new java.util.LinkedHashMap<>();
+			out.put("jobId", jobId);
+			out.put("kbId", id);
+			out.put("toModelId", Integer.valueOf(String.valueOf(tm)));
+			return ApiResponse.success("重建任务已创建", out);
+		}
+		catch (Exception e) {
+			return ApiResponse.error("创建重建任务失败: " + e.getMessage());
+		}
+	}
+
+	/** R-04/T-10 进度查询：最新任务的数值进度与失败清单。 */
+	@GetMapping("/{id}/rebuild/latest")
+	public ApiResponse<Object> rebuildLatest(@PathVariable("id") Long id) {
+		try {
+			if (!isSuperAdmin()) {
+				return ApiResponse.error("仅管理员可查看重建进度");
+			}
+			return ApiResponse.success("查询成功", knowledgeRebuildService.latest(id));
+		}
+		catch (Exception e) {
+			return ApiResponse.error(e.getMessage());
+		}
+	}
+
+	/** R-04/T-10 续跑（断点续跑，亦可由启动钩子自动触发）。 */
+	@PostMapping("/rebuild/{jobId}/resume")
+	public ApiResponse<String> rebuildResume(@PathVariable("jobId") Long jobId) {
+		try {
+			if (!isSuperAdmin()) {
+				return ApiResponse.error("仅管理员可续跑重建");
+			}
+			knowledgeRebuildService.resume(jobId);
+			return ApiResponse.success("已提交续跑");
+		}
+		catch (Exception e) {
+			return ApiResponse.error(e.getMessage());
+		}
+	}
+
+	/** R-04/T-10 重试失败条目。 */
+	@PostMapping("/rebuild/{jobId}/retry")
+	public ApiResponse<String> rebuildRetry(@PathVariable("jobId") Long jobId) {
+		try {
+			if (!isSuperAdmin()) {
+				return ApiResponse.error("仅管理员可重试重建");
+			}
+			knowledgeRebuildService.retryFailed(jobId);
+			return ApiResponse.success("已提交重试");
+		}
+		catch (Exception e) {
+			return ApiResponse.error(e.getMessage());
+		}
+	}
+
+	/** R-06 归属与失效体检（管理员）：按库列出绑定模型/空间键/规模/可用性。 */
+	@GetMapping("/ownership-audit")
+	public ApiResponse<java.util.List<java.util.Map<String, Object>>> ownershipAudit() {
+	    try {
+	        if (!isSuperAdmin()) {
+	            return ApiResponse.error("仅管理员可查看归属体检");
+	        }
+	        return ApiResponse.success("查询成功", knowledgeBaseService.ownershipAudit());
+	    }
+	    catch (Exception e) {
+	        return ApiResponse.error(e.getMessage());
+	    }
 	}
 
 	@GetMapping("/{id}")

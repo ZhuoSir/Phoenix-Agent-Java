@@ -21,8 +21,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/* \
     && useradd -r -u 10001 app
 WORKDIR /app
-COPY --from=build /src/phoenix-admin/phoenix-admin-manager/target/phoenix-admin.jar /app/phoenix-admin.jar
-RUN mkdir -p /app/logs && chown -R app:app /app
+COPY --from=build --chown=app:app /src/phoenix-admin/phoenix-admin-manager/target/phoenix-admin.jar /app/phoenix-admin.jar
+RUN mkdir -p /app/logs && chown -R app:app /app && chmod 644 /app/phoenix-admin.jar
 USER app
 ENV JAVA_OPTS="-XX:MaxRAMPercentage=70 -XX:+UseContainerSupport" TZ=Asia/Shanghai LANG=C.UTF-8
 EXPOSE 8066

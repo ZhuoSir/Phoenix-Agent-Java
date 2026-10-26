@@ -955,3 +955,207 @@
   有则在群里/界面告知或等其结束再动；② 每次重启都会**丢日志**，排障前先 `docker logs > 文件` 或用持久化日志；
   ③ 若必须立即部署，部署后主动告知"刚刚的重启可能打断了 X 会话，请重试"，并**主动核对**有没有被中断的 assistant 消息。
 - 关联: 用户实测 22:13 标准草案审查会话；同类风险见 L-96（口令制动作）
+
+## L-98 构建上下文必须排除"打包产物目录"；排除规则要与 Dockerfile 的 COPY 依赖交叉核对
+- 现象：v2.0.0 打包时每次构建都白传 **3.5GB** 上下文（arm64 那次 340s+），因为 `.dockerignore` 没排除
+  `docker/dist`（内含 1.6G 包 + 1.2G 兜底包）与 `**/*.tar.gz`。
+- 连带风险：修 `.dockerignore` 时我一度加了 `docker/.stage/*.jar`，而 **`Dockerfile.backend:52` 正是 COPY 它** ⇒
+  会使"薄组装"构建失败。已及时撤回。
+- 规则：① 产物目录（`docker/dist`、`*.tar.gz`、`build/`）一律进 `.dockerignore`；
+  ② **改 `.dockerignore` 前先 grep 所有 Dockerfile 的 `COPY/ADD` 目标**，确认不会误伤；
+  ③ 构建耗时异常时，先看 `#N transferring context` 的体积。
+
+## L-99 交付包验收必须包含"全新空库安装"；脚本层的顺序耦合要在迁移前幂等解开
+- 现象：v2.0.0 交付包在**全新空库**上装不起来（migrator exit 3）：`V2.0.0_13/14` 需要"应用自建表"
+  `tbl_harness_skills`，但该表只由**应用启动时**创建，而编排又让 backend 等 migrator 成功 ⇒ 鸡生蛋。
+  本机手工验证时 backend 早已跑过（表存在），所以**一直没暴露**。
+- 规则：① 每次出交付包，必须做一次"**清空卷 + 全新库**"的 install.sh 验收（不能只在已有环境上验）；
+  ② 迁移脚本凡依赖"应用自建对象"，必须在迁移前**幂等预建**（`CREATE TABLE IF NOT EXISTS` + `to_regclass` 守卫），
+  ③ 预建块必须可重入——否则在"已有数据的重装"场景会 `already exists` 再次失败（本次踩过）。
+
+## L-100 Docker CLI 插件按用户查找；安装脚本严禁 root 与普通用户混跑
+- 现象①：现场"root 找不到 compose 插件、普通用户却可以"——因为插件装在 `~/.docker/cli-plugins/`（**按用户**）。
+  系统级路径为 `/usr/libexec/docker/cli-plugins/`、`/usr/lib/docker/cli-plugins/`、`/usr/local/lib/docker/cli-plugins/`。
+- 现象②：先用 root 跑过 install.sh，留下 root 属主的 `.phoenix-install.state`、`docker/.env`(600)、`RECEIPT`；
+  再用普通用户跑 ⇒ `common.sh:31`（写状态文件）"权限不够"，且 `.env` 可能读不到。
+- 规则：① 统一用**普通用户 + docker 组**执行安装（不 sudo）；② 换用户重跑前先
+  `sudo chown -R "$(id -un):$(id -gn)" <包目录>`；③ 交付文档里写明"插件要装系统级还是用户级"。
+
+## L-101 容器内以非 root 运行的应用，其 COPY 进镜像的产物必须显式 chown/chmod 644
+- 现象：`Dockerfile.backend.multistage` 里 jar 由 build 阶段 `COPY --from` 带入后为 **root:root 0600**，
+  容器以 uid 10001 运行 ⇒ `Unable to access jarfile` 无限重启（镜像能起、日志只说读不到 jar，极易误判为镜像缺文件）。
+- 规则：① 每个 `COPY` 后跟 `RUN chmod 644 <file>` 或使用 `--chown=`；② 排查此类问题优先
+  `docker run --rm --entrypoint sh <img> -c 'ls -l <path>; id'` 对比"文件属主/权限 vs 运行用户"。
+
+## L-102 复现验证前必须做「环境三对齐」；用例间严禁共享可变载荷（否则假失败 + 误导报错）
+- 分类: 验证盲区 / 工具
+- 触发场景: 为 T-01/T-02 跑单元自测与反例时
+- 坑（同日连栽三次）:
+  ① **T-01**：自测脚本没把 Docker CLI 加进 PATH ⇒ `docker info` 失败 ⇒ 3 项断言"失败"，
+     实际是**环境不对**，代码没问题；
+  ② **T-02**：测试载荷里没同步新的 `lib/common.sh`（缺 `phx_ostype_is_linux`）⇒ 未定义函数返回 127，
+     被 `x || phx_fail "引擎类型不符"` 吞成**看起来像检查失败**的业务报错 —— 差一步就误判代码；
+  ③ **T-02**：我在前一用例把载荷 `manifest.json` 的 arch 改成 amd64 且未复原，后一用例因此
+     在**架构闸**就早退；又把 2b 用例的"删状态文件"放在了幂等用例之前，导致"未跳过"假失败。
+- 附带改进（已落地）: `preflight_capabilities()` 先 `command -v` 自检依赖函数，缺失时直接报
+  "载荷内 lib/common.sh 过旧：缺少 X" —— 把 127 假象变成真因。
+- 防再犯规则:
+  ① 复现/验证前做**环境三对齐**：工具在 PATH（`command -v` 先验）、载荷与产物同步（改动脚本全部拷入）、
+     前提状态显式设定（架构/端口/状态文件/开关）；
+  ② **每个用例独立载荷副本**或显式复原；状态文件属可变状态，禁被前序用例删除/写入；
+  ③ 断言失败先核"前提是否成立"，再怀疑代码；日志里出现与场景无关的业务报错（如"引擎类型不符"而实际是 v1 场景）时，
+     优先排查**未定义函数/未设前提被 `||` 吞掉**；
+  ④ 被复用的函数在调用前 self-check 存在性（脚本层 `command -v` 守卫）。
+- 状态: active
+
+## L-103 `mktemp` 模板必须以 `XXXXXX` 结尾——macOS 不接受后缀，返回空路径后被重定向变成"空文件名"
+- 分类: 工具 / 跨平台
+- 触发场景: `vector-dim-migrate.sh` 生成临时 SQL 文件（T-06）
+- 坑: `mktemp "${TMPDIR:-/tmp}/phx-vdm.XXXXXX.sql"` 在 macOS 直接失败并返回**空串** ⇒ 后续
+  `{ ... } > "$SQLF"` 报 `line 91: : No such file or directory`（**空命令名**），极易误判为脚本语法问题
+- 防再犯规则:
+  ① `mktemp` 模板一律以 `XXXXXX` 结尾；需要后缀就在创建后 `mv` 重命名；
+  ② 临时路径变量创建后立即 `[ -n "$VAR" ]` 守卫，报"临时文件创建失败"真因；
+  ③ 见到空命令名报错（`` : No such file or directory ``）先查**未赋值/空变量**，再怀疑语法。
+## L-104 用字符串 `replace` 打补丁必须断言命中数——静默无操作会伪装成"打好了"
+- 分类: 工具 / 判断
+- 触发场景: T-02 用 python `s.replace(anchor, new)` 批量改 `KnowledgeBaseServiceImpl`
+- 坑: 多处锚点因缩进/上下文差异未命中，`replace` **不报错地返回原串**，脚本仍打印"✅ 已应用"⇒
+  编译产物里只有 import 落地、字段被加了两次（上一轮"失败"的补丁其实加过字段）、业务逻辑全无；
+  运行期表现为"新字段有、但值为 null"，很容易误判为解析/缓存问题，白跑两轮构建
+- 防再犯规则:
+  ① 补丁一律用 `re.subn(pattern, repl, s, count=1)` 并 **断言 `n == count`**，未命中即抛错终止；
+  ② 优先用"正则 + 宽松缩进"匹配，别抄终端里看起来一样的空格；
+  ③ 打完后**立即 `grep` 关键标记**核对（如新方法名/日志字段），别信脚本自己的成功文案；
+  ④ 运行期出现"字段存在但值为空"时，先核对**产物里是否真有该逻辑**（`strings class | grep 标记`），再查业务。
+  ⑤ 判断异步命令"跑完没"要看**进程存活/退出码**，别只看日志尾部——本轮 T-03 我在 vue-tsc 尚未跑完时读日志，
+     据此写下"0 类型错误"并提交，随后完整结果实为 203 条（其中**我改动的文件 0 条**，其余是既有错误）⇒ 已更正提交信息。
+  ⑥ 断言别用 `grep "键": "值"` 去匹配 JSON——本项目接口是**紧凑 JSON**（`"table":"x"` 冒号后无空格），
+     本轮 T-06 因此把 4 条**实际通过**的断判成失败，差点误判功能没生效；断言一律用 `python -c json.load` 取值比较。
+  ⑦ **否定标记一律精确比较，禁止子串匹配**：本轮 T-08 我用 `grep -q KW` 判"是否关键词降级"，
+     而 python 侧输出的是 `NOKW`（含子串 KW）⇒ 3 条断言**假通过**，真实的"响应缺降级字段"缺陷差点被埋掉。
+     规则：布尔/枚举判定写 `== true` / `== "keyword"`（php/python 精确比较），不要 `grep` 包含关系。
+- 状态: active
+
+## L-105 名字叫"关键词检索"的腿，其实是**向量检索**（同一个 store）——多模型改造必漏
+- 分类: 代码结构 / 判断
+- 触发场景: T-06 按知识库绑定模型路由向量存储（多模型）
+- 坑: 生效策略 `PgHyhridRetrievalStrategy.getDocumentsByKeywords()` 的实现是
+  `SearchRequest.builder()...` + **`vectorStore.similaritySearch(...)`**（继承自抽象类的默认 store），
+  并不是 SQL/全文关键词检索。于是：① 混合检索的两条腿**都是向量检索**；② 只改抽象类的向量腿**不足以**完成路由，
+  关键词腿仍打默认表 ⇒ 实测表现为"路由表已切换、命中集合却完全不变"，极易误判为"路由没生效/表没切"。
+  同类陷阱：`ElasticsearchHybridRetrievalStrategy`（关键词腿走 ES，不受向量路由影响）——两条腿的**数据源要分别确认**。
+- 防再犯规则:
+  ① 改造"检索"前，先读出**每条腿实际执行了什么**（点进 `getDocumentsByKeywords` 实现，别看方法名）；
+  ② 路由类改造必须覆盖**所有**使用 store 的位置（grep `vectorStore.` / `similaritySearch(` 全量清点）；
+  ③ 验证时用**哨兵行**（往目标表塞一条能过过滤条件的特殊文档）判定"到底查了哪张表"，别只看命中数；
+  ④ 命中数不变 ≠ 路由失效，也可能是**另一条腿**在出结果 ⇒ 用"把目标表塞满哨兵 + 把默认表排除"的方式二分。
+- 状态: active
+
+## L-106 运维 shell 脚本的三个"静默不执行"陷阱（psql 相关）
+- 分类: 工具 / 判断
+- 触发场景: T-14 写 `docker/scripts/vector-ops.sh`（纯 shell + psql 直连运维工具箱）
+- 坑与规则:
+  ① **`psql ... -f -` 必须重定向 stdin**。写成 `qfile "$SQLF"`（把文件名当参数）时，psql 会把路径当库名/参数，
+     脚本**不执行且不报错**（输出被 `2>&1` 捕获后又被脚本吞掉）⇒ 表现为"迁移成功但一行没搬"。
+     规则：`out="$(qfile < "$SQLF" 2>&1)"`，并**校验输出含 COMMIT**（否则 die），别只信退出码。
+  ② **`while read` 循环里再调 psql 会吞掉外层 stdin** ⇒ 循环只跑一次（本轮"重嵌完成率"只打印了 1 个库）。
+     规则：改用 `for row in $LIST` 或给内层命令加 `< /dev/null`。
+  ③ **SQL 侧不要假设 pgcrypto**：`digest()/encode()` 在未装 pgcrypto 的库上直接报
+     `function digest(text, unknown) does not exist`。需要"与 Java 同口径的短哈希"时，**在 shell 里算**
+     （`printf '%s|%s' prov model | sha256sum | cut -c1-12` 与 Java `SHA-256` 前 6 字节完全一致，已实测对齐）。
+  补充：类型别硬凑——`metadata->>'k'` 是 text，IN 列表要带引号；`coalesce(int,0)::text` 才能与 text 拼接。
+  ④ **`docker compose` 没有 `inspect` 子命令**：想按服务名取容器名要 `docker inspect -f '{{.Name}}' "$(compose ps -q postgres)"`；
+     写成 `$DC inspect ...` 时容器名为空 ⇒ 下游拿到空 `--pg-container` ⇒ 走直连 psql 失败、门禁退化成 rc=1（实测踩坑）。
+  ⑤ **`set -u` 下空数组展开 `${arr[@]}` 会报 unbound**：用 `${arr[@]+"${arr[@]}"}` 安全展开。
+  ⑥ **`cp -R src/ dst/` 的尾斜杠会摊平目录**：`cp -R releases/v2.0.0/ /tmp/x/` 把该版本**内容**倒进 `/tmp/x/`，
+     于是 `/tmp/x/v2.0.0/sql/` 根本不存在 ⇒ 迁移器只跑基线、旧库缺列直接起不来（第一次搭升级测试树即踩）。
+     规则：要保留层级就别带尾斜杠（`ls -d …/ | sed "s#/$##"` 后 `cp -R "$v" dst/`）。
+  ⑦ **`package.sh --out` 必须传绝对路径**：脚本内部有 `( cd "$PAY" && … > "$WORK/.filelist" )` 这类子壳换目录，
+     相对 `--out` 会让 `$WORK` 相对解析错位 ⇒ 步骤 6/8 报 `.filelist: No such file` + tar 失败（实测）。
+     另：`upgrade.sh <vX.Y.Z>` 参数**要带 `v`**（传 `2.1.0` 会被"releases/2.1.0/sql 不存在"拒绝，非第二套流程）。
+- 状态: active
+
+## L-108 项目级台账必须在"账房"（版本分支）记，不能只在施工分支记
+
+- **日期**：2026-10-24 ｜ **来源**：`group-management-ui` 立项时发现
+- **现象**：BL-66/67/69、BUG-204/205/206 及 BUG-201~203 的状态更新，全部提交在
+  `feature/chat-runtime-hardening` 分支上；切回账房 `2.1.0` 后 `backlog.md`/`bugs.md` **查不到这些行**
+  （账房是子集）。cherry-pick 两个台账提交时还在插入点产生冲突。
+- **原因**：bryanchen-spec 规定 spec 文档与**全局账**永远活在版本分支线上；我图顺手把台账提交在施工分支，
+  等于把账挂在别人的 feature 上。
+- **处置**：`git checkout feature/chat-runtime-hardening -- specs/_project/bugs.md specs/_project/backlog.md`
+  一次性把台账整体回收到账房（账房是子集，无回退风险），随后在同一提交里改 BL-69 状态。
+- **防再犯规则**：① 记 BUG/BL/L 之前先 `git symbolic-ref --short HEAD`，**不是版本分支就切回去再记**
+  （或记录后立刻在账房补一次）；② 施工分支只允许提交"代码 + 该 spec 目录内文档（Spec footer）"；
+  ③ 立项/续做前的第一件事仍是验分支，发现台账缺失先回收再继续。
+
+## L-109 删除语义（逻辑删 vs 物理删）必须回读验证，别凭 `del_flag` 猜测；恢复动作不能吞输出
+
+- **日期**：2026-10-24 ｜ **来源**：`group-management-ui` T-02 成员移除实测
+- **现象**：`DELETE /platform/account-group-info/group/{g}/account/{a}` 删掉关联后，我用同主键 INSERT 恢复，
+  命令 `>/dev/null 2>&1` 吞掉错误、误判为"该行是逻辑删，须 `UPDATE del_flag=0`"，结果两轮恢复都无效，
+  测试数据一度缺失（`total` 仍为 2）。
+- **原因**：① 未先确认删除实现（实际是物理 remove）；② 恢复命令全部重定向到 `/dev/null`，等于放弃验证；
+  ③ 未在每步后回读 `total`/行数。
+- **防再犯规则**：① 执行会改变数据的操作前，**先备份整行**（`row_to_json`）；② 恢复后用**查询回读**证明
+  （行数/total/关键字段），不允许只看命令退出码；③ 数据操作一律输出可见（禁 `>/dev/null`）；
+  ④ 判断"逻辑删/物理删"看实现或直接查行是否存在，别用字段名推测。
+
+## L-110 前端「构建通过」不等于「运行可用」——全局标识符缺失只在运行时炸
+
+- **日期**：2026-10-24 ｜ **来源**：`group-management-ui` T-06（BUG-208，用户现场白屏）
+- **现象**：给 `index.vue` 加了 `const detailRef = ref<any>()` 但漏了 `import { ref } from 'vue'`；
+  `vite build` 成功（4.8s，0 error）、chunk 正常产出、部署后首页 200，**但打开组管理页直接白屏**：
+  `ReferenceError: ref is not defined`。自动导入并不覆盖所有标识符。
+- **原因**：Vite/rolldown 只做模块图与类型无关的打包，**未定义全局变量不报错**；我以"构建通过"当作功能可用。
+- **防再犯规则**：① 前端改动除构建外，必须做一次**真实加载冒烟**（有浏览器插件则开页面看 console；
+  无浏览器时至少 `node --input-type=module -e` 走一遍纯逻辑，或用 `grep` 断言新增标识符**都有 import**）；
+  ② 新增 `ref/reactive/computed/onMounted` 等 vue 标识符时，**先检查该文件 import 列表**再写；
+  ③ 白屏类问题优先看 console 第一行错误，别猜。
+
+## L-111 前端"调用了不存在的导出/写错模板"不会报错，只会在点击时静默失效
+
+- **日期**：2026-10-24 ｜ **来源**：`group-management-ui`（保存无反应、分配后不刷新）
+- **现象**：① `updateGroupInfoApi` 未真正 import（`#/api` 不导出该函数）⇒ 点「保存基本信息」没有任何请求，
+  被 `finally` 吞掉无提示；② 弹窗绑定写成 `@success="refreshGrid"`（少括号）→ 字符串替换未命中，实际仍是
+  `@success="refreshGrid()"` ⇒ 抽屉表格永不刷新。
+- **防再犯规则**：① 任何"点了没反应"先看 Network 有无请求，再看 console；② 用字符串替换改模板/绑定，
+  **必须断言替换命中数**（L-104 同源）；③ 关键写操作（保存/分配）必须 `catch` 并 `ElMessage.error`，
+  禁止静默吞异常；④ 引入新 API 前先确认导出位置（`grep "export async function <name>"`）。
+
+## L-112 vben 的 vxe 网格：高度/分页/列/数据必须"整份替换"，逐项 setGridOptions 会互相覆盖
+
+- **日期**：2026-10-24 ｜ **来源**：`group-management-ui`（高度不一致、分页器消失、状态列不生效）
+- **现象**：① `setGridOptions({ columns })` 只传列 ⇒ 把 `height`、`pagerConfig` 一起冲掉（分页器消失）；
+  ② 列 `formatter`/`slots` 在 vben 包装下可能不生效（状态仍显示数字）⇒ 改为在**数据层**映射成中文；
+  ③ 同名 `pagerConfig` 写了两次，后者覆盖前者（`enabled:false` 覆盖 `true`）⇒ 授权页签一直没有分页。
+- **防再犯规则**：① `setGridOptions` 要么传全量（columns+height+pagerConfig+data），要么改用 `gridApi.query()`；
+  ② 展示型字段（状态/枚举）优先在**数据层转换**，别依赖 formatter/slots 透传；
+  ③ 配置对象里禁止出现重复键——写完后 `grep` 同名键计数校验。
+
+## L-113 业务类配置优先写进工程配置文件（application.yml），不要依赖环境变量手传
+
+- **日期**：2026-10-24 ｜ **来源**：`long-doc-chunking` T-01（用户纠正）｜ **用户原话**：「后续相关业务类的配置，首先考虑的是工程配置，而不是环境变量」
+- **现象**：我把 6 个附件分批参数先做成 compose 的 env（`${VAR:-默认}`），要靠部署时手传；
+  用户指出应当写进 `application.yml`，否则部署方不可见、易漏传，且"默认值"散落在编排文件里。
+- **规则**：
+  1. **业务参数**（阈值、条数、超时、开关）→ 一律落 `application.yml`，写清注释与默认值；
+  2. **环境变量只用于**环境差异与敏感项（host、账号、密钥、部署端口、镜像 tag），不作为业务默认值的唯一来源；
+  3. **不要同时**在 compose 与 yml 写同一项：env 优先级更高，会把 yml 覆盖掉 ⇒ 出现"改了配置文件不生效"的陷阱；
+     若确需 compose 注入，只注入差异值，且**默认值留空**（不写 `${VAR:-默认}`）；
+  4. 生效值必须在启动日志打印（本次 `[attachment-batch] 生效配置: …`），便于现场核对；
+  5. env 覆盖命名规则：Spring 宽松绑定**短横线去掉**（`attachment-chunk-size` → `PHOENIX_AGENT_CHAT_ATTACHMENTCHUNKSIZE`）。
+- **落地**：`application.yml` 的 `phoenix.agent.chat.attachment-*` 六项；compose 已移除对应 env（提交 `94649598`）。
+
+## L-107 `@AllArgsConstructor` 类里加 `@Value` 字段 ⇒ 启动即 `No qualifying bean of type int/String`
+- 分类: Spring / 工具
+- 触发场景: chat-runtime-hardening T-03 给 `ChatAttachmentController` 加
+  `@Value("${phoenix.agent.chat.attachment-max-count:20}") private int attachmentMaxCount;`
+- 坑: 该类原本是 `@AllArgsConstructor`（Lombok 的 all-args **包含非 final 字段**）⇒ 构造器多出 `int` 形参 ⇒
+  Spring 试图按类型注入 `int`，报 `NoSuchBeanDefinitionException: No qualifying bean of type 'int'`，
+  容器启动失败（日志里只有 bean 创建栈，不点名字段，很容易误判成"新加的依赖没注入"）
+- 规则: 给已有类加 `@Value` **字段注入**时，先看 Lombok 注解 ——
+  ① `@AllArgsConstructor` ⇒ 改成 `@RequiredArgsConstructor`（只保留 final 字段构造），或
+  ② 字段改走 `@Value` 的 setter，或 ③ 该类本来就用 `@RequiredArgsConstructor`（如 `HarnessModelRegistry`）则安全
+  验证最小动作：**编译通过 ≠ 能启动**，涉及 Spring 装配的改动必须真起一次容器

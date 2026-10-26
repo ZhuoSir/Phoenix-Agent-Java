@@ -159,6 +159,25 @@ public interface AgentKnowledgeMapper extends BaseMapper<AgentKnowledge> {
 	List<Integer> selectRecalledKnowledgeIdsByBindings(@Param("agentId") Long agentId);
 
 	/**
+	 * T-08 降级兜底：模型不可达时按**关键词**检索指定知识库的条目（不依赖任何嵌入模型）。
+	 *
+	 * @param kbIdsCsv 知识库 id 逗号串
+	 * @param query    查询词
+	 * @param limit    返回上限
+	 */
+	@Select("""
+			SELECT * FROM tbl_data_agent_knowledge
+			WHERE is_deleted = 0 AND is_recall = 1
+			  AND knowledge_base_id = ANY(string_to_array(#{kbIdsCsv}, ',')::bigint[])
+			  AND (coalesce(title,'') ILIKE '%' || #{query} || '%'
+			       OR coalesce(content,'') ILIKE '%' || #{query} || '%'
+			       OR coalesce(question,'') ILIKE '%' || #{query} || '%')
+			LIMIT #{limit}
+			""")
+	List<com.phoenix.data.entity.AgentKnowledge> selectKeywordFallback(@Param("kbIdsCsv") String kbIdsCsv,
+			@Param("query") String query, @Param("limit") int limit);
+
+	/**
 	 * 查询待清理的“僵尸”记录 条件：is_deleted = 1 AND is_resource_cleaned = 0 AND updated_time <(当前时间
 	 * - N分钟)
 	 */

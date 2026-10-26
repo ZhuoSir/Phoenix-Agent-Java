@@ -12,6 +12,12 @@ export interface KnowledgeBase {
   groupNames: string[];
   itemCount: number;
   boundAgentNames?: null | string[];
+  /** 绑定的向量模型 id（R-01）；null=未绑定/待重建 */
+  embeddingModelId?: null | number;
+  /** 向量空间键（R-06） */
+  modelSpaceKey?: null | string;
+  /** 换模型提示：非空表示请求要求换绑但未确认（R-01 附加） */
+  rebuildHint?: null | string;
 }
 
 interface Envelope<T = any> {
@@ -26,11 +32,11 @@ export async function kbPageApi(query: { name?: string; pageNum: number; pageSiz
   );
 }
 
-export async function kbCreateApi(body: { description?: string; name: string }) {
+export async function kbCreateApi(body: { description?: string; embeddingModelId?: number; name: string }) {
   return requestClient.post<Envelope<KnowledgeBase>>('/api/knowledge-base', body, { responseReturn: 'body' });
 }
 
-export async function kbUpdateApi(body: { description?: string; id: number; name?: string; status?: number }) {
+export async function kbUpdateApi(body: { confirmRebuild?: boolean; description?: string; embeddingModelId?: number; id: number; name?: string; status?: number }) {
   return requestClient.put<Envelope<KnowledgeBase>>('/api/knowledge-base', body, { responseReturn: 'body' });
 }
 

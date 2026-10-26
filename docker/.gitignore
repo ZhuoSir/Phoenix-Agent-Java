@@ -4,3 +4,4 @@ phoenix-*-images.tar.gz*
 .stage/
 dist/
 *.tar.gz
+dist-rebuild/
