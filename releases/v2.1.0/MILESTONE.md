@@ -1,6 +1,6 @@
 # 里程碑 v2.1.0
 
-> 状态：**Implement 完成、待冻结（7 个 spec：release-delivery-hardening 10/10、vector-dim-flexibility 16/16、chat-runtime-hardening 18/19（T-09 作废转 BL-73）、group-management-ui 9/10（T-08 作废转 BL-70）、long-doc-chunking 10/10、brand-configuration 9/9、offline-icons 9/9；全部已并入 `2.1.0`）**（2026-10-25 更新）
+> 状态：**已冻结（M2，2026-10-25）· 口径 A（带缺陷冻结）**（7 个 spec：release-delivery-hardening 10/10、vector-dim-flexibility 16/16、chat-runtime-hardening 18/19（T-09 作废转 BL-73）、group-management-ui 9/10（T-08 作废转 BL-70）、long-doc-chunking 10/10、brand-configuration 9/9、offline-icons 9/9；全部已并入 `2.1.0`）**（2026-10-25 更新）
 
 > 创建: 2026-10-11 | 类型: **MINOR**（新增交付链能力，不改库表结构、不改应用行为）
 > **版本分支**: `2.1.0`（基点 = **`2.0.1` tip `10d4504`**，链式切——v2.0.1 尚未合 main，属在途/悬空，按 git-workflow §一 从该线 tip 切）
@@ -67,7 +67,16 @@
 | BUG-149 | P1 | 新建 | 干净环境无法产出前端镜像（打包链），待裁决 |
 | BUG-195 | P1 | 待现场执行（SQL 已提供） | 站点向量表唯一约束待现场执行 |
 
-### 6.3 三种可选口径（需用户拍板）
+### 6.3 拍板结果（2026-10-25）
+
+**用户选定 A：带缺陷冻结**。9 条 P1 已：
+1) `bugs.md` 状态改为「已延期（从 v2.1.0 移至 v2.1.1 待排期）」；
+2) 登记跟踪条目 **BL-75**（逐条回归/修根因，明细以 bugs.md 为准）；
+3) 写入 `RELEASE-NOTES` §四之三「发版遗留缺陷（已知限制 · 带缺陷冻结口径 A）」。
+
+**冻结后规则**：新需求默认进下一版本（v2.1.1 或 v2.2.0）；挤入 v2.1.0 需用户明确同意。
+
+#### （原）三种可选口径
 
 | 口径 | 含义 | 后果 |
 |---|---|---|
