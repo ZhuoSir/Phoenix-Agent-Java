@@ -217,7 +217,8 @@ phx_step 5 $TOTAL "payload 组装（deploy 资产+脚本+manifest+SHA256SUMS）"
   cp -r "$REPO/sql" "$PAY/sql"
   cp -r "$REPO/releases" "$PAY/releases"
   # 安装脚本（T-03/T-05 交付后自动入包；缺席时手动链兜底并如实警告）
-  for f in install.sh install.ps1; do
+  # upgrade.sh 与 install.sh 同级入包根 = 客户机一键升级入口（自动探测旧项目名/旧 .env 后转调 install.sh）
+  for f in install.sh upgrade.sh install.ps1; do
     if [ -f "$HERE/$f" ]; then cp "$HERE/$f" "$PAY/$f"; chmod +x "$PAY/$f" 2>/dev/null || true
     else phx_log WARN "$f 尚未交付（T-03/T-05）——本包暂以 docs 手动链安装"; fi
   done

@@ -13,25 +13,33 @@
 **路径不是固定的**：包解到哪儿就 `cd` 到哪儿；`tar` 会自带一层目录 `phoenix-2.1.1-arm64`。
 
 ```bash
-# ① 解包（放哪都行，示例用当前目录）
 tar -xzf phoenix-2.1.1-arm64.tar.gz
 cd phoenix-2.1.1-arm64
+bash upgrade.sh                       # ← 一条命令：自动探测旧安装的项目名与旧 .env
+```
 
-# ② 查旧安装的项目名（输出形如 phoenix-backend-1 → 项目名 = phoenix）
+看到 **`Phoenix 安装收据 —— 安装成功`** 即完成（镜像、迁移、健康等待、自检都在这一步里）。
+想先看会执行什么：`bash upgrade.sh --dry-run`（零副作用）。
+
+> ⚠️ **`upgrade.sh` 是 2026-10-27 补的一键入口**：2026-10-26 打出的那份
+> `phoenix-2.1.1-arm64.tar.gz` **包根里没有它**（`package.sh` 当时只拷 install.sh/install.ps1）。
+> 拿旧包时改用手填两条参数的 `install.sh`（见下）；重新打包后的包直接 `bash upgrade.sh` 即可。
+> 详见 `docs/UPGRADE-2.0.0-to-2.1.1.md` §5（含实测证据：t09 21/21、t07 五项门禁 12/12）。
+
+### 手填两个参数（老包可用）
+
+```bash
+# ① 查旧安装的项目名（输出形如 phoenix-backend-1 → 项目名 = phoenix）
 docker ps -a --format '{{.Names}}' | grep backend
 
-# ③ 查旧安装的 .env 在哪
+# ② 查旧安装的 .env 在哪
 find / -name .env -path '*docker*' 2>/dev/null | head
 
-# ④ 升级（把下面两个占位换成②③的结果）
+# ③ 升级（把两个占位换成上面查到的结果）
 bash install.sh --offline --timeout 900 \
   --project  <项目名>          \
   --env-from <旧安装目录>/docker/.env
 ```
-
-看到 **`Phoenix 安装收据 —— 安装成功`** 即完成（镜像、迁移、健康等待、自检都在这一步里）。
-
-### 只有两个参数必须填对
 
 | 参数 | 填什么 | 填错的后果 |
 |---|---|---|
@@ -39,6 +47,7 @@ bash install.sh --offline --timeout 900 \
 | `--env-from` | 旧安装的 `docker/.env` 绝对路径 | 不给 ⇒ 随机生成库密码，新容器连不上旧数据卷 |
 
 > 其余都可以默认：包目录位置、执行目录、`--timeout`（默认 300，建议给 900）。
+> `upgrade.sh` 就是把这两个参数自动查好，查不到时**宁可中止也不猜**（防升错栈/连错库）。
 
 ## 二、部署
 

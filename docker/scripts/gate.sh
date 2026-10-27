@@ -2,8 +2,9 @@
 # Phoenix 出货门禁（R-05 · v2.1.0 release-delivery-hardening）
 # 用法: gate.sh --payload <解包目录> [--out <证据目录>] [--jar-image IMG] [--skip-install]
 #               [--project phxgate] [--port 8190] [--timeout 900] [--allow-arch-mismatch]
-# 四项自检: ①SHA256SUMS 全量 ②镜像内应用 jar 对运行用户可读 ③前置(架构/Compose v2)与声明一致 ④全新空库安装到收据
-# 退出码: 0=四项全 PASS；非 0=有 FAIL（证据与失败项见日志/证据文件）
+# 五项自检: ①SHA256SUMS 全量 ②镜像内应用 jar 对运行用户可读 ③前置(架构/Compose v2)与声明一致
+#           ④包根升级入口 upgrade.sh 可用（--dry-run 组装正确且不动系统） ⑤全新空库安装到收据
+# 退出码: 0=五项全 PASS；非 0=有 FAIL（证据与失败项见日志/证据文件）
 set -uo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
 . "$HERE/lib/common.sh"
@@ -21,7 +22,7 @@ while [ $# -gt 0 ]; do
     --port) PORT="$2"; shift 2;;
     --timeout) TIMEOUT="$2"; shift 2;;
     --allow-arch-mismatch) ALLOW_MISMATCH=1; shift;;
-    -h|--help) sed -n '2,9p' "$0"; exit 0;;
+    -h|--help) sed -n '2,7p' "$0"; exit 0;;
     *) phx_log ERROR "未知参数: $1"; exit 2;;
   esac
 done
@@ -55,7 +56,30 @@ prereq() {
 }
 phx_gate_item "prereq-match" prereq || true
 
-# ④ 全新空库安装到收据（独立项目名 + 独立端口；结束只清本项目，绝不触碰其它栈）
+# ④ 包根升级入口 upgrade.sh 可用（只跑 --dry-run：必须能组装出 install.sh 命令，且不写任何状态）
+upgrade_entry() {
+  [ -f "$PAYLOAD/upgrade.sh" ] || { phx_log ERROR "包根缺 upgrade.sh（交付包内无法一键升级）"; return 1; }
+  local fake="$OUT/upgrade-fake.env" uout before_state=0 before_env=0
+  printf 'PHOENIX_HTTP_PORT=8199\nPG_PASSWORD=gatefake\nIMAGE_TAG=%s\n' "$VERSION" > "$fake" || return 1
+  [ -f "$PAYLOAD/.phoenix-install.state" ] && before_state=1
+  [ -f "$PAYLOAD/docker/.env" ] && before_env=1
+  uout="$( cd "$PAYLOAD" && bash upgrade.sh --dry-run --project gate-readonly --env-from "$fake" 2>&1 )"
+  if [ $? -ne 0 ]; then phx_log ERROR "upgrade.sh --dry-run 退出非 0"; printf '%s\n' "$uout" | tail -3; return 1; fi
+  printf '%s\n' "$uout" | grep -q 'bash install.sh --offline' \
+    || { phx_log ERROR "upgrade.sh --dry-run 未组装出 install.sh 命令"; printf '%s\n' "$uout" | tail -3; return 1; }
+  # 零副作用断言：dry-run 不得生成安装状态或 .env（前次门禁留下的既存文件不算）
+  if [ "$before_state" = 0 ] && [ -f "$PAYLOAD/.phoenix-install.state" ]; then
+    phx_log ERROR "upgrade.sh --dry-run 竟写了安装状态（应零副作用）"; return 1
+  fi
+  if [ "$before_env" = 0 ] && [ -f "$PAYLOAD/docker/.env" ]; then
+    phx_log ERROR "upgrade.sh --dry-run 竟生成了 docker/.env（应零副作用）"; return 1
+  fi
+  phx_log INFO "升级入口可用：包根 upgrade.sh --dry-run 组装正确（未触碰任何栈）"
+  return 0
+}
+phx_gate_item "upgrade-entry" upgrade_entry || true
+
+# ⑤ 全新空库安装到收据（独立项目名 + 独立端口；结束只清本项目，绝不触碰其它栈）
 fresh_install() {
   local envflag=""
   # 装前预清：同名项目的残留容器会让 compose recreate 撞上竞态（实测 No such container）

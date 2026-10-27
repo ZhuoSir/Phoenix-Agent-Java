@@ -13,7 +13,8 @@
 | **phoenix-ctl.sh / .ps1** | 日常运维一条入口：start/stop/restart/status/logs/verify/purge | 装机（ps1 为 Windows 转发） |
 | verify.sh | 13 项健康断言（装完自检/日常体检） | 有栈的机器 |
 | build.sh / save-offline.sh / load-and-run.sh | 旧手工链（保留兼容，日常不推荐） | 构建机/目标机 |
-| backup.sh / upgrade.sh | 数据备份 / 旧版升级辅助（手工链时代产物） | 运维机 |
+| backup.sh | 数据备份（pg_dump -Fc） | 运维机 |
+| **upgrade.sh** | **升级统一入口**：交付包根跑 `bash upgrade.sh`（自动探测旧项目名/旧 `.env` 后转调 install.sh）；仓库里跑 `bash docker/scripts/upgrade.sh vX.Y.Z`（开发栈，有 SQL 才迁移） | 客户机 / 运维机 |
 | mirrors.list | 镜像加速候选源清单（package/install 竞速选优，可直接编辑） | - |
 | lib/common.sh + selftest.sh | 共用函数基座 + 22 断言自测（`bash lib/selftest.sh` 可跑） | - |
 

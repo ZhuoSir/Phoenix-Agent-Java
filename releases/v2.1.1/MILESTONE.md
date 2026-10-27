@@ -49,3 +49,15 @@
 **演练中发现的唯一阻塞坑**：手工搭基线时未挂载 `releases/` ⇒ migrator 只跑基线 `all_schema.sql`，
 缺 `V1.2.0_05` 的 `is_default` 列 ⇒ v2.0.0 后端 `Application run failed`；补齐 `releases/` 后恢复。
 该坑已写入手册「必踩坑」段（安装器标准流程本身不受影响，因为它自带 releases）。
+
+## 七、发版后追加（2026-10-27，未回改 tag）
+
+| 项 | 内容 |
+|---|---|
+| 触发 | 用户「补充到 upgrade 中」+「太复杂看不明白」⇒ 要一条命令的升级入口 |
+| 缺陷登记 | **BUG-213**（原 `upgrade.sh` 三处硬伤：SQL 硬门槛致 PATCH 版升不了 / `TAG` 死变量切版本不生效 / 不入交付包根故客户机没有该入口） |
+| 改动（main） | `docker/scripts/upgrade.sh` 重写为「场景自动判别」统一入口；`package.sh` 将其拷入**包根**；`gate.sh` 门禁四项 → **五项**（新增 `upgrade-entry`）；`tests/t07` 加反例、新增 `tests/t09_upgrade_selftest.sh` |
+| 证据 | `t09` 通过 22/22；`t07` 通过 12/12（真实 2.1.1 包载荷上跑通五项，含「包根缺 upgrade.sh ⇒ FAIL」反例；门禁栈零残留） |
+| 文档 | `docs/UPGRADE-2.0.0-to-2.1.1.md` §5、`releases/v2.1.1/UPGRADE.md` 最简操作、包内 `docker/payload-docs/INSTALL.md` 升级节、`docker/scripts/README.md` |
+| 教训 | **L-114**（仓库里有脚本 ≠ 客户机能用：必须「入包清单 + 门禁断言 + 真包载荷实测」三件齐全） |
+| **交付状态** | 手头的 `phoenix-2.1.1-arm64.tar.gz`（2026-10-26 打）**包根内没有 upgrade.sh**——须重打包才随包交付；tag `v2.1.1` 未动、未 push |

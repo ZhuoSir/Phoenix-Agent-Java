@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# T-07 验证：gate.sh 四项门禁（R-05）—— 两反例 + 一正例
+# T-07 验证：gate.sh 五项门禁（R-05）—— 三反例 + 一正例
 # 依赖: docker 在 PATH；arm64 交付包 tar（默认 docker/dist/phoenix-2.0.0-arm64.tar.gz，可用 PHX_TEST_PKG 覆盖）
 set -u
 ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"; cd "$ROOT"
@@ -12,8 +12,12 @@ ok(){ P=$((P+1)); printf '  ✅ %s\n' "$1"; }; no(){ F=$((F+1)); printf '  ❌ %
 
 # 准备：解包 + 覆盖为新脚本 + 重算 SHA256SUMS（模拟重打包后的产物）
 tar -xzf "$PKG" -C "$W"
-PAY="$W/phoenix-2.0.0-arm64"
+TOP="$(tar -tzf "$PKG" | head -1 | cut -d/ -f1)"     # 包内顶层目录名随版本变化，不写死
+PAY="$W/$TOP"
+[ -d "$PAY" ] || { echo "  ❌ 解包后找不到载荷目录: $PAY"; exit 2; }
+VER="$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' "$PAY/manifest.json" | head -1)"
 cp docker/scripts/install.sh "$PAY/install.sh"
+cp docker/scripts/upgrade.sh "$PAY/upgrade.sh"       # 一键升级入口须与 install.sh 同级入包根
 cp docker/scripts/gate.sh "$PAY/docker/scripts/gate.sh" 2>/dev/null || { mkdir -p "$PAY/docker/scripts"; cp docker/scripts/gate.sh "$PAY/docker/scripts/gate.sh"; }
 cp docker/scripts/lib/common.sh "$PAY/docker/scripts/lib/common.sh"
 ( cd "$PAY" && python3 - <<'PY'
@@ -50,14 +54,22 @@ p=sys.argv[1]+'/SHA256SUMS'; L=io.open(p,encoding='utf-8').read().split('\n')
 L[0]=('a' if not L[0].startswith('a') else 'b')+L[0][1:]
 io.open(p,'w',encoding='utf-8').write('\n'.join(L))
 PY
-bash docker/scripts/gate.sh --payload "$PAYB" --out "$W/gateB" --jar-image phoenix-backend:2.0.0 --skip-install > "$W/gateB.log" 2>&1; RB=$?
+bash docker/scripts/gate.sh --payload "$PAYB" --out "$W/gateB" --jar-image "phoenix-backend:${VER:-2.0.0}" --skip-install > "$W/gateB.log" 2>&1; RB=$?
 [ $RB -ne 0 ] && ok "反例B 门禁整体非 0（=$RB）" || no "反例B rc" "0"
 grep -q "门禁 FAIL item=sha256sums" "$W/gateB.log" && ok "反例B 失败项=sha256sums" || no "反例B 失败项" "$(grep -c '门禁' "$W/gateB.log") 行"
 
-# 正例：四项全 PASS（含全新空库安装到收据）
+# 反例C：包根缺 upgrade.sh（老包形态）⇒ 必须 FAIL 在 upgrade-entry，而不是静默放过
+PAYC="$W/payC"; cp -R "$PAY" "$PAYC"; rm -f "$PAYC/upgrade.sh"
+bash docker/scripts/gate.sh --payload "$PAYC" --out "$W/gateC0" --jar-image "phoenix-backend:${VER:-2.0.0}" --skip-install > "$W/gateC0.log" 2>&1; RC0=$?
+[ $RC0 -ne 0 ] && grep -q "门禁 FAIL item=upgrade-entry" "$W/gateC0.log" \
+  && ok "反例C 缺包根升级入口被门禁拦下（rc=$RC0）" || no "反例C" "rc=$RC0；应 FAIL item=upgrade-entry"
+grep -q "门禁 PASS item=upgrade-entry" "$W/gateA.log" \
+  && ok "反例A 载荷内含 upgrade.sh 时该项 PASS（不误伤）" || no "反例A upgrade-entry" "$(grep upgrade-entry "$W/gateA.log" | tail -1 | cut -c1-90)"
+
+# 正例：五项全 PASS（含全新空库安装到收据）
 bash docker/scripts/gate.sh --payload "$PAY" --out "$W/gateC" --project "phxgate-t07-$$" --port 8191 --timeout 900 > "$W/gateC.log" 2>&1; RCC=$?
-[ $RCC -eq 0 ] && ok "正例 门禁四项全 PASS（rc=0）" || no "正例 rc" "$RCC（见 $W/gateC.log）"
-grep -q "门禁结束.*结果=PASS 通过=4 失败=0" "$W/gateC.log" && ok "正例 日志含 通过=4 失败=0" || no "正例计数" "$(grep '门禁结束' "$W/gateC.log" | tail -1 | cut -c1-90)"
+[ $RCC -eq 0 ] && ok "正例 门禁五项全 PASS（rc=0）" || no "正例 rc" "$RCC（见 $W/gateC.log）"
+grep -q "门禁结束.*结果=PASS 通过=5 失败=0" "$W/gateC.log" && ok "正例 日志含 通过=5 失败=0" || no "正例计数" "$(grep '门禁结束' "$W/gateC.log" | tail -1 | cut -c1-90)"
 grep -q "安装成功" "$PAY/RECEIPT" 2>/dev/null && ok "正例 全新空库安装产出收据" || no "正例 收据" "无"
 [ "$(docker ps -a --filter 'name=^phxgate-t07' -q | wc -l | tr -d ' ')" = "0" ] && ok "正例 门禁栈已清理（零残留容器）" || no "正例 清理" "有残留"
 docker rmi t07-jar600:test >/dev/null 2>&1 || true

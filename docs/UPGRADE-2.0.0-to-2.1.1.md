@@ -41,21 +41,38 @@ bash install.sh --project <project> --port 8901
 tar -xzf phoenix-2.1.1-arm64.tar.gz
 cd phoenix-2.1.1-arm64
 
-# ② 查旧安装的项目名（输出形如 phoenix-backend-1 → 项目名 = phoenix）
-docker ps -a --format '{{.Names}}' | grep backend
-
-# ③ 查旧安装的 .env 在哪
-find / -name .env -path '*docker*' 2>/dev/null | head
-
-# ④ 升级（把下面两个占位换成②③的结果）
-bash install.sh --offline --timeout 900 \
-  --project  <项目名>          \
-  --env-from <旧安装目录>/docker/.env
+# ② 升级 —— 一条命令，不用查任何东西
+bash upgrade.sh
 ```
 
 看到 **`Phoenix 安装收据 —— 安装成功`** 即完成（镜像、迁移、健康等待、自检都在这一步里）。
 
-### 只有两个参数必须填对
+`upgrade.sh` 自己会去机器上找「装过的那一套」，找不到就说清缺什么：
+
+| 情形 | 它的行为 |
+|---|---|
+| 机器上只有一套 Phoenix | 自动取项目名（从容器 label 反查，运行中/已停止都能取到） |
+| 机器上有多套（如既有生产栈又有演练栈） | **拒绝猜**，列出「容器 → 项目名」让你挑：`bash upgrade.sh --project <名>` |
+| 旧安装的 `docker/.env` | 先从容器 label 定位；不行再在 `/opt /srv /data ~` 找带 `PG_PASSWORD=` 的那个 |
+| 就是找不到旧 `.env` | **中止**（不给它安装器会随机生成库密码 ⇒ 新容器连不上旧数据卷），并教你手动指定 |
+| 想先看会干什么 | `bash upgrade.sh --dry-run`（零副作用，只打印将要执行的命令） |
+
+### 老包（含手头的 `phoenix-2.1.1-arm64.tar.gz`）里还没有 `upgrade.sh`
+
+一键入口是 2026-10-27 补的，**要重新打包才会进包**。拿到旧包时仍用 `install.sh`，两个参数必须填对：
+
+```bash
+# ① 查旧安装的项目名（输出形如 phoenix-backend-1 → 项目名 = phoenix）
+docker ps -a --format '{{.Names}}' | grep backend
+
+# ② 查旧安装的 .env 在哪
+find / -name .env -path '*docker*' 2>/dev/null | head
+
+# ③ 升级（把两个占位换成上面查到的结果）
+bash install.sh --offline --timeout 900 \
+  --project  <项目名>          \
+  --env-from <旧安装目录>/docker/.env
+```
 
 | 参数 | 填什么 | 填错的后果 |
 |---|---|---|
@@ -63,6 +80,8 @@ bash install.sh --offline --timeout 900 \
 | `--env-from` | 旧安装的 `docker/.env` 绝对路径 | 不给 ⇒ 随机生成库密码，新容器连不上旧数据卷 |
 
 > 其余都可以默认：包目录位置、执行目录、`--timeout`（默认 300，建议给 900）。
+> 装好后要改端口见 §0.1；日常启停用包内 `docker/scripts/phoenix-ctl.sh`。
+
 
 ## 1. 准备 v2.0.0 基线（模拟客户现网）
 
@@ -168,9 +187,65 @@ IMAGE_TAG=v2.0.0 PHOENIX_HTTP_PORT=9191 docker compose -p phxupg up -d --force-r
 > 若需**彻底回退结构**（不建议，通常无需）：
 > `releases/v2.1.0/sql/rollback/V2.1.0_04→03→02→01`（逆序）+ 用升级前 `pg_dump` 恢复。
 
-## 5. 结论与注意事项
+## 5. 一键升级入口 `upgrade.sh`（2026-10-27 落地，实测）
 
-1. **升级流程完整**：安装器一条命令完成「校验→载镜像→承接 env→重建容器→迁移→健康等待→verify→收据」。
+上面 §2 那条命令要手填两个参数，容易看迷糊，故把「查项目名 + 找旧 .env + 调安装器 + 自检」收进一条：
+
+```bash
+cd phoenix-2.1.1-arm64 && bash upgrade.sh          # 交付包内（推荐）
+bash upgrade.sh --dry-run                          # 只打印将执行什么，零副作用
+bash docker/scripts/upgrade.sh v2.1.1              # 仓库开发栈（同一脚本自动判别场景）
+```
+
+### 5.1 它替人做的判断
+
+| 情形 | 行为 |
+|---|---|
+| 一套栈 / 多套栈 | 单套自动取项目名；**多套拒绝猜测**，列出「容器 → 项目名」要求 `--project` 指定 |
+| 旧 `.env` | 先按容器 label `com.docker.compose.project.config_files` 反查；查不到再在 `/opt /srv /data ~` 内找带 `PG_PASSWORD=` 的 `docker/.env`（**跳过 git 工作树内的**，防误用开发栈密码） |
+| 仍找不到旧 `.env` | **中止**并说明后果（不给 ⇒ 安装器随机生成库密码 ⇒ 连不上旧数据卷），而不是带着新密码往下装 |
+| 找到的 `.env` 不在旧 compose 目录同层 | 继续但 ⚠️ 提示核对库密码 |
+| 其它未识别参数 | 连同取值原样转给 `install.sh`（不吞参数、不假装是版本号） |
+| 升级完成 | 打印地址 / 登录状态码 / 容器与镜像 / 迁移台账查询命令 |
+
+脚本**不另造安装流程**：包根有 `install.sh` + `manifest.json` 即判为交付包场景，内部就是
+`bash install.sh --offline --timeout 900 --project … --env-from …`（九步状态机、幂等续跑都在安装器里）。
+
+### 5.2 顺手修掉的三个真缺陷（仓库原 `upgrade.sh`）
+
+| # | 原状 | 后果 | 现状 |
+|---|---|---|---|
+| 1 | 硬门槛 `releases/<VER>/sql` 不存在即「拒绝执行」 | **v2.1.1 这类 PATCH 版（无 SQL）根本升不了** | 有 SQL 才迁移，无则跳过并说明 |
+| 2 | `TAG="${IMAGE_TAG:-v1.2.0}"` 赋值后**从未使用**（死变量） | 切版本不生效，容器仍跑旧镜像 | tag 真正写入 `docker/.env` 的 `IMAGE_TAG` 或本次注入 |
+| 3 | 只存在于 `docker/scripts/`，**不入交付包根** | 客户机没有 `bash upgrade.sh` 这个入口 | `package.sh` 与 `install.sh` 同级入包根，并由出货门禁断言 |
+
+### 5.3 实测证据（全部真跑）
+
+```
+bash docker/scripts/tests/t09_upgrade_selftest.sh  → 通过 22 / 失败 0 / 跳过 0
+bash docker/scripts/tests/t07_gate_selftest.sh     → 通过 12 / 失败 0（门禁由四项升为五项，含 upgrade-entry）
+```
+
+t09 关键断言：场景判别、命令组装与 `install.sh` 参数契约一致、dry-run 零副作用（不写状态/不生成 `.env`）、
+多栈并存拒绝猜测（本机实测 5 套栈）、缺旧 `.env` 不放行、`--env-from` 文件不存在早退、
+未知参数透传、PATCH 版跳过迁移、tag 真正落到命令里、打包与门禁接线。
+
+t07 在**真实 2.1.1 交付包**上跑通五项门禁：`sha256sums` / `jar-readable` / `prereq-match` /
+**`upgrade-entry`** / `fresh-db-install`；并验反例「包根缺 `upgrade.sh` ⇒ 门禁 FAIL 拦下」。
+
+真实探测也验过：`--project phx210` 从容器 label 正确反查到
+`…/Phoenix-Agent-Java/docker/.env`；`--project phxupg`（其 compose 目录已被系统清掉）
+**拒绝执行**而非随机生成密码。
+
+### 5.4 现有包与重打包
+
+手头的 `docker/dist/phoenix-2.1.1-arm64.tar.gz` 打于 2026-10-26，**包根没有 `upgrade.sh`**；
+拿旧包仍按 §2 用 `install.sh` 两条参数。下次打包（`package.sh`）起自动入包并被门禁把关。
+
+## 6. 结论与注意事项
+
+1. **升级流程完整**：安装器一条命令完成「校验→载镜像→承接 env→重建容器→迁移→健康等待→verify→收据」；
+   现在对外只暴露 `bash upgrade.sh` 一个动作。
 2. **迁移幂等**：`tbl_phoenix_release` 台账保证重复执行跳过；四件 SQL 均可重跑。
 3. **数据不丢**：升级不动业务数据（本次演练用户/菜单/模型配置均保留）。
 4. **回滚可逆**：换镜像即可回旧版；结构回退只在必要时用 rollback + 备份。

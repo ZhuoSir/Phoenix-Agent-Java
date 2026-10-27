@@ -36,7 +36,10 @@ sh scripts/verify.sh          # 7 项断言全 PASS 即部署成功
 - 恢复：见 backup.sh 输出尾行 `pg_restore` 命令；卷需先 `docker volume create` 同名卷
 
 ## 6. 升级 / 回滚
-- 升级：拿到新 `releases/vX.Y.Z/`（SQL 权威）与新镜像 → 放好目录 → `sh scripts/upgrade.sh vX.Y.Z`（哨兵台账只补增量件，幂等）
+- 升级（开发栈）：`bash docker/scripts/upgrade.sh vX.Y.Z` —— 有 `releases/vX.Y.Z/sql` 才跑 migrator（台账幂等），
+  并把 `IMAGE_TAG` 切到该版本后重建 backend/nginx；PATCH 版无 SQL 时会自动跳过迁移
+- 升级（客户机/交付包）：解包后在**包根** `bash upgrade.sh`（自动探测旧项目名与旧 `.env`，内部转调 `install.sh --offline`；
+  多套栈并存或缺旧 `.env` 时**拒绝猜测并中止**，详见 `docs/UPGRADE-2.0.0-to-2.1.1.md` §5）
 - 回滚：**先回退 backend 镜像版本，再按 `releases/vX.Y.Z/UPGRADE.md`「回滚步骤」逆序执行**（回滚件在 `releases/vX.Y.Z/sql/rollback/`）；结构回滚不还原数据，兜底走 §5 的 dump
 
 ## 7. 故障排查
