@@ -76,7 +76,7 @@ function isImageUrl(val: string) {
   <div class="agent-panel" :class="{ 'is-collapsed': collapsed }">
     <header class="agent-panel__header">
       <div class="agent-panel__title">
-        <img class="agent-panel__logo" src="/public/imgs/logo.png" alt="logo" />
+        <img class="agent-panel__logo" src="/imgs/logo.png" alt="logo" />
         <span v-if="!collapsed">智能体</span>
       </div>
       <div v-if="!collapsed" class="agent-panel__desc">

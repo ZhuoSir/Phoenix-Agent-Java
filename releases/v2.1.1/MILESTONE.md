@@ -61,7 +61,7 @@
 | 文档 | `docs/UPGRADE-2.0.0-to-2.1.1.md` §5、`releases/v2.1.1/UPGRADE.md` 最简操作、包内 `docker/payload-docs/INSTALL.md` 升级节、`docker/scripts/README.md` |
 | 教训 | **L-114**（仓库里有脚本 ≠ 客户机能用：必须「入包清单 + 门禁断言 + 真包载荷实测」三件齐全） |
 | **交付状态** | 手头的 `phoenix-2.1.1-arm64.tar.gz`（2026-10-26 打）**包根内没有 upgrade.sh**——须重打包才随包交付；tag `v2.1.1` 未动、未 push |
-| 重打包（2026-10-31） | **`docker/dist/phoenix-2.1.2-amd64.tar.gz` 已打出**（1.8G，`sha256=078c51f83e393aca4ebec3dbad72951c4602e5528b41e9620f0ee26b357e3122`，`shasum -c` → OK）；应用代码与 v2.1.1 一致（`git diff v2.1.1..HEAD` 对 `*.java/*.ts/*.vue/*.sql/*.yml` 为空），差异仅交付脚本与文档，故取 PATCH 号 2.1.2 |
+| 重打包（2026-10-31） | 09:25 首打 `sha256=078c51f8…e3122`——**已作废**（不含同日 BUG-214 图标修复）；13:07 重打为 **`sha256=ebecb5f69ce0937a09af515318f063abb38bc4fe834cfbff9fc6036abc58bcc6`**（当前交付物，门禁五项 PASS，见 `releases/v2.1.2/MILESTONE.md` §五）；应用代码与 v2.1.1 一致（`git diff v2.1.1..HEAD` 对 `*.java/*.ts/*.vue/*.sql/*.yml` 为空），差异仅交付脚本与文档，故取 PATCH 号 2.1.2 |
 | 该包门禁 | **五项全 PASS**（`sha256sums`/`jar-readable`/`prereq-match`/**`upgrade-entry`**/`fresh-db-install`），耗时 251s；证据 `docker/dist/gate-2.1.2-amd64-20261031-092543/`；门禁栈零残留 |
 | 2.1.2 台账 | **未建版支/未建 releases/v2.1.2/、未打 tag、未 push**（等口令）|
 | 镜像源现状（重要） | 10-26 记的 `docker.1panel.live` **现已超时不可达**；本次可用的是 `https://docker.1ms.run`（`docker.m.daocloud.io` 仍拉 `postgres:16-alpine` 卡死史）。以后打包先探活再带 `--mirror` |
