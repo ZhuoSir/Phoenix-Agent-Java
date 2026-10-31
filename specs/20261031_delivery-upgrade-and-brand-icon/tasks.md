@@ -1,4 +1,4 @@
-> 版本: v0.1.0 | 状态: 草稿 | 更新: 2026-10-31
+> 版本: v1.0.0 | 状态: 已确认 | 更新: 2026-10-31 | 确认人: 陈卓 | 确认日期: 2026-10-31
 
 # 任务拆解：一键升级入口 + 品牌图标可访问
 
@@ -85,12 +85,12 @@
   验证方式: 升级手册 `docs/UPGRADE-2.0.0-to-2.1.1.md` §最简操作/§5、`releases/v2.1.1/UPGRADE.md`、包内 `docker/payload-docs/INSTALL.md`（升级节）、`docker/README.md` §6、`docker/scripts/README.md` 脚本地图；台账 `BUG-213`/`BUG-214`/`L-114`/`L-115`/`releases/v2.1.1/MILESTONE.md` §七
   验收标准: `mdtable_check.py` 对全部改动 md 全绿；手册里每条命令都在目标形态（包内/仓库）实测过，未实测处显式写明
 
-- [ ] T-15 spec 三重确认 + v2.1.2 收口动作（**等用户口令**）
+- [x] T-15 spec 三重确认 + v2.1.2 收口动作（2026-10-31 用户口令「2.1.2 走发版流程，然后合并Main」；三文档 v1.0.0 已确认，确认人 陈卓）
   关联: 全部 　依赖: T-14
   验证方式: requirements/plan/tasks 三份版本头翻「已确认」并记确认人；随后按口令执行 `releases/v2.1.2/RELEASE-NOTES.md` + `UPGRADE.md` 汇总（M3）、打 tag `v2.1.2`、合 main、push（M4）
   验收标准: 账先 tag 后（四步核验通过才打 tag）；未收口前 v2.1.2 保持「在途」，不对外宣称已发布
 
-- [ ] T-16 真实 amd64 机器上端到端复验一次升级（含图标上传显示）
+- [ ] T-16 真实 amd64 机器上端到端复验一次升级（含图标上传显示）（延期→v2.1.3，原因: 本轮仍无真实 x86 机器；构建机 arm64、门禁 allow-arch-mismatch 放行）
   关联: R-01 R-06 　依赖: T-15
   验证方式: 目标机 `bash upgrade.sh` 走到收据；外观设置上传 Logo → 页面即时显示、刷新后登录页显示；`select seq from tbl_phoenix_release` 台账 4 行
   验收标准: 收据 + 图标显示 + 台账三项齐备即记「已验证」；本轮构建机为 arm64（门禁以 allow-arch-mismatch 放行），故本项不完成不得对外称"amd 已实测"（L-12）
