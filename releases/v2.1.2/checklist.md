@@ -1,6 +1,6 @@
 # v2.1.2 发布检查单（M2 冻结 / M3 汇总 / M4 发布）
 
-> 生成 2026-10-31 ｜ 状态：**M3 汇总完成，M4 发布进行中**
+> 生成 2026-10-31 ｜ 状态：**M4 发布完成（已发布）**——§四 的 5 项由发版会话做完但漏勾，2026-10-31 19:55 按判据复跑补勾，留痕见 §六
 > 勾选规则：**勾 = 从事实推导（附判据）；手工勾而无判据 = 无效勾**。演练项为唯一不可推导项，强制留证。
 
 ---
@@ -55,11 +55,20 @@
 
 ## 四、M4 发布
 
-- [ ] 发版落账批处理（tag 前一次写全）：`bugs.md` 本版 3 条「已修复」→「已发布(v2.1.2)+日期」；MILESTONE 纳入 spec 翻终态「已发布(v2.1.2)」+ 状态头「已发布」+ 汇总进度全勾；`version.md` 翻「已发布」；根 `CHANGELOG.md` 增补 v2.1.2 节
-- [ ] 四步核验：a) 逐条 grep 回验 + 改动 md 表格闸退出码 0；b) 重跑里程碑审计全绿；c) `git status --porcelain` 干净且落账已提交；d) 三条齐绿
-- [ ] 打 tag **`v2.1.2`**（注解 tag，打在版本分支落账 tip）
-- [ ] 合并 `2.1.2` → `main`（`--no-ff`）→ 验证 `git diff v2.1.2 main -- releases/v2.1.2/ specs/_project/version.md` **为空**
-- [ ] push（**需口令**）→ 远端复核 `git ls-remote` 与远端 MILESTONE 终态
+- [x] 发版落账批处理（tag 前一次写全）：`bugs.md` 本版 3 条「已修复」→「已发布(v2.1.2)+日期」；MILESTONE 纳入 spec 翻终态「已发布(v2.1.2)」+ 状态头「已发布」+ 汇总进度全勾；`version.md` 翻「已发布」；根 `CHANGELOG.md` 增补 v2.1.2 节
+  > **判据（2026-10-31 19:55 回读）** `grep -c '^## \[v2.1.2\]' CHANGELOG.md` = **1**；`bugs.md` 内 `已发布(v2.1.2)` = **3 次**（BUG-213/214/215）；`MILESTONE.md` 第 3 行含「已发布」；`version.md` 第 26 行 = **已发布(2026-10-31)**。落账提交 = `43fabb7f`
+- [x] 四步核验：a) 逐条 grep 回验 + 改动 md 表格闸退出码 0；b) 重跑里程碑审计全绿；c) `git status --porcelain` 干净且落账已提交；d) 三条齐绿
+  > **判据（补勾时复跑，非引用旧结论）** a) 上述四条 grep 全中 + `mdtable_check.py` 对 8 个发布相关 md **退出码 0**；
+  > b) 审计复跑：`grep "挂载:.*v2.1.2"` 命中本 spec 且 MILESTONE 纳入表有该行（**1:1**）、`git branch --no-merged main` **无输出**（无悬挂特性分支）；
+  > c) 工作树 **0 项**变更（仅你未跟踪的 `img/icons/web/存档.zip` 不计）；d) 三项齐绿 ✅
+- [x] 打 tag **`v2.1.2`**（注解 tag，打在版本分支落账 tip）
+  > **判据** `git for-each-ref refs/tags/v2.1.2` → `tag feae25a3 -> 43fabb7f`（**注解 tag**，落在 `2.1.2` 分支落账 tip）；注解首行「v2.1.2 (PATCH) — 交付链一键升级 upgrade.sh + 品牌图标链路修复」
+- [x] 合并 `2.1.2` → `main`（`--no-ff`）→ 验证 `git diff v2.1.2 main -- releases/v2.1.2/ specs/_project/version.md` **为空**
+  > **判据** merge commit = `ac3fe90e`；`git merge-base --is-ancestor v2.1.2 main` → **真**；
+  > **当时**一致性用 `git diff v2.1.2 ac3fe90e -- releases/v2.1.2/ specs/_project/version.md CHANGELOG.md` 复算 = **空** ✅
+  > （今天再跑同一命令对 `main` 会显示 15 行差异 = 我在 tag 之后追加的 §八 发版后台账，属**已留痕的追加**，不是当时不等）
+- [x] push（**需口令**）→ 远端复核 `git ls-remote` 与远端 MILESTONE 终态
+  > **判据** 用户口令「2. Push」；`git ls-remote origin` 实测 `refs/heads/main=f967a7f7`、`refs/heads/2.1.2=43fabb7f`、`refs/tags/v2.1.2=feae25a3`（首次重试失败于 GitHub 连接超时，第 2 次成功）；本地 `git log origin/main..main` = **0**（无未推送）
 
 ## 五、遗留与后续
 
@@ -68,3 +77,15 @@
 | 1 | 真实 amd64 机器端到端复验（T-16） | 延期 → v2.1.3 |
 | 2 | Windows 侧 `upgrade.ps1` 一键升级 | 未立项（BL 待记） |
 | 3 | 浏览器侧图标目视确认 | 用户强刷回执 |
+
+
+---
+
+## 六、发版后补勾留痕（2026-10-31 19:55，**未回改 tag `v2.1.2`**）
+
+| 项 | 事实 |
+|---|---|
+| 为什么要补 | MILESTONE §七「四步核验」行写着「见 checklist §四」，而 §四 的 5 个勾一直没打、文件头停在「M4 发布进行中」⇒ **指针悬空**（tag/合 main/push/落账动作本身都做完了，账上却没证据） |
+| 怎么补的 | 不引用旧结论：**逐条复跑判据**（见 §四 各行下的「判据」），复跑全绿才勾；tag 当时的那条一致性判定改用 `git diff v2.1.2 ac3fe90e` 复算，避免被 tag 后的追加行污染结论 |
+| 顺带纠正的口径差 | 本单 §一 写「14/16 勾选；T-15 本轮收口已勾」——冻结时点确实是 14/16，M4 收口 T-15 后实测 **15/16**（`grep -c '^- \[x\]' tasks.md`=15、未勾=1 即 T-16 延期）。以 MILESTONE §七「进度重算 15/16」为准；MILESTONE 纳入表里的终态进度同步改为 15/16，**冻结依据行的 14/16 保持不动**（那是 M2 当时快照） |
+| 未动项 | 未回改 tag；未回改 §一/§二/§三 的历史判定；T-16（真实 amd64 机复验）仍延期 → v2.1.3；`img/icons/web/存档.zip` 仍未跟踪（你的素材，我没碰） |
