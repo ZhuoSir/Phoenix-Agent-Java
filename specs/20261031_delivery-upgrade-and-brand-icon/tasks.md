@@ -90,7 +90,7 @@
   验证方式: requirements/plan/tasks 三份版本头翻「已确认」并记确认人；随后按口令执行 `releases/v2.1.2/RELEASE-NOTES.md` + `UPGRADE.md` 汇总（M3）、打 tag `v2.1.2`、合 main、push（M4）
   验收标准: 账先 tag 后（四步核验通过才打 tag）；未收口前 v2.1.2 保持「在途」，不对外宣称已发布
 
-- [ ] T-16 真实 amd64 机器上端到端复验一次升级（含图标上传显示）（延期→v2.1.3，原因: 本轮仍无真实 x86 机器；构建机 arm64、门禁 allow-arch-mismatch 放行）
+- [ ] T-16 真实 amd64 机器上端到端复验一次升级（含图标上传显示）**[作废｜用户 2026-10-31 口令「T-16 不用管了」，不追真机复验]**（延期→v2.1.3，原因: 本轮仍无真实 x86 机器；构建机 arm64、门禁 allow-arch-mismatch 放行）
   关联: R-01 R-06 　依赖: T-15
   验证方式: 目标机 `bash upgrade.sh` 走到收据；外观设置上传 Logo → 页面即时显示、刷新后登录页显示；`select seq from tbl_phoenix_release` 台账 4 行
   验收标准: 收据 + 图标显示 + 台账三项齐备即记「已验证」；本轮构建机为 arm64（门禁以 allow-arch-mismatch 放行），故本项不完成不得对外称"amd 已实测"（L-12）

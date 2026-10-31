@@ -70,7 +70,7 @@ IMAGE_TAG=2.1.1 docker compose -p <项目名> up -d --no-deps backend nginx
 ## 六、已知限制
 
 1. **未在真实 amd64 机器端到端复验**：本轮构建机为 arm64，出货门禁的 `fresh-db-install` 以 `PHX_ALLOW_ARCH_MISMATCH=1` 放行（模拟执行）。
-   出货前建议按本文件在真实 x86 机器跑一遍（对应 spec 任务 T-16，已标延期 → v2.1.3）。
+   仍**建议**出货前按本文件在真实 x86 机器跑一遍；对应 spec 任务 `T-16` 已由用户 2026-10-31 口令拍板**作废**（不再作为待办追），但不等于已验证——本条仍是已知限制，不是完成项。
 2. **Windows 侧无一键升级**：`install.ps1` 只覆盖安装；升级需进 WSL 执行 `bash upgrade.sh`。
 3. 若现场把 `phoenix.data.file.url-prefix` 改成非 `/uploads`，需同步 nginx `location /uploads`（本版未加自动断言）。
 4. 浏览器侧图标缓存：换图后建议 `Cmd/Ctrl+Shift+R` 强刷；品牌图 URL 为 uuid 命名，正常不会命中旧缓存。
