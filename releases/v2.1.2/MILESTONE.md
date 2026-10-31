@@ -80,4 +80,8 @@
 | 现行交付物复核 | `docker/dist/phoenix-2.1.2-amd64.tar.gz` 1.8G ｜ sha256 `1a84f672…05dded0` ｜ `shasum -a 256 -c` → **OK** ｜ manifest `git=v2.1.1-13-ga094e68c`、`arch=amd64`、`built_at=13:47` ｜ 包根含 `upgrade.sh`（1 条） |
 | 门禁复核 | 证据 `docker/dist/gate-2.1.2-amd64-20261031-134927/`：五项 **全 PASS**（`sha256sums`/`jar-readable`/`prereq-match`/`upgrade-entry`/`fresh-db-install`） |
 | 远端复验（受阻，如实） | 复核时刻 `github.com:443` **不可达**（`curl` → 000 超时；`git ls-remote` → Failed to connect），无法向远端取证。本地远端跟踪引用显示推送已在 13:54 成功：`origin/main=ac3fe90e`、`origin/2.1.2=43fabb7f`、tag `v2.1.2`→`43fabb7f`。**网络恢复后请复跑** `git -c http.version=HTTP/1.1 ls-remote origin refs/heads/main refs/heads/2.1.2 refs/tags/v2.1.2` 三条对齐即销 |
-| 仍未了结 | 真实 amd64 机器端到端复验（spec 任务 T-16）；arm64 包按用户「先不用了」不补 |
+| arm64 包补打（2026-10-31 19:49，用户改口「3.补充」） | **`docker/dist/phoenix-2.1.2-arm64.tar.gz`** 1.7G ｜ sha256 `167a2c5c4ee1df9f485bc12bcee349577ab182303cdd640532031f68bae38220` ｜ `shasum -c` → **OK** ｜ manifest `arch=arm64`、`git=v2.1.2-2-g154cfd39`（**与 tag 代码一致**：`git diff v2.1.2..HEAD` 对 `*.java/*.ts/*.vue/*.sql/*.yml/docker/**` 为空，只多两条文档提交） ｜ 包根含 `upgrade.sh`+`install.sh` |
+| arm64 包门禁 | 五项**全 PASS**，耗时 **57s**，证据 `docker/dist/gate-2.1.2-arm64-20261031-194803/`；**本次未用 `--allow-arch-mismatch`**（构建机即 arm64，`prereq-match` 与 `fresh-db-install` 是真实执行，不是模拟） |
+| 出货目录现状 | `docker/dist/` 内 v2.1.2 两份、按机器二选一：x86_64 → `…-amd64.tar.gz`（`1a84f672…`）；ARM（鲲鹏/飞腾/Apple Silicon 虚机）→ `…-arm64.tar.gz`（`167a2c5c…`）。作废包仍在 `docker/dist/_superseded/` |
+| ⚠️ 同名镜像标签被覆盖 | 为出 arm64 包，本地 `phoenix-backend:2.1.2` / `phoenix-frontend:2.1.2` 已被重打为 **arm64**。两份包各自内嵌本架构镜像、互不影响；但**若还要再出 amd64 包，需重新组装 amd64 镜像**（`--arch amd64` 重跑即可，约 20 分钟） |
+| 仍未了结 | 真实 amd64 机器端到端复验（spec 任务 T-16）；本地台账提交 `154cfd39` 及本次追加提交受 GitHub 连通性影响待推 |
