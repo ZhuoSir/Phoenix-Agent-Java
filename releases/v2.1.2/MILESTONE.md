@@ -84,4 +84,5 @@
 | arm64 包门禁 | 五项**全 PASS**，耗时 **57s**，证据 `docker/dist/gate-2.1.2-arm64-20261031-194803/`；**本次未用 `--allow-arch-mismatch`**（构建机即 arm64，`prereq-match` 与 `fresh-db-install` 是真实执行，不是模拟） |
 | 出货目录现状 | `docker/dist/` 内 v2.1.2 两份、按机器二选一：x86_64 → `…-amd64.tar.gz`（`1a84f672…`）；ARM（鲲鹏/飞腾/Apple Silicon 虚机）→ `…-arm64.tar.gz`（`167a2c5c…`）。作废包仍在 `docker/dist/_superseded/` |
 | ⚠️ 同名镜像标签被覆盖 | 为出 arm64 包，本地 `phoenix-backend:2.1.2` / `phoenix-frontend:2.1.2` 已被重打为 **arm64**。两份包各自内嵌本架构镜像、互不影响；但**若还要再出 amd64 包，需重新组装 amd64 镜像**（`--arch amd64` 重跑即可，约 20 分钟） |
-| 仍未了结 | 真实 amd64 机器端到端复验（spec 任务 T-16）；本地台账提交 `154cfd39` 及本次追加提交受 GitHub 连通性影响待推 |
+| 远端复验（**已销账** 2026-10-31 19:5x） | 网络恢复后 `git ls-remote origin` 实测：`refs/heads/main=be1649e5`（=本地 main ✓）、`refs/heads/2.1.2=43fabb7f`（=本地 ✓）、`refs/tags/v2.1.2=feae25a3`→ peel `43fabb7f`（=本地 tag ✓）。两条发版后台账提交 `154cfd39`/`be1649e5` 已随 `push origin main` 上远端 |
+| 仍未了结 | 真实 amd64 机器端到端复验（spec 任务 T-16）—— arm64 侧的门禁是原生真实执行（57s 全 PASS），amd64 侧仅模拟执行，故该复验只针对 amd64 出货机 |
