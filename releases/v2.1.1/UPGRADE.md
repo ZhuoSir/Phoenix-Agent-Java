@@ -23,7 +23,9 @@ bash upgrade.sh                       # ← 一条命令：自动探测旧安装
 
 > ⚠️ **`upgrade.sh` 是 2026-10-27 补的一键入口**：2026-10-26 打出的那份
 > `phoenix-2.1.1-arm64.tar.gz` **包根里没有它**（`package.sh` 当时只拷 install.sh/install.ps1）。
-> 拿旧包时改用手填两条参数的 `install.sh`（见下）；重新打包后的包直接 `bash upgrade.sh` 即可。
+> 拿那份旧包时改用手填两条参数的 `install.sh`（见下）。
+> **2026-10-31 已重打包**：`phoenix-2.1.2-amd64.tar.gz`（1.8G，`sha256=078c51f8…e3122`，
+> 门禁五项全 PASS）包根内含 `upgrade.sh` 与包内 `docs/INSTALL.md` 的升级节 —— 用这份包就一条命令。
 > 详见 `docs/UPGRADE-2.0.0-to-2.1.1.md` §5（含实测证据：t09 21/21、t07 五项门禁 12/12）。
 
 ### 手填两个参数（老包可用）

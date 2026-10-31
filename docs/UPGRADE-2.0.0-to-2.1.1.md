@@ -239,8 +239,14 @@ t07 在**真实 2.1.1 交付包**上跑通五项门禁：`sha256sums` / `jar-rea
 
 ### 5.4 现有包与重打包
 
-手头的 `docker/dist/phoenix-2.1.1-arm64.tar.gz` 打于 2026-10-26，**包根没有 `upgrade.sh`**；
-拿旧包仍按 §2 用 `install.sh` 两条参数。下次打包（`package.sh`）起自动入包并被门禁把关。
+`docker/dist/phoenix-2.1.1-arm64.tar.gz`（打于 2026-10-26）**包根没有 `upgrade.sh`**——
+拿这份旧包仍按 §2 手填 `install.sh` 两条参数。
+
+**已重打包**：2026-10-31 打出 `docker/dist/phoenix-2.1.2-amd64.tar.gz`（1.8G，
+`sha256=078c51f8…e3122`，门禁五项全 PASS 含 `upgrade-entry`，证据
+`docker/dist/gate-2.1.2-amd64-20261031-092543/`）。这份包**解包即可 `bash upgrade.sh`**。
+包内应用代码与 v2.1.1 完全一致（`git diff v2.1.1..HEAD` 对 `*.java/*.ts/*.vue/*.sql/*.yml` 为空），
+差异只有交付脚本与文档，故取 PATCH 号 2.1.2；`v2.1.2` 尚未建版本分支/未打 tag。
 
 ## 6. 结论与注意事项
 
