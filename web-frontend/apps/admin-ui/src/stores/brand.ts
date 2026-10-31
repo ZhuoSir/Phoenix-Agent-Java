@@ -69,9 +69,14 @@ export function applyBrand(cfg: BrandConfig) {
   applyPrimaryColor(cfg.primaryColor);
   applyIconAndTitle(cfg);
   // 让 Vben 的动态标题（路由切换时生成）也使用品牌名：否则每次路由切换会把我们的 title 覆盖回 VITE_APP_TITLE
+  // 同时把侧边栏/登录页 logo 指向品牌配置里的 logoUrl：后台「品牌设置」换图后，顶部系统名左侧图标随之生效
   import('@vben/preferences')
     .then(({ updatePreferences }) => {
-      updatePreferences({ app: { name: cfg.systemName } });
+      const logoUrl = cfg.logoUrl || BRAND_DEFAULTS.logoUrl;
+      updatePreferences({
+        app: { name: cfg.systemName },
+        logo: { enable: true, source: logoUrl, sourceDark: logoUrl },
+      });
     })
     .catch(() => {});
 }

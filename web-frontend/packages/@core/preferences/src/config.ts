@@ -58,7 +58,7 @@ const defaultPreferences: Preferences = {
   logo: {
     enable: true,
     fit: 'contain',
-    source: '/public/imgs/logo.png',
+    source: '/imgs/logo.png',
   },
   navigation: {
     accordion: true,

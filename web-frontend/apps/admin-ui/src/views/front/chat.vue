@@ -180,7 +180,7 @@ init();
 
 <template>
   <div v-if="noAgents" class="chat-layout__no-agents">
-    <img class="chat-layout__no-agents-logo" src="/public/imgs/logo.png" alt="logo" />
+    <img class="chat-layout__no-agents-logo" src="/imgs/logo.png" alt="logo" />
     <span class="chat-layout__no-agents-text">暂无可用的智能体，请联系管理员！</span>
     <ElButton type="primary" plain @click="useAuthStore().logout(true)">
       退出登录
