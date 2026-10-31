@@ -71,3 +71,13 @@
 | CR 对账 | 本 spec 无 `changes/` 目录 | 0 未收口 |
 | 升级件对账 | 无 `sql/`、无配置变更；`config/changes.md` 记「无变更」 | 与 artifacts 事实一致 |
 | 四步核验 | ①逐条 grep 回验+表检 ②审计复跑 ③工作树干净 ④三条齐绿 | 见 checklist §四 |
+
+## 八、发版后追加（2026-10-31，未回改 tag `v2.1.2`）
+
+| 项 | 内容 |
+|---|---|
+| 作废包物理隔离 | 用户口令「作废包移走」→ `phoenix-2.1.2-amd64.superseded-ebecb5f6.tar.gz` 已从**出货目录** `docker/dist/` 移入 `docker/dist/_superseded/`，同目录落 `README.txt`（记 sha、作废原因、现行交付物路径）。此后 `docker/dist/` 内的 2.1.2 包**只剩一个**，不会误发 |
+| 现行交付物复核 | `docker/dist/phoenix-2.1.2-amd64.tar.gz` 1.8G ｜ sha256 `1a84f672…05dded0` ｜ `shasum -a 256 -c` → **OK** ｜ manifest `git=v2.1.1-13-ga094e68c`、`arch=amd64`、`built_at=13:47` ｜ 包根含 `upgrade.sh`（1 条） |
+| 门禁复核 | 证据 `docker/dist/gate-2.1.2-amd64-20261031-134927/`：五项 **全 PASS**（`sha256sums`/`jar-readable`/`prereq-match`/`upgrade-entry`/`fresh-db-install`） |
+| 远端复验（受阻，如实） | 复核时刻 `github.com:443` **不可达**（`curl` → 000 超时；`git ls-remote` → Failed to connect），无法向远端取证。本地远端跟踪引用显示推送已在 13:54 成功：`origin/main=ac3fe90e`、`origin/2.1.2=43fabb7f`、tag `v2.1.2`→`43fabb7f`。**网络恢复后请复跑** `git -c http.version=HTTP/1.1 ls-remote origin refs/heads/main refs/heads/2.1.2 refs/tags/v2.1.2` 三条对齐即销 |
+| 仍未了结 | 真实 amd64 机器端到端复验（spec 任务 T-16）；arm64 包按用户「先不用了」不补 |
