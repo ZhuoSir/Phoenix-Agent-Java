@@ -46,8 +46,15 @@ public class BrandAssetServiceImpl implements BrandAssetService {
 						"文件过大（" + size + " 字节），上限 " + assetMaxBytes + " 字节（2MB）"));
 			}
 			FileStorageService storage = fileStorageServiceFactory.getObject();
-			return storage.storeFile(file, "brand").doOnNext(url -> log.info(
-					"[brand] 上传 by={}, ext={}, bytes={}, url={}", operator, ext, size, url));
+			// storeFile() 返回的是**磁盘相对路径**（data-agent/brand/xxx.png），不是可访问 URL。
+			// 直接回给前端 ⇒ 浏览器按站内相对地址请求 /data-agent/... ⇒ 命中 nginx 的 SPA 兜底拿回 index.html
+			// ⇒ 图标显示不出来（BUG-214，2026-10-31 用户现场）。与头像上传同构：再过一道 getFileUrl()
+			// 换成 /uploads/** 下的访问地址（本地盘由静态资源处理器出图，OSS 模式返回其域名地址）。
+			return storage.storeFile(file, "brand").map(path -> {
+				String url = storage.getFileUrl(path);
+				log.info("[brand] 上传 by={}, ext={}, bytes={}, path={}, url={}", operator, ext, size, path, url);
+				return url;
+			});
 		});
 	}
 }

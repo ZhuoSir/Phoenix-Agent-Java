@@ -50,7 +50,8 @@ public class BrandConfigServiceImpl implements BrandConfigService {
 			BrandConfig row = QueryChain.of(brandConfigMapper).where(BrandConfig::getId).eq(1).one();
 			BrandConfigVO vo = row == null ? defaults()
 					: new BrandConfigVO(blankTo(row.getSystemName(), DEFAULT_NAME),
-							blankTo(row.getLogoUrl(), DEFAULT_LOGO), blankTo(row.getFaviconUrl(), DEFAULT_FAVICON),
+							toAccessUrl(blankTo(row.getLogoUrl(), DEFAULT_LOGO)),
+							toAccessUrl(blankTo(row.getFaviconUrl(), DEFAULT_FAVICON)),
 							blankTo(row.getPrimaryColor(), DEFAULT_COLOR));
 			cached = vo;
 			cachedAt = now;
@@ -109,12 +110,30 @@ public class BrandConfigServiceImpl implements BrandConfigService {
 		if (raw == null || raw.isBlank()) {
 			return null;
 		}
-		String v = raw.trim();
+		String v = toAccessUrl(raw);
 		if (v.length() > 512) {
 			throw new IllegalArgumentException(label + " 地址过长（需 ≤512 字符）");
 		}
 		if (!v.startsWith("/") && !v.startsWith("http://") && !v.startsWith("https://")) {
 			throw new IllegalArgumentException(label + " 需为 / 开头的相对路径或 http(s) 地址");
+		}
+		return v;
+	}
+
+	/**
+	 * 兜底纠正「存储相对路径」形态（BUG-214）：旧版上传接口曾把 {@code data-agent/brand/xxx.png}
+	 * 直接当 URL 回给前端。这种值既显示不出来（浏览器按站内相对地址请求 ⇒ 被 SPA 兜底成 index.html），
+	 * 也过不了本类的校验。命中该形态时补上访问前缀 {@code /uploads/}；
+	 * 已是站内绝对路径或 http(s) 地址的原样返回。
+	 */
+	private static String toAccessUrl(String raw) {
+		String v = raw.trim();
+		if (v.startsWith("/") || v.startsWith("http://") || v.startsWith("https://")) {
+			return v;
+		}
+		if (v.matches("^[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)+\\.[A-Za-z0-9]{1,8}$")) {
+			log.info("[brand] 检测到存储相对路径，兜底补访问前缀 /uploads/: {}", v);
+			return "/uploads/" + v;
 		}
 		return v;
 	}
