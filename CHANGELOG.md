@@ -3,6 +3,27 @@
 本项目版本记录。语义化版本 + 里程碑制（细则：bryanchen-spec skill / releases/ 目录）。
 tag 之前无正式发版记录，历史 1.1.x 分支线（phoenix-1.1.1-release / 1.1.2-dev）未打过 tag，不追溯。
 
+## [v2.1.2] - 2026-10-31
+### 新增能力（交付链）
+- **一键升级入口 `upgrade.sh`**（`specs/20261031_delivery-upgrade-and-brand-icon` R-01~R-05）：解包后包根执行 `bash upgrade.sh` 一条命令完成升级，
+  自动探测旧安装的 compose 项目名与旧 `docker/.env`；多栈并存/缺 `.env` 时拒绝猜测并中止；`--dry-run` 零副作用；
+  随包交付并由出货门禁第五项 `upgrade-entry` 把关（缺脚本或 dry-run 有副作用 ⇒ 整包不可出货）。
+
+### 修复
+- **BUG-213**：仓库 `upgrade.sh` 对交付包升级不可用（SQL 硬门槛挡死 PATCH 版 / `TAG` 死变量 / 脚本不入包根）。
+- **BUG-214**：外观设置上传 Logo/favicon 显示不出来 —— 上传返回磁盘相对路径被当 URL，改为 `getFileUrl()`（`/uploads/…`），并对历史裸路径加 `toAccessUrl()` 兜底。
+- **BUG-215**：后台「品牌设置」换的 Logo 只改 favicon/标题/主题色，侧边栏徽标始终是内置旧图 —— 侧边栏改为跟随 `brand.logoUrl`；
+  Vben 默认路径 `/public/imgs/logo.png`（nginx 下 404 命中 SPA 兜底）改为 `/imgs/logo.png`；换上新的 GJB 徽标资源。
+
+### 交付包
+- `phoenix-2.1.2-amd64.tar.gz`（1.8G）｜ sha256 `1a84f672d0e7f2a99240add4f0bf597eb43654070699875d22dd4166805dded0`
+- `package.sh` 8/8 步通过；出货门禁 **五项 PASS**（260s，含 `fresh-db-install` 真装与 `upgrade-entry`）
+- 作废包：`phoenix-2.1.2-amd64.superseded-ebecb5f6.tar.gz`（不含 BUG-215，已改名留存）
+
+### 兼容性
+- **无 SQL、无配置变更**；后端 Java 代码与 v2.1.1 一致，前端仅 4 文件 + 2 个图标资源差异
+- 已知限制：真实 amd64 机器端到端复验未做（T-16 延期→v2.1.3）；Windows 侧暂无 `upgrade.ps1`
+
 ## [v2.1.1] - 2026-10-26
 ### 修复（打包链）
 - **BUG-212**：`apps/admin-ui/package.json` 残留 `"vxe-table": "catalog:"` 依赖行、锁文件未收录 ⇒
